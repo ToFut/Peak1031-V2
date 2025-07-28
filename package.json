@@ -1,0 +1,42 @@
+{
+  "name": "peak-1031-v1",
+  "version": "1.0.0",
+  "description": "Peak 1031 V1 Platform - Complete 1031 Exchange Management System",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm start",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "build": "cd backend && npm run build && cd ../frontend && npm run build",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:build": "docker-compose up -d --build",
+    "docker:logs": "docker-compose logs -f",
+    "db:migrate": "cd backend && npm run migrate",
+    "db:seed": "cd backend && npm run seed",
+    "setup": "npm run install:all && npm run docker:up && sleep 30 && npm run db:migrate && npm run db:seed"
+  },
+  "keywords": [
+    "1031",
+    "exchange",
+    "practice-panther",
+    "real-estate",
+    "tax-deferred",
+    "react",
+    "nodejs",
+    "postgresql"
+  ],
+  "author": "Peak 1031 Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+} 

@@ -1,0 +1,158 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: peak1031_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: peak1031_dev
+      POSTGRES_USER: peak1031_user
+      POSTGRES_PASSWORD: peak1031_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/seeds:/docker-entrypoint-initdb.d/seeds
+    ports:
+      - "5433:5432"
+    networks:
+      - peak1031_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U peak1031_user -d peak1031_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: peak1031_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass peak1031_redis_password
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6380:6379"
+    networks:
+      - peak1031_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Backend API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: peak1031_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      
+      # Database Configuration
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: peak1031_dev
+      DB_USER: peak1031_user
+      DB_PASSWORD: peak1031_password
+      
+      # Redis Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: peak1031_redis_password
+      
+      # JWT Configuration
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_EXPIRES_IN: 1h
+      JWT_REFRESH_EXPIRES_IN: 7d
+      
+      # PracticePanther API Configuration
+      PP_BASE_URL: https://api.practicepanther.com/v1
+      PP_API_KEY: your-practice-panther-api-key
+      PP_CLIENT_ID: your-practice-panther-client-id
+      
+      # Email Configuration (SendGrid)
+      SENDGRID_API_KEY: your-sendgrid-api-key
+      SENDGRID_FROM_EMAIL: noreply@peak1031.com
+      SENDGRID_FROM_NAME: Peak 1031 Exchange
+      
+      # SMS Configuration (Twilio)
+      TWILIO_ACCOUNT_SID: your-twilio-account-sid
+      TWILIO_AUTH_TOKEN: your-twilio-auth-token
+      TWILIO_PHONE_NUMBER: your-twilio-phone-number
+      
+      # File Storage Configuration
+      STORAGE_TYPE: local # local, aws_s3
+      UPLOAD_PATH: /app/uploads
+      MAX_FILE_SIZE: 52428800 # 50MB
+      
+      # AWS S3 Configuration (if using S3)
+      AWS_ACCESS_KEY_ID: your-aws-access-key
+      AWS_SECRET_ACCESS_KEY: your-aws-secret-key
+      AWS_REGION: us-west-2
+      AWS_S3_BUCKET: peak1031-documents
+      
+      # Security Configuration
+      BCRYPT_ROUNDS: 12
+      RATE_LIMIT_WINDOW_MS: 900000 # 15 minutes
+      RATE_LIMIT_MAX_REQUESTS: 100
+      
+      # Frontend URL
+      FRONTEND_URL: http://localhost:3000
+      
+      # Logging
+      LOG_LEVEL: debug
+    volumes:
+      - ./backend:/app
+      - backend_uploads:/app/uploads
+      - /app/node_modules # Prevent overwriting node_modules
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - peak1031_network
+
+  # Frontend React Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: peak1031_frontend
+    restart: unless-stopped
+    environment:
+      REACT_APP_API_URL: http://localhost:5000/api
+      REACT_APP_SOCKET_URL: http://localhost:5000
+      REACT_APP_ENVIRONMENT: development
+      CHOKIDAR_USEPOLLING: true
+      WATCHPACK_POLLING: true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Prevent overwriting node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - peak1031_network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_uploads:
+    driver: local
+
+networks:
+  peak1031_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
