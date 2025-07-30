@@ -61,72 +61,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { usePermissions } from '../hooks/usePermissions';
-import { 
-  exchangeService, 
-  documentService, 
-  taskService, 
-  messageService 
-} from '../services/api';
-
-interface Exchange {
-  id: string;
-  name: string;
-  status: 'PENDING' | '45D' | '180D' | 'COMPLETED';
-  client_id: string;
-  coordinator_id: string;
-  start_date: string;
-  completion_date: string;
-  created_at: string;
-  updated_at: string;
-  client?: {
-    first_name: string;
-    last_name: string;
-    email: string;
-  };
-  coordinator?: {
-    first_name: string;
-    last_name: string;
-    email: string;
-  };
-}
-
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
-  priority: 'LOW' | 'MEDIUM' | 'HIGH';
-  exchange_id: string;
-  assigned_to: string;
-  due_date: string;
-  completed_at: string;
-  created_at: string;
-  updated_at: string;
-  assigned_user?: {
-    first_name: string;
-    last_name: string;
-    email: string;
-  };
-}
-
-interface Document {
-  id: string;
-  filename: string;
-  original_filename: string;
-  file_size: number;
-  mime_type: string;
-  exchange_id: string;
-  uploaded_by: string;
-  category: string;
-  pin_required: boolean;
-  created_at: string;
-  updated_at: string;
-  uploader?: {
-    first_name: string;
-    last_name: string;
-    email: string;
-  };
-}
+import { apiService } from '../services/api';
+import { Exchange, Task, Document } from '../services/supabase';
 
 interface Message {
   id: string;
@@ -170,14 +106,14 @@ const ThirdPartyDashboard: React.FC = () => {
       setLoading(true);
       
       const [exchangesData, tasksData, documentsData] = await Promise.all([
-        exchangeService.getExchanges(),
-        taskService.getTasks(),
-        documentService.getDocuments()
+        apiService.getExchanges(),
+        apiService.getTasks(),
+        apiService.getDocuments()
       ]);
 
-      setExchanges(exchangesData);
-      setTasks(tasksData);
-      setDocuments(documentsData);
+      setExchanges(exchangesData as any);
+      setTasks(tasksData as any);
+      setDocuments(documentsData as any);
       
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
@@ -188,7 +124,7 @@ const ThirdPartyDashboard: React.FC = () => {
 
   const loadExchangeMessages = async (exchangeId: string) => {
     try {
-      const messagesData = await messageService.getMessages(exchangeId);
+              const messagesData = await apiService.getMessages(exchangeId);
       setMessages(messagesData);
     } catch (error) {
       console.error('Failed to load messages:', error);
@@ -206,7 +142,7 @@ const ThirdPartyDashboard: React.FC = () => {
         setSelectedDocument(document);
         setShowDocumentModal(true);
       } else {
-        await documentService.downloadDocument(document.id, document.original_filename);
+        await apiService.downloadDocument(document.id, document.original_filename);
       }
     } catch (error) {
       console.error('Failed to download document:', error);
@@ -217,14 +153,12 @@ const ThirdPartyDashboard: React.FC = () => {
     if (!selectedDocument || !pinCode) return;
 
     try {
-      await documentService.verifyPin(selectedDocument.id, pinCode);
-      await documentService.downloadDocument(selectedDocument.id, selectedDocument.original_filename);
+              await apiService.downloadDocument(selectedDocument.id, pinCode);
       setShowDocumentModal(false);
       setPinCode('');
       setSelectedDocument(null);
     } catch (error) {
-      console.error('Invalid PIN:', error);
-      // Show error message to user
+      console.error('Failed to download document:', error);
     }
   };
 
@@ -232,10 +166,7 @@ const ThirdPartyDashboard: React.FC = () => {
     if (!selectedExchange || !newMessage.trim()) return;
 
     try {
-      await messageService.sendMessage(selectedExchange.id, {
-        content: newMessage,
-        message_type: 'text'
-      });
+              await apiService.sendMessage(selectedExchange.id, newMessage);
       setNewMessage('');
       setShowMessageModal(false);
       await loadExchangeMessages(selectedExchange.id); // Refresh messages
@@ -272,10 +203,18 @@ const ThirdPartyDashboard: React.FC = () => {
     }
   };
 
+  const getExchangeStatusColor = (status: string) => {
+    switch (status) {
+      case 'Draft': return 'bg-yellow-100 text-yellow-800';
+      case 'In Progress': return 'bg-blue-100 text-blue-800';
+      case 'Completed': return 'bg-green-100 text-green-800';
+      case 'Cancelled': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   const filteredExchanges = exchanges.filter(exchange => {
-    const matchesSearch = exchange.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         exchange.client?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         exchange.client?.last_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (exchange.exchange_name || exchange.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || exchange.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -406,12 +345,12 @@ const ThirdPartyDashboard: React.FC = () => {
                     </div>
                     <div className="flex items-center">
                       <Calendar className="w-4 h-4 mr-2" />
-                      <span>Started: {new Date(exchange.start_date).toLocaleDateString()}</span>
+                      <span>Started: {exchange.start_date ? new Date(exchange.start_date).toLocaleDateString() : 'N/A'}</span>
                     </div>
                     {exchange.completion_date && (
                       <div className="flex items-center">
                         <CheckCircle className="w-4 h-4 mr-2" />
-                        <span>Due: {new Date(exchange.completion_date).toLocaleDateString()}</span>
+                        <span>Completed: {new Date(exchange.completion_date).toLocaleDateString()}</span>
                       </div>
                     )}
                   </div>
@@ -456,7 +395,7 @@ const ThirdPartyDashboard: React.FC = () => {
                       <p>Status: <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(selectedExchange.status)}`}>
                         {selectedExchange.status}
                       </span></p>
-                      <p>Start Date: {new Date(selectedExchange.start_date).toLocaleDateString()}</p>
+                      <p>Start Date: {selectedExchange.start_date ? new Date(selectedExchange.start_date).toLocaleDateString() : 'N/A'}</p>
                       {selectedExchange.completion_date && (
                         <p>Completion Date: {new Date(selectedExchange.completion_date).toLocaleDateString()}</p>
                       )}
@@ -492,9 +431,9 @@ const ThirdPartyDashboard: React.FC = () => {
                     <p className="text-sm text-gray-600 mb-2">{task.description}</p>
                     
                     <div className="flex justify-between items-center text-sm text-gray-500">
-                      <span>Due: {new Date(task.due_date).toLocaleDateString()}</span>
+                      <span>Due: {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A'}</span>  
                       <span>Exchange: {exchanges.find(e => e.id === task.exchange_id)?.name}</span>
-                      <span>Assigned: {task.assigned_user ? `${task.assigned_user.first_name} ${task.assigned_user.last_name}` : 'Unassigned'}</span>
+                      <span>Assigned: {task.assigned_to || 'Unassigned'}</span>
                     </div>
                   </div>
                 ))}

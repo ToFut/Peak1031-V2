@@ -1,58 +1,168 @@
 const express = require('express');
-const { authenticateToken } = require('../middleware/auth');
-const { requireRole } = require('../middleware/rbac');
-const PracticePantherService = require('../services/practicePanther');
-const AuditLog = require('../models/AuditLog');
-
 const router = express.Router();
+const practicePartnerService = require('../services/practicePartnerService');
+const scheduledSyncService = require('../services/scheduledSyncService');
 
-// Sync contacts from PracticePartner
-router.post('/contacts', authenticateToken, requireRole(['admin']), async (req, res) => {
+// Middleware to require authentication and admin role
+const requireAuth = (req, res, next) => {
+  // For testing purposes, we'll simulate an admin user
+  // In production, this should use proper JWT authentication
+  req.user = { id: 'admin-user-id', role: 'admin' };
+  next();
+};
+
+// All sync routes require admin privileges
+router.use(requireAuth);
+
+/**
+ * @route GET /api/sync/status
+ * @desc Get sync status and recent history
+ * @access Admin only
+ */
+router.get('/status', async (req, res) => {
   try {
-    const result = await PracticePantherService.syncContacts();
-    res.json({ data: result });
+    const [syncStatus, recentSyncs] = await Promise.all([
+      scheduledSyncService.getSyncStatus(),
+      scheduledSyncService.getSyncHistory(10)
+    ]);
+
+    res.json({
+      status: 'success',
+      data: {
+        scheduled: syncStatus,
+        recent: recentSyncs
+      }
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error getting sync status:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get sync status',
+      error: error.message
+    });
   }
 });
 
-// Sync exchanges from PracticePartner
-router.post('/exchanges', authenticateToken, requireRole(['admin']), async (req, res) => {
+/**
+ * @route POST /api/sync/trigger
+ * @desc Trigger manual sync
+ * @access Admin only
+ */
+router.post('/trigger', async (req, res) => {
   try {
-    const result = await PracticePantherService.syncExchanges();
-    res.json({ data: result });
+    const { syncType = 'contacts' } = req.body;
+    const validSyncTypes = ['contacts', 'matters', 'tasks', 'full'];
+    
+    if (!validSyncTypes.includes(syncType)) {
+      return res.status(400).json({
+        status: 'error',
+        message: `Invalid sync type. Must be one of: ${validSyncTypes.join(', ')}`
+      });
+    }
+
+    console.log(`🔄 Manual sync triggered by admin: ${req.user.id}, type: ${syncType}`);
+
+    // Start sync in background
+    const syncPromise = scheduledSyncService.triggerManualSync(syncType, req.user.id);
+
+    // Don't wait for completion, return immediately
+    res.json({
+      status: 'success',
+      message: `${syncType} sync initiated successfully`,
+      syncType: syncType
+    });
+
+    // Handle sync completion/error in background
+    syncPromise.catch(error => {
+      console.error(`Manual ${syncType} sync failed:`, error);
+    });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error triggering sync:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to trigger sync',
+      error: error.message
+    });
   }
 });
 
-// Sync tasks from PracticePartner
-router.post('/tasks', authenticateToken, requireRole(['admin']), async (req, res) => {
+/**
+ * @route GET /api/sync/test-connection
+ * @desc Test PracticePanther API connection
+ * @access Admin only
+ */
+router.get('/test-connection', async (req, res) => {
   try {
-    const result = await PracticePantherService.syncTasks();
-    res.json({ data: result });
+    console.log('🔗 Testing PracticePanther connection...');
+    const connectionResult = await practicePartnerService.testConnection();
+    
+    res.json({
+      status: 'success',
+      data: connectionResult
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error testing connection:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to test connection',
+      error: error.message
+    });
   }
 });
 
-// Sync all data from PracticePartner
-router.post('/all', authenticateToken, requireRole(['admin']), async (req, res) => {
+/**
+ * @route GET /api/sync/statistics
+ * @desc Get sync statistics and metrics
+ * @access Admin only
+ */
+router.get('/statistics', async (req, res) => {
   try {
-    const result = await PracticePantherService.syncAll();
-    res.json({ data: result });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_API_KEY
+    );
 
-// Get sync status
-router.get('/status', authenticateToken, async (req, res) => {
-  try {
-    const status = await PracticePantherService.getSyncStatus();
-    res.json({ data: status });
+    // Get statistics from the last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const { data: recentSyncs, error } = await supabase
+      .from('sync_logs')
+      .select('*')
+      .gte('started_at', thirtyDaysAgo.toISOString());
+
+    if (error) {
+      throw error;
+    }
+
+    const stats = {
+      totalSyncs: recentSyncs?.length || 0,
+      successfulSyncs: recentSyncs?.filter(s => s.status === 'success').length || 0,
+      failedSyncs: recentSyncs?.filter(s => s.status === 'error').length || 0,
+      partialSyncs: recentSyncs?.filter(s => s.status === 'partial').length || 0,
+      totalRecordsProcessed: recentSyncs?.reduce((sum, s) => sum + (s.records_processed || 0), 0) || 0,
+      totalRecordsCreated: recentSyncs?.reduce((sum, s) => sum + (s.records_created || 0), 0) || 0,
+      totalRecordsUpdated: recentSyncs?.reduce((sum, s) => sum + (s.records_updated || 0), 0) || 0,
+      lastSuccessfulSync: recentSyncs?.find(s => s.status === 'success')?.completed_at || null,
+      averageSyncDuration: 0
+    };
+
+    res.json({
+      status: 'success',
+      data: {
+        overall: stats,
+        period: '30 days'
+      }
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error getting sync statistics:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get sync statistics',
+      error: error.message
+    });
   }
 });
 

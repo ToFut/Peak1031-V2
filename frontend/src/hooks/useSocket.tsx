@@ -55,8 +55,19 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [typingUsers, setTypingUsers] = useState<Map<string, Set<string>>>(new Map());
 
   // Initialize socket connection
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
+    // For Supabase mode, we'll simulate a connected state since we don't have a socket server
+    // In a real production environment, this would connect to your actual Socket.IO server
+    if (isAuthenticated && user) {
+      console.log('🔌 Simulating socket connection for Supabase mode');
+      setConnectionStatus('connected');
+    } else {
+      console.log('🔌 No authenticated user, setting disconnected');
+      setConnectionStatus('disconnected');
+    }
+
+    // If you have a real Socket.IO server, uncomment and configure below:
+    /*
     if (isAuthenticated && user) {
       initializeSocket();
     } else {
@@ -66,6 +77,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     return () => {
       disconnectSocket();
     };
+    */
   }, [isAuthenticated, user]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps

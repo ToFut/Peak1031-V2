@@ -8,10 +8,11 @@ interface User {
   last_name: string;
   role: 'admin' | 'client' | 'coordinator' | 'third_party' | 'agency';
   is_active: boolean;
-  email_verified: boolean;
+  email_verified?: boolean; // Made optional since Supabase doesn't provide this
   two_fa_enabled: boolean;
-  last_login: string | null;
+  last_login?: string | null; // Made optional to match Supabase interface
   created_at: string;
+  updated_at: string;
 }
 
 interface LoginCredentials {
@@ -66,7 +67,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Verify token is still valid
       try {
-        const userProfile = await apiService.get('/auth/profile');
+        const userProfile = await apiService.getCurrentUser();
         setUser(userProfile);
         
         // Update last activity
@@ -76,10 +77,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('Token validation failed:', error);
         
         // Try to refresh token if we have a refresh token
-        if (refreshTokenValue && error.status === 401) {
+        if (refreshTokenValue) {
           try {
-            await refreshToken();
-            const userProfile = await apiService.get('/auth/profile');
+            await apiService.refreshToken();
+            const userProfile = await apiService.getCurrentUser();
             setUser(userProfile);
           } catch (refreshError) {
             console.error('Token refresh failed:', refreshError);
@@ -119,44 +120,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
       
-      const response = await apiService.post('/auth/login', credentials);
+      const response = await apiService.login({
+        email: credentials.email,
+        password: credentials.password,
+        twoFactorCode: undefined
+      });
       
       // Check if 2FA is required
       if (response.requiresTwoFactor) {
         return { requiresTwoFactor: true };
       }
       
-      const { user: userData, access_token, refresh_token } = response;
-      
-      // Store tokens
-      localStorage.setItem('token', access_token);
-      if (refresh_token) {
-        localStorage.setItem('refreshToken', refresh_token);
-      }
-      
       // Store user data
-      setUser(userData);
+      setUser(response.user);
       
       // Update last activity
       localStorage.setItem('lastActivity', Date.now().toString());
       
-      console.log('Login successful:', userData.email);
+      console.log('Login successful:', response.user.email);
       
       return { requiresTwoFactor: false };
       
     } catch (error: any) {
       console.error('Login failed:', error);
-      
-      // Handle specific error cases
-      if (error.status === 401) {
-        throw new Error(error.data?.message || 'Invalid email or password');
-      } else if (error.status === 423) {
-        throw new Error('Account is temporarily locked. Please try again later.');
-      } else if (error.status === 403) {
-        throw new Error('Account is disabled. Please contact support.');
-      } else {
-        throw new Error('Login failed. Please try again.');
-      }
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -166,21 +153,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
       
-      await apiService.post('/auth/register', data);
-      
-      // Registration successful, but user needs to verify email
-      console.log('Registration successful. Please check your email to verify your account.');
+      // For now, registration is not implemented with Supabase
+      // Users should be created by admin
+      throw new Error('Registration is currently disabled. Please contact an administrator.');
       
     } catch (error: any) {
       console.error('Registration failed:', error);
-      
-      if (error.status === 409) {
-        throw new Error('An account with this email already exists');
-      } else if (error.status === 400) {
-        throw new Error(error.data?.message || 'Invalid registration data');
-      } else {
-        throw new Error('Registration failed. Please try again.');
-      }
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -188,18 +167,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async (): Promise<void> => {
     try {
-      const token = localStorage.getItem('token');
-      
-      if (token) {
-        // Notify server of logout
-        try {
-          await apiService.post('/auth/logout');
-        } catch (error) {
-          // Continue with logout even if server request fails
-          console.warn('Server logout failed:', error);
-        }
-      }
-      
+      await apiService.logout();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -210,24 +178,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshToken = async (): Promise<void> => {
     try {
-      const refreshTokenValue = localStorage.getItem('refreshToken');
+      await apiService.refreshToken();
       
-      if (!refreshTokenValue) {
-        throw new Error('No refresh token available');
-      }
-
-      const response = await apiService.post('/auth/refresh', {
-        refresh_token: refreshTokenValue
-      });
-
-      const { access_token, refresh_token: newRefreshToken } = response;
-
-      // Update tokens
-      localStorage.setItem('token', access_token);
-      if (newRefreshToken) {
-        localStorage.setItem('refreshToken', newRefreshToken);
-      }
-
       // Update last activity
       localStorage.setItem('lastActivity', Date.now().toString());
 
@@ -250,36 +202,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const setupTwoFactor = async (): Promise<void> => {
     try {
-      await apiService.post('/auth/2fa/setup');
+      // 2FA not implemented with Supabase yet
+      throw new Error('Two-factor authentication is not yet available');
     } catch (error: any) {
       console.error('2FA setup failed:', error);
-      throw new Error(error.data?.message || 'Failed to setup 2FA');
+      throw error;
     }
   };
 
   const verifyTwoFactor = async (code: string): Promise<void> => {
     try {
-      const response = await apiService.post('/auth/2fa/verify', { code });
-      
-      const { user: userData, access_token, refresh_token } = response;
-      
-      // Store tokens
-      localStorage.setItem('token', access_token);
-      if (refresh_token) {
-        localStorage.setItem('refreshToken', refresh_token);
-      }
-      
-      // Store user data
-      setUser(userData);
-      
-      // Update last activity
-      localStorage.setItem('lastActivity', Date.now().toString());
-      
-      console.log('2FA verification successful:', userData.email);
-      
+      // 2FA not implemented with Supabase yet
+      throw new Error('Two-factor authentication is not yet available');
     } catch (error: any) {
       console.error('2FA verification failed:', error);
-      throw new Error(error.data?.message || 'Invalid 2FA code');
+      throw error;
     }
   };
 

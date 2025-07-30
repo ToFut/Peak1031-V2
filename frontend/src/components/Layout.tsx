@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useSocket } from '../hooks/useSocket';
+import { apiService } from '../services/api';
 
 // Icons (using heroicons or lucide-react)
 import {
@@ -164,19 +165,14 @@ const Layout: React.FC = () => {
   useEffect(() => {
     const loadNotifications = async () => {
       try {
-        const response = await fetch('/api/notifications?limit=50', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setNotifications(data.notifications || []);
-          setUnreadCount(data.unread_count || 0);
-        }
+        const notifications = await apiService.getNotifications();
+        setNotifications(notifications || []);
+        setUnreadCount(notifications.filter(n => !n.read).length || 0);
       } catch (error) {
         console.error('Failed to load notifications:', error);
+        // Set empty arrays to prevent further errors
+        setNotifications([]);
+        setUnreadCount(0);
       }
     };
 
@@ -196,19 +192,13 @@ const Layout: React.FC = () => {
 
   const markNotificationAsRead = async (notificationId: string) => {
     try {
-      const response = await fetch(`/api/notifications/${notificationId}/read`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (response.ok) {
-        setNotifications(prev => 
-          prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-        );
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
+      await apiService.markNotificationAsRead(notificationId);
+      
+      // Update local state
+      setNotifications(prev => 
+        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
     }

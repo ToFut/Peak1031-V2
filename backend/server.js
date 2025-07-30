@@ -22,6 +22,7 @@ const documentRoutes = require('./routes/documents');
 const messageRoutes = require('./routes/messages');
 const syncRoutes = require('./routes/sync');
 const adminRoutes = require('./routes/admin');
+const oauthRoutes = require('./routes/oauth');
 
 // Import services
 const MessageService = require('./services/messages');
@@ -139,6 +140,7 @@ class PeakServer {
 
     // API routes
     this.app.use('/api/auth', authRoutes);
+    this.app.use('/api/oauth', oauthRoutes);
     this.app.use('/api/contacts', authenticateToken, contactRoutes);
     this.app.use('/api/exchanges', authenticateToken, exchangeRoutes);
     this.app.use('/api/tasks', authenticateToken, taskRoutes);

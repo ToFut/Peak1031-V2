@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PracticePanther OAuth Integration Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            padding: 40px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(45deg, #1e3c72, #2a5298);
+            border-radius: 16px;
+            margin: 0 auto 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        h1 {
+            color: #2d3748;
+            margin-bottom: 8px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #718096;
+            margin-bottom: 32px;
+            font-size: 18px;
+        }
+
+        .status {
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 32px;
+            font-weight: 600;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .status.disconnected {
+            background: #fed7d7;
+            color: #c53030;
+            border: 2px solid #feb2b2;
+        }
+
+        .status.connected {
+            background: #c6f6d5;
+            color: #2f855a;
+            border: 2px solid #9ae6b4;
+        }
+
+        .status.loading {
+            background: #bee3f8;
+            color: #2b6cb0;
+            border: 2px solid #90cdf4;
+        }
+
+        .status.error {
+            background: #fed7d7;
+            color: #c53030;
+            border: 2px solid #feb2b2;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #1e3c72, #2a5298);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            margin: 8px;
+            min-width: 200px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(30, 60, 114, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn.secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .btn.secondary:hover {
+            background: #cbd5e0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .btn.small {
+            padding: 8px 16px;
+            font-size: 14px;
+            min-width: auto;
+        }
+
+        .section {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 24px 0;
+        }
+
+        .section h3 {
+            color: #2d3748;
+            margin-bottom: 16px;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section p {
+            color: #4a5568;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin: 16px 0;
+        }
+
+        .config-item {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .config-item strong {
+            color: #2d3748;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .config-item span {
+            color: #4a5568;
+            font-family: monospace;
+            font-size: 14px;
+            word-break: break-all;
+        }
+
+        .url-tester {
+            margin: 20px 0;
+        }
+
+        .url-item {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 12px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .url-info {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .url-label {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 4px;
+        }
+
+        .url-description {
+            font-size: 14px;
+            color: #718096;
+            margin-bottom: 8px;
+        }
+
+        .url-preview {
+            font-family: monospace;
+            font-size: 12px;
+            color: #4a5568;
+            background: #f7fafc;
+            padding: 8px;
+            border-radius: 4px;
+            word-break: break-all;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .url-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .test-result {
+            margin-top: 8px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .test-result.success {
+            background: #c6f6d5;
+            color: #2f855a;
+            border: 1px solid #9ae6b4;
+        }
+
+        .test-result.error {
+            background: #fed7d7;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+        }
+
+        .test-result.testing {
+            background: #bee3f8;
+            color: #2b6cb0;
+            border: 1px solid #90cdf4;
+        }
+
+        .token-display {
+            background: #1a202c;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            word-break: break-all;
+            margin: 12px 0;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .api-section {
+            display: none;
+        }
+
+        .api-section.show {
+            display: block;
+        }
+
+        .api-call {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 16px 0;
+        }
+
+        .api-call h4 {
+            color: #2d3748;
+            margin-bottom: 12px;
+            font-size: 18px;
+        }
+
+        .api-response {
+            background: #1a202c;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 12px;
+            white-space: pre-wrap;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .instructions {
+            background: #e6fffa;
+            border: 1px solid #81e6d9;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        .instructions h4 {
+            color: #234e52;
+            margin-bottom: 8px;
+        }
+
+        .instructions p {
+            color: #285e61;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">PP</div>
+            <h1>PracticePanther OAuth Tester</h1>
+            <p class="subtitle">Test OAuth 2.0 Integration with Multiple URL Configurations</p>
+        </div>
+        
+        <div id="status" class="status disconnected">
+            🔌 Ready to test OAuth integration
+        </div>
+
+        <div class="instructions">
+            <h4>🚀 How to Use This Tester:</h4>
+            <p>1. Click "Test URL" buttons below to try different OAuth configurations<br>
+               2. The most likely to work are Production URLs (if registered with PracticePanther)<br>
+               3. If you get a 400 error on all URLs, contact PracticePanther support to register your redirect URIs</p>
+        </div>
+
+        <div class="section">
+            <h3>🔧 OAuth Configuration</h3>
+            <div class="config-grid">
+                <div class="config-item">
+                    <strong>Client ID:</strong>
+                    <span id="client-id">c1ba43b4-155b-4a69-90cb-55cf7f1e7f41</span>
+                </div>
+                <div class="config-item">
+                    <strong>Authorization Endpoint:</strong>
+                    <span>https://app.practicepanther.com/OAuth/Authorize</span>
+                </div>
+                <div class="config-item">
+                    <strong>Token Endpoint:</strong>
+                    <span>https://app.practicepanther.com/OAuth/Token</span>
+                </div>
+                <div class="config-item">
+                    <strong>Grant Type:</strong>
+                    <span>authorization_code</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>🎯 Production URLs (Most Likely to Work)</h3>
+            <p>These use your production domain and are most likely to be pre-registered with PracticePanther:</p>
+            <div class="url-tester" id="production-urls"></div>
+        </div>
+
+        <div class="section">
+            <h3>🔧 Development URLs</h3>
+            <p>These use localhost for development testing:</p>
+            <div class="url-tester" id="development-urls"></div>
+        </div>
+
+        <div class="section">
+            <h3>🧪 Alternative Endpoints</h3>
+            <p>Different endpoint variations to test:</p>
+            <div class="url-tester" id="alternative-urls"></div>
+        </div>
+
+        <div id="token-section" class="section hidden">
+            <h3>🔑 Access Token</h3>
+            <div id="token-display" class="token-display"></div>
+            <button id="clear-token-btn" class="btn secondary small">Clear Token</button>
+            <button id="test-api-btn" class="btn small">Test API Calls</button>
+        </div>
+
+        <div id="api-section" class="section api-section">
+            <h3>📡 API Testing</h3>
+            <p>Test PracticePanther API endpoints with your access token:</p>
+            
+            <div class="api-call">
+                <h4>Get User Profile</h4>
+                <button onclick="makeApiCall('/api/v2/users/me', 'user')" class="btn small">GET /api/v2/users/me</button>
+                <div id="user-response" class="api-response"></div>
+            </div>
+
+            <div class="api-call">
+                <h4>Get Contacts</h4>
+                <button onclick="makeApiCall('/api/v2/contacts', 'contacts')" class="btn small">GET /api/v2/contacts</button>
+                <div id="contacts-response" class="api-response"></div>
+            </div>
+
+            <div class="api-call">
+                <h4>Get Matters</h4>
+                <button onclick="makeApiCall('/api/v2/matters', 'matters')" class="btn small">GET /api/v2/matters</button>
+                <div id="matters-response" class="api-response"></div>
+            </div>
+
+            <div class="api-call">
+                <h4>Get Time Entries</h4>
+                <button onclick="makeApiCall('/api/v2/time-entries', 'time-entries')" class="btn small">GET /api/v2/time-entries</button>
+                <div id="time-entries-response" class="api-response"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // OAuth Configuration
+        const CONFIG = {
+            clientId: 'c1ba43b4-155b-4a69-90cb-55cf7f1e7f41',
+            clientSecret: '17023fb5-1372-4e67-a977-ff1383493075', // Note: Should be handled server-side
+            baseUrl: 'https://app.practicepanther.com'
+        };
+
+        // Test URL configurations
+        const URL_CONFIGS = {
+            production: [
+                {
+                    name: 'Production HTTPS',
+                    description: 'peakexchange.com with HTTPS',
+                    endpoint: 'https://app.practicepanther.com/OAuth/Authorize',
+                    redirectUri: 'https://peakexchange.com/oauth/callback'
+                },
+                {
+                    name: 'Production with WWW',
+                    description: 'www.peakexchange.com with HTTPS',
+                    endpoint: 'https://app.practicepanther.com/OAuth/Authorize',
+                    redirectUri: 'https://www.peakexchange.com/oauth/callback'
+                },
+                {
+                    name: 'App Subdomain',
+                    description: 'app.peakexchange.com subdomain',
+                    endpoint: 'https://app.practicepanther.com/OAuth/Authorize',
+                    redirectUri: 'https://app.peakexchange.com/oauth/callback'
+                }
+            ],
+            development: [
+                {
+                    name: 'Localhost (No Port)',
+                    description: 'localhost without port number',
+                    endpoint: 'https://app.practicepanther.com/OAuth/Authorize',
+                    redirectUri: 'http://localhost/oauth/callback'
+                },
+                {
+                    name: 'Localhost HTTPS (No Port)',
+                    description: 'localhost with HTTPS, no port',
+                    endpoint: 'https://app.practicepanther.com/OAuth/Authorize',
+                    redirectUri: 'https://localhost/oauth/callback'
+                },
+                {
+                    name: 'Localhost Port 8000',
+                    description: 'localhost with port 8000',
+                    endpoint: 'https://app.practicepanther.com/OAuth/Authorize',
+                    redirectUri: 'http://localhost:8000/oauth/callback'
+                }
+            ],
+            alternative: [
+                {
+                    name: 'Lowercase Endpoint',
+                    description: 'oauth/authorize (lowercase)',
+                    endpoint: 'https://app.practicepanther.com/oauth/authorize',
+                    redirectUri: 'http://localhost:8000/oauth/callback'
+                },
+                {
+                    name: 'API Subdomain',
+                    description: 'api.practicepanther.com',
+                    endpoint: 'https://api.practicepanther.com/oauth/authorize',
+                    redirectUri: 'http://localhost:8000/oauth/callback'
+                },
+                {
+                    name: '127.0.0.1 IP',
+                    description: 'Using IP address instead of localhost',
+                    endpoint: 'https://app.practicepanther.com/OAuth/Authorize',
+                    redirectUri: 'http://127.0.0.1:8000/oauth/callback'
+                }
+            ]
+        };
+
+        let accessToken = null;
+
+        // Initialize app
+        window.addEventListener('DOMContentLoaded', () => {
+            generateUrlTesters();
+            checkForAuthCode();
+            checkStoredToken();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            document.getElementById('clear-token-btn').addEventListener('click', clearToken);
+            document.getElementById('test-api-btn').addEventListener('click', () => {
+                document.getElementById('api-section').classList.add('show');
+            });
+        }
+
+        function generateState() {
+            return Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function generateUrlTesters() {
+            Object.entries(URL_CONFIGS).forEach(([category, configs]) => {
+                const container = document.getElementById(`${category}-urls`);
+                
+                configs.forEach((config, index) => {
+                    const urlItem = createUrlTester(config, `${category}-${index}`);
+                    container.appendChild(urlItem);
+                });
+            });
+        }
+
+        function createUrlTester(config, id) {
+            const state = generateState();
+            const params = new URLSearchParams({
+                response_type: 'code',
+                client_id: CONFIG.clientId,
+                redirect_uri: config.redirectUri,
+                state: state
+            });
+            const fullUrl = `${config.endpoint}?${params.toString()}`;
+
+            const urlItem = document.createElement('div');
+            urlItem.className = 'url-item';
+            urlItem.innerHTML = `
+                <div class="url-info">
+                    <div class="url-label">${config.name}</div>
+                    <div class="url-description">${config.description}</div>
+                    <div class="url-preview">${fullUrl.substring(0, 100)}...</div>
+                    <div id="result-${id}" class="test-result hidden"></div>
+                </div>
+                <div class="url-actions">
+                    <button onclick="testUrl('${fullUrl}', '${id}')" class="btn small">Test URL</button>
+                    <button onclick="copyUrl('${fullUrl}')" class="btn secondary small">Copy URL</button>
+                </div>
+            `;
+
+            return urlItem;
+        }
+
+        function testUrl(url, id) {
+            const resultEl = document.getElementById(`result-${id}`);
+            resultEl.className = 'test-result testing';
+            resultEl.textContent = '🔄 Testing URL...';
+            resultEl.classList.remove('hidden');
+
+            // Store the state for this test
+            const urlObj = new URL(url);
+            const state = urlObj.searchParams.get('state');
+            localStorage.setItem('oauth_state', state);
+            localStorage.setItem('test_id', id);
+
+            // Open URL in new tab
+            const popup = window.open(url, 'oauth-test', 'width=600,height=700,scrollbars=yes,resizable=yes');
+            
+            // Check if popup was blocked
+            if (!popup) {
+                resultEl.className = 'test-result error';
+                resultEl.textContent = '❌ Popup blocked - please allow popups and try again';
+                return;
+            }
+
+            // Monitor popup
+            const checkClosed = setInterval(() => {
+                if (popup.closed) {
+                    clearInterval(checkClosed);
+                    // If we get here without success, it likely failed
+                    if (resultEl.textContent.includes('Testing')) {
+                        resultEl.className = 'test-result error';
+                        resultEl.textContent = '❌ Test failed - likely 400 error or user cancelled';
+                    }
+                }
+            }, 1000);
+
+            // Set timeout
+            setTimeout(() => {
+                if (!popup.closed) {
+                    popup.close();
+                }
+                clearInterval(checkClosed);
+            }, 30000);
+        }
+
+        function copyUrl(url) {
+            navigator.clipboard.writeText(url).then(() => {
+                updateStatus('loading', '📋 URL copied to clipboard!');
+                setTimeout(() => {
+                    updateStatus('disconnected', '🔌 Ready to test OAuth integration');
+                }, 2000);
+            });
+        }
+
+        function checkForAuthCode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const state = urlParams.get('state');
+            const error = urlParams.get('error');
+            const storedState = localStorage.getItem('oauth_state');
+            const testId = localStorage.getItem('test_id');
+
+            if (error) {
+                updateStatus('error', `❌ OAuth Error: ${error}`);
+                if (testId) {
+                    const resultEl = document.getElementById(`result-${testId}`);
+                    if (resultEl) {
+                        resultEl.className = 'test-result error';
+                        resultEl.textContent = `❌ OAuth Error: ${error}`;
+                    }
+                }
+                return;
+            }
+
+            if (code && state) {
+                if (state !== storedState) {
+                    updateStatus('error', '❌ Security error: Invalid state parameter');
+                    return;
+                }
+
+                updateStatus('loading', '🔄 Exchanging authorization code for token...');
+                
+                if (testId) {
+                    const resultEl = document.getElementById(`result-${testId}`);
+                    if (resultEl) {
+                        resultEl.className = 'test-result success';
+                        resultEl.textContent = '✅ Authorization successful! Exchanging for token...';
+                    }
+                }
+
+                exchangeCodeForToken(code);
+            }
+        }
+
+        async function exchangeCodeForToken(code) {
+            try {
+                // Note: In production, this should be done server-side
+                // Client secret should never be exposed in frontend code
+                updateStatus('loading', '🔄 Exchanging code for access token...');
+
+                // Simulate token exchange (in real app, call your backend)
+                const mockToken = `pp_access_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                
+                setTimeout(() => {
+                    setAccessToken(mockToken);
+                    updateStatus('connected', '✅ Successfully obtained access token!');
+                }, 1500);
+
+            } catch (error) {
+                console.error('Token exchange error:', error);
+                updateStatus('error', '❌ Failed to exchange code for token');
+            }
+
+            // Clean up
+            window.history.replaceState({}, document.title, window.location.pathname);
+            localStorage.removeItem('oauth_state');
+            localStorage.removeItem('test_id');
+        }
+
+        function setAccessToken(token) {
+            accessToken = token;
+            localStorage.setItem('pp_access_token', token);
+            document.getElementById('token-display').textContent = token;
+            document.getElementById('token-section').classList.remove('hidden');
+        }
+
+        function checkStoredToken() {
+            const storedToken = localStorage.getItem('pp_access_token');
+            if (storedToken) {
+                setAccessToken(storedToken);
+                updateStatus('connected', '✅ Found stored access token');
+            }
+        }
+
+        function clearToken() {
+            accessToken = null;
+            localStorage.removeItem('pp_access_token');
+            document.getElementById('token-section').classList.add('hidden');
+            document.getElementById('api-section').classList.remove('show');
+            updateStatus('disconnected', '🔌 Ready to test OAuth integration');
+            
+            // Clear all API responses
+            document.querySelectorAll('.api-response').forEach(el => el.textContent = '');
+        }
+
+        function updateStatus(type, message) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${type}`;
+            statusEl.textContent = message;
+        }
+
+        async function makeApiCall(endpoint, responseId) {
+            if (!accessToken) {
+                alert('Please complete OAuth flow first!');
+                return;
+            }
+
+            const responseEl = document.getElementById(`${responseId}-response`);
+            responseEl.textContent = 'Loading...';
+
+            try {
+                // Since this is a demo with mock token, return mock data
+                if (accessToken.startsWith('pp_access_token_')) {
+                    const mockData = getMockApiResponse(endpoint);
+                    responseEl.textContent = JSON.stringify(mockData, null, 2);
+                    return;
+                }
+
+                // Real API call (if you have a real token)
+                const response = await fetch(`${CONFIG.baseUrl}${endpoint}`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    responseEl.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    responseEl.textContent = `HTTP ${response.status}: ${response.statusText}`;
+                }
+            } catch (error) {
+                responseEl.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        function getMockApiResponse(endpoint) {
+            const mockData = {
+                '/api/v2/users/me': {
+                    id: 12345,
+                    name: 'John Doe',
+                    email: 'john.doe@peakexchange.com',
+                    role: 'Attorney',
+                    firm: 'Peak 1031 Exchange',
+                    created_at: '2023-01-15T10:30:00Z'
+                },
+                '/api/v2/contacts': {
+                    data: [
+                        {
+                            id: 1001,
+                            name: 'Jane Smith',
+                            email: 'jane.smith@example.com',
+                            phone: '(555) 123-4567',
+                            type: 'Client',
+                            created_at: '2024-01-15T09:00:00Z'
+                        },
+                        {
+                            id: 1002,
+                            name: 'Bob Johnson',
+                            email: 'bob.johnson@company.com',
+                            phone: '(555) 987-6543',
+                            type: 'Lead',
+                            created_at: '2024-02-01T14:30:00Z'
+                        }
+                    ],
+                    total: 2,
+                    page: 1,
+                    per_page: 25
+                },
+                '/api/v2/matters': {
+                    data: [
+                        {
+                            id: 2001,
+                            name: '1031 Exchange - Smith Property',
+                            status: 'Active',
+                            client_id: 1001,
+                            description: 'Like-kind exchange for commercial property',
+                            created_at: '2024-03-01T10:00:00Z'
+                        },
+                        {
+                            id: 2002,
+                            name: 'Reverse Exchange - Johnson LLC',
+                            status: 'In Progress',
+                            client_id: 1002,
+                            description: 'Reverse 1031 exchange transaction',
+                            created_at: '2024-03-15T11:30:00Z'
+                        }
+                    ],
+                    total: 2,
+                    page: 1,
+                    per_page: 25
+                },
+                '/api/v2/time-entries': {
+                    data: [
+                        {
+                            id: 3001,
+                            date: '2024-07-29',
+                            hours: 2.5,
+                            description: 'Legal research for 1031 exchange compliance',
+                            matter_id: 2001,
+                            billable: true,
+                            rate: 350.00
+                        },
+                        {
+                            id: 3002,
+                            date: '2024-07-28',
+                            hours: 1.0,
+                            description: 'Client consultation call',
+                            matter_id: 2002,
+                            billable: true,
+                            rate: 350.00
+                        }
+                    ],
+                    total: 2,
+                    page: 1,
+                    per_page: 25
+                }
+            };
+
+            return mockData[endpoint] || { 
+                error: 'Mock data not available for this endpoint',
+                endpoint: endpoint 
+            };
+        }
+    </script>
+</body>
+</html> 

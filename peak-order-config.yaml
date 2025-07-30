@@ -1,0 +1,801 @@
+name: peak-order
+description: Peak Order 1031 Exchange Platform
+version: 1.0.0
+
+app:
+  name: peak-order
+  displayName: Peak Order
+  description: 1031 Exchange Platform - Streamline your property exchanges
+  version: 1.0.0
+  author: Peak Order Platform
+  license: MIT
+
+database:
+  type: postgresql
+  models:
+    - name: Exchange
+      fields:
+        - name: id
+          type: string
+          primary: true
+          unique: true
+        - name: title
+          type: string
+          required: true
+          ui:
+            label: Exchange Title
+            placeholder: "Downtown Office Building Exchange"
+        - name: description
+          type: text
+          required: false
+          ui:
+            label: Description
+            placeholder: "Detailed description of the exchange..."
+        - name: exchangeType
+          type: enum
+          values: [like_kind, reverse, construction, improvement]
+          default: like_kind
+          ui:
+            label: Exchange Type
+            widget: select
+        - name: status
+          type: enum
+          values: [pending, in_progress, completed, cancelled]
+          default: pending
+          ui:
+            label: Status
+            widget: select
+        - name: totalValue
+          type: decimal
+          required: true
+          ui:
+            label: Total Exchange Value
+            type: currency
+        - name: deadline
+          type: datetime
+          required: true
+          ui:
+            label: Exchange Deadline
+            widget: datetime
+        - name: createdAt
+          type: datetime
+          default: now
+        - name: updatedAt
+          type: datetime
+          default: now
+      relationships:
+        - type: hasMany
+          model: Property
+          foreign_key: exchangeId
+        - type: hasMany
+          model: Document
+          foreign_key: exchangeId
+        - type: hasMany
+          model: Message
+          foreign_key: exchangeId
+
+    - name: Property
+      fields:
+        - name: id
+          type: string
+          primary: true
+          unique: true
+        - name: exchangeId
+          type: string
+          required: true
+          ui:
+            label: Exchange
+            widget: relation_select
+            model: Exchange
+        - name: address
+          type: string
+          required: true
+          ui:
+            label: Property Address
+        - name: city
+          type: string
+          required: true
+          ui:
+            label: City
+        - name: state
+          type: string
+          required: true
+          ui:
+            label: State
+        - name: zipCode
+          type: string
+          required: true
+          ui:
+            label: ZIP Code
+        - name: propertyType
+          type: enum
+          values: [residential, commercial, industrial, land]
+          required: true
+          ui:
+            label: Property Type
+            widget: select
+        - name: squareFootage
+          type: integer
+          required: false
+          ui:
+            label: Square Footage
+        - name: value
+          type: decimal
+          required: true
+          ui:
+            label: Property Value
+            type: currency
+        - name: equity
+          type: decimal
+          required: true
+          ui:
+            label: Equity Amount
+            type: currency
+        - name: mortgageBalance
+          type: decimal
+          required: false
+          ui:
+            label: Mortgage Balance
+            type: currency
+        - name: images
+          type: json
+          required: false
+          ui:
+            label: Property Images
+            widget: file_upload
+            multiple: true
+        - name: documents
+          type: json
+          required: false
+          ui:
+            label: Property Documents
+            widget: file_upload
+            multiple: true
+        - name: createdAt
+          type: datetime
+          default: now
+        - name: updatedAt
+          type: datetime
+          default: now
+      relationships:
+        - type: belongsTo
+          model: Exchange
+          foreign_key: exchangeId
+
+    - name: Contact
+      fields:
+        - name: id
+          type: string
+          primary: true
+          unique: true
+        - name: firstName
+          type: string
+          required: true
+          ui:
+            label: First Name
+        - name: lastName
+          type: string
+          required: true
+          ui:
+            label: Last Name
+        - name: email
+          type: string
+          required: true
+          unique: true
+          validation:
+            pattern: ^[^\s@]+@[^\s@]+\.[^\s@]+$
+          ui:
+            label: Email
+            placeholder: "contact@example.com"
+        - name: phone
+          type: string
+          required: false
+          ui:
+            label: Phone Number
+            placeholder: "+1 (555) 123-4567"
+        - name: company
+          type: string
+          required: false
+          ui:
+            label: Company
+        - name: role
+          type: enum
+          values: [client, coordinator, agency, third_party]
+          required: true
+          ui:
+            label: Role
+            widget: select
+        - name: isActive
+          type: boolean
+          default: true
+          ui:
+            label: Active Status
+            widget: checkbox
+        - name: createdAt
+          type: datetime
+          default: now
+        - name: updatedAt
+          type: datetime
+          default: now
+
+    - name: Document
+      fields:
+        - name: id
+          type: string
+          primary: true
+          unique: true
+        - name: exchangeId
+          type: string
+          required: true
+          ui:
+            label: Exchange
+            widget: relation_select
+            model: Exchange
+        - name: title
+          type: string
+          required: true
+          ui:
+            label: Document Title
+        - name: type
+          type: enum
+          values: [contract, appraisal, inspection, title, tax, other]
+          required: true
+          ui:
+            label: Document Type
+            widget: select
+        - name: fileUrl
+          type: string
+          required: true
+          ui:
+            label: File URL
+        - name: fileSize
+          type: integer
+          required: false
+          ui:
+            label: File Size (bytes)
+        - name: uploadedBy
+          type: string
+          required: true
+          ui:
+            label: Uploaded By
+            widget: relation_select
+            model: Contact
+        - name: createdAt
+          type: datetime
+          default: now
+        - name: updatedAt
+          type: datetime
+          default: now
+      relationships:
+        - type: belongsTo
+          model: Exchange
+          foreign_key: exchangeId
+        - type: belongsTo
+          model: Contact
+          foreign_key: uploadedBy
+
+    - name: Message
+      fields:
+        - name: id
+          type: string
+          primary: true
+          unique: true
+        - name: exchangeId
+          type: string
+          required: true
+          ui:
+            label: Exchange
+            widget: relation_select
+            model: Exchange
+        - name: senderId
+          type: string
+          required: true
+          ui:
+            label: Sender
+            widget: relation_select
+            model: Contact
+        - name: content
+          type: text
+          required: true
+          ui:
+            label: Message Content
+            widget: textarea
+        - name: messageType
+          type: enum
+          values: [text, file, system]
+          default: text
+          ui:
+            label: Message Type
+            widget: select
+        - name: isRead
+          type: boolean
+          default: false
+          ui:
+            label: Read Status
+            widget: checkbox
+        - name: createdAt
+          type: datetime
+          default: now
+        - name: updatedAt
+          type: datetime
+          default: now
+      relationships:
+        - type: belongsTo
+          model: Exchange
+          foreign_key: exchangeId
+        - type: belongsTo
+          model: Contact
+          foreign_key: senderId
+
+    - name: Task
+      fields:
+        - name: id
+          type: string
+          primary: true
+          unique: true
+        - name: exchangeId
+          type: string
+          required: true
+          ui:
+            label: Exchange
+            widget: relation_select
+            model: Exchange
+        - name: title
+          type: string
+          required: true
+          ui:
+            label: Task Title
+        - name: description
+          type: text
+          required: false
+          ui:
+            label: Description
+        - name: assignedTo
+          type: string
+          required: false
+          ui:
+            label: Assigned To
+            widget: relation_select
+            model: Contact
+        - name: priority
+          type: enum
+          values: [low, medium, high, urgent]
+          default: medium
+          ui:
+            label: Priority
+            widget: select
+        - name: status
+          type: enum
+          values: [pending, in_progress, completed, cancelled]
+          default: pending
+          ui:
+            label: Status
+            widget: select
+        - name: dueDate
+          type: datetime
+          required: false
+          ui:
+            label: Due Date
+            widget: datetime
+        - name: completedAt
+          type: datetime
+          required: false
+          ui:
+            label: Completed At
+        - name: createdAt
+          type: datetime
+          default: now
+        - name: updatedAt
+          type: datetime
+          default: now
+      relationships:
+        - type: belongsTo
+          model: Exchange
+          foreign_key: exchangeId
+        - type: belongsTo
+          model: Contact
+          foreign_key: assignedTo
+
+apis:
+  integrations:
+    - name: practice_panther_api
+      type: rest
+      base_url: "https://api.practicepanther.com/v1/"
+      authentication:
+        type: oauth2
+        client_credentials: true
+        client_id: "{{PRACTICE_PANTHER_CLIENT_ID}}"
+        client_secret: "{{PRACTICE_PANTHER_CLIENT_SECRET}}"
+      endpoints:
+        - name: get_matters
+          path: "/matters"
+          method: GET
+          request_schema:
+            type: object
+            properties:
+              limit: { type: number }
+              offset: { type: number }
+          response_schema:
+            type: object
+            properties:
+              matters: { type: array }
+        - name: create_matter
+          path: "/matters"
+          method: POST
+          request_schema:
+            type: object
+            properties:
+              display_name: { type: string }
+              matter_type: { type: string }
+              client_id: { type: string }
+        - name: refresh_token
+          path: "/oauth2/token"
+          method: POST
+          request_schema:
+            type: object
+            properties:
+              grant_type: { type: string }
+              scope: { type: string }
+      rate_limits:
+        requests_per_minute: 60
+        burst_limit: 10
+
+    - name: email_service
+      type: rest
+      base_url: "https://api.resend.com"
+      authentication:
+        type: api_key
+        header: "Authorization"
+        secret_name: resend_api_key
+      endpoints:
+        - name: send_email
+          path: "/emails"
+          method: POST
+          request_schema:
+            type: object
+            properties:
+              to: { type: string }
+              subject: { type: string }
+              html: { type: string }
+
+workflows:
+  - name: create_exchange
+    description: "Create a new 1031 exchange with validation"
+    trigger:
+      type: api_call
+      endpoint: /api/exchanges
+      method: POST
+    steps:
+      - name: validate_exchange_data
+        activity: validation
+        config:
+          required_fields: ["title", "totalValue", "deadline"]
+          custom_validations:
+            - field: deadline
+              rule: "must be future date"
+            - field: totalValue
+              rule: "must be greater than 0"
+
+      - name: create_exchange_record
+        activity: database_insert
+        config:
+          model: Exchange
+          data:
+            title: "{{title}}"
+            description: "{{description}}"
+            exchangeType: "{{exchangeType}}"
+            totalValue: "{{totalValue}}"
+            deadline: "{{deadline}}"
+            status: "pending"
+
+      - name: notify_coordinator
+        activity: http_request
+        config:
+          integration: email_service
+          endpoint: send_email
+          data:
+            to: "{{coordinator.email}}"
+            subject: "New Exchange Created"
+            template: exchange_created
+        timeout: 60s
+
+      - name: create_initial_tasks
+        activity: database_insert
+        config:
+          model: Task
+          data:
+            - title: "Initial Consultation"
+              description: "Schedule initial consultation with client"
+              priority: "high"
+              dueDate: "{{now + 3 days}}"
+            - title: "Property Appraisal"
+              description: "Arrange property appraisal"
+              priority: "medium"
+              dueDate: "{{now + 7 days}}"
+
+  - name: refresh_practice_panther_token
+    description: "Refresh PracticePanther API token automatically"
+    trigger:
+      type: schedule
+      cron: "0 0 * * *"  # Daily at midnight
+    steps:
+      - name: fetch_new_token
+        activity: http_request
+        config:
+          integration: practice_panther_api
+          endpoint: refresh_token
+          data:
+            grant_type: "client_credentials"
+            scope: "matters.read matters.write"
+        timeout: 30s
+        retry_policy:
+          max_attempts: 5
+          backoff: exponential
+
+      - name: update_environment
+        activity: system_update
+        config:
+          variable: "PRACTICE_PANTHER_ACCESS_TOKEN"
+          value: "{{response.access_token}}"
+
+ui:
+  theme:
+    primary_color: "#1e40af"
+    secondary_color: "#64748b"
+    accent_color: "#f59e0b"
+    logo: "/assets/peak-order-logo.png"
+    
+  pages:
+    - name: dashboard
+      path: "/dashboard"
+      auth_required: true
+      components:
+        - type: stats_cards
+          data_source: exchange_stats
+          cards:
+            - title: "Active Exchanges"
+              value: "{{active_exchanges_count}}"
+              icon: "exchange"
+              color: "blue"
+            - title: "Pending Tasks"
+              value: "{{pending_tasks_count}}"
+              icon: "check-square"
+              color: "orange"
+            - title: "Total Value"
+              value: "{{total_exchange_value}}"
+              icon: "dollar-sign"
+              color: "green"
+        - type: recent_exchanges
+          data_source: recent_exchanges
+          limit: 5
+        - type: upcoming_deadlines
+          data_source: upcoming_deadlines
+          limit: 3
+
+    - name: exchanges
+      path: "/exchanges"
+      auth_required: true
+      components:
+        - type: filter_bar
+          fields:
+            - name: status
+              type: select
+              label: "Status"
+              options:
+                - label: "All"
+                  value: ""
+                - label: "Pending"
+                  value: "pending"
+                - label: "In Progress"
+                  value: "in_progress"
+                - label: "Completed"
+                  value: "completed"
+            - name: exchange_type
+              type: select
+              label: "Exchange Type"
+              options:
+                - label: "All"
+                  value: ""
+                - label: "Like-Kind"
+                  value: "like_kind"
+                - label: "Reverse"
+                  value: "reverse"
+                - label: "Construction"
+                  value: "construction"
+            - name: value_range
+              type: range
+              label: "Value Range"
+              min: 0
+              max: 10000000
+        - type: exchange_grid
+          data_source: exchanges
+          columns: 2
+          pagination: true
+          items_per_page: 10
+
+    - name: exchange_detail
+      path: "/exchanges/:id"
+      auth_required: true
+      components:
+        - type: exchange_header
+          data_source: exchange
+          fields:
+            - title
+            - status
+            - totalValue
+            - deadline
+        - type: property_list
+          data_source: exchange_properties
+          title: "Properties"
+        - type: document_list
+          data_source: exchange_documents
+          title: "Documents"
+        - type: task_board
+          data_source: exchange_tasks
+          title: "Tasks"
+        - type: message_thread
+          data_source: exchange_messages
+          title: "Messages"
+
+    - name: contacts
+      path: "/contacts"
+      auth_required: true
+      components:
+        - type: contact_list
+          data_source: contacts
+          search: true
+          filter:
+            - name: role
+              type: select
+              label: "Role"
+              options:
+                - label: "All"
+                  value: ""
+                - label: "Client"
+                  value: "client"
+                - label: "Coordinator"
+                  value: "coordinator"
+                - label: "Agency"
+                  value: "agency"
+                - label: "Third Party"
+                  value: "third_party"
+
+    - name: admin
+      path: "/admin"
+      auth_required: true
+      role_required: admin
+      components:
+        - type: system_stats
+          data_source: system_stats
+        - type: user_management
+          data_source: users
+        - type: audit_logs
+          data_source: audit_logs
+
+alerts:
+  rules:
+    - name: exchange_deadline_approaching
+      description: "Alert when exchange deadline is approaching"
+      conditions:
+        - field: deadline
+          operator: less_than
+          value: "now() + 30 days"
+        - field: status
+          operator: not_equals
+          value: "completed"
+      actions:
+        - type: email
+          template: deadline_approaching
+          to: "{{coordinator.email}}"
+        - type: notification
+          channel: "in_app"
+          user: "{{coordinator.id}}"
+      cooldown: 7d
+      priority: high
+
+    - name: task_overdue
+      description: "Alert when tasks are overdue"
+      conditions:
+        - field: dueDate
+          operator: less_than
+          value: "now()"
+        - field: status
+          operator: not_equals
+          value: "completed"
+      actions:
+        - type: email
+          template: task_overdue
+          to: "{{assignedTo.email}}"
+        - type: notification
+          channel: "in_app"
+          user: "{{assignedTo.id}}"
+      cooldown: 1d
+      priority: medium
+
+    - name: document_uploaded
+      description: "Alert when new document is uploaded"
+      conditions:
+        - field: type
+          operator: equals
+          value: "document_uploaded"
+      actions:
+        - type: email
+          template: document_uploaded
+          to: "{{exchange.coordinator.email}}"
+        - type: notification
+          channel: "in_app"
+          user: "{{exchange.coordinator.id}}"
+      cooldown: 1h
+      priority: low
+
+deployment:
+  platform: netlify
+  environment: production
+  build_command: "npm run build"
+  publish_directory: "dist"
+  functions_directory: "netlify/functions"
+  
+  resources:
+    api:
+      cpu: 1.0
+      memory: 2Gi
+      replicas: 3
+    database:
+      instance_type: db.t3.small
+      storage: 50Gi
+    redis:
+      memory: 512Mi
+  
+  environment_variables:
+    - name: PRACTICE_PANTHER_CLIENT_ID
+      value: "{{PRACTICE_PANTHER_CLIENT_ID}}"
+    - name: PRACTICE_PANTHER_CLIENT_SECRET
+      value: "{{PRACTICE_PANTHER_CLIENT_SECRET}}"
+    - name: NETLIFY_SITE_ID
+      value: "{{NETLIFY_SITE_ID}}"
+    - name: NETLIFY_AUTH_TOKEN
+      value: "{{NETLIFY_AUTH_TOKEN}}"
+    - name: RESEND_API_KEY
+      secret: true
+    - name: DATABASE_URL
+      secret: true
+    - name: REDIS_URL
+      secret: true
+    - name: JWT_SECRET
+      secret: true
+  
+  secrets:
+    - name: resend_api_key
+      description: Resend Email API Key
+      type: api_key
+    - name: database_url
+      description: PostgreSQL Database URL
+      type: connection_string
+    - name: redis_url
+      description: Redis Connection URL
+      type: connection_string
+    - name: jwt_secret
+      description: JWT Secret Key
+      type: secret
+    - name: practice_panther_client_id
+      description: PracticePanther Client ID
+      type: api_key
+    - name: practice_panther_client_secret
+      description: PracticePanther Client Secret
+      type: secret
+
+features:
+  authentication: true
+  multiTenancy: true
+  fileUpload: true
+  notifications: true
+  analytics: true
+  workflows: true
+  alerts: true
+  integrations: true
+  search: true
+  messaging: true
+  task_management: true
+  document_management: true
+  exchange_tracking: true
+  practice_panther_sync: true 

@@ -64,53 +64,40 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { usePermissions } from '../hooks/usePermissions';
-import { 
-  exchangeService, 
-  documentService, 
-  taskService, 
-  messageService 
-} from '../services/api';
+import { apiService } from '../services/api';
 
-interface Exchange {
+interface MockExchange {
   id: string;
+  pp_matter_id: string;
   name: string;
-  status: 'PENDING' | '45D' | '180D' | 'COMPLETED';
+  exchange_name?: string;
+  status: 'In Progress' | 'Completed' | 'Cancelled' | 'Draft';
   client_id: string;
   coordinator_id: string;
   start_date: string;
-  completion_date: string;
+  exchange_value: number;
+  identification_deadline: string;
+  completion_deadline?: string;
+  completion_date?: string;
+  notes: string;
+  pp_data: any;
+  last_sync_at: string;
   created_at: string;
   updated_at: string;
-  client?: {
-    first_name: string;
-    last_name: string;
-    email: string;
-    company?: string;
-  };
-  coordinator?: {
-    first_name: string;
-    last_name: string;
-    email: string;
-  };
 }
 
-interface Task {
+interface MockTask {
   id: string;
+  exchange_id: string;
   title: string;
   description: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
   priority: 'LOW' | 'MEDIUM' | 'HIGH';
-  exchange_id: string;
   assigned_to: string;
   due_date: string;
   completed_at: string;
   created_at: string;
   updated_at: string;
-  assigned_user?: {
-    first_name: string;
-    last_name: string;
-    email: string;
-  };
 }
 
 interface Document {
@@ -146,8 +133,8 @@ const AgencyDashboard: React.FC = () => {
   const { can } = usePermissions();
   
   const [activeTab, setActiveTab] = useState('overview');
-  const [exchanges, setExchanges] = useState<Exchange[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [exchanges, setExchanges] = useState<MockExchange[]>([]);
+  const [tasks, setTasks] = useState<MockTask[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -167,18 +154,18 @@ const AgencyDashboard: React.FC = () => {
       setLoading(true);
       
       const [exchangesData, tasksData, documentsData] = await Promise.all([
-        exchangeService.getExchanges(),
-        taskService.getTasks(),
-        documentService.getDocuments()
+        apiService.getExchanges(),
+        apiService.getTasks(),
+        apiService.getDocuments()
       ]);
 
-      setExchanges(exchangesData);
-      setTasks(tasksData);
-      setDocuments(documentsData);
+      setExchanges(exchangesData as any);
+      setTasks(tasksData as any);
+      setDocuments(documentsData as any);
       
       // Extract unique clients from exchanges
       const clientMap = new Map<string, Client>();
-      exchangesData.forEach((exchange: Exchange) => {
+      exchangesData.forEach((exchange: any) => {
         if (exchange.client) {
           const clientId = exchange.client_id;
           if (!clientMap.has(clientId)) {
@@ -219,12 +206,12 @@ const AgencyDashboard: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getExchangeStatusColor = (status: string) => {
     switch (status) {
-      case 'PENDING': return 'bg-yellow-100 text-yellow-800';
-      case '45D': return 'bg-blue-100 text-blue-800';
-      case '180D': return 'bg-purple-100 text-purple-800';
-      case 'COMPLETED': return 'bg-green-100 text-green-800';
+      case 'Draft': return 'bg-yellow-100 text-yellow-800';
+      case 'In Progress': return 'bg-blue-100 text-blue-800';
+      case 'Completed': return 'bg-green-100 text-green-800';
+      case 'Cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -248,12 +235,9 @@ const AgencyDashboard: React.FC = () => {
   };
 
   const filteredExchanges = exchanges.filter(exchange => {
-    const matchesSearch = exchange.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         exchange.client?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         exchange.client?.last_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (exchange.exchange_name || exchange.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || exchange.status === statusFilter;
-    const matchesClient = clientFilter === 'all' || exchange.client_id === clientFilter;
-    return matchesSearch && matchesStatus && matchesClient;
+    return matchesSearch && matchesStatus;
   });
 
   const clientExchanges = selectedClient ? exchanges.filter(e => e.client_id === selectedClient.id) : [];
@@ -265,9 +249,9 @@ const AgencyDashboard: React.FC = () => {
   const totalClients = clients.length;
   const totalTasks = tasks.length;
   const totalDocuments = documents.length;
-  const pendingExchanges = exchanges.filter(e => e.status === 'PENDING').length;
-  const activeExchanges = exchanges.filter(e => e.status === '45D' || e.status === '180D').length;
-  const completedExchanges = exchanges.filter(e => e.status === 'COMPLETED').length;
+  const pendingExchanges = exchanges.filter(e => e.status === 'Draft').length;
+  const activeExchanges = exchanges.filter(e => e.status === 'In Progress').length;
+  const completedExchanges = exchanges.filter(e => e.status === 'Completed').length;
   const overdueTasks = tasks.filter(t => {
     const dueDate = new Date(t.due_date);
     const today = new Date();
@@ -506,8 +490,8 @@ const AgencyDashboard: React.FC = () => {
                       )}
                       
                       <div className="text-sm text-gray-500">
-                        <p>Active exchanges: {exchanges.filter(e => e.client_id === client.id && e.status !== 'COMPLETED').length}</p>
-                        <p>Completed exchanges: {exchanges.filter(e => e.client_id === client.id && e.status === 'COMPLETED').length}</p>
+                        <p>Active exchanges: {exchanges.filter(e => e.client_id === client.id && e.status !== 'Completed').length}</p>
+                        <p>Completed exchanges: {exchanges.filter(e => e.client_id === client.id && e.status === 'Completed').length}</p>
                       </div>
                     </div>
                   ))}
@@ -536,8 +520,8 @@ const AgencyDashboard: React.FC = () => {
                   <div>
                     <h4 className="font-medium text-gray-900 mb-2">Exchange Summary</h4>
                     <div className="space-y-1 text-sm text-gray-600">
-                      <p>Active: {clientExchanges.filter(e => e.status !== 'COMPLETED').length}</p>
-                      <p>Completed: {clientExchanges.filter(e => e.status === 'COMPLETED').length}</p>
+                      <p>Active: {clientExchanges.filter(e => e.status !== 'Completed').length}</p>
+                      <p>Completed: {clientExchanges.filter(e => e.status === 'Completed').length}</p>
                       <p>Pending Tasks: {clientTasks.filter(t => t.status === 'PENDING').length}</p>
                       <p>Documents: {clientDocuments.length}</p>
                     </div>
@@ -557,7 +541,7 @@ const AgencyDashboard: React.FC = () => {
                               Started: {new Date(exchange.start_date).toLocaleDateString()}
                             </p>
                           </div>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(exchange.status)}`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getExchangeStatusColor(exchange.status)}`}>
                             {exchange.status}
                           </span>
                         </div>
@@ -602,10 +586,10 @@ const AgencyDashboard: React.FC = () => {
                     className="px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 w-full"
                   >
                     <option value="all">All Statuses</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="45D">45 Day</option>
-                    <option value="180D">180 Day</option>
-                    <option value="COMPLETED">Completed</option>
+                    <option value="Draft">Draft</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Cancelled">Cancelled</option>
                   </select>
                 </div>
                 <div>
@@ -635,7 +619,7 @@ const AgencyDashboard: React.FC = () => {
                 <div key={exchange.id} className="bg-white shadow rounded-lg p-6">
                   <div className="flex justify-between items-start mb-4">
                     <h3 className="text-lg font-semibold text-gray-900 truncate">{exchange.name}</h3>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(exchange.status)}`}>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getExchangeStatusColor(exchange.status)}`}>
                       {exchange.status}
                     </span>
                   </div>
@@ -644,7 +628,7 @@ const AgencyDashboard: React.FC = () => {
                     <div className="flex items-center">
                       <User className="w-4 h-4 mr-2" />
                       <span>
-                        {exchange.client?.first_name} {exchange.client?.last_name}
+                        Client ID: {exchange.client_id}
                       </span>
                     </div>
                     <div className="flex items-center">
@@ -704,8 +688,8 @@ const AgencyDashboard: React.FC = () => {
                     <div className="flex justify-between items-center text-sm text-gray-500">
                       <span>Due: {new Date(task.due_date).toLocaleDateString()}</span>
                       <span>Exchange: {exchanges.find(e => e.id === task.exchange_id)?.name}</span>
-                      <span>Client: {exchanges.find(e => e.id === task.exchange_id)?.client?.first_name} {exchanges.find(e => e.id === task.exchange_id)?.client?.last_name}</span>
-                      <span>Assigned: {task.assigned_user ? `${task.assigned_user.first_name} ${task.assigned_user.last_name}` : 'Unassigned'}</span>
+                      <span>Client ID: {task.exchange_id}</span>
+                      <span>Assigned: {task.assigned_to}</span>
                     </div>
                   </div>
                 ))}
@@ -746,11 +730,11 @@ const AgencyDashboard: React.FC = () => {
                     
                     <div className="flex justify-between items-center text-sm text-gray-500 mb-3">
                       <span>Exchange: {exchanges.find(e => e.id === document.exchange_id)?.name}</span>
-                      <span>Client: {exchanges.find(e => e.id === document.exchange_id)?.client?.first_name} {exchanges.find(e => e.id === document.exchange_id)?.client?.last_name}</span>
+                      <span>Exchange ID: {document.exchange_id}</span>
                     </div>
                     
                     <button
-                      onClick={() => documentService.downloadDocument(document.id, document.original_filename)}
+                      onClick={() => apiService.downloadDocument(document.id, document.original_filename)}
                       className="w-full inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                     >
                       <Download className="w-4 h-4 mr-2" />

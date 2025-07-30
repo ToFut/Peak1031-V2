@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const session = require('express-session');
 require('dotenv').config();
 
 const app = express();
@@ -22,6 +23,18 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.'
 });
 app.use('/api/', limiter);
+
+// Session middleware (for OAuth state management)
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'peak1031-oauth-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -46,6 +59,7 @@ app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/documents', require('./routes/documents'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/sync', require('./routes/sync'));
+app.use('/api/oauth', require('./routes/oauth'));
 app.use('/api/admin', require('./routes/admin'));
 
 // Error handling middleware

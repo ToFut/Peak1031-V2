@@ -56,4 +56,8 @@ function requireRole(roles) {
   };
 }
 
-module.exports = { checkPermission, requireRole, permissions }; 
+function requireAdmin(req, res, next) {
+  return requireRole(['admin'])(req, res, next);
+}
+
+module.exports = { checkPermission, requireRole, requireAdmin, permissions }; 
