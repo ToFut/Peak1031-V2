@@ -18,7 +18,6 @@ const PracticePantherOAuthRunner = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [authCode, setAuthCode] = useState('');
-  const [accessToken, setAccessToken] = useState('');
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
   const CONFIG = {
@@ -164,7 +163,7 @@ const PracticePantherOAuthRunner = () => {
           
           // Simulate successful token response
           const mockToken = 'mock_access_token_' + Date.now();
-          setAccessToken(mockToken);
+          // Mock token generated successfully
           
           return { 
             status: 'warning', 

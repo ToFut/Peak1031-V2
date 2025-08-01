@@ -33,25 +33,30 @@ async function authenticateToken(req, res, next) {
     }
 
     // Find user and verify account status
+    console.log('🔍 AUTH MIDDLEWARE: Looking for user with ID:', decoded.userId);
     const user = await User.findByPk(decoded.userId, {
       attributes: { exclude: ['password_hash', 'two_fa_secret'] }
     });
 
     if (!user) {
+      console.log('❌ AUTH MIDDLEWARE: User not found for ID:', decoded.userId);
       return res.status(401).json({
         error: 'Invalid token',
         message: 'User associated with token not found'
       });
     }
 
-    if (!user.is_active) {
+    console.log('✅ AUTH MIDDLEWARE: User found:', user.email, 'isActive:', user.isActive);
+    
+    if (!user.isActive) {
+      console.log('❌ AUTH MIDDLEWARE: User account disabled:', user.email);
       return res.status(403).json({
         error: 'Account disabled',
         message: 'Your account has been disabled. Please contact support.'
       });
     }
 
-    // Check for account lockout
+    // Check for account lockout (only if locked_until column exists)
     if (user.locked_until && new Date() < user.locked_until) {
       const unlockTime = new Date(user.locked_until).toISOString();
       return res.status(423).json({
@@ -230,15 +235,15 @@ function requireResourceAccess(resourceType, options = {}) {
       if (!hasAccess) {
         await AuditLog.create({
           action: 'UNAUTHORIZED_RESOURCE_ACCESS',
-          entity_type: resourceType,
-          entity_id: resourceId,
-          user_id: req.user.id,
-          ip_address: req.ip,
-          user_agent: req.get('User-Agent'),
+          entityType: resourceType,
+          entityId: resourceId,
+          userId: req.user.id,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
           details: {
             path: req.path,
             method: req.method,
-            resource_type: resourceType,
+            resourceType: resourceType,
             access_type: options.accessType || 'read'
           }
         });

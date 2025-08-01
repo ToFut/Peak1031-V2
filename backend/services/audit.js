@@ -3,13 +3,19 @@ const { AuditLog } = require('../models');
 class AuditService {
   static async log(data) {
     try {
+      // Only create audit log if userId is provided
+      if (!data.userId) {
+        console.log('⚠️ Audit log skipped - no userId provided');
+        return;
+      }
+
       await AuditLog.create({
-        user_id: data.userId,
+        userId: data.userId,
         action: data.action,
-        resource_type: data.resourceType,
-        resource_id: data.resourceId,
-        ip_address: data.ipAddress,
-        user_agent: data.userAgent,
+        entityType: data.resourceType,
+        entityId: data.resourceId,
+        ipAddress: data.ipAddress,
+        userAgent: data.userAgent,
         details: data.details || {}
       });
     } catch (error) {
@@ -20,14 +26,14 @@ class AuditService {
   static async getAuditLogs(filters = {}) {
     const where = {};
     
-    if (filters.userId) where.user_id = filters.userId;
+    if (filters.userId) where.userId = filters.userId;
     if (filters.action) where.action = filters.action;
-    if (filters.resourceType) where.resource_type = filters.resourceType;
-    if (filters.resourceId) where.resource_id = filters.resourceId;
+    if (filters.resourceType) where.entityType = filters.resourceType;
+    if (filters.resourceId) where.entityId = filters.resourceId;
     
     return await AuditLog.findAll({
       where,
-      order: [['created_at', 'DESC']],
+      order: [['createdAt', 'DESC']],
       limit: filters.limit || 100,
       offset: filters.offset || 0
     });

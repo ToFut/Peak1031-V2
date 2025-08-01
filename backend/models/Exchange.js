@@ -34,6 +34,16 @@ const Exchange = sequelize.define('Exchange', {
     comment: 'Exchange name/title'
   },
   
+  exchange_name: {
+    type: DataTypes.STRING(255),
+    allowNull: false,
+    validate: {
+      notEmpty: true,
+      len: [1, 255]
+    },
+    comment: 'Display name for the exchange'
+  },
+  
   // Status Management
   status: {
     type: DataTypes.ENUM(
@@ -134,6 +144,27 @@ const Exchange = sequelize.define('Exchange', {
     comment: 'Relinquished property details'
   },
   
+  relinquished_property_address: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    comment: 'Address of the relinquished property'
+  },
+  
+  relinquished_sale_price: {
+    type: DataTypes.DECIMAL(15, 2),
+    allowNull: true,
+    validate: {
+      min: 0
+    },
+    comment: 'Sale price of the relinquished property'
+  },
+  
+  relinquished_closing_date: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+    comment: 'Closing date of the relinquished property sale'
+  },
+  
   replacement_properties: {
     type: DataTypes.JSONB,
     allowNull: true,
@@ -180,6 +211,25 @@ const Exchange = sequelize.define('Exchange', {
     comment: 'QI contact information'
   },
   
+  // Exchange Coordinator and Professionals
+  exchange_coordinator_name: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    comment: 'Name of the exchange coordinator'
+  },
+  
+  attorney_or_cpa: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    comment: 'Attorney or CPA handling the exchange'
+  },
+  
+  bank_account_escrow: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    comment: 'Bank account or escrow information'
+  },
+  
   // Notes and Documentation
   notes: {
     type: DataTypes.TEXT,
@@ -191,6 +241,13 @@ const Exchange = sequelize.define('Exchange', {
     type: DataTypes.TEXT,
     allowNull: true,
     comment: 'Client-facing notes'
+  },
+  
+  documents: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    defaultValue: [],
+    comment: 'Array of document URIs related to this exchange'
   },
   
   // Priority and Urgency
@@ -283,6 +340,8 @@ const Exchange = sequelize.define('Exchange', {
     { fields: ['compliance_status'] },
     { fields: ['is_active'] },
     { fields: ['last_activity_at'] },
+    { fields: ['relinquished_closing_date'] },
+    { fields: ['exchange_coordinator_name'] },
     
     // Composite indexes for common queries
     { fields: ['status', 'priority'] },
@@ -292,8 +351,10 @@ const Exchange = sequelize.define('Exchange', {
     
     // Search indexes
     { fields: ['name'], type: 'gin', operator: 'gin_trgm_ops' },
+    { fields: ['exchange_name'], type: 'gin', operator: 'gin_trgm_ops' },
     { fields: ['tags'], type: 'gin' },
-    { fields: ['metadata'], type: 'gin' }
+    { fields: ['metadata'], type: 'gin' },
+    { fields: ['documents'], type: 'gin' }
   ],
   
   scopes: {
@@ -357,7 +418,7 @@ const Exchange = sequelize.define('Exchange', {
         { association: 'client', attributes: ['id', 'first_name', 'last_name', 'email', 'company'] },
         { association: 'coordinator', attributes: ['id', 'first_name', 'last_name', 'email'] },
         { association: 'tasks', where: { status: { [sequelize.Sequelize.Op.ne]: 'COMPLETED' } }, required: false },
-        { association: 'documents', attributes: ['id', 'filename', 'category', 'created_at'] }
+        { association: 'exchangeDocuments', attributes: ['id', 'filename', 'category', 'created_at'] }
       ]
     }
   },

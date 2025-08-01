@@ -85,7 +85,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ exchangeId, messages, onSendMe
                   <div className="flex-1">
                     {!isOwnMessage(message) && (
                       <p className="text-xs font-medium mb-1">
-                        {message.sender?.firstName} {message.sender?.lastName}
+                        {message.sender?.first_name} {message.sender?.last_name}
                       </p>
                     )}
                     

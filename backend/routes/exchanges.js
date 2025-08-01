@@ -2,9 +2,14 @@ const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
 const { Exchange, Contact, User, ExchangeParticipant, Task, Document, Message } = require('../models');
 const { requireRole, requireResourceAccess } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
+const { checkPermission } = require('../middleware/rbac');
 const AuditService = require('../services/audit');
 const NotificationService = require('../services/notifications');
+const ExchangeWorkflowService = require('../services/exchangeWorkflow');
+const { transformToCamelCase, transformToSnakeCase } = require('../utils/caseTransform');
 const { Op } = require('sequelize');
+const databaseService = require('../services/database');
 
 const router = express.Router();
 
@@ -83,26 +88,30 @@ router.get('/', [
     // Calculate offset for pagination
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    // Execute query with pagination
-    const { count, rows: exchanges } = await Exchange.findAndCountAll({
+    // Use database service instead of direct Sequelize
+    const exchanges = await databaseService.getExchanges({
       where: whereClause,
-      include: includeArray,
       limit: parseInt(limit),
       offset: offset,
-      order: [[sort_by, sort_order.toUpperCase()]],
-      distinct: true // Important for accurate count with includes
+      orderBy: { column: sort_by, ascending: sort_order === 'asc' }
     });
+
+    // For now, we'll get count separately since our service doesn't support findAndCountAll yet
+    const allExchanges = await databaseService.getExchanges({ where: whereClause });
+    const count = allExchanges.length;
 
     // Enhance exchange data with computed fields
     const enhancedExchanges = exchanges.map(exchange => {
-      const exchangeData = exchange.toJSON();
+      // Handle both Sequelize models and plain objects
+      const exchangeData = exchange.toJSON ? exchange.toJSON() : exchange;
       
+      // Add computed fields with defaults for Supabase data
       return {
         ...exchangeData,
-        progress: exchange.calculateProgress(),
-        deadlines: exchange.getDaysToDeadline(),
-        urgency_level: exchange.getUrgencyLevel(),
-        is_overdue: exchange.isOverdue(),
+        progress: exchange.calculateProgress ? exchange.calculateProgress() : 0,
+        deadlines: exchange.getDaysToDeadline ? exchange.getDaysToDeadline() : null,
+        urgency_level: exchange.getUrgencyLevel ? exchange.getUrgencyLevel() : 'normal',
+        is_overdue: exchange.isOverdue ? exchange.isOverdue() : false,
         participant_count: exchangeData.exchangeParticipants?.length || 0
       };
     });
@@ -110,7 +119,7 @@ router.get('/', [
     // Calculate pagination metadata
     const totalPages = Math.ceil(count / parseInt(limit));
 
-    res.json({
+    res.json(transformToCamelCase({
       exchanges: enhancedExchanges,
       pagination: {
         current_page: parseInt(page),
@@ -129,7 +138,7 @@ router.get('/', [
         sort_by,
         sort_order
       }
-    });
+    }));
 
   } catch (error) {
     console.error('Error fetching exchanges:', error);
@@ -188,7 +197,7 @@ router.get('/:id', [
         },
         {
           model: Document,
-          as: 'documents',
+          as: 'exchangeDocuments',
           where: { is_active: true },
           required: false,
           attributes: ['id', 'filename', 'category', 'created_at', 'file_size', 'pin_required']
@@ -223,7 +232,7 @@ router.get('/:id', [
         total_tasks: exchange.tasks?.length || 0,
         completed_tasks: exchange.tasks?.filter(t => t.status === 'COMPLETED').length || 0,
         pending_tasks: exchange.tasks?.filter(t => t.status === 'PENDING').length || 0,
-        total_documents: exchange.documents?.length || 0,
+        total_documents: exchange.exchangeDocuments?.length || 0,
         total_participants: exchange.exchangeParticipants?.length || 0,
         recent_activity_count: recentMessages.length
       },
@@ -247,7 +256,7 @@ router.get('/:id', [
       details: { exchange_number: exchange.exchange_number }
     });
 
-    res.json(responseData);
+    res.json(transformToCamelCase(responseData));
 
   } catch (error) {
     console.error('Error fetching exchange details:', error);
@@ -329,8 +338,16 @@ router.post('/', [
       notes,
       relinquished_property,
       replacement_properties,
-      status: 'PENDING'
+      status: 'Draft'
     });
+
+    // Create initial workflow tasks for new exchange
+    try {
+      await ExchangeWorkflowService.createStatusTasks(exchange, req.user.id);
+    } catch (error) {
+      console.error('Error creating initial workflow tasks:', error);
+      // Don't fail the exchange creation if task creation fails
+    }
 
     // Add creating user as participant if not already coordinator
     if (exchange.coordinator_id !== req.user.id) {
@@ -458,14 +475,28 @@ router.put('/:id', [
       }
     }
 
-    // Validate status transitions
+    // Validate status transitions using workflow service
     if (updates.status && updates.status !== exchange.status) {
-      const validTransitions = getValidStatusTransitions(exchange.status);
-      if (!validTransitions.includes(updates.status)) {
+      try {
+        const validation = await ExchangeWorkflowService.validateTransition(
+          exchange.id,
+          exchange.status,
+          updates.status,
+          req.user.id
+        );
+        
+        if (!validation.valid) {
+          return res.status(400).json({
+            error: 'Invalid status transition',
+            message: validation.message,
+            details: validation.details,
+            failed_conditions: validation.failedConditions
+          });
+        }
+      } catch (error) {
         return res.status(400).json({
-          error: 'Invalid status transition',
-          message: `Cannot change status from ${exchange.status} to ${updates.status}`,
-          valid_transitions: validTransitions
+          error: 'Status transition validation failed',
+          message: error.message
         });
       }
     }
@@ -575,23 +606,12 @@ router.get('/:id/participants', [
   requireResourceAccess('exchange')
 ], async (req, res) => {
   try {
-    const participants = await ExchangeParticipant.findAll({
-      where: { exchange_id: req.params.id },
-      include: [
-        { model: Contact, as: 'contact' },
-        { model: User, as: 'user', attributes: { exclude: ['password_hash', 'two_fa_secret'] } }
-      ]
+    const participants = await databaseService.getExchangeParticipants({
+      where: { exchangeId: req.params.id }
     });
 
     res.json({
-      participants: participants.map(p => ({
-        id: p.id,
-        role: p.role,
-        permissions: p.permissions,
-        contact: p.contact,
-        user: p.user,
-        created_at: p.created_at
-      }))
+      participants: participants || []
     });
 
   } catch (error) {
@@ -694,6 +714,366 @@ router.post('/:id/participants', [
 });
 
 /**
+ * DELETE /api/exchanges/:id/participants/:participantId
+ * Remove participant from exchange
+ */
+router.delete('/:id/participants/:participantId', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  param('participantId').isUUID().withMessage('Participant ID must be a valid UUID'),
+  authenticateToken,
+  requireResourceAccess('exchange', { permission: 'edit' })
+], async (req, res) => {
+  try {
+    const participant = await ExchangeParticipant.findOne({
+      where: {
+        id: req.params.participantId,
+        exchange_id: req.params.id
+      }
+    });
+
+    if (!participant) {
+      return res.status(404).json({
+        error: 'Participant not found'
+      });
+    }
+
+    await participant.destroy();
+
+    // Log participant removal
+    await AuditService.log({
+      action: 'EXCHANGE_PARTICIPANT_REMOVED',
+      entityType: 'exchange',
+      entityId: req.params.id,
+      userId: req.user.id,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: {
+        participant_id: req.params.participantId,
+        participant_email: participant.email,
+        participant_role: participant.role
+      }
+    });
+
+    res.json(transformToCamelCase({
+      success: true,
+      message: 'Participant removed successfully'
+    }));
+
+  } catch (error) {
+    console.error('Error removing participant:', error);
+    res.status(500).json({
+      error: 'Failed to remove participant',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/exchanges/:id/workflow
+ * Get exchange workflow summary
+ */
+router.get('/:id/workflow', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  authenticateToken,
+  requireResourceAccess('exchange')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const workflowSummary = await ExchangeWorkflowService.getExchangeWorkflowSummary(req.params.id);
+    
+    res.json(transformToCamelCase({
+      success: true,
+      data: workflowSummary
+    }));
+
+  } catch (error) {
+    console.error('Error fetching exchange workflow:', error);
+    res.status(500).json({
+      error: 'Failed to fetch exchange workflow',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/exchanges/:id/transitions
+ * Get available status transitions for an exchange
+ */
+router.get('/:id/transitions', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  authenticateToken,
+  requireResourceAccess('exchange')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const exchange = await Exchange.findByPk(req.params.id);
+    if (!exchange) {
+      return res.status(404).json({
+        error: 'Exchange not found'
+      });
+    }
+
+    const currentStatus = exchange.status || exchange.newStatus;
+    const availableTransitions = ExchangeWorkflowService.getAvailableTransitions(currentStatus);
+    
+    res.json(transformToCamelCase({
+      success: true,
+      currentStatus,
+      availableTransitions
+    }));
+
+  } catch (error) {
+    console.error('Error fetching available transitions:', error);
+    res.status(500).json({
+      error: 'Failed to fetch available transitions',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/exchanges/:id/transition
+ * Execute status transition for an exchange
+ */
+router.post('/:id/transition', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  authenticateToken,
+  requireResourceAccess('exchange', { permission: 'edit' }),
+  body('toStatus').isLength({ min: 1 }).withMessage('Target status is required'),
+  body('reason').optional().isLength({ max: 500 }).withMessage('Reason must be less than 500 characters'),
+  body('additionalData').optional().isObject()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { toStatus, reason, additionalData } = req.body;
+    
+    const result = await ExchangeWorkflowService.executeTransition(
+      req.params.id,
+      toStatus,
+      req.user.id,
+      reason,
+      additionalData
+    );
+
+    // Log the successful transition
+    await AuditService.log({
+      action: 'EXCHANGE_WORKFLOW_TRANSITION',
+      entityType: 'exchange',
+      entityId: req.params.id,
+      userId: req.user.id,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: {
+        toStatus,
+        reason,
+        additionalData
+      }
+    });
+
+    res.json(transformToCamelCase(result));
+
+  } catch (error) {
+    console.error('Error executing status transition:', error);
+    res.status(500).json({
+      error: 'Failed to execute status transition',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/exchanges/:id/timeline
+ * Get exchange status change timeline
+ */
+router.get('/:id/timeline', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  authenticateToken,
+  requireResourceAccess('exchange')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const timeline = await ExchangeWorkflowService.getExchangeTimeline(req.params.id);
+    
+    res.json(transformToCamelCase({
+      success: true,
+      timeline
+    }));
+
+  } catch (error) {
+    console.error('Error fetching exchange timeline:', error);
+    res.status(500).json({
+      error: 'Failed to fetch exchange timeline',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/exchanges/:id/validate-transition
+ * Validate a potential status transition without executing it
+ */
+router.post('/:id/validate-transition', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  authenticateToken,
+  requireResourceAccess('exchange'),
+  body('toStatus').isLength({ min: 1 }).withMessage('Target status is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const exchange = await Exchange.findByPk(req.params.id);
+    if (!exchange) {
+      return res.status(404).json({
+        error: 'Exchange not found'
+      });
+    }
+
+    const fromStatus = exchange.status || exchange.newStatus;
+    const { toStatus } = req.body;
+    
+    const validation = await ExchangeWorkflowService.validateTransition(
+      req.params.id,
+      fromStatus,
+      toStatus,
+      req.user.id
+    );
+
+    res.json(transformToCamelCase({
+      success: true,
+      validation
+    }));
+
+  } catch (error) {
+    console.error('Error validating transition:', error);
+    res.status(500).json({
+      error: 'Failed to validate transition',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/exchanges/:id/tasks
+ * Get tasks for a specific exchange
+ */
+router.get('/:id/tasks', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  authenticateToken,
+  requireResourceAccess('exchange', { permission: 'view' })
+], async (req, res) => {
+  try {
+    const tasks = await databaseService.getTasks({
+      where: { exchangeId: req.params.id },
+      orderBy: { column: 'dueDate', ascending: true }
+    });
+
+    res.json(transformToCamelCase({
+      success: true,
+      tasks: tasks || []
+    }));
+
+  } catch (error) {
+    console.error('Error fetching exchange tasks:', error);
+    res.status(500).json({
+      error: 'Failed to fetch tasks',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/exchanges/:id/documents
+ * Get documents for a specific exchange
+ */
+router.get('/:id/documents', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  authenticateToken,
+  requireResourceAccess('exchange', { permission: 'view' })
+], async (req, res) => {
+  try {
+    const documents = await databaseService.getDocuments({
+      where: { exchangeId: req.params.id },
+      orderBy: { column: 'createdAt', ascending: false }
+    });
+
+    res.json(transformToCamelCase({
+      success: true,
+      documents: documents || []
+    }));
+
+  } catch (error) {
+    console.error('Error fetching exchange documents:', error);
+    res.status(500).json({
+      error: 'Failed to fetch documents',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/exchanges/:id/audit-logs
+ * Get audit logs for a specific exchange
+ */
+router.get('/:id/audit-logs', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  authenticateToken,
+  requireResourceAccess('exchange', { permission: 'view' })
+], async (req, res) => {
+  try {
+    const auditLogs = await AuditService.getAuditLogs({
+      entityType: 'exchange',
+      entityId: req.params.id
+    });
+
+    res.json(transformToCamelCase({
+      success: true,
+      auditLogs: auditLogs || []
+    }));
+
+  } catch (error) {
+    console.error('Error fetching exchange audit logs:', error);
+    res.status(500).json({
+      error: 'Failed to fetch audit logs',
+      message: error.message
+    });
+  }
+});
+
+/**
  * Helper function to build where clause based on user role and filters
  */
 async function buildExchangeWhereClause(user, filters) {
@@ -750,19 +1130,277 @@ async function buildExchangeWhereClause(user, filters) {
 }
 
 /**
- * Get valid status transitions for an exchange
+ * GET /api/exchanges/system/overdue-check
+ * Check for overdue deadlines across all exchanges (admin only)
  */
-function getValidStatusTransitions(currentStatus) {
-  const transitions = {
-    'PENDING': ['45D', 'TERMINATED', 'ON_HOLD'],
-    '45D': ['180D', 'TERMINATED', 'ON_HOLD'],
-    '180D': ['COMPLETED', 'TERMINATED', 'ON_HOLD'],
-    'COMPLETED': [], // No transitions from completed
-    'TERMINATED': [], // No transitions from terminated
-    'ON_HOLD': ['PENDING', '45D', '180D', 'TERMINATED']
-  };
+router.get('/system/overdue-check', [
+  authenticateToken,
+  requireRole(['admin', 'staff'])
+], async (req, res) => {
+  try {
+    const overdueResults = await ExchangeWorkflowService.checkOverdueDeadlines();
+    
+    res.json(transformToCamelCase({
+      success: true,
+      data: overdueResults,
+      message: `Found ${overdueResults.overdueIdentification} overdue identification deadlines and ${overdueResults.overdueExchange} overdue exchange deadlines`
+    }));
 
-  return transitions[currentStatus] || [];
-}
+  } catch (error) {
+    console.error('Error checking overdue deadlines:', error);
+    res.status(500).json({
+      error: 'Failed to check overdue deadlines',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/exchanges/:id/status
+ * Update exchange status with workflow validation
+ */
+router.post('/:id/status', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  authenticateToken,
+  requireResourceAccess('exchange', { permission: 'edit' }),
+  body('status').isLength({ min: 1 }).withMessage('Status is required'),
+  body('reason').optional().isLength({ max: 500 }).withMessage('Reason must be less than 500 characters'),
+  body('notes').optional().isLength({ max: 1000 }).withMessage('Notes must be less than 1000 characters')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { status, reason, notes } = req.body;
+    const exchange = await databaseService.getExchange(req.params.id);
+
+    if (!exchange) {
+      return res.status(404).json({ error: 'Exchange not found' });
+    }
+
+    const updateData = {
+      status,
+      updated_by: req.user.id,
+      updated_at: new Date()
+    };
+
+    if (notes) updateData.notes = notes;
+
+    const updatedExchange = await databaseService.updateExchange(req.params.id, updateData);
+
+    // Log status change
+    await AuditService.log({
+      action: 'EXCHANGE_STATUS_UPDATED',
+      entityType: 'exchange',
+      entityId: req.params.id,
+      userId: req.user.id,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: {
+        old_status: exchange.status,
+        new_status: status,
+        reason,
+        notes
+      }
+    });
+
+    // Emit real-time status update
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`exchange-${req.params.id}`).emit('status-updated', {
+        exchangeId: req.params.id,
+        status,
+        updatedBy: req.user.id,
+        updatedAt: new Date()
+      });
+    }
+
+    res.json(transformToCamelCase({
+      success: true,
+      exchange: updatedExchange,
+      message: 'Exchange status updated successfully'
+    }));
+
+  } catch (error) {
+    console.error('Error updating exchange status:', error);
+    res.status(500).json({
+      error: 'Failed to update exchange status',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/exchanges/:id/activity
+ * Get exchange activity feed
+ */
+router.get('/:id/activity', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  authenticateToken,
+  requireResourceAccess('exchange')
+], async (req, res) => {
+  try {
+    const { limit = 50, offset = 0 } = req.query;
+    
+    const activities = await databaseService.getExchangeActivity(req.params.id, {
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+    res.json(transformToCamelCase({
+      activities,
+      pagination: {
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        hasMore: activities.length === parseInt(limit)
+      }
+    }));
+
+  } catch (error) {
+    console.error('Error fetching exchange activity:', error);
+    res.status(500).json({
+      error: 'Failed to fetch exchange activity',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/exchanges/:id/milestone
+ * Add milestone to exchange
+ */
+router.post('/:id/milestone', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  authenticateToken,
+  requireResourceAccess('exchange', { permission: 'edit' }),
+  body('title').isLength({ min: 1, max: 255 }).withMessage('Title is required and must be less than 255 characters'),
+  body('description').optional().isLength({ max: 1000 }),
+  body('due_date').optional().isISO8601(),
+  body('milestone_type').optional().isIn(['deadline', 'checkpoint', 'approval', 'document', 'payment'])
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { title, description, due_date, milestone_type = 'checkpoint' } = req.body;
+
+    const milestoneData = {
+      exchange_id: req.params.id,
+      title,
+      description,
+      due_date: due_date ? new Date(due_date) : null,
+      milestone_type,
+      status: 'pending',
+      created_by: req.user.id,
+      created_at: new Date()
+    };
+
+    const milestone = await databaseService.createExchangeMilestone(milestoneData);
+
+    // Log milestone creation
+    await AuditService.log({
+      action: 'EXCHANGE_MILESTONE_CREATED',
+      entityType: 'exchange',
+      entityId: req.params.id,
+      userId: req.user.id,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: {
+        milestone_id: milestone.id,
+        title,
+        milestone_type
+      }
+    });
+
+    res.status(201).json(transformToCamelCase({
+      success: true,
+      milestone,
+      message: 'Milestone created successfully'
+    }));
+
+  } catch (error) {
+    console.error('Error creating exchange milestone:', error);
+    res.status(500).json({
+      error: 'Failed to create milestone',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/exchanges/:id/milestone/:milestoneId
+ * Update exchange milestone
+ */
+router.put('/:id/milestone/:milestoneId', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  param('milestoneId').isUUID().withMessage('Milestone ID must be a valid UUID'),
+  authenticateToken,
+  requireResourceAccess('exchange', { permission: 'edit' }),
+  body('status').optional().isIn(['pending', 'in_progress', 'completed', 'cancelled']),
+  body('completion_notes').optional().isLength({ max: 500 })
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { status, completion_notes } = req.body;
+    const updateData = {};
+
+    if (status !== undefined) {
+      updateData.status = status;
+      if (status === 'completed') {
+        updateData.completed_at = new Date();
+        updateData.completed_by = req.user.id;
+      }
+    }
+
+    if (completion_notes) updateData.completion_notes = completion_notes;
+
+    const milestone = await databaseService.updateExchangeMilestone(req.params.milestoneId, updateData);
+
+    // Log milestone update
+    await AuditService.log({
+      action: 'EXCHANGE_MILESTONE_UPDATED',
+      entityType: 'exchange',
+      entityId: req.params.id,
+      userId: req.user.id,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: {
+        milestone_id: req.params.milestoneId,
+        status,
+        completion_notes
+      }
+    });
+
+    res.json(transformToCamelCase({
+      success: true,
+      milestone,
+      message: 'Milestone updated successfully'
+    }));
+
+  } catch (error) {
+    console.error('Error updating milestone:', error);
+    res.status(500).json({
+      error: 'Failed to update milestone',
+      message: error.message
+    });
+  }
+});
 
 module.exports = router;

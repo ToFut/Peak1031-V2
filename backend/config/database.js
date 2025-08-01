@@ -1,42 +1,24 @@
 const { Sequelize } = require('sequelize');
 const path = require('path');
 
-// Use SQLite for development, PostgreSQL for production
+// For development, use Supabase REST API for data operations
 const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+const useSupabase = true; // Always use Supabase
+const useSQLite = false; // Never use SQLite
 
-const sequelize = new Sequelize(
-  isDevelopment 
-    ? {
-        dialect: 'sqlite',
-        storage: path.join(__dirname, '../../database.sqlite'),
-        logging: false,
-        define: {
-          timestamps: true,
-          underscored: true,
-          freezeTableName: true
-        }
-      }
-    : {
-        database: process.env.DB_NAME || 'peak1031_dev',
-        username: process.env.DB_USER || 'postgres',
-        password: process.env.DB_PASSWORD || 'password',
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 5432,
-    dialect: 'postgres',
-    logging: process.env.NODE_ENV === 'development' ? console.log : false,
-    pool: {
-      max: 10,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
-    },
-    define: {
-      timestamps: true,
-      underscored: true,
-      freezeTableName: true
-    }
+console.log('🔧 Database Service: Using Supabase REST API only');
+
+// Create a minimal Sequelize instance for model definitions
+const sequelize = new Sequelize({
+  dialect: 'sqlite',
+  storage: path.join(__dirname, '../../database.sqlite'),
+  logging: false,
+  define: {
+    timestamps: true,
+    underscored: true,
+    freezeTableName: true
   }
-);
+});
 
 // Test database connection
 const testConnection = async () => {
@@ -48,4 +30,4 @@ const testConnection = async () => {
   }
 };
 
-module.exports = { sequelize, testConnection }; 
+module.exports = { sequelize, testConnection, useSupabase }; 

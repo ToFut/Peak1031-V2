@@ -1,76 +1,545 @@
-const { User } = require('../models');
+const sgMail = require('@sendgrid/mail');
+const twilio = require('twilio');
+require('dotenv').config();
 
 class NotificationService {
-  constructor(io) {
-    this.io = io;
+  constructor() {
+    // Initialize SendGrid only if valid API key is provided
+    if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.startsWith('SG.')) {
+      sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+      this.sendGridEnabled = true;
+    } else {
+      this.sendGridEnabled = false;
+      console.log('⚠️ SendGrid not configured - email notifications disabled');
+    }
+    
+    // Initialize Twilio only if valid credentials are provided
+    if (process.env.TWILIO_ACCOUNT_SID && 
+        process.env.TWILIO_AUTH_TOKEN && 
+        process.env.TWILIO_ACCOUNT_SID.startsWith('AC')) {
+      this.twilioClient = twilio(
+        process.env.TWILIO_ACCOUNT_SID,
+        process.env.TWILIO_AUTH_TOKEN
+      );
+      this.twilioEnabled = true;
+    } else {
+      this.twilioEnabled = false;
+      console.log('⚠️ Twilio not configured - SMS notifications disabled');
+    }
+    
+    this.fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@peak1031.com';
+    this.fromName = process.env.SENDGRID_FROM_NAME || 'Peak 1031 Platform';
+    this.fromPhone = process.env.TWILIO_FROM_NUMBER;
+    this.baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   }
 
-  async sendNotification(userId, notification) {
+  /**
+   * Send welcome email to new users
+   */
+  async sendWelcomeEmail(email, firstName, tempPassword = null) {
+    if (!this.sendGridEnabled) {
+      console.log('📧 SendGrid not enabled - skipping welcome email to:', email);
+      return { success: true, skipped: true };
+    }
+
     try {
-      // Send real-time notification
-      this.io.to(`user:${userId}`).emit('notification', notification);
+      const subject = 'Welcome to Peak 1031 Platform';
       
-      // Store notification in database (if needed)
-      // await Notification.create({
-      //   user_id: userId,
-      //   title: notification.title,
-      //   message: notification.message,
-      //   type: notification.type
-      // });
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #2563eb; color: white; padding: 20px; text-align: center;">
+            <h1>Welcome to Peak 1031</h1>
+          </div>
+          
+          <div style="padding: 30px;">
+            <h2>Hello ${firstName}!</h2>
+            
+            <p>Welcome to the Peak 1031 Exchange Management Platform. Your account has been created successfully.</p>
+            
+            ${tempPassword ? `
+              <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3>Your Login Details:</h3>
+                <p><strong>Email:</strong> ${email}</p>
+                <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+                <p style="color: #dc2626;"><strong>Important:</strong> Please change your password after your first login.</p>
+              </div>
+            ` : ''}
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${this.baseUrl}/login" 
+                 style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Access Your Account
+              </a>
+            </div>
+            
+            <h3>What's Next?</h3>
+            <ul>
+              <li>Complete your profile setup</li>
+              <li>Review your assigned exchanges</li>
+              <li>Enable two-factor authentication for enhanced security</li>
+            </ul>
+            
+            <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+            
+            <p>Best regards,<br>The Peak 1031 Team</p>
+          </div>
+          
+          <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 14px;">
+              This email was sent to ${email}. If you didn't expect this email, please ignore it.
+            </p>
+          </div>
+        </div>
+      `;
+
+      const msg = {
+        to: email,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject,
+        html
+      };
+
+      await sgMail.send(msg);
+      console.log('✅ Welcome email sent to:', email);
       
-      return true;
+      return { success: true };
     } catch (error) {
-      console.error('Error sending notification:', error);
-      return false;
+      console.error('❌ Failed to send welcome email:', error);
+      return { success: false, error: error.message };
     }
   }
 
-  async sendExchangeNotification(exchangeId, notification) {
+  /**
+   * Send password reset email
+   */
+  async sendPasswordResetEmail(email, firstName, resetToken) {
+    if (!this.sendGridEnabled) {
+      console.log('📧 SendGrid not enabled - skipping password reset email to:', email);
+      return { success: true, skipped: true };
+    }
+
     try {
-      // Get all users involved in the exchange
-      const exchange = await Exchange.findByPk(exchangeId, {
-        include: [
-          { model: User, as: 'coordinator' },
-          { model: User, as: 'client' }
-        ]
-      });
+      const resetUrl = `${this.baseUrl}/reset-password?token=${resetToken}`;
+      const subject = 'Reset Your Password - Peak 1031';
+      
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #dc2626; color: white; padding: 20px; text-align: center;">
+            <h1>Password Reset Request</h1>
+          </div>
+          
+          <div style="padding: 30px;">
+            <h2>Hello ${firstName},</h2>
+            
+            <p>We received a request to reset your password for your Peak 1031 account.</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${resetUrl}" 
+                 style="background-color: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Reset Your Password
+              </a>
+            </div>
+            
+            <p>This link will expire in 1 hour for security reasons.</p>
+            
+            <p>If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>
+            
+            <p>For security reasons, if you continue to receive these emails, please contact our support team immediately.</p>
+            
+            <p>Best regards,<br>The Peak 1031 Team</p>
+          </div>
+          
+          <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 14px;">
+              This email was sent to ${email}. This link expires in 1 hour.
+            </p>
+          </div>
+        </div>
+      `;
 
-      if (!exchange) return;
+      const msg = {
+        to: email,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject,
+        html
+      };
 
-      const users = [];
-      if (exchange.coordinator) users.push(exchange.coordinator);
-      if (exchange.client) users.push(exchange.client);
-
-      // Send notification to all users
-      users.forEach(user => {
-        this.sendNotification(user.id, {
-          ...notification,
-          exchangeId
-        });
-      });
+      await sgMail.send(msg);
+      console.log('✅ Password reset email sent to:', email);
+      
+      return { success: true };
     } catch (error) {
-      console.error('Error sending exchange notification:', error);
+      console.error('❌ Failed to send password reset email:', error);
+      return { success: false, error: error.message };
     }
   }
 
-  async sendTaskNotification(taskId, notification) {
+  /**
+   * Send password reset confirmation email
+   */
+  async sendPasswordResetConfirmation(email, firstName) {
+    if (!this.sendGridEnabled) {
+      console.log('📧 SendGrid not enabled - skipping password reset confirmation email to:', email);
+      return { success: true, skipped: true };
+    }
+
     try {
-      const task = await Task.findByPk(taskId, {
-        include: [
-          { model: User, as: 'assignedUser' }
-        ]
+      const subject = 'Password Reset Successful - Peak 1031';
+      
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #16a34a; color: white; padding: 20px; text-align: center;">
+            <h1>Password Reset Successful</h1>
+          </div>
+          
+          <div style="padding: 30px;">
+            <h2>Hello ${firstName},</h2>
+            
+            <p>Your password has been successfully reset for your Peak 1031 account.</p>
+            
+            <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 15px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>✅ Password Reset Complete</strong></p>
+              <p style="margin: 5px 0 0 0;">You can now log in with your new password.</p>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${this.baseUrl}/login" 
+                 style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Log In Now
+              </a>
+            </div>
+            
+            <p>If you didn't reset your password, please contact our support team immediately as your account may be compromised.</p>
+            
+            <p>For your security, we recommend:</p>
+            <ul>
+              <li>Using a strong, unique password</li>
+              <li>Enabling two-factor authentication</li>
+              <li>Not sharing your login credentials</li>
+            </ul>
+            
+            <p>Best regards,<br>The Peak 1031 Team</p>
+          </div>
+          
+          <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 14px;">
+              This email was sent to ${email} at ${new Date().toLocaleString()}.
+            </p>
+          </div>
+        </div>
+      `;
+
+      const msg = {
+        to: email,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject,
+        html
+      };
+
+      await sgMail.send(msg);
+      console.log('✅ Password reset confirmation sent to:', email);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Failed to send password reset confirmation:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send 2FA enabled confirmation
+   */
+  async sendTwoFactorEnabled(email, firstName) {
+    if (!this.sendGridEnabled) {
+      console.log('📧 SendGrid not enabled - skipping 2FA enabled email to:', email);
+      return { success: true, skipped: true };
+    }
+
+    try {
+      const subject = 'Two-Factor Authentication Enabled - Peak 1031';
+      
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #16a34a; color: white; padding: 20px; text-align: center;">
+            <h1>🔒 2FA Enabled</h1>
+          </div>
+          
+          <div style="padding: 30px;">
+            <h2>Hello ${firstName},</h2>
+            
+            <p>Two-factor authentication has been successfully enabled for your Peak 1031 account.</p>
+            
+            <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 15px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>✅ Enhanced Security Active</strong></p>
+              <p style="margin: 5px 0 0 0;">Your account is now protected with an additional layer of security.</p>
+            </div>
+            
+            <h3>What This Means:</h3>
+            <ul>
+              <li>You'll need both your password and authenticator code to log in</li>
+              <li>Your account is protected even if your password is compromised</li>
+              <li>You can manage 2FA settings in your account preferences</li>
+            </ul>
+            
+            <p><strong>Important:</strong> Make sure to save your backup codes in a secure location. You can access them in your account settings.</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${this.baseUrl}/dashboard" 
+                 style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Access Your Account
+              </a>
+            </div>
+            
+            <p>If you didn't enable 2FA, please contact our support team immediately.</p>
+            
+            <p>Best regards,<br>The Peak 1031 Team</p>
+          </div>
+        </div>
+      `;
+
+      const msg = {
+        to: email,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject,
+        html
+      };
+
+      await sgMail.send(msg);
+      console.log('✅ 2FA enabled email sent to:', email);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Failed to send 2FA enabled email:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send 2FA disabled confirmation
+   */
+  async sendTwoFactorDisabled(email, firstName) {
+    if (!this.sendGridEnabled) {
+      console.log('📧 SendGrid not enabled - skipping 2FA disabled email to:', email);
+      return { success: true, skipped: true };
+    }
+
+    try {
+      const subject = 'Two-Factor Authentication Disabled - Peak 1031';
+      
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #dc2626; color: white; padding: 20px; text-align: center;">
+            <h1>🔓 2FA Disabled</h1>
+          </div>
+          
+          <div style="padding: 30px;">
+            <h2>Hello ${firstName},</h2>
+            
+            <p>Two-factor authentication has been disabled for your Peak 1031 account.</p>
+            
+            <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>⚠️ Security Level Reduced</strong></p>
+              <p style="margin: 5px 0 0 0;">Your account now relies only on password protection.</p>
+            </div>
+            
+            <p>We strongly recommend keeping 2FA enabled for the best security. You can re-enable it at any time in your account settings.</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${this.baseUrl}/dashboard/settings" 
+                 style="background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Re-enable 2FA
+              </a>
+            </div>
+            
+            <p>If you didn't disable 2FA, please contact our support team immediately and change your password.</p>
+            
+            <p>Best regards,<br>The Peak 1031 Team</p>
+          </div>
+        </div>
+      `;
+
+      const msg = {
+        to: email,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject,
+        html
+      };
+
+      await sgMail.send(msg);
+      console.log('✅ 2FA disabled email sent to:', email);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Failed to send 2FA disabled email:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send SMS notification
+   */
+  async sendSMS(phoneNumber, message) {
+    if (!this.twilioEnabled) {
+      console.log('📱 Twilio not enabled - skipping SMS to:', phoneNumber);
+      return { success: true, skipped: true };
+    }
+
+    try {
+      const result = await this.twilioClient.messages.create({
+        body: message,
+        from: this.fromPhone,
+        to: phoneNumber
       });
 
-      if (task && task.assignedUser) {
-        this.sendNotification(task.assignedUser.id, {
-          ...notification,
-          taskId
-        });
-      }
+      console.log('✅ SMS sent:', result.sid);
+      return { success: true, messageId: result.sid };
     } catch (error) {
-      console.error('Error sending task notification:', error);
+      console.error('❌ Failed to send SMS:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send document notification
+   */
+  async sendDocumentNotification(email, firstName, documentName, exchangeName, action = 'uploaded') {
+    if (!this.sendGridEnabled) {
+      console.log('📧 SendGrid not enabled - skipping document notification email to:', email);
+      return { success: true, skipped: true };
+    }
+
+    try {
+      const subject = `New Document ${action.charAt(0).toUpperCase() + action.slice(1)} - ${exchangeName}`;
+      
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #2563eb; color: white; padding: 20px; text-align: center;">
+            <h1>📄 Document ${action.charAt(0).toUpperCase() + action.slice(1)}</h1>
+          </div>
+          
+          <div style="padding: 30px;">
+            <h2>Hello ${firstName},</h2>
+            
+            <p>A document has been ${action} for your exchange.</p>
+            
+            <div style="background-color: #eff6ff; border-left: 4px solid #2563eb; padding: 15px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>Exchange:</strong> ${exchangeName}</p>
+              <p style="margin: 5px 0 0 0;"><strong>Document:</strong> ${documentName}</p>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${this.baseUrl}/dashboard" 
+                 style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                View Document
+              </a>
+            </div>
+            
+            <p>You can access this document in your exchange dashboard.</p>
+            
+            <p>Best regards,<br>The Peak 1031 Team</p>
+          </div>
+        </div>
+      `;
+
+      const msg = {
+        to: email,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject,
+        html
+      };
+
+      await sgMail.send(msg);
+      console.log('✅ Document notification sent to:', email);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Failed to send document notification:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send message notification
+   */
+  async sendMessageNotification(email, firstName, senderName, exchangeName, messagePreview) {
+    if (!this.sendGridEnabled) {
+      console.log('📧 SendGrid not enabled - skipping message notification email to:', email);
+      return { success: true, skipped: true };
+    }
+
+    try {
+      const subject = `New Message from ${senderName} - ${exchangeName}`;
+      
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #16a34a; color: white; padding: 20px; text-align: center;">
+            <h1>💬 New Message</h1>
+          </div>
+          
+          <div style="padding: 30px;">
+            <h2>Hello ${firstName},</h2>
+            
+            <p>You have a new message in your exchange.</p>
+            
+            <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 15px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>From:</strong> ${senderName}</p>
+              <p style="margin: 5px 0;"><strong>Exchange:</strong> ${exchangeName}</p>
+              <div style="margin-top: 10px; padding: 10px; background-color: #dcfce7; border-radius: 4px;">
+                <em>${messagePreview}</em>
+              </div>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${this.baseUrl}/dashboard" 
+                 style="background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                View Message
+              </a>
+            </div>
+            
+            <p>You can reply directly in your exchange dashboard.</p>
+            
+            <p>Best regards,<br>The Peak 1031 Team</p>
+          </div>
+        </div>
+      `;
+
+      const msg = {
+        to: email,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject,
+        html
+      };
+
+      await sgMail.send(msg);
+      console.log('✅ Message notification sent to:', email);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Failed to send message notification:', error);
+      return { success: false, error: error.message };
     }
   }
 }
 
-module.exports = NotificationService; 
+module.exports = new NotificationService();

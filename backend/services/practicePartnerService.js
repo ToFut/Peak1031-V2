@@ -10,11 +10,16 @@ class PracticePartnerService {
     this.accessToken = null;
     this.tokenExpiry = null;
     
-    // Initialize Supabase
-    this.supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_API_KEY
-    );
+    // Initialize Supabase only if configuration is available
+    if (process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_API_KEY)) {
+      this.supabase = createClient(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_API_KEY
+      );
+    } else {
+      console.log('⚠️ Supabase configuration not available - PracticePartner service will use limited functionality');
+      this.supabase = null;
+    }
 
     // Rate limiting: 300 requests per 5 minutes according to PP docs
     this.rateLimiter = {
@@ -81,6 +86,11 @@ class PracticePartnerService {
    */
   async getStoredToken() {
     try {
+      if (!this.supabase) {
+        console.log('🔍 PP: Supabase not available, cannot get stored token');
+        return null;
+      }
+
       const { data, error } = await this.supabase
         .from('oauth_tokens')
         .select('*')
@@ -122,6 +132,11 @@ class PracticePartnerService {
    */
   async storeToken(tokenData) {
     try {
+      if (!this.supabase) {
+        console.log('⚠️ PP: Supabase not available, cannot store token');
+        return false;
+      }
+
       const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000));
       
       const tokenRecord = {
@@ -168,7 +183,7 @@ class PracticePartnerService {
         client_secret: this.clientSecret
       });
 
-      const response = await axios.post('https://app.practicepanther.com/oauth/token', formData, {
+      const response = await axios.post('https://app.practicepanther.com/OAuth/Token', formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json'
@@ -208,7 +223,7 @@ class PracticePartnerService {
       state: state || Math.random().toString(36).substring(7)
     });
 
-    const authUrl = `https://app.practicepanther.com/oauth/authorize?${params.toString()}`;
+    const authUrl = `https://app.practicepanther.com/OAuth/Authorize?${params.toString()}`;
     console.log('🔗 PP: Generated auth URL:', authUrl);
     return authUrl;
   }
@@ -228,7 +243,7 @@ class PracticePartnerService {
         redirect_uri: process.env.PP_REDIRECT_URI
       });
 
-      const response = await axios.post('https://app.practicepanther.com/oauth/token', formData, {
+      const response = await axios.post('https://app.practicepanther.com/OAuth/Token', formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json'
@@ -414,12 +429,12 @@ class PracticePartnerService {
     try {
       const response = await this.client.get('/contacts', { params });
       
-      console.log(`✅ PP: Fetched ${response.data.results?.length || 0} contacts`);
+      console.log(`✅ PP: Fetched ${Object.values(response.data)?.length || 0} contacts`);
       
       return {
-        results: response.data.results || [],
-        hasMore: response.data.has_more || false,
-        nextPageUrl: response.data.next_page_url || null
+        results: Object.values(response.data) || [],
+        hasMore: false || false,
+        nextPageUrl: null || null
       };
     } catch (error) {
       console.error('❌ PP: Error fetching contacts:', error.message);
@@ -436,12 +451,12 @@ class PracticePartnerService {
     try {
       const response = await this.client.get('/matters', { params });
       
-      console.log(`✅ PP: Fetched ${response.data.results?.length || 0} matters`);
+      console.log(`✅ PP: Fetched ${Object.values(response.data)?.length || 0} matters`);
       
       return {
-        results: response.data.results || [],
-        hasMore: response.data.has_more || false,
-        nextPageUrl: response.data.next_page_url || null
+        results: Object.values(response.data) || [],
+        hasMore: false || false,
+        nextPageUrl: null || null
       };
     } catch (error) {
       console.error('❌ PP: Error fetching matters:', error.message);
@@ -458,12 +473,12 @@ class PracticePartnerService {
     try {
       const response = await this.client.get('/tasks', { params });
       
-      console.log(`✅ PP: Fetched ${response.data.results?.length || 0} tasks`);
+      console.log(`✅ PP: Fetched ${Object.values(response.data)?.length || 0} tasks`);
       
       return {
-        results: response.data.results || [],
-        hasMore: response.data.has_more || false,
-        nextPageUrl: response.data.next_page_url || null
+        results: Object.values(response.data) || [],
+        hasMore: false || false,
+        nextPageUrl: null || null
       };
     } catch (error) {
       console.error('❌ PP: Error fetching tasks:', error.message);
@@ -1398,4 +1413,13 @@ class PracticePartnerService {
   }
 }
 
-module.exports = new PracticePartnerService();
+// Only create the service instance if Supabase is configured
+let practicePartnerService = null;
+if (process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_API_KEY)) {
+  practicePartnerService = new PracticePartnerService();
+  console.log('✅ PracticePartnerService initialized with Supabase');
+} else {
+  console.log('⚠️ Supabase not configured - PracticePartnerService disabled');
+}
+
+module.exports = practicePartnerService;

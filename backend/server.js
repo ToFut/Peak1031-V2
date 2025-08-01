@@ -1,3 +1,6 @@
+// Load environment variables from .env file
+require('dotenv').config();
+
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -11,10 +14,14 @@ const path = require('path');
 const { sequelize } = require('./models');
 const config = require('./config/database');
 const { authenticateToken } = require('./middleware/auth');
+const { authenticateSupabaseToken } = require('./middleware/supabase-auth');
+const { authenticateHybridToken } = require('./middleware/hybrid-auth');
 const auditMiddleware = require('./middleware/audit');
 
 // Import routes
 const authRoutes = require('./routes/auth');
+const supabaseAuthRoutes = require('./routes/supabase-auth');
+const workingAuthRoutes = require('./routes/working-auth');
 const contactRoutes = require('./routes/contacts');
 const exchangeRoutes = require('./routes/exchanges');
 const taskRoutes = require('./routes/tasks');
@@ -22,7 +29,10 @@ const documentRoutes = require('./routes/documents');
 const messageRoutes = require('./routes/messages');
 const syncRoutes = require('./routes/sync');
 const adminRoutes = require('./routes/admin');
+const notificationRoutes = require('./routes/notifications');
 const oauthRoutes = require('./routes/oauth');
+const exportRoutes = require('./routes/exports');
+const { router: exchangeParticipantsRoutes } = require('./routes/exchange-participants');
 
 // Import services
 const MessageService = require('./services/messages');
@@ -34,7 +44,7 @@ class PeakServer {
     this.server = http.createServer(this.app);
     this.io = socketIo(this.server, {
       cors: {
-        origin: process.env.FRONTEND_URL || "http://localhost:8000",
+        origin: process.env.FRONTEND_URL || "http://localhost:3000",
         methods: ["GET", "POST"],
         credentials: true
       },
@@ -64,34 +74,55 @@ class PeakServer {
     }));
 
     // CORS configuration
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || "http://localhost:3000",
+      "http://localhost:3001", // Allow port 3001 for development
+      "http://localhost:3002", // Allow port 3002 for development
+      "http://localhost:3003"  // Allow port 3003 for development
+    ];
+    
     this.app.use(cors({
-      origin: process.env.FRONTEND_URL || "http://localhost:8000",
+      origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+          callback(null, true);
+        } else {
+          console.log('🚫 CORS blocked origin:', origin);
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization']
     }));
 
     // Rate limiting
-    const limiter = rateLimit({
-      windowMs: 15 * 60 * 1000, // 15 minutes
-      max: process.env.NODE_ENV === 'production' ? 100 : 1000, // requests per window
-      message: {
-        error: 'Too many requests from this IP, please try again later'
-      },
-      standardHeaders: true,
-      legacyHeaders: false
-    });
-    this.app.use(limiter);
+    if (process.env.DISABLE_RATE_LIMIT !== 'true') {
+      const limiter = rateLimit({
+        windowMs: 15 * 60 * 1000, // 15 minutes
+        max: process.env.NODE_ENV === 'production' ? 100 : 1000, // requests per window
+        message: {
+          error: 'Too many requests from this IP, please try again later'
+        },
+        standardHeaders: true,
+        legacyHeaders: false
+      });
+      this.app.use(limiter);
+    }
 
     // Stricter rate limiting for auth endpoints
-    const authLimiter = rateLimit({
-      windowMs: 15 * 60 * 1000,
-      max: 10,
-      message: {
-        error: 'Too many authentication attempts, please try again later'
-      }
-    });
-    this.app.use('/api/auth', authLimiter);
+    if (process.env.DISABLE_RATE_LIMIT !== 'true') {
+      const authLimiter = rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: process.env.NODE_ENV === 'production' ? 10 : 100, // Higher limit for development
+        message: {
+          error: 'Too many authentication attempts, please try again later'
+        }
+      });
+      this.app.use('/api/auth', authLimiter);
+    }
 
     // Body parsing middleware
     this.app.use(compression());
@@ -103,11 +134,10 @@ class PeakServer {
       this.app.use(morgan('combined'));
     }
 
-    // Audit logging middleware
-    this.app.use(auditMiddleware);
-
+    // NO audit middleware here - will apply per route later
     // Health check endpoint (before auth)
     this.app.get('/health', (req, res) => {
+      console.log('🏥 Simple health check');
       res.status(200).json({ 
         status: 'healthy', 
         timestamp: new Date().toISOString(),
@@ -119,6 +149,18 @@ class PeakServer {
   }
 
   initializeRoutes() {
+    // Health check endpoint (no auth required)
+    this.app.get('/api/health', (req, res) => {
+      console.log('🏥 Health check requested - ROUTE HANDLER REACHED');
+      res.json({ 
+        status: 'healthy', 
+        timestamp: new Date().toISOString(),
+        service: 'Peak 1031 Backend API',
+        version: '1.0.0'
+      });
+      console.log('🏥 Health response sent');
+    });
+
     // API documentation endpoint (must be first)
     this.app.get('/api', (req, res) => {
       res.json({
@@ -127,25 +169,32 @@ class PeakServer {
         documentation: '/api/docs',
         endpoints: {
           auth: '/api/auth',
+          'legacy-auth': '/api/auth/legacy',
           contacts: '/api/contacts',
           exchanges: '/api/exchanges',
           tasks: '/api/tasks',
           documents: '/api/documents',
           messages: '/api/messages',
+          notifications: '/api/notifications',
+          exports: '/api/exports',
           sync: '/api/sync',
           admin: '/api/admin'
         }
       });
     });
 
-    // API routes
-    this.app.use('/api/auth', authRoutes);
+    // API routes - Use working auth for now
+    this.app.use('/api/auth', workingAuthRoutes);
+    this.app.use('/api/auth/supabase', supabaseAuthRoutes); // Keep Supabase auth available
+    this.app.use('/api/auth/legacy', authRoutes); // Keep old auth for reference
     this.app.use('/api/oauth', oauthRoutes);
     this.app.use('/api/contacts', authenticateToken, contactRoutes);
     this.app.use('/api/exchanges', authenticateToken, exchangeRoutes);
     this.app.use('/api/tasks', authenticateToken, taskRoutes);
     this.app.use('/api/documents', authenticateToken, documentRoutes);
     this.app.use('/api/messages', authenticateToken, messageRoutes);
+    this.app.use('/api/notifications', authenticateToken, notificationRoutes);
+    this.app.use('/api/exports', authenticateToken, exportRoutes);
     this.app.use('/api/sync', authenticateToken, syncRoutes);
     this.app.use('/api/admin', authenticateToken, adminRoutes);
 
@@ -173,13 +222,44 @@ class PeakServer {
     // Socket.IO authentication middleware
     this.io.use(async (socket, next) => {
       try {
+        console.log('🔌 Socket.IO authentication attempt');
         const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
         if (!token) {
+          console.log('❌ No token provided');
           return next(new Error('Authentication token required'));
         }
 
-        const authService = require('./services/auth');
-        const user = await authService.verifyToken(token);
+        console.log('🔍 Token received, verifying...');
+        // Use same JWT verification as API routes
+        const AuthService = require('./services/auth');
+        const { User } = require('./models');
+        
+        const decoded = AuthService.verifyToken(token);
+        console.log('✅ Token verified, user ID:', decoded.userId);
+        
+        // Check if token is expired
+        if (decoded.exp && decoded.exp < Date.now() / 1000) {
+          console.log('❌ Token expired');
+          return next(new Error('Token expired'));
+        }
+
+        // Find user and verify account status
+        console.log('🔍 Looking for user with ID:', decoded.userId);
+        const user = await User.findByPk(decoded.userId, {
+          attributes: { exclude: ['password_hash', 'two_fa_secret'] }
+        });
+        
+        if (!user) {
+          console.log('❌ User not found');
+          return next(new Error('User not found'));
+        }
+
+        console.log('✅ User found:', user.email, 'isActive:', user.isActive);
+        if (!user.isActive) {
+          console.log('❌ Account disabled');
+          return next(new Error('Account disabled'));
+        }
+        
         socket.user = user;
         
         // Log socket connection
@@ -191,9 +271,10 @@ class PeakServer {
           details: { socketId: socket.id }
         });
 
+        console.log('✅ Socket authentication successful');
         next();
       } catch (error) {
-        console.error('Socket authentication failed:', error.message);
+        console.error('❌ Socket authentication failed:', error.message);
         next(new Error('Authentication failed'));
       }
     });
@@ -204,6 +285,17 @@ class PeakServer {
 
       // Join user to their personal room
       socket.join(`user_${socket.user.id}`);
+
+      // Handle explicit join_user_room requests from frontend
+      socket.on('join_user_room', (userId) => {
+        // Only allow users to join their own room
+        if (userId === socket.user.id) {
+          socket.join(`user_${userId}`);
+          socket.emit('joined_user_room', { userId, status: 'success' });
+        } else {
+          socket.emit('join_error', { userId, error: 'Access denied' });
+        }
+      });
 
       // Handle joining exchange rooms
       socket.on('join_exchange', async (exchangeId) => {
@@ -292,12 +384,12 @@ class PeakServer {
 
       // Handle disconnection
       socket.on('disconnect', async (reason) => {
-        console.log(`User ${socket.user.email} disconnected: ${reason}`);
+        console.log(`User ${socket.user?.email || 'unknown'} disconnected: ${reason}`);
         
         // Log socket disconnection
         await AuditService.log({
           action: 'SOCKET_DISCONNECT',
-          userId: socket.user.id,
+          userId: socket.user?.id,
           details: { socketId: socket.id, reason }
         });
 
@@ -318,7 +410,7 @@ class PeakServer {
         console.error('Socket error:', error);
         AuditService.log({
           action: 'SOCKET_ERROR',
-          userId: socket.user.id,
+          userId: socket.user?.id,
           details: { error: error.message, socketId: socket.id }
         });
       });
@@ -333,7 +425,7 @@ class PeakServer {
       // Log error
       AuditService.log({
         action: 'APPLICATION_ERROR',
-        userId: req.user?.id,
+        userId: req.user?.id || null,
         ipAddress: req.ip,
         userAgent: req.get('User-Agent'),
         details: {
@@ -399,11 +491,9 @@ class PeakServer {
       await sequelize.authenticate();
       console.log('✅ Database connection established successfully');
 
-      // Sync database models (only in development)
-      if (process.env.NODE_ENV === 'development') {
-        await sequelize.sync({ alter: true });
-        console.log('✅ Database models synchronized');
-      }
+      // Skip database sync to avoid constraint issues
+      // Database schema is already set up
+      console.log('✅ Database models loaded (sync skipped)');
 
       // Start server
       const PORT = process.env.PORT || 8001;

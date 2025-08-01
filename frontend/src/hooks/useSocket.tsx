@@ -54,33 +54,19 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [typingUsers, setTypingUsers] = useState<Map<string, Set<string>>>(new Map());
 
-  // Initialize socket connection
-  useEffect(() => {
-    // For Supabase mode, we'll simulate a connected state since we don't have a socket server
-    // In a real production environment, this would connect to your actual Socket.IO server
-    if (isAuthenticated && user) {
-      console.log('🔌 Simulating socket connection for Supabase mode');
-      setConnectionStatus('connected');
-    } else {
-      console.log('🔌 No authenticated user, setting disconnected');
-      setConnectionStatus('disconnected');
+  // Disconnect socket function
+  const disconnectSocket = useCallback(() => {
+    if (socket) {
+      console.log('🔌 Disconnecting socket...');
+      socket.disconnect();
+      setSocket(null);
     }
+    setConnectionStatus('disconnected');
+    setTypingUsers(new Map());
+  }, [socket]);
 
-    // If you have a real Socket.IO server, uncomment and configure below:
-    /*
-    if (isAuthenticated && user) {
-      initializeSocket();
-    } else {
-      disconnectSocket();
-    }
 
-    return () => {
-      disconnectSocket();
-    };
-    */
-  }, [isAuthenticated, user]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const initializeSocket = useCallback(() => {
     if (socket) {
       socket.disconnect();
@@ -116,7 +102,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       setReconnectAttempts(0);
       
       // Join user-specific room
-      newSocket.emit('join_user_room', user?.id);
+      if (user?.id) {
+        newSocket.emit('join_user_room', user.id);
+      }
     });
 
     newSocket.on('disconnect', (reason) => {
@@ -150,14 +138,13 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       setConnectionStatus('error');
     });
 
-    // Message handlers
+    // Message handlers - inline to avoid circular dependencies
     setupMessageHandlers(newSocket);
 
     setSocket(newSocket);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user?.id]); // Remove setupMessageHandlers dependency to prevent circular dependency
 
-  const setupMessageHandlers = (socket: Socket) => {
+  const setupMessageHandlers = useCallback((socket: Socket) => {
     // New message received
     socket.on('new_message', (message: MessageData) => {
       console.log('💬 New message received:', message);
@@ -307,17 +294,20 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       });
       window.dispatchEvent(event);
     });
-  };
+  }, [setTypingUsers]); // Add dependencies for useCallback
 
-  const disconnectSocket = useCallback(() => {
-    if (socket) {
-      console.log('🔌 Disconnecting socket...');
-      socket.disconnect();
-      setSocket(null);
+  // Initialize socket connection
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      initializeSocket();
+    } else {
+      disconnectSocket();
     }
-    setConnectionStatus('disconnected');
-    setTypingUsers(new Map());
-  }, [socket]);
+
+    return () => {
+      disconnectSocket();
+    };
+  }, [isAuthenticated, user?.id]); // Remove function dependencies to prevent infinite loops
 
   const joinExchange = useCallback((exchangeId: string) => {
     if (socket && connectionStatus === 'connected') {

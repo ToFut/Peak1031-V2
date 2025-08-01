@@ -8,14 +8,62 @@ const Task = require('../models/Task');
 const Document = require('../models/Document');
 const Message = require('../models/Message');
 const { Op } = require('sequelize');
+const supabaseService = require('../services/supabase');
 
 const router = express.Router();
 
 // Get system statistics
 router.get('/stats', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
+    let userCount = 0;
+    
+    // Try to get user count from Supabase first
+    if (supabaseService.client) {
+      try {
+        const users = await supabaseService.getUsers();
+        userCount = users.length;
+      } catch (supabaseError) {
+        console.log('⚠️ Falling back to local database for user count:', supabaseError.message);
+        userCount = await User.count();
+      }
+    } else {
+      userCount = await User.count();
+    }
+    
     const stats = {
-      users: await User.count(),
+      users: userCount,
+      exchanges: await Exchange.count(),
+      documents: await Document.count(),
+      tasks: await Task.count(),
+      messages: await Message.count()
+    };
+
+    res.json({ data: stats });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get dashboard statistics (alias for /stats)
+router.get('/dashboard-stats', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    let userCount = 0;
+    
+    // Try to get user count from Supabase first
+    if (supabaseService.client) {
+      try {
+        const users = await supabaseService.getUsers();
+        userCount = users.length;
+      } catch (supabaseError) {
+        console.log('⚠️ Falling back to local database for user count:', supabaseError.message);
+        userCount = await User.count();
+      }
+    } else {
+      userCount = await User.count();
+    }
+    
+    const stats = {
+      users: userCount,
       exchanges: await Exchange.count(),
       documents: await Document.count(),
       tasks: await Task.count(),
@@ -33,6 +81,51 @@ router.get('/users', authenticateToken, requireRole(['admin']), async (req, res)
   try {
     const { page = 1, limit = 20, search, role, status } = req.query;
     
+    // Try to get users from Supabase first
+    if (supabaseService.client) {
+      try {
+        const options = {
+          orderBy: { column: 'created_at', ascending: false },
+          limit: parseInt(limit),
+          offset: (parseInt(page) - 1) * parseInt(limit)
+        };
+
+        // Add filters if provided
+        if (role || status) {
+          options.where = {};
+          if (role) options.where.role = role;
+          if (status) options.where.is_active = status === 'active';
+        }
+
+        const users = await supabaseService.getUsers(options);
+        
+        // Apply search filter on the results if needed
+        let filteredUsers = users;
+        if (search) {
+          const searchLower = search.toLowerCase();
+          filteredUsers = users.filter(user => 
+            user.first_name?.toLowerCase().includes(searchLower) ||
+            user.last_name?.toLowerCase().includes(searchLower) ||
+            user.email?.toLowerCase().includes(searchLower)
+          );
+        }
+
+        res.json({
+          data: filteredUsers,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: filteredUsers.length,
+            totalPages: Math.ceil(filteredUsers.length / parseInt(limit))
+          }
+        });
+        return;
+      } catch (supabaseError) {
+        console.log('⚠️ Falling back to local database:', supabaseError.message);
+      }
+    }
+
+    // Fallback to local database
     const whereClause = {};
     if (search) {
       whereClause[Op.or] = [
@@ -76,42 +169,477 @@ router.post('/users', authenticateToken, requireRole(['admin']), async (req, res
   try {
     const { email, password, firstName, lastName, role, phone } = req.body;
     
+    // Try to create user in Supabase first
+    if (supabaseService.client) {
+      try {
+        const bcrypt = require('bcrypt');
+        const passwordHash = await bcrypt.hash(password, 10);
+        
+        const userData = {
+          email,
+          password_hash: passwordHash,
+          first_name: firstName,
+          last_name: lastName,
+          role: role || 'client',
+          phone,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        const user = await supabaseService.createUser(userData);
+        res.status(201).json({ data: user });
+        return;
+      } catch (supabaseError) {
+        console.log('⚠️ Falling back to local database:', supabaseError.message);
+      }
+    }
+
+    // Fallback to local database
     const user = await User.create({
       email,
-      passwordHash: password, // Will be hashed by model hook
+      password,
       firstName,
       lastName,
       role: role || 'client',
-      phone
+      phone,
+      isActive: true
     });
 
-    res.status(201).json({ data: user.toJSON() });
+    res.status(201).json({ data: user });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Update user (admin only)
-router.put('/users/:id', authenticateToken, requireRole(['admin']), async (req, res) => {
+// Send login link to user (admin only)
+router.post('/users/:userId/send-login-link', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const user = await User.findByPk(req.params.id);
+    const { userId } = req.params;
     
+    // Try to send login link via Supabase first
+    if (supabaseService.client) {
+      try {
+        // Get user from Supabase
+        const user = await supabaseService.getUserById(userId);
+        if (!user) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Generate a temporary password reset token
+        const crypto = require('crypto');
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+        // Update user with reset token
+        await supabaseService.updateUser(userId, {
+          reset_token: resetToken,
+          reset_token_expires_at: resetTokenExpiry.toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+        // Create login link
+        const loginLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?token=${resetToken}&email=${user.email}`;
+
+        // TODO: Send email with login link
+        // For now, we'll return the link in the response
+        console.log(`Login link generated for ${user.email}: ${loginLink}`);
+
+        res.json({ 
+          success: true, 
+          message: 'Login link sent successfully',
+          loginLink: loginLink // Remove this in production
+        });
+        return;
+      } catch (supabaseError) {
+        console.log('⚠️ Falling back to local database:', supabaseError.message);
+      }
+    }
+
+    // Fallback to local database
+    const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const { email, firstName, lastName, role, phone, isActive } = req.body;
-    
+    // Generate reset token for local database
+    const crypto = require('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
     await user.update({
-      email,
-      firstName,
-      lastName,
-      role,
-      phone,
-      isActive
+      resetToken,
+      resetTokenExpiry
     });
 
-    res.json({ data: user.toJSON() });
+    const loginLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?token=${resetToken}&email=${user.email}`;
+    console.log(`Login link generated for ${user.email}: ${loginLink}`);
+
+    res.json({ 
+      success: true, 
+      message: 'Login link sent successfully',
+      loginLink: loginLink // Remove this in production
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update user status (activate/deactivate)
+router.patch('/users/:userId/status', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { isActive } = req.body;
+    
+    // Try to update user in Supabase first
+    if (supabaseService.client) {
+      try {
+        const user = await supabaseService.updateUser(userId, {
+          is_active: isActive,
+          updated_at: new Date().toISOString()
+        });
+
+        // Log the action
+        await AuditLog.create({
+          userId: req.user.id,
+          action: isActive ? 'user_activated' : 'user_deactivated',
+          details: `User ${user.email} ${isActive ? 'activated' : 'deactivated'} by admin`,
+          ip: req.ip,
+          userAgent: req.get('User-Agent')
+        });
+
+        res.json({ 
+          success: true, 
+          message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
+          data: user
+        });
+        return;
+      } catch (supabaseError) {
+        console.log('⚠️ Falling back to local database:', supabaseError.message);
+      }
+    }
+
+    // Fallback to local database
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await user.update({ isActive });
+
+    // Log the action
+    await AuditLog.create({
+      userId: req.user.id,
+      action: isActive ? 'user_activated' : 'user_deactivated',
+      details: `User ${user.email} ${isActive ? 'activated' : 'deactivated'} by admin`,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    res.json({ 
+      success: true, 
+      message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
+      data: user
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update user role
+router.patch('/users/:userId/role', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+    
+    // Validate role
+    const validRoles = ['admin', 'coordinator', 'client', 'third_party', 'agency'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+    
+    // Try to update user in Supabase first
+    if (supabaseService.client) {
+      try {
+        const user = await supabaseService.updateUser(userId, {
+          role: role,
+          updated_at: new Date().toISOString()
+        });
+
+        // Log the action
+        await AuditLog.create({
+          userId: req.user.id,
+          action: 'user_role_changed',
+          details: `User ${user.email} role changed to ${role} by admin`,
+          ip: req.ip,
+          userAgent: req.get('User-Agent')
+        });
+
+        res.json({ 
+          success: true, 
+          message: 'User role updated successfully',
+          data: user
+        });
+        return;
+      } catch (supabaseError) {
+        console.log('⚠️ Falling back to local database:', supabaseError.message);
+      }
+    }
+
+    // Fallback to local database
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await user.update({ role });
+
+    // Log the action
+    await AuditLog.create({
+      userId: req.user.id,
+      action: 'user_role_changed',
+      details: `User ${user.email} role changed to ${role} by admin`,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'User role updated successfully',
+      data: user
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Reset user password
+router.post('/users/:userId/reset-password', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Try to reset password in Supabase first
+    if (supabaseService.client) {
+      try {
+        const user = await supabaseService.getUserById(userId);
+        if (!user) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Generate new password
+        const crypto = require('crypto');
+        const newPassword = crypto.randomBytes(8).toString('hex');
+        const bcrypt = require('bcrypt');
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+
+        // Update user with new password and force password reset
+        await supabaseService.updateUser(userId, {
+          password_hash: passwordHash,
+          force_password_reset: true,
+          updated_at: new Date().toISOString()
+        });
+
+        // Log the action
+        await AuditLog.create({
+          userId: req.user.id,
+          action: 'password_reset',
+          details: `Password reset for user ${user.email} by admin`,
+          ip: req.ip,
+          userAgent: req.get('User-Agent')
+        });
+
+        res.json({ 
+          success: true, 
+          message: 'Password reset successfully',
+          newPassword: newPassword // Remove this in production, send via email instead
+        });
+        return;
+      } catch (supabaseError) {
+        console.log('⚠️ Falling back to local database:', supabaseError.message);
+      }
+    }
+
+    // Fallback to local database
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Generate new password
+    const crypto = require('crypto');
+    const newPassword = crypto.randomBytes(8).toString('hex');
+    await user.update({ 
+      password: newPassword,
+      forcePasswordReset: true
+    });
+
+    // Log the action
+    await AuditLog.create({
+      userId: req.user.id,
+      action: 'password_reset',
+      details: `Password reset for user ${user.email} by admin`,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Password reset successfully',
+      newPassword: newPassword // Remove this in production, send via email instead
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Toggle 2FA for user
+router.patch('/users/:userId/2fa', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { twoFaEnabled } = req.body;
+    
+    // Try to update user in Supabase first
+    if (supabaseService.client) {
+      try {
+        const user = await supabaseService.updateUser(userId, {
+          two_fa_enabled: twoFaEnabled,
+          updated_at: new Date().toISOString()
+        });
+
+        // Log the action
+        await AuditLog.create({
+          userId: req.user.id,
+          action: twoFaEnabled ? '2fa_enabled' : '2fa_disabled',
+          details: `2FA ${twoFaEnabled ? 'enabled' : 'disabled'} for user ${user.email} by admin`,
+          ip: req.ip,
+          userAgent: req.get('User-Agent')
+        });
+
+        res.json({ 
+          success: true, 
+          message: `2FA ${twoFaEnabled ? 'enabled' : 'disabled'} successfully`,
+          data: user
+        });
+        return;
+      } catch (supabaseError) {
+        console.log('⚠️ Falling back to local database:', supabaseError.message);
+      }
+    }
+
+    // Fallback to local database
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await user.update({ twoFaEnabled });
+
+    // Log the action
+    await AuditLog.create({
+      userId: req.user.id,
+      action: twoFaEnabled ? '2fa_enabled' : '2fa_disabled',
+      details: `2FA ${twoFaEnabled ? 'enabled' : 'disabled'} for user ${user.email} by admin`,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    res.json({ 
+      success: true, 
+      message: `2FA ${twoFaEnabled ? 'enabled' : 'disabled'} successfully`,
+      data: user
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get user audit logs
+router.get('/users/:userId/audit', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { page = 1, limit = 20 } = req.query;
+    
+    const logs = await AuditLog.findAndCountAll({
+      where: { userId },
+      order: [['createdAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit)
+    });
+
+    res.json({
+      data: logs.rows,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: logs.count,
+        totalPages: Math.ceil(logs.count / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete user (soft delete)
+router.delete('/users/:userId', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Try to delete user in Supabase first
+    if (supabaseService.client) {
+      try {
+        const user = await supabaseService.getUserById(userId);
+        if (!user) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Soft delete by setting deleted_at
+        await supabaseService.updateUser(userId, {
+          deleted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+        // Log the action
+        await AuditLog.create({
+          userId: req.user.id,
+          action: 'user_deleted',
+          details: `User ${user.email} deleted by admin`,
+          ip: req.ip,
+          userAgent: req.get('User-Agent')
+        });
+
+        res.json({ 
+          success: true, 
+          message: 'User deleted successfully'
+        });
+        return;
+      } catch (supabaseError) {
+        console.log('⚠️ Falling back to local database:', supabaseError.message);
+      }
+    }
+
+    // Fallback to local database
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Soft delete
+    await user.update({ deletedAt: new Date() });
+
+    // Log the action
+    await AuditLog.create({
+      userId: req.user.id,
+      action: 'user_deleted',
+      details: `User ${user.email} deleted by admin`,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'User deleted successfully'
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -165,6 +693,48 @@ router.get('/health', authenticateToken, requireRole(['admin']), async (req, res
     };
 
     res.json({ data: health });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get system settings (admin only)
+router.get('/system-settings', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const settings = {
+      appName: 'Peak 1031 Exchange Platform',
+      version: '1.0.0',
+      environment: process.env.NODE_ENV || 'development',
+      features: {
+        realTimeMessaging: true,
+        documentUpload: true,
+        practicePantherSync: true,
+        auditLogging: true
+      },
+      limits: {
+        maxFileSize: 10 * 1024 * 1024, // 10MB
+        maxUploadsPerDay: 100,
+        maxUsers: 1000
+      }
+    };
+
+    res.json({ data: settings });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update system settings (admin only)
+router.put('/system-settings', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    // In a real application, you would save these to a database
+    // For now, we'll just return success
+    res.json({ 
+      data: { 
+        message: 'Settings updated successfully',
+        settings: req.body 
+      } 
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

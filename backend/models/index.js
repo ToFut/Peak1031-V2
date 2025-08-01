@@ -5,6 +5,7 @@ const { sequelize } = require('../config/database');
 const User = require('./User');
 const Contact = require('./Contact');
 const Exchange = require('./Exchange');
+const ExchangeParticipant = require('./ExchangeParticipant');
 const Task = require('./Task');
 const Document = require('./Document');
 const Message = require('./Message');
@@ -16,6 +17,7 @@ const models = {
   User,
   Contact,
   Exchange,
+  ExchangeParticipant,
   Task,
   Document,
   Message,
@@ -77,11 +79,15 @@ function defineAssociations() {
   });
   Exchange.hasMany(Document, { 
     foreignKey: 'exchange_id', 
-    as: 'documents' 
+    as: 'exchangeDocuments' 
   });
   Exchange.hasMany(Message, { 
     foreignKey: 'exchange_id', 
     as: 'messages' 
+  });
+  Exchange.hasMany(ExchangeParticipant, { 
+    foreignKey: 'exchange_id', 
+    as: 'exchangeParticipants' 
   });
 
   // Task associations
@@ -120,6 +126,20 @@ function defineAssociations() {
   Message.belongsTo(Document, { 
     foreignKey: 'attachment_id', 
     as: 'attachment' 
+  });
+
+  // ExchangeParticipant associations
+  ExchangeParticipant.belongsTo(Exchange, { 
+    foreignKey: 'exchange_id', 
+    as: 'exchange' 
+  });
+  ExchangeParticipant.belongsTo(Contact, { 
+    foreignKey: 'contact_id', 
+    as: 'contact' 
+  });
+  ExchangeParticipant.belongsTo(User, { 
+    foreignKey: 'user_id', 
+    as: 'user' 
   });
 
   // AuditLog associations

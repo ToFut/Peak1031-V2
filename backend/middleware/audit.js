@@ -11,12 +11,12 @@ const auditMiddleware = (action, resourceType = null) => {
       // Log the audit event
       if (req.user) {
         AuditLog.create({
-          user_id: req.user.id,
+          userId: req.user.id,
           action: action,
-          resource_type: resourceType,
-          resource_id: req.params.id || null,
-          ip_address: req.ip,
-          user_agent: req.get('User-Agent'),
+          entityType: resourceType,
+          entityId: req.params.id || null,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
           details: {
             method: req.method,
             path: req.path,

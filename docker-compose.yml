@@ -132,6 +132,7 @@ services:
       REACT_APP_ENVIRONMENT: development
       CHOKIDAR_USEPOLLING: true
       WATCHPACK_POLLING: true
+      PORT: 3000
     volumes:
       - ./frontend:/app
       - /app/node_modules # Prevent overwriting node_modules

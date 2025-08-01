@@ -7,12 +7,35 @@ class MessageService {
 
   async canAccessExchange(userId, exchangeId) {
     try {
-      const exchange = await Exchange.findByPk(exchangeId);
-      if (!exchange) return false;
+      // Find user to get their role
+      const user = await User.findByPk(userId);
+      if (!user) return false;
+
+      // Find the exchange with related data
+      const exchange = await Exchange.findByPk(exchangeId, {
+        include: [
+          { model: User, as: 'coordinator' },
+          { model: Contact, as: 'client' }
+        ]
+      });
       
-      // For now, allow access if user is coordinator or client
-      // In a real app, you'd check specific permissions
-      return true;
+      if (!exchange) return false;
+
+      // Admins and coordinators have access to all exchanges
+      if (user.role === 'admin' || user.role === 'coordinator') {
+        return true;
+      }
+
+      // Check if user is the assigned coordinator for this exchange
+      if (exchange.coordinatorId === userId) {
+        return true;
+      }
+
+      // TODO: Check if user is a participant in the exchange
+      // This would query the exchange_participants table
+      // For now, restrict access to admin/coordinator only for security
+
+      return false;
     } catch (error) {
       console.error('Error checking exchange access:', error);
       return false;

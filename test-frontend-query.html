@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Frontend Query</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Testing Frontend Supabase Query</h1>
+    <div id="results"></div>
+
+    <script>
+        // Same credentials as frontend
+        const supabaseUrl = 'https://ynwfrmykghcozqnuszho.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlud2ZybXlrZ2hjb3pxbnVzemhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MzYyNjUsImV4cCI6MjA2OTMxMjI2NX0.0rJ7GjjsU1DcZEx9jFzJMKgiS6JN7c_PuHcfU1f2wsM';
+        
+        const { createClient } = supabase;
+        const client = createClient(supabaseUrl, supabaseAnonKey);
+        
+        async function testQuery() {
+            const resultsDiv = document.getElementById('results');
+            
+            // 1. Test basic connection
+            resultsDiv.innerHTML += '<h2>1. Testing basic connection:</h2>';
+            const { data: testData, error: testError } = await client
+                .from('users')
+                .select('id')
+                .limit(1);
+            
+            if (testError) {
+                resultsDiv.innerHTML += `<p style="color: red">Connection error: ${JSON.stringify(testError)}</p>`;
+            } else {
+                resultsDiv.innerHTML += '<p style="color: green">✓ Connection successful</p>';
+            }
+            
+            // 2. Test the exact chatService query
+            resultsDiv.innerHTML += '<h2>2. Testing chatService query:</h2>';
+            const { data: exchanges, error } = await client
+                .from('exchanges')
+                .select(`
+                    id,
+                    name,
+                    status,
+                    messages (
+                        id,
+                        content,
+                        sender_id,
+                        created_at,
+                        read_by
+                    )
+                `)
+                .order('created_at', { ascending: false });
+            
+            if (error) {
+                resultsDiv.innerHTML += `<p style="color: red">Query error: ${JSON.stringify(error)}</p>`;
+            } else {
+                resultsDiv.innerHTML += `<p style="color: green">✓ Query successful</p>`;
+                resultsDiv.innerHTML += `<p>Found ${exchanges?.length || 0} exchanges</p>`;
+                
+                if (exchanges && exchanges.length > 0) {
+                    resultsDiv.innerHTML += '<h3>Exchanges:</h3><ul>';
+                    exchanges.forEach(ex => {
+                        resultsDiv.innerHTML += `<li>${ex.name} (${ex.status}) - ${ex.messages?.length || 0} messages</li>`;
+                    });
+                    resultsDiv.innerHTML += '</ul>';
+                }
+            }
+            
+            // 3. Check RLS policies
+            resultsDiv.innerHTML += '<h2>3. Checking Row Level Security:</h2>';
+            resultsDiv.innerHTML += '<p>If you see exchanges above but not in the app, it might be an RLS policy issue.</p>';
+            
+            // 4. Test with different queries
+            resultsDiv.innerHTML += '<h2>4. Testing simpler query:</h2>';
+            const { data: simpleExchanges, error: simpleError } = await client
+                .from('exchanges')
+                .select('id, name, status');
+            
+            if (simpleError) {
+                resultsDiv.innerHTML += `<p style="color: red">Simple query error: ${JSON.stringify(simpleError)}</p>`;
+            } else {
+                resultsDiv.innerHTML += `<p style="color: green">✓ Simple query returned ${simpleExchanges?.length || 0} exchanges</p>`;
+            }
+        }
+        
+        testQuery();
+    </script>
+</body>
+</html>

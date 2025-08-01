@@ -2,48 +2,26 @@
 export interface User {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
+  first_name: string;
+  last_name: string;
+  role: 'admin' | 'client' | 'coordinator' | 'third_party' | 'agency';
   phone?: string;
-  isActive: boolean;
-  lastLogin?: string;
-  createdAt: string;
-  updatedAt: string;
+  is_active: boolean;
+  two_fa_enabled: boolean;
+  last_login?: string;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface Contact {
-  id: string;
-  ppContactId: string;
-  firstName: string;
-  lastName: string;
-  email?: string;
-  phone?: string;
-  company?: string;
-  address?: string;
-  ppData: any;
-  lastSyncAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+// Import types explicitly to avoid circular dependencies
+import { Exchange } from './exchange';
+import { Contact } from './contact';
 
-export interface Exchange {
-  id: string;
-  ppMatterId?: string;
-  name: string;
-  status: string;
-  clientId?: string;
-  coordinatorId?: string;
-  startDate?: string;
-  completionDate?: string;
-  ppData: any;
-  metadata: any;
-  lastSyncAt?: string;
-  createdAt: string;
-  updatedAt: string;
-  client?: Contact;
-  coordinator?: User;
-}
+// Re-export Contact types from the dedicated file
+export * from './contact';
+
+// Re-export Exchange types from the dedicated file
+export * from './exchange';
 
 export interface Task {
   id: string;
@@ -110,6 +88,13 @@ export interface AuditLog {
   details: any;
   createdAt: string;
   user?: User;
+  // Additional properties used in the frontend
+  timestamp?: string;
+  severity?: 'info' | 'warning' | 'error' | 'critical';
+  userName?: string;
+  ip?: string;
+  exchangeId?: string;
+  documentId?: string;
 }
 
 export interface SyncLog {
@@ -144,6 +129,13 @@ export interface AuthResponse {
   token: string;
   refreshToken: string;
   user: User;
+}
+
+export interface LoginResponse {
+  user: User;
+  token: string;
+  refreshToken?: string;
+  requiresTwoFactor?: boolean;
 }
 
 export interface ApiResponse<T> {

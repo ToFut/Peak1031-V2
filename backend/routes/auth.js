@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const AuthService = require('../services/auth');
 const { authenticateToken } = require('../middleware/auth');
+const { transformToCamelCase } = require('../utils/caseTransform');
 
 const router = express.Router();
 
@@ -11,15 +12,22 @@ router.post('/login', [
   body('password').isLength({ min: 1 })
 ], async (req, res) => {
   try {
+    console.log('\n🔐 AUTH ROUTE: Login attempt received');
+    console.log('📧 Email:', req.body.email);
+    console.log('🔍 Request body keys:', Object.keys(req.body));
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Validation errors:', errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
 
     const { email, password, twoFactorCode } = req.body;
+    console.log('✅ Validation passed, attempting authentication...');
 
     // Authenticate user
     const user = await AuthService.authenticateUser(email, password);
+    console.log('✅ User authenticated:', user.email, 'Role:', user.role);
 
     // Check 2FA if enabled
     if (user.twoFaEnabled) {
@@ -37,15 +45,61 @@ router.post('/login', [
     }
 
     // Generate tokens
+    console.log('🔑 Generating tokens...');
+    const { token, refreshToken } = AuthService.generateTokens(user);
+    console.log('✅ Tokens generated successfully');
+
+    const responseData = {
+      user: transformToCamelCase(user.toJSON()),
+      token,
+      refreshToken
+    };
+    console.log('📤 Sending login response for:', responseData.user.email);
+    
+    res.json(responseData);
+  } catch (error) {
+    console.error('❌ AUTH ROUTE ERROR:', error.message);
+    console.error('🔍 Full error:', error);
+    res.status(401).json({ error: error.message });
+  }
+});
+
+// Registration endpoint
+router.post('/register', [
+  body('email').isEmail().normalizeEmail(),
+  body('password').isLength({ min: 8 }),
+  body('firstName').isLength({ min: 1 }),
+  body('lastName').isLength({ min: 1 }),
+  body('role').optional().isIn(['admin', 'client', 'coordinator', 'third_party', 'agency'])
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { email, password, firstName, lastName, role = 'client' } = req.body;
+    
+    // Create user
+    const user = await AuthService.createUser({
+      email,
+      password,
+      firstName,
+      lastName,
+      role
+    });
+
+    // Generate tokens
     const { token, refreshToken } = AuthService.generateTokens(user);
 
-    res.json({
-      user: user.toJSON(),
+    res.status(201).json({
+      user: transformToCamelCase(user.toJSON()),
       token,
       refreshToken
     });
   } catch (error) {
-    res.status(401).json({ error: error.message });
+    console.error('Registration error:', error);
+    res.status(400).json({ error: error.message });
   }
 });
 
@@ -92,7 +146,7 @@ router.get('/me', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ user: user.toJSON() });
+    res.json(transformToCamelCase(user.toJSON()));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

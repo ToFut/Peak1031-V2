@@ -1,9 +1,10 @@
 import { useAuth } from './useAuth';
+import { useCallback } from 'react';
 
 export const usePermissions = () => {
   const { user } = useAuth();
 
-  const can = (resource: string, action: string): boolean => {
+  const can = useCallback((resource: string, action: string): boolean => {
     if (!user) return false;
 
     const permissions: Record<string, string[]> = {
@@ -37,18 +38,18 @@ export const usePermissions = () => {
     const requiredPermission = `${resource}:${action}`;
 
     return userPerms.includes('*') || userPerms.includes(requiredPermission);
-  };
+  }, [user]);
 
-  const hasRole = (roles: string[]): boolean => {
+  const hasRole = useCallback((roles: string[]): boolean => {
     if (!user) return false;
     return roles.includes(user.role);
-  };
+  }, [user]);
 
-  const isAdmin = (): boolean => hasRole(['admin']);
-  const isCoordinator = (): boolean => hasRole(['coordinator', 'admin']);
-  const isClient = (): boolean => hasRole(['client']);
-  const isThirdParty = (): boolean => hasRole(['third_party']);
-  const isAgency = (): boolean => hasRole(['agency']);
+  const isAdmin = useCallback((): boolean => hasRole(['admin']), [hasRole]);
+  const isCoordinator = useCallback((): boolean => hasRole(['coordinator', 'admin']), [hasRole]);
+  const isClient = useCallback((): boolean => hasRole(['client']), [hasRole]);
+  const isThirdParty = useCallback((): boolean => hasRole(['third_party']), [hasRole]);
+  const isAgency = useCallback((): boolean => hasRole(['agency']), [hasRole]);
 
   return {
     can,

@@ -3,28 +3,38 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { SocketProvider } from './hooks/useSocket';
 import Layout from './components/Layout';
+
+// Pages
+import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import ClientDashboard from './pages/ClientDashboard';
 import CoordinatorDashboard from './pages/CoordinatorDashboard';
 import ThirdPartyDashboard from './pages/ThirdPartyDashboard';
 import AgencyDashboard from './pages/AgencyDashboard';
-import Login from './pages/Login';
-import OAuthCallback from './pages/OAuthCallback';
-import PracticePantherOAuthRunner from './components/PracticePantherOAuthRunner';
-import './index.css';
+import Messages from './pages/Messages';
+import Exchanges from './pages/Exchanges';
+import ExchangeDetailsPage from './pages/ExchangeDetailsPage';
+import Tasks from './pages/Tasks';
+import Contacts from './pages/Contacts';
+import Documents from './pages/Documents';
+import Users from './pages/Users';
+import Reports from './pages/Reports';
+import Settings from './pages/Settings';
 
 // Protected Route Component
-const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ 
-  children, 
-  allowedRoles 
-}) => {
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  allowedRoles?: string[];
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles = [] }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-  return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-              </div>
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
     );
   }
 
@@ -32,146 +42,249 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: strin
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/unauthorized" replace />;
+  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900">Access Denied</h1>
+          <p className="mt-2 text-gray-600">You don't have permission to access this page.</p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;
 };
 
+// Dashboard Route Component
+const DashboardRoute: React.FC = () => {
+  const { user } = useAuth();
 
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
-// Unauthorized Page
-const UnauthorizedPage: React.FC = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-50">
-    <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6">
-      <div className="text-center">
-        <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-          <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
-              </div>
-        <h3 className="mt-2 text-sm font-medium text-gray-900">Access Denied</h3>
-        <p className="mt-1 text-sm text-gray-500">
-          You don't have permission to access this page.
-            </p>
-        <div className="mt-6">
-          <button
-            onClick={() => window.history.back()}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Go Back
-          </button>
-          </div>
-      </div>
-      </div>
-    </div>
-  );
-
-// Main App Component
-const AppContent: React.FC = () => {
-  return (
-    <Router>
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/oauth/callback" element={<OAuthCallback />} />
-        
-        {/* Development/Testing Routes - Admin only */}
-        <Route
-          path="/pp-oauth-test"
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <PracticePantherOAuthRunner />
-            </ProtectedRoute>
-          }
-        />
-        
-        {/* Protected Routes */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <SocketProvider>
-                <Layout />
-              </SocketProvider>
-            </ProtectedRoute>
-          }
-        />
-        
-        {/* Role-specific Routes */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <SocketProvider>
-                <Layout />
-              </SocketProvider>
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/client"
-          element={
-            <ProtectedRoute allowedRoles={['client']}>
-              <SocketProvider>
-                <Layout />
-              </SocketProvider>
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/coordinator"
-          element={
-            <ProtectedRoute allowedRoles={['coordinator']}>
-              <SocketProvider>
-                <Layout />
-              </SocketProvider>
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/third-party"
-          element={
-            <ProtectedRoute allowedRoles={['third_party']}>
-              <SocketProvider>
-                <Layout />
-              </SocketProvider>
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/agency"
-          element={
-            <ProtectedRoute allowedRoles={['agency']}>
-              <SocketProvider>
-                <Layout />
-              </SocketProvider>
-            </ProtectedRoute>
-          }
-        />
-        
-        {/* Error Routes */}
-        <Route path="/unauthorized" element={<UnauthorizedPage />} />
-        
-        {/* Catch-all route */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
-  );
+  // Route to appropriate dashboard based on user role
+  switch (user.role) {
+    case 'admin':
+      return <AdminDashboard />;
+    case 'coordinator':
+      return <CoordinatorDashboard />;
+    case 'client':
+      return <ClientDashboard />;
+    case 'third_party':
+      return <ThirdPartyDashboard />;
+    case 'agency':
+      return <AgencyDashboard />;
+    default:
+      return <Navigate to="/login" replace />;
+  }
 };
 
-// Root App Component with Providers
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <AppContent />
+      <SocketProvider>
+        <Router>
+          <div className="App">
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/login" element={<Login />} />
+              
+              {/* Protected Routes */}
+              <Route 
+                path="/" 
+                element={
+                  <ProtectedRoute>
+                    <Navigate to="/dashboard" replace />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <DashboardRoute />
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Messages - Available to most users */}
+              <Route 
+                path="/messages" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client', 'agency', 'third_party']}>
+                    <Messages />
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Exchanges - Available to all authenticated users */}
+              <Route 
+                path="/exchanges" 
+                element={
+                  <ProtectedRoute>
+                    <Exchanges />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              <Route 
+                path="/exchanges/:id" 
+                element={
+                  <ProtectedRoute>
+                    <ExchangeDetailsPage />
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Tasks - Available to core users */}
+              <Route 
+                path="/tasks" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client']}>
+                    <Tasks />
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Contacts - Available to all authenticated users */}
+              <Route 
+                path="/contacts" 
+                element={
+                  <ProtectedRoute>
+                    <Contacts />
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Documents - Available to all authenticated users */}
+              <Route 
+                path="/documents" 
+                element={
+                  <ProtectedRoute>
+                    <Documents />
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Users - Admin only */}
+              <Route 
+                path="/admin/users" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Users />
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Admin-specific routes */}
+              <Route 
+                path="/admin/templates" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <div className="p-8">
+                        <h1 className="text-2xl font-bold mb-4">Document Templates</h1>
+                        <p className="text-gray-600">Document template management coming soon...</p>
+                      </div>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/admin/audit" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <div className="p-8">
+                        <h1 className="text-2xl font-bold mb-4">Audit Logs</h1>
+                        <p className="text-gray-600">Audit logs management coming soon...</p>
+                      </div>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/admin/system" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <div className="p-8">
+                        <h1 className="text-2xl font-bold mb-4">System Settings</h1>
+                        <p className="text-gray-600">System settings management coming soon...</p>
+                      </div>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/admin/system/sync" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <div className="p-8">
+                        <h1 className="text-2xl font-bold mb-4">Sync Status</h1>
+                        <p className="text-gray-600">Sync status management coming soon...</p>
+                      </div>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/admin/system/settings" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <div className="p-8">
+                        <h1 className="text-2xl font-bold mb-4">System Settings</h1>
+                        <p className="text-gray-600">System settings management coming soon...</p>
+                      </div>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Reports - Admin and Coordinator */}
+              <Route 
+                path="/reports" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
+                    <Reports />
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Settings - Available to all authenticated users */}
+              <Route 
+                path="/settings" 
+                element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Catch all - redirect to dashboard */}
+              <Route 
+                path="*" 
+                element={
+                  <ProtectedRoute>
+                    <Navigate to="/dashboard" replace />
+                  </ProtectedRoute>
+                } 
+              />
+            </Routes>
+          </div>
+        </Router>
+      </SocketProvider>
     </AuthProvider>
   );
 };
 
-export default App; 
+export default App;

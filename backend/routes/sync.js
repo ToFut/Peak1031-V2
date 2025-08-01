@@ -3,16 +3,12 @@ const router = express.Router();
 const practicePartnerService = require('../services/practicePartnerService');
 const scheduledSyncService = require('../services/scheduledSyncService');
 
-// Middleware to require authentication and admin role
-const requireAuth = (req, res, next) => {
-  // For testing purposes, we'll simulate an admin user
-  // In production, this should use proper JWT authentication
-  req.user = { id: 'admin-user-id', role: 'admin' };
-  next();
-};
+const { authenticateToken } = require('../middleware/auth');
+const { requireRole } = require('../middleware/rbac');
 
 // All sync routes require admin privileges
-router.use(requireAuth);
+router.use(authenticateToken);
+router.use(requireRole(['admin']));
 
 /**
  * @route GET /api/sync/status
@@ -38,6 +34,91 @@ router.get('/status', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to get sync status',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route GET /api/sync/logs
+ * @desc Get sync logs
+ * @access Admin only
+ */
+router.get('/logs', async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status, syncType } = req.query;
+    
+    // For now, return mock sync logs since we don't have a sync_logs table
+    const mockLogs = [
+      {
+        id: '1',
+        syncType: 'contacts',
+        status: 'success',
+        startedAt: new Date(Date.now() - 3600000).toISOString(),
+        completedAt: new Date(Date.now() - 3500000).toISOString(),
+        recordsProcessed: 150,
+        recordsUpdated: 10,
+        recordsCreated: 5,
+        errorMessage: null,
+        triggeredBy: 'admin@peak1031.com'
+      },
+      {
+        id: '2',
+        syncType: 'matters',
+        status: 'success',
+        startedAt: new Date(Date.now() - 7200000).toISOString(),
+        completedAt: new Date(Date.now() - 7100000).toISOString(),
+        recordsProcessed: 25,
+        recordsUpdated: 3,
+        recordsCreated: 2,
+        errorMessage: null,
+        triggeredBy: 'admin@peak1031.com'
+      },
+      {
+        id: '3',
+        syncType: 'tasks',
+        status: 'error',
+        startedAt: new Date(Date.now() - 10800000).toISOString(),
+        completedAt: null,
+        recordsProcessed: 0,
+        recordsUpdated: 0,
+        recordsCreated: 0,
+        errorMessage: 'API rate limit exceeded',
+        triggeredBy: 'admin@peak1031.com'
+      }
+    ];
+
+    // Filter by status if provided
+    let filteredLogs = mockLogs;
+    if (status) {
+      filteredLogs = mockLogs.filter(log => log.status === status);
+    }
+    if (syncType) {
+      filteredLogs = filteredLogs.filter(log => log.syncType === syncType);
+    }
+
+    // Pagination
+    const startIndex = (parseInt(page) - 1) * parseInt(limit);
+    const endIndex = startIndex + parseInt(limit);
+    const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
+
+    res.json({
+      status: 'success',
+      data: {
+        logs: paginatedLogs,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: filteredLogs.length,
+          totalPages: Math.ceil(filteredLogs.length / parseInt(limit))
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error getting sync logs:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get sync logs',
       error: error.message
     });
   }

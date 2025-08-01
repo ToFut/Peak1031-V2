@@ -19,7 +19,8 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ExclamationTriangleIcon,
-  InformationCircleIcon
+  InformationCircleIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 import {
   HomeIcon as HomeIconSolid,
@@ -52,14 +53,18 @@ interface Notification {
   read: boolean;
 }
 
-const Layout: React.FC = () => {
+interface LayoutProps {
+  children?: React.ReactNode;
+}
+
+const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const { socket, connectionStatus } = useSocket();
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Start closed on mobile, will be controlled by responsive behavior
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -67,10 +72,16 @@ const Layout: React.FC = () => {
 
   // Navigation configuration based on user role
   const getNavigation = (): NavigationItem[] => {
+    const dashboardPath = user?.role === 'admin' ? '/admin' : 
+                         user?.role === 'coordinator' ? '/coordinator' :
+                         user?.role === 'client' ? '/client' :
+                         user?.role === 'third_party' ? '/third-party' :
+                         user?.role === 'agency' ? '/agency' : '/dashboard';
+    
     const baseNavigation: NavigationItem[] = [
       {
         name: 'Dashboard',
-        href: '/dashboard',
+        href: dashboardPath,
         icon: HomeIcon,
         iconSolid: HomeIconSolid,
         roles: ['admin', 'client', 'coordinator', 'third_party', 'agency']
@@ -101,7 +112,7 @@ const Layout: React.FC = () => {
         href: '/messages',
         icon: ChatBubbleLeftRightIcon,
         iconSolid: ChatIconSolid,
-        roles: ['admin', 'client', 'coordinator', 'agency'],
+        roles: ['admin', 'client', 'coordinator', 'agency', 'third_party'],
         badge: unreadCount
       }
     ];
@@ -110,22 +121,35 @@ const Layout: React.FC = () => {
     if (user?.role === 'admin') {
       baseNavigation.push(
         {
-          name: 'Users',
-          href: '/users',
+          name: 'User Management',
+          href: '/admin/users',
           icon: UsersIcon,
           iconSolid: UsersIconSolid,
           roles: ['admin']
         },
         {
+          name: 'Document Templates',
+          href: '/admin/templates',
+          icon: DocumentDuplicateIcon,
+          iconSolid: DocumentDuplicateIconSolid,
+          roles: ['admin']
+        },
+        {
+          name: 'Audit Logs',
+          href: '/admin/audit',
+          icon: ShieldCheckIcon,
+          iconSolid: ShieldCheckIcon,
+          roles: ['admin']
+        },
+        {
           name: 'System',
-          href: '/system',
+          href: '/admin/system',
           icon: CogIcon,
           iconSolid: CogIconSolid,
           roles: ['admin'],
           children: [
-            { name: 'Sync Status', href: '/system/sync', icon: CogIcon, iconSolid: CogIconSolid, roles: ['admin'] },
-            { name: 'Audit Logs', href: '/system/audit', icon: CogIcon, iconSolid: CogIconSolid, roles: ['admin'] },
-            { name: 'Settings', href: '/system/settings', icon: CogIcon, iconSolid: CogIconSolid, roles: ['admin'] }
+            { name: 'Sync Status', href: '/admin/system/sync', icon: CogIcon, iconSolid: CogIconSolid, roles: ['admin'] },
+            { name: 'Settings', href: '/admin/system/settings', icon: CogIcon, iconSolid: CogIconSolid, roles: ['admin'] }
           ]
         }
       );
@@ -244,62 +268,72 @@ const Layout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
+      <div className={`fixed inset-y-0 left-0 z-50 w-80 bg-white shadow-xl transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:w-64 lg:flex-shrink-0 ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
+        {/* Sidebar Header */}
+        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 bg-white">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <img 
-                className="h-8 w-8" 
-                src="/logo.svg" 
-                alt="Peak 1031" 
-                onError={(e) => {
-                  (e.currentTarget as HTMLElement).style.display = 'none';
-                  (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'block';
-                }}
-              />
-              <div className="h-8 w-8 bg-blue-600 rounded hidden items-center justify-center">
-                <span className="text-white font-bold text-sm">P</span>
+              <div className="h-10 w-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-lg">P</span>
               </div>
             </div>
-            <span className="ml-2 text-xl font-semibold text-gray-900">Peak 1031</span>
+            <div className="ml-3">
+              <h1 className="text-lg font-bold text-gray-900">Peak 1031</h1>
+              <p className="text-xs text-gray-500">Exchange Platform</p>
+            </div>
           </div>
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1 rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <ChevronLeftIcon className="h-5 w-5" />
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="mt-6 px-3">
-          <div className="space-y-1">
+        <nav className="flex-1 px-4 py-6">
+          <div className="space-y-2">
             {getNavigation().map((item) => {
               const Icon = isCurrentPath(item.href) ? item.iconSolid : item.icon;
+              const isActive = isCurrentPath(item.href);
               
               if (item.children) {
                 return (
-                  <div key={item.name} className="space-y-1">
-                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <div key={item.name} className="space-y-2">
+                    <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                       {item.name}
                     </div>
                     {item.children.map((child) => {
                       const ChildIcon = isCurrentPath(child.href) ? child.iconSolid : child.icon;
+                      const isChildActive = isCurrentPath(child.href);
                       return (
                         <button
                           key={child.href}
-                          onClick={() => navigate(child.href)}
-                          className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ${
-                            isCurrentPath(child.href)
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'text-gray-700 hover:bg-gray-100'
+                          onClick={() => {
+                            navigate(child.href);
+                            setSidebarOpen(false); // Close sidebar on mobile after navigation
+                          }}
+                          className={`w-full group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
+                            isChildActive
+                              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
+                              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                           }`}
                         >
-                          <ChildIcon className="flex-shrink-0 h-5 w-5 mr-3" />
+                          <ChildIcon className={`flex-shrink-0 h-5 w-5 mr-3 ${isChildActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} />
                           {child.name}
                         </button>
                       );
@@ -311,17 +345,24 @@ const Layout: React.FC = () => {
               return (
                 <button
                   key={item.href}
-                  onClick={() => navigate(item.href)}
-                  className={`w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ${
-                    isCurrentPath(item.href)
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-700 hover:bg-gray-100'
+                  onClick={() => {
+                    navigate(item.href);
+                    setSidebarOpen(false); // Close sidebar on mobile after navigation
+                  }}
+                  className={`w-full group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
+                    isActive
+                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   }`}
                 >
-                  <Icon className="flex-shrink-0 h-5 w-5 mr-3" />
-                  {item.name}
+                  <Icon className={`flex-shrink-0 h-5 w-5 mr-3 ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <span className="flex-1 text-left">{item.name}</span>
                   {item.badge && item.badge > 0 && (
-                    <span className="ml-auto inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      isActive 
+                        ? 'bg-white bg-opacity-20 text-white' 
+                        : 'bg-red-100 text-red-600'
+                    }`}>
                       {item.badge > 99 ? '99+' : item.badge}
                     </span>
                   )}
@@ -331,35 +372,53 @@ const Layout: React.FC = () => {
           </div>
         </nav>
 
-        {/* Connection Status */}
-        <div className="absolute bottom-0 left-0 right-0 p-4">
+        {/* Connection Status & User Info */}
+        <div className="border-t border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-medium">
+                  {user.first_name?.[0]}{user.last_name?.[0]}
+                </span>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-900">
+                  {user.first_name} {user.last_name}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {getRoleDisplayName(user.role)}
+                </p>
+              </div>
+            </div>
+          </div>
+          
           <div className={`flex items-center text-xs ${
             connectionStatus === 'connected' ? 'text-green-600' : 'text-red-600'
           }`}>
             <div className={`w-2 h-2 rounded-full mr-2 ${
               connectionStatus === 'connected' ? 'bg-green-400' : 'bg-red-400'
             }`}></div>
-            {connectionStatus === 'connected' ? 'Connected' : 'Reconnecting...'}
+            <span className="font-medium">
+              {connectionStatus === 'connected' ? 'Connected' : 'Reconnecting...'}
+            </span>
           </div>
         </div>
       </div>
 
       {/* Main content */}
-      <div className={`transition-all duration-300 ease-in-out ${
-        sidebarOpen ? 'ml-64' : 'ml-0'
-      }`}>
+      <div className="flex-1 min-w-0">
         {/* Top navigation */}
         <header className="bg-white shadow-sm border-b border-gray-200">
           <div className="flex justify-between items-center px-6 py-4">
             <div className="flex items-center">
-              {!sidebarOpen && (
-                <button
-                  onClick={() => setSidebarOpen(true)}
-                  className="p-2 rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 mr-4"
-                >
-                  <ChevronRightIcon className="h-5 w-5" />
-                </button>
-              )}
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 mr-4"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
               <h1 className="text-2xl font-semibold text-gray-900">
                 {getNavigation().find(item => isCurrentPath(item.href))?.name || 'Dashboard'}
               </h1>
@@ -500,9 +559,9 @@ const Layout: React.FC = () => {
         </header>
 
         {/* Page content */}
-        <main className="flex-1">
+        <main className="flex-1 bg-gray-50">
           <div className="px-6 py-8">
-            <Outlet />
+            {children || <Outlet />}
           </div>
         </main>
       </div>
