@@ -153,7 +153,7 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
           apiService.get(`/enterprise-exchanges/${id}`).catch(() => apiService.get(`/exchanges/${id}`)),
           apiService.get(`/exchanges/${id}/participants`),
           apiService.get(`/exchanges/${id}/tasks`),
-          apiService.get(`/exchanges/${id}/documents`),
+          apiService.get(`/documents/exchange/${id}`),
           apiService.get(`/exchanges/${id}/audit-logs`),
           apiService.get(`/enterprise-exchanges/${id}/timeline`).catch(() => []),
           apiService.get(`/enterprise-exchanges/${id}/compliance`).catch(() => null)
@@ -164,7 +164,7 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
           apiService.get(`/exchanges/${id}`),
           apiService.get(`/exchanges/${id}/participants`),
           apiService.get(`/exchanges/${id}/tasks`),
-          apiService.get(`/exchanges/${id}/documents`),
+          apiService.get(`/documents/exchange/${id}`),
           apiService.get(`/exchanges/${id}/audit-logs`)
         ]);
         timelineData = [];
@@ -1020,10 +1020,22 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
                     <div key={document.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center space-x-3">
-                            <FileText className="w-8 h-8 text-blue-600" />
+                            <FileText className={`w-8 h-8 ${document.document_type === 'generated' ? 'text-green-600' : 'text-blue-600'}`} />
                             <div>
-                              <h4 className="font-semibold text-gray-900">{document.originalFilename}</h4>
-                              <p className="text-sm text-gray-600">{document.mimeType}</p>
+                              <h4 className="font-semibold text-gray-900">
+                                {document.originalFilename || document.name}
+                                {document.document_type === 'generated' && (
+                                  <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    Generated
+                                  </span>
+                                )}
+                              </h4>
+                              <p className="text-sm text-gray-600">
+                                {document.mimeType || document.category}
+                                {document.template_name && (
+                                  <span className="ml-2 text-gray-500">• Template: {document.template_name}</span>
+                                )}
+                              </p>
                             </div>
                           </div>
                           <button className="p-1 text-gray-400 hover:text-gray-600 rounded">
@@ -1053,7 +1065,19 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
                         </div>
                       
                       <div className="flex items-center space-x-2 mt-4 pt-4 border-t border-gray-100">
-                        <button className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                        <button 
+                          onClick={() => {
+                            if (document.document_type === 'generated' && document.file_url) {
+                              // For generated documents, download directly from URL
+                              window.open(document.file_url, '_blank');
+                            } else {
+                              // For regular documents, use the download API
+                              // apiService.downloadDocument(document.id);
+                              console.log('Download regular document:', document.id);
+                            }
+                          }}
+                          className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                        >
                           <Download className="w-4 h-4" />
                           <span>Download</span>
                         </button>

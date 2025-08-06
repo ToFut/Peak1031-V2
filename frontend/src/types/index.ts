@@ -65,6 +65,11 @@ export interface Document {
   updatedAt: string;
   exchange?: Exchange;
   uploadedByUser?: User;
+  // Additional properties for document types and templates
+  document_type?: string;
+  name?: string;
+  template_name?: string;
+  file_url?: string;
 }
 
 export interface Message {
