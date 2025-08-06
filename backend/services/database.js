@@ -130,7 +130,12 @@ class DatabaseService {
   // Contact operations
   async getContacts(options = {}) {
     if (this.useSupabase) {
-      return await supabaseService.getContacts(options);
+      try {
+        return await supabaseService.getContacts(options);
+      } catch (error) {
+        console.log('⚠️ Supabase error, falling back to Sequelize for contacts:', error.message);
+        return await Contact.findAll(options);
+      }
     } else {
       return await Contact.findAll(options);
     }

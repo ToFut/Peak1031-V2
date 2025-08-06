@@ -211,27 +211,38 @@ class ApiService {
     // Check if user is admin to request all exchanges
     const userStr = localStorage.getItem('user');
     let limit = '20';
+    let isAdmin = false;
+    
+    console.log('🔍 Checking user for exchanges request...');
+    console.log('User in localStorage:', userStr?.substring(0, 100) + '...');
+    
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
+        console.log('Parsed user role:', user.role);
         if (user.role === 'admin') {
           limit = '2000'; // Admin gets ALL exchanges (increased to ensure we get all)
-          console.log('📊 Admin requesting all exchanges with limit:', limit);
+          isAdmin = true;
+          console.log('📊 ADMIN DETECTED! Requesting all exchanges with limit:', limit);
         }
       } catch (e) {
         console.error('Error parsing user data:', e);
       }
     }
     
-    const response = await this.request<any>(`/exchanges?limit=${limit}`);
+    const endpoint = `/exchanges?limit=${limit}`;
+    console.log('Making request to:', endpoint);
+    
+    const response = await this.request<any>(endpoint);
     // Handle both array response and paginated response
     if (Array.isArray(response)) {
-      console.log(`✅ Received ${response.length} exchanges`);
+      console.log(`✅ ${isAdmin ? 'ADMIN' : 'USER'} received ${response.length} exchanges`);
       return response;
     } else if (response && response.exchanges) {
-      console.log(`✅ Received ${response.exchanges.length} exchanges`);
+      console.log(`✅ ${isAdmin ? 'ADMIN' : 'USER'} received ${response.exchanges.length} exchanges`);
       return response.exchanges;
     } else {
+      console.log('⚠️ Unexpected response format:', response);
       return [];
     }
   }

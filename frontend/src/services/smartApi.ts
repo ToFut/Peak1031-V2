@@ -292,13 +292,32 @@ class SmartApiService {
   async getExchanges(options?: ApiOptions) {
     const cacheKey = 'api:/exchanges';
     
-    // Check cache first
-    if (options?.useCache !== false && !options?.forceRefresh) {
+    // Check if user is admin - don't use cache for admin to ensure fresh data
+    const userStr = localStorage.getItem('user');
+    let isAdmin = false;
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        isAdmin = user.role === 'admin';
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+    }
+    
+    // Check cache first (skip cache for admin to get fresh data)
+    if (!isAdmin && options?.useCache !== false && !options?.forceRefresh) {
       const cached = cacheService.get<any>(cacheKey);
       if (cached) {
         console.log('📦 Using cached exchanges');
         return cached;
       }
+    } else if (isAdmin) {
+      console.log('👑 Admin user - clearing cache and getting fresh data');
+      // Clear cache for admin to ensure fresh data
+      cacheService.clear(cacheKey);
+    } else if (options?.forceRefresh) {
+      console.log('🔄 Force refresh requested - clearing cache');
+      cacheService.clear(cacheKey);
     }
     
     try {

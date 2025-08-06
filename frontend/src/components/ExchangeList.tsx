@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { usePermissions } from '../hooks/usePermissions';
 import { ExchangeCard } from './ExchangeCard';
 import ModernDropdown from './ui/ModernDropdown';
+import { VirtualizedList } from './VirtualizedList';
 import {
   Search,
   Plus,
@@ -192,34 +193,51 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
       setLoading(true);
       setError(null);
       
+      // Debug user detection
+      console.log('🔍 ExchangeList: Current user:', user);
+      console.log('🔍 ExchangeList: User role:', user?.role);
+      console.log('🔍 ExchangeList: Is admin?', user?.role === 'admin');
+      
       // For admin users, fetch ALL exchanges directly from Supabase
       if (user?.role === 'admin') {
+        console.log('👑 ExchangeList: Admin detected - attempting direct Supabase fetch');
         try {
           // Try to get Supabase client from the service
           const { createClient } = await import('@supabase/supabase-js');
           const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
           const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
           
+          console.log('🔍 ExchangeList: Supabase URL exists?', !!supabaseUrl);
+          console.log('🔍 ExchangeList: Supabase Key exists?', !!supabaseKey);
+          
           if (supabaseUrl && supabaseKey) {
             const supabase = createClient(supabaseUrl, supabaseKey);
             
+            console.log('📡 ExchangeList: Making direct Supabase query...');
             // Fetch ALL exchanges for admin (no limit)
             const { data, error } = await supabase
               .from('exchanges')
               .select('*')
               .order('created_at', { ascending: false });
             
-            if (error) throw error;
+            if (error) {
+              console.error('❌ ExchangeList: Supabase error:', error);
+              throw error;
+            }
             
             if (data) {
-              console.log(`✅ Admin loaded ${data.length} exchanges directly from Supabase`);
+              console.log(`✅ ExchangeList: Admin loaded ${data.length} exchanges directly from Supabase`);
               setExchanges(data);
               return;
             }
+          } else {
+            console.warn('⚠️ ExchangeList: Missing Supabase credentials');
           }
         } catch (supabaseError) {
-          console.warn('Direct Supabase fetch failed, falling back to API:', supabaseError);
+          console.warn('❌ ExchangeList: Direct Supabase fetch failed, falling back to API:', supabaseError);
         }
+      } else {
+        console.log('👤 ExchangeList: Non-admin user, using regular API');
       }
       
       // Fallback to regular API for non-admins or if direct fetch fails
@@ -585,6 +603,55 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
                 Clear Filters
               </button>
             )}
+          </div>
+        ) : filteredExchanges.length > 100 && user?.role === 'admin' ? (
+          // Use virtualized rendering for admin users with large datasets
+          <div className="bg-white rounded-lg shadow border">
+            <div className="p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">
+                All System Exchanges ({filteredExchanges.length} total)
+                <span className="ml-2 text-sm text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                  Virtualized for Performance
+                </span>
+              </h3>
+            </div>
+            <VirtualizedList
+              items={filteredExchanges}
+              itemHeight={80}
+              containerHeight={600}
+              renderItem={(exchange, index) => (
+                <div
+                  key={exchange.id}
+                  className="border-b border-gray-200 p-4 hover:bg-gray-50 cursor-pointer flex items-center justify-between"
+                  onClick={() => handleExchangeClick(exchange)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {exchange.name || exchange.id}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {exchange.status}
+                      </p>
+                    </div>
+                    <div className="mt-1 flex items-center text-sm text-gray-500">
+                      <span>{exchange.client?.firstName} {exchange.client?.lastName}</span>
+                      {exchange.exchangeValue && (
+                        <span className="ml-4">
+                          ${(exchange.exchangeValue / 1000000).toFixed(1)}M
+                        </span>
+                      )}
+                      <span className="ml-4">
+                        {exchange.lifecycle_stage || 'N/A'}
+                      </span>
+                      <span className="ml-4 text-xs">
+                        #{index + 1}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            />
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

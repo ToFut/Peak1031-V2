@@ -22,6 +22,8 @@ import Documents from './pages/Documents';
 import Users from './pages/Users';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import Profile from './pages/Profile';
+import Preferences from './pages/Preferences';
 import AuthTest from './pages/AuthTest';
 import TemplateManager from './components/TemplateManager';
 import TemplateDocumentManager from './pages/TemplateDocumentManager';
@@ -278,6 +280,26 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Settings />
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Profile - Available to all authenticated users */}
+              <Route 
+                path="/profile" 
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Preferences - Available to all authenticated users */}
+              <Route 
+                path="/preferences" 
+                element={
+                  <ProtectedRoute>
+                    <Preferences />
                   </ProtectedRoute>
                 } 
               />

@@ -116,16 +116,30 @@ const EnhancedAdminDashboard: React.FC = () => {
 
   const loadAdminStats = async () => {
     setLoading(true);
+    console.log('🔄 Admin Dashboard: Loading stats...');
+    
     try {
       const [exchangesRes, tasksRes, usersRes] = await Promise.all([
-        smartApi.getExchanges(),
+        smartApi.getExchanges({ forceRefresh: true }),  // Force fresh data
         smartApi.getTasks(),
         apiService.get('/admin/users').catch(() => ({ data: [] }))
       ]);
       
+      console.log('📊 Admin Dashboard: Raw responses:');
+      console.log('- Exchanges Response type:', typeof exchangesRes, 'Array?', Array.isArray(exchangesRes));
+      console.log('- Exchanges Response length:', exchangesRes?.length || 'no length');
+      console.log('- Exchanges Response.exchanges length:', exchangesRes?.exchanges?.length || 'no exchanges prop');
+      console.log('- Tasks Response:', tasksRes);
+      console.log('- Users Response:', usersRes);
+      
       const exchanges = exchangesRes.exchanges || exchangesRes || [];
       const tasks = tasksRes.tasks || tasksRes || [];
       const users = usersRes.data || [];
+      
+      console.log('📊 Admin Dashboard: Processed data:');
+      console.log('- Exchanges count:', exchanges.length);
+      console.log('- Tasks count:', tasks.length);
+      console.log('- Users count:', users.length);
       
       const now = new Date();
       
