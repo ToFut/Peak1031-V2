@@ -12,7 +12,7 @@ import {
 } from '../types';
 
 class ApiService {
-  private baseURL: string = process.env.REACT_APP_API_URL || 'http://localhost:8001/api';
+  private baseURL: string = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
   // Helper method to get auth headers
   private getAuthHeaders(isFormData: boolean = false): HeadersInit {
@@ -24,8 +24,10 @@ class ApiService {
   }
 
   // Helper method for HTTP requests
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
+    console.log(`🔗 API Request: ${options.method || 'GET'} ${url}`);
+    
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -35,33 +37,28 @@ class ApiService {
     });
 
     if (!response.ok) {
-      // If we get a 401 and have a refresh token, try to refresh
-      if (response.status === 401 && localStorage.getItem('refreshToken')) {
+      // If we get a 401 and have a refresh token, try to refresh (but only once)
+      if (response.status === 401 && localStorage.getItem('refreshToken') && !isRetry) {
         try {
           await this.refreshToken();
           // Retry the request with the new token
-          const retryResponse = await fetch(url, {
-            ...options,
-            headers: {
-              ...this.getAuthHeaders(),
-              ...options.headers
-            }
-          });
-          
-          if (!retryResponse.ok) {
-            const errorData = await retryResponse.json().catch(() => ({}));
-            throw new Error(errorData.message || `HTTP ${retryResponse.status}: ${retryResponse.statusText}`);
-          }
-          
-          const retryData = await retryResponse.json();
-          return retryData.data || retryData;
+          return await this.request<T>(endpoint, options, true);
         } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
           // If refresh fails, clear tokens and throw original error
           localStorage.removeItem('token');
           localStorage.removeItem('refreshToken');
+          // Redirect to login or dispatch logout action
+          window.location.href = '/login';
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+          throw new Error(errorData.message || 'Authentication failed. Please login again.');
         }
+      }
+      
+      // Handle rate limiting
+      if (response.status === 429) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error('Too many requests. Please wait a moment and try again.');
       }
       
       const errorData = await response.json().catch(() => ({}));
@@ -69,6 +66,8 @@ class ApiService {
     }
 
     const data = await response.json();
+    console.log(`✅ API Response from ${endpoint}:`, data);
+    
     // Return data.data if it exists (backend format), otherwise return the whole response
     return data.data || data;
   }
@@ -305,7 +304,7 @@ class ApiService {
     formData.append('category', category);
     
     const token = localStorage.getItem('token');
-    const response = await fetch(`${this.baseURL}/documents/upload`, {
+    const response = await fetch(`${this.baseURL}/documents`, {
       method: 'POST',
       headers: {
         ...(token && { 'Authorization': `Bearer ${token}` })
@@ -445,11 +444,11 @@ class ApiService {
 
   // Document Template Management
   async getDocumentTemplates(): Promise<any[]> {
-    return this.request<any[]>('/document-templates');
+    return this.request<any[]>('/documents/templates');
   }
 
   async uploadDocumentTemplate(formData: FormData): Promise<any> {
-    const response = await fetch(`${this.baseURL}/document-templates`, {
+    const response = await fetch(`${this.baseURL}/documents/templates/upload`, {
       method: 'POST',
       headers: this.getAuthHeaders(true), // Don't set Content-Type for FormData
       body: formData
@@ -463,9 +462,41 @@ class ApiService {
   }
 
   async deleteDocumentTemplate(templateId: string): Promise<void> {
-    return this.request<void>(`/document-templates/${templateId}`, {
+    return this.request<void>(`/documents/templates/${templateId}`, {
       method: 'DELETE'
     });
+  }
+
+  async updateDocumentTemplate(templateId: string, templateData: any): Promise<any> {
+    return this.request<any>(`/documents/templates/${templateId}`, {
+      method: 'PUT',
+      body: JSON.stringify(templateData)
+    });
+  }
+
+  async downloadDocumentTemplate(templateId: string): Promise<Blob> {
+    const response = await fetch(`${this.baseURL}/documents/templates/${templateId}/download`, {
+      headers: this.getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to download template: ${response.statusText}`);
+    }
+
+    return response.blob();
+  }
+
+  async viewDocumentTemplate(templateId: string): Promise<string> {
+    const response = await fetch(`${this.baseURL}/documents/templates/${templateId}/view`, {
+      headers: this.getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to view template: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
   }
 
   async generateDocumentFromTemplate(data: {
@@ -474,7 +505,7 @@ class ApiService {
     generation_data: any;
     generated_by: string;
   }): Promise<{ document_id: string; download_url: string }> {
-    return this.request<{ document_id: string; download_url: string }>('/document-templates/generate', {
+    return this.request<{ document_id: string; download_url: string }>('/documents/templates/generate', {
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -482,9 +513,128 @@ class ApiService {
 
   async getGeneratedDocuments(exchangeId?: string): Promise<any[]> {
     const endpoint = exchangeId 
-      ? `/generated-documents?exchange_id=${exchangeId}`
-      : '/generated-documents';
+      ? `/documents/templates/generated?exchange_id=${exchangeId}`
+      : '/documents/templates/generated';
     return this.request<any[]>(endpoint);
+  }
+
+  async checkAutoGeneration(data: {
+    exchange_id: string;
+    new_status: string;
+    triggered_by: string;
+  }): Promise<any> {
+    return this.request<any>('/documents/templates/check-auto-generation', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  // Exchange Participant Management
+  async getExchangeParticipants(exchangeId: string): Promise<any> {
+    return this.request<any>(`/exchanges/${exchangeId}/participants`);
+  }
+
+  async getAvailableMembers(exchangeId: string, search?: string): Promise<any> {
+    const endpoint = search 
+      ? `/exchanges/${exchangeId}/available-members?search=${encodeURIComponent(search)}`
+      : `/exchanges/${exchangeId}/available-members`;
+    return this.request<any>(endpoint);
+  }
+
+  async addExchangeParticipant(exchangeId: string, data: {
+    user_id?: string;
+    contact_id?: string;
+    email?: string;
+    role?: string;
+    permissions?: Record<string, boolean>;
+  }): Promise<any> {
+    return this.request<any>(`/exchanges/${exchangeId}/participants`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async removeExchangeParticipant(exchangeId: string, participantId: string): Promise<void> {
+    return this.request<void>(`/exchanges/${exchangeId}/participants/${participantId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // Enterprise API Methods
+  // Enterprise Exchanges
+  async getEnterpriseExchange(exchangeId: string): Promise<any> {
+    return this.request<any>(`/enterprise-exchanges/${exchangeId}`);
+  }
+
+  async getEnterpriseExchanges(params?: any): Promise<any> {
+    const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
+    return this.request<any>(`/enterprise-exchanges${queryString}`);
+  }
+
+  async getEnterpriseExchangeStats(): Promise<any> {
+    return this.request<any>('/enterprise-exchanges/dashboard/stats');
+  }
+
+  async advanceExchangeStage(exchangeId: string, data: { new_stage: string; reason: string }): Promise<any> {
+    return this.request<any>(`/enterprise-exchanges/${exchangeId}/advance-stage`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async getExchangeTimeline(exchangeId: string): Promise<any> {
+    return this.request<any>(`/enterprise-exchanges/${exchangeId}/timeline`);
+  }
+
+  async getExchangeCompliance(exchangeId: string): Promise<any> {
+    return this.request<any>(`/enterprise-exchanges/${exchangeId}/compliance`);
+  }
+
+  // Account Management
+  async getAccountActivityLogs(): Promise<any> {
+    return this.request<any>('/account/activity-logs');
+  }
+
+  async updateAccountPreferences(preferences: any): Promise<any> {
+    return this.request<any>('/account/preferences', {
+      method: 'PUT',
+      body: JSON.stringify(preferences)
+    });
+  }
+
+  async updateAccountSecurity(securityData: any): Promise<any> {
+    return this.request<any>('/account/security', {
+      method: 'PUT',
+      body: JSON.stringify(securityData)
+    });
+  }
+
+  // Enhanced Exchange Methods with Enterprise Features
+  async getExchangesWithLifecycle(params?: any): Promise<any> {
+    // First try enterprise endpoint, fallback to regular
+    try {
+      const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
+      return await this.request<any>(`/enterprise-exchanges${queryString}`);
+    } catch (error) {
+      // Fallback to regular exchanges endpoint
+      const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
+      return await this.request<any>(`/exchanges${queryString}`);
+    }
+  }
+
+  async exportEnterpriseData(type: string, filters?: any): Promise<Blob> {
+    const endpoint = `/enterprise-exchanges/export/${type}`;
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: filters ? JSON.stringify(filters) : undefined
+    });
+    
+    if (!response.ok) {
+      throw new Error('Export failed');
+    }
+
+    return response.blob();
   }
 }
 

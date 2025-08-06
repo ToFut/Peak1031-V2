@@ -4,8 +4,12 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
+  firstName?: string; // Frontend compatibility
+  lastName?: string; // Frontend compatibility
   role: 'admin' | 'client' | 'coordinator' | 'third_party' | 'agency';
   phone?: string;
+  avatar?: string;
+  company?: string; // Company name for agency users
   is_active: boolean;
   two_fa_enabled: boolean;
   last_login?: string;

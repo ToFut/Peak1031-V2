@@ -18,11 +18,14 @@ const TasksPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiService.get('/tasks');
-      setTasks(response.tasks || response || []);
+      
+      // Note: Auto-login removed - users should use proper login flow
+      
+      const response = await apiService.getTasks();
+      setTasks(Array.isArray(response) ? response : []);
     } catch (err: any) {
       console.error('Error loading tasks:', err);
-      setError(err.message || 'Failed to load tasks');
+      setError(err.message || 'Failed to load tasks from Practice Partner database');
     } finally {
       setLoading(false);
     }

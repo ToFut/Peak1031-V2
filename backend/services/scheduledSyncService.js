@@ -1,7 +1,8 @@
 const cron = require('node-cron');
 const practicePartnerService = require('./practicePartnerService');
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 class ScheduledSyncService {
   constructor() {

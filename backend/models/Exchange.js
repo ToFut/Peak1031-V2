@@ -34,15 +34,7 @@ const Exchange = sequelize.define('Exchange', {
     comment: 'Exchange name/title'
   },
   
-  exchange_name: {
-    type: DataTypes.STRING(255),
-    allowNull: false,
-    validate: {
-      notEmpty: true,
-      len: [1, 255]
-    },
-    comment: 'Display name for the exchange'
-  },
+
   
   // Status Management
   status: {

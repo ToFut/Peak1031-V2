@@ -58,11 +58,47 @@ export const ExchangeChatBox: React.FC<ExchangeChatBoxProps> = ({ exchange, clas
   const [hasAccess, setHasAccess] = useState(false);
   const [userPermissions, setUserPermissions] = useState<any>({});
 
+  // Define loadExchangeData first
+  const loadExchangeData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Load exchange participants and check access
+      const [exchangeParticipants, exchangeMessages] = await Promise.all([
+        apiService.get(`/exchanges/${exchange.id}/participants`),
+        apiService.get(`/exchanges/${exchange.id}/messages`)
+      ]);
+
+      // Check if user has access to this exchange
+      const userParticipant = exchangeParticipants.find((p: ExchangeParticipant) => 
+        (p.user && p.user.email === user?.email) || 
+        (p.contact && p.contact.email === user?.email)
+      );
+
+      if (!userParticipant) {
+        setError('You do not have access to this exchange');
+        setHasAccess(false);
+        return;
+      }
+
+      setHasAccess(true);
+      setParticipants(exchangeParticipants);
+      setMessages(exchangeMessages || []);
+
+    } catch (err: any) {
+      console.error('Error loading exchange data:', err);
+      setError(err.message || 'Failed to load exchange data');
+    } finally {
+      setLoading(false);
+    }
+  }, [exchange.id, user?.email]);
+
   useEffect(() => {
     if (exchange.id && user) {
       loadExchangeData();
     }
-  }, [exchange.id, user]); // loadExchangeData is defined inside this component so it's safe to exclude
+  }, [exchange.id, user, loadExchangeData]);
 
   const setupSocketListeners = useCallback(() => {
     if (!socket) return;
@@ -147,51 +183,7 @@ export const ExchangeChatBox: React.FC<ExchangeChatBoxProps> = ({ exchange, clas
     scrollToBottom();
   }, [messages]);
 
-  const loadExchangeData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
 
-      // Load exchange participants and check access
-      const [exchangeParticipants, exchangeMessages] = await Promise.all([
-        apiService.get(`/exchanges/${exchange.id}/participants`),
-        apiService.get(`/exchanges/${exchange.id}/messages`)
-      ]);
-
-      setParticipants(exchangeParticipants);
-      
-      // Check if current user has access to this exchange
-      const userAccess = exchangeParticipants.some((p: ExchangeParticipant) => 
-        (p.user?.email === user?.email) || 
-        (p.contact?.email === user?.email) ||
-        (user?.role === 'admin') ||
-        (user?.role === 'coordinator')
-      );
-
-      if (!userAccess) {
-        setError('You do not have permission to access this exchange chat.');
-        setHasAccess(false);
-        return;
-      }
-
-      setHasAccess(true);
-      
-      // Get user permissions
-      const userParticipant = exchangeParticipants.find((p: ExchangeParticipant) => 
-        p.user?.email === user?.email || p.contact?.email === user?.email
-      );
-      
-      setUserPermissions(userParticipant?.permissions || {});
-      setMessages(exchangeMessages);
-
-    } catch (err: any) {
-      console.error('Error loading exchange data:', err);
-      setError(err.message || 'Failed to load exchange chat');
-      setHasAccess(false);
-    } finally {
-      setLoading(false);
-    }
-  };
 
 
 

@@ -92,6 +92,31 @@ export interface Exchange {
   urgencyLevel?: string;
   isOverdue?: boolean;
   participantCount?: number;
+  
+  // Exchange participants
+  exchangeParticipants?: Array<{
+    id: string;
+    role: string;
+    user?: {
+      id: string;
+      email: string;
+      firstName?: string;
+      lastName?: string;
+    } | null;
+    contact?: {
+      id: string;
+      email: string;
+      firstName?: string;
+      lastName?: string;
+    } | null;
+    permissions?: {
+      sendMessages?: boolean;
+      viewMessages?: boolean;
+      viewDocuments?: boolean;
+      uploadDocuments?: boolean;
+      viewExchange?: boolean;
+    };
+  }>;
 }
 
 export interface ReplacementProperty {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Exchange } from '../types';
-import { apiService } from '../services/api';
+import { smartApi } from '../services/smartApi';
 import { useAuth } from '../hooks/useAuth';
 import { usePermissions } from '../hooks/usePermissions';
 import { ExchangeCard } from './ExchangeCard';
@@ -15,14 +15,11 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
-  Download,
-  Settings,
-  User,
   Building,
-  FileText,
-  Shield,
   TrendingUp,
-  Activity
+  Activity,
+  Grid3X3,
+  Table
 } from 'lucide-react';
 
 interface ExchangeListProps {
@@ -147,7 +144,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
+  // const { user } = useAuth(); // Unused variable
   const { isAdmin, isCoordinator } = usePermissions();
   const navigate = useNavigate();
 
@@ -159,6 +156,9 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
   const [valueMaxFilter, setValueMaxFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [showFilterChips, setShowFilterChips] = useState(false);
+
+  // View toggle state
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
   // Filter options
   const statusOptions = [
@@ -192,24 +192,23 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
       setLoading(true);
       setError(null);
       
-      // Build query parameters
-      const params = new URLSearchParams();
-      if (filters.status) params.append('status', filters.status);
-      if (filters.limit) params.append('limit', filters.limit.toString());
+      // Use smart API to fetch data
+      const response = await smartApi.getExchanges();
+      const exchangesData = response.exchanges || response || [];
+      setExchanges(Array.isArray(exchangesData) ? exchangesData : []);
       
-      const queryString = params.toString();
-      const endpoint = `/exchanges${queryString ? `?${queryString}` : ''}`;
-      
-      const response = await apiService.get(endpoint);
-      setExchanges(response.exchanges || response || []);
+      // Check if using fallback data
+      if (exchangesData.some((e: any) => e._isFallback)) {
+        setError('Using cached data - backend connection unavailable');
+      }
       
     } catch (err: any) {
       console.error('Error loading exchanges:', err);
-      setError(err.message || 'Failed to load exchanges');
+      setError(err.message || 'Failed to load exchanges from Practice Partner database');
     } finally {
       setLoading(false);
     }
-  }, [filters.status, filters.limit]);
+  }, []);
 
   useEffect(() => {
     loadExchanges();
@@ -262,7 +261,16 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
     if (onExchangeSelect) {
       onExchangeSelect(exchange);
     } else {
-      navigate(`/exchanges/${exchange.id}`);
+      // Debug log for troubleshooting
+      console.log('Clicking exchange:', exchange.id, exchange.name);
+      
+      // Navigate to exchange details page
+      if (exchange.id) {
+        navigate(`/exchanges/${exchange.id}`);
+      } else {
+        console.error('Exchange missing ID:', exchange);
+        alert('Cannot view exchange: No ID found');
+      }
     }
   };
 
@@ -298,7 +306,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
     );
   }
 
-  if (error) {
+  if (error && !error.includes('cached')) {
     return (
       <div className="bg-white shadow rounded-lg p-6">
         <div className="text-center">
@@ -318,6 +326,22 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Cached data warning */}
+      {error && error.includes('cached') && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2" />
+            <p className="text-yellow-800">{error}</p>
+          </div>
+          <button
+            onClick={loadExchanges}
+            className="bg-yellow-600 text-white px-3 py-1 rounded-md hover:bg-yellow-700 text-sm"
+          >
+            Refresh
+          </button>
+        </div>
+      )}
+      
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -495,36 +519,106 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
         </div>
       )}
 
-      {/* Exchange Grid */}
-      {filteredExchanges.length === 0 ? (
-        <div className="bg-white rounded-lg shadow border p-12 text-center">
-          <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Exchanges Found</h3>
-          <p className="text-gray-500 mb-4">
-            {hasActiveFilters 
-              ? "No exchanges match your current filters. Try adjusting your search criteria."
-              : "No exchanges have been created yet."
-            }
-          </p>
-          {hasActiveFilters && (
-            <button
-              onClick={clearAllFilters}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-            >
-              Clear Filters
-            </button>
-          )}
-        </div>
+      {/* View Toggle */}
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => setViewMode(prev => prev === 'grid' ? 'table' : 'grid')}
+          className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200 transition-colors"
+        >
+          {viewMode === 'grid' ? <Grid3X3 className="w-4 h-4" /> : <Table className="w-4 h-4" />}
+          {viewMode === 'grid' ? 'Grid View' : 'Table View'}
+        </button>
+      </div>
+
+      {/* Exchange Grid/Table */}
+      {viewMode === 'grid' ? (
+        filteredExchanges.length === 0 ? (
+          <div className="bg-white rounded-lg shadow border p-12 text-center">
+            <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Exchanges Found</h3>
+            <p className="text-gray-500 mb-4">
+              {hasActiveFilters 
+                ? "No exchanges match your current filters. Try adjusting your search criteria."
+                : "No exchanges have been created yet."
+              }
+            </p>
+            {hasActiveFilters && (
+              <button
+                onClick={clearAllFilters}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredExchanges.map((exchange) => (
+              <ExchangeCard
+                key={exchange.id}
+                exchange={exchange}
+                onClick={() => handleExchangeClick(exchange)}
+                selected={false}
+              />
+            ))}
+          </div>
+        )
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredExchanges.map((exchange) => (
-            <ExchangeCard
-              key={exchange.id}
-              exchange={exchange}
-              onClick={() => handleExchangeClick(exchange)}
-              selected={false}
-            />
-          ))}
+        // Table view placeholder
+        <div className="bg-white rounded-lg shadow border p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Exchanges</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Exchange Number
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Client
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Value
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Progress
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th scope="col" className="relative px-6 py-3">
+                    <span className="sr-only">Edit</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredExchanges.map((exchange) => (
+                  <tr key={exchange.id} onClick={() => handleExchangeClick(exchange)} className="hover:bg-gray-100 cursor-pointer">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{exchange.exchangeNumber}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{exchange.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{exchange.client?.firstName} {exchange.client?.lastName}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{exchange.status}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{exchange.exchangeType}</td>
+                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${exchange.exchangeValue ? (exchange.exchangeValue / 1000000).toFixed(1) + 'M' : 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{exchange.progress}%</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(exchange.createdAt || exchange.identificationDeadline || '').toLocaleDateString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <a href="#" className="text-blue-600 hover:text-blue-900">View</a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

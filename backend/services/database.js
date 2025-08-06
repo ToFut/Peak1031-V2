@@ -1,11 +1,11 @@
 const { sequelize, useSupabase } = require('../config/database');
 const supabaseService = require('./supabase');
-const { User, Exchange, Contact, Task, Message, Document, AuditLog, Notification } = require('../models');
+const { User, Exchange, Contact, Task, Message, Document, AuditLog, Notification, ExchangeParticipant } = require('../models');
 
 class DatabaseService {
   constructor() {
-    this.useSupabase = true; // Always use Supabase
-    console.log('🔧 Database Service: Using Supabase REST API only');
+    this.useSupabase = useSupabase; // Use the config setting
+    console.log('🔧 Database Service: Using', this.useSupabase ? 'Supabase REST API' : 'local SQLite database');
   }
 
   // User operations
@@ -19,7 +19,18 @@ class DatabaseService {
 
   async getUserById(id) {
     if (this.useSupabase) {
-      return await supabaseService.getUserById(id);
+      try {
+        const user = await supabaseService.getUserById(id);
+        if (user) {
+          return user;
+        }
+        // If not found in Supabase, fall back to Sequelize
+        console.log('🔄 User not found in Supabase, trying Sequelize fallback for ID:', id);
+        return await User.findByPk(id);
+      } catch (error) {
+        console.log('⚠️ Supabase error, falling back to Sequelize:', error.message);
+        return await User.findByPk(id);
+      }
     } else {
       return await User.findByPk(id);
     }
@@ -27,7 +38,18 @@ class DatabaseService {
 
   async getUserByEmail(email) {
     if (this.useSupabase) {
-      return await supabaseService.getUserByEmail(email);
+      try {
+        const user = await supabaseService.getUserByEmail(email);
+        if (user) {
+          return user;
+        }
+        // If not found in Supabase, fall back to Sequelize
+        console.log('🔄 User not found in Supabase, trying Sequelize fallback for email:', email);
+        return await User.findOne({ where: { email } });
+      } catch (error) {
+        console.log('⚠️ Supabase error, falling back to Sequelize:', error.message);
+        return await User.findOne({ where: { email } });
+      }
     } else {
       return await User.findOne({ where: { email } });
     }
@@ -60,7 +82,15 @@ class DatabaseService {
         ...options,
         include: [
           { model: User, as: 'coordinator' },
-          { model: Contact, as: 'client' }
+          { model: Contact, as: 'client' },
+          { 
+            model: ExchangeParticipant, 
+            as: 'exchangeParticipants',
+            include: [
+              { model: User, as: 'user', attributes: { exclude: ['password_hash', 'two_fa_secret'] } },
+              { model: Contact, as: 'contact' }
+            ]
+          }
         ]
       });
     }
@@ -135,46 +165,52 @@ class DatabaseService {
   // Task operations
   async getTasks(options = {}) {
     if (this.useSupabase) {
-      // Convert camelCase column names to snake_case for Supabase
-      const supabaseOptions = { ...options };
-      if (supabaseOptions.orderBy) {
-        const columnMap = {
-          'dueDate': 'due_date',
-          'createdAt': 'created_at',
-          'updatedAt': 'updated_at',
-          'assignedTo': 'assigned_to',
-          'exchangeId': 'exchange_id',
-          'priority': 'priority',
-          'status': 'status',
-          'title': 'title'
-        };
-        supabaseOptions.orderBy.column = columnMap[supabaseOptions.orderBy.column] || supabaseOptions.orderBy.column;
+      try {
+        // Convert camelCase column names to snake_case for Supabase
+        const supabaseOptions = { ...options };
+        if (supabaseOptions.orderBy) {
+          const columnMap = {
+            'dueDate': 'due_date',
+            'createdAt': 'created_at',
+            'updatedAt': 'updated_at',
+            'assignedTo': 'assigned_to',
+            'exchangeId': 'exchange_id',
+            'priority': 'priority',
+            'status': 'status',
+            'title': 'title'
+          };
+          supabaseOptions.orderBy.column = columnMap[supabaseOptions.orderBy.column] || supabaseOptions.orderBy.column;
+        }
+        return await supabaseService.getTasks(supabaseOptions);
+      } catch (error) {
+        console.log('⚠️ Supabase error, falling back to Sequelize for tasks:', error.message);
+        // Fall back to Sequelize
+        this.useSupabase = false;
       }
-      return await supabaseService.getTasks(supabaseOptions);
-    } else {
-      // Handle orderBy parameter for Sequelize
-      const { orderBy, ...sequelizeOptions } = options;
-      if (orderBy) {
-        // Convert camelCase to snake_case for database columns
-        const columnMap = {
-          'dueDate': 'due_date',
-          'createdAt': 'created_at',
-          'updatedAt': 'updated_at',
-          'assignedTo': 'assigned_to',
-          'exchangeId': 'exchange_id'
-        };
-        const dbColumn = columnMap[orderBy.column] || orderBy.column;
-        sequelizeOptions.order = [[dbColumn, orderBy.ascending ? 'ASC' : 'DESC']];
-      }
-      
-      return await Task.findAll({
-        ...sequelizeOptions,
-        include: [
-          { model: User, as: 'assignedUser' },
-          { model: Exchange, as: 'exchange' }
-        ]
-      });
     }
+    
+    // Use Sequelize (either as primary or fallback)
+    const { orderBy, ...sequelizeOptions } = options;
+    if (orderBy) {
+      // Convert camelCase to snake_case for database columns
+      const columnMap = {
+        'dueDate': 'due_date',
+        'createdAt': 'created_at',
+        'updatedAt': 'updated_at',
+        'assignedTo': 'assigned_to',
+        'exchangeId': 'exchange_id'
+      };
+      const dbColumn = columnMap[orderBy.column] || orderBy.column;
+      sequelizeOptions.order = [[dbColumn, orderBy.ascending ? 'ASC' : 'DESC']];
+    }
+    
+    return await Task.findAll({
+      ...sequelizeOptions,
+      include: [
+        { model: User, as: 'assignedUser' },
+        { model: Exchange, as: 'exchange' }
+      ]
+    });
   }
 
   async getTaskById(id) {
@@ -253,9 +289,15 @@ class DatabaseService {
   }
 
   async createMessage(messageData) {
+    console.log('🗄️ DatabaseService.createMessage called with:', messageData);
+    
     if (this.useSupabase) {
-      return await supabaseService.createMessage(messageData);
+      console.log('🔵 Using Supabase to create message');
+      const result = await supabaseService.createMessage(messageData);
+      console.log('🔵 Supabase createMessage result:', result);
+      return result;
     } else {
+      console.log('🟢 Using Sequelize to create message');
       return await Message.create(messageData);
     }
   }
@@ -267,6 +309,24 @@ class DatabaseService {
       const message = await Message.findByPk(id);
       if (!message) throw new Error('Message not found');
       return await message.update(messageData);
+    }
+  }
+
+  async getMessageById(id) {
+    if (this.useSupabase) {
+      return await supabaseService.getMessageById(id);
+    } else {
+      return await Message.findByPk(id);
+    }
+  }
+
+  async markMessageAsRead(messageId, userId) {
+    if (this.useSupabase) {
+      return await supabaseService.markMessageAsRead(messageId, userId);
+    } else {
+      const message = await Message.findByPk(messageId);
+      if (!message) throw new Error('Message not found');
+      return await message.markAsRead(userId);
     }
   }
 
@@ -294,7 +354,7 @@ class DatabaseService {
       return await Document.findAll({
         ...options,
         include: [
-          { model: User, as: 'uploadedBy' },
+          { model: User, as: 'uploader' },
           { model: Exchange, as: 'exchange' }
         ]
       });
@@ -307,7 +367,7 @@ class DatabaseService {
     } else {
       return await Document.findByPk(id, {
         include: [
-          { model: User, as: 'uploadedBy' },
+          { model: User, as: 'uploader' },
           { model: Exchange, as: 'exchange' }
         ]
       });
@@ -452,6 +512,26 @@ class DatabaseService {
     });
     
     return participants;
+  }
+
+  async createExchangeParticipant(participantData) {
+    if (this.useSupabase) {
+      return await supabaseService.createExchangeParticipant(participantData);
+    }
+    
+    // SQLite fallback
+    return await ExchangeParticipant.create(participantData);
+  }
+
+  async deleteExchangeParticipant(participantId) {
+    if (this.useSupabase) {
+      return await supabaseService.deleteExchangeParticipant(participantId);
+    }
+    
+    // SQLite fallback
+    const participant = await ExchangeParticipant.findByPk(participantId);
+    if (!participant) throw new Error('Participant not found');
+    return await participant.destroy();
   }
 
   // Database connection test

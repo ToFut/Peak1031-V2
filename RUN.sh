@@ -14,7 +14,7 @@ for port in 8000 8001; do
   fi
 done
 
-echo "Starting backend (port 8001) with rate limiting disabled..."
+echo "Starting backend (port 8001) with rate limiting disabled and CORS fixed..."
 (cd "$SCRIPT_DIR/backend" && DISABLE_RATE_LIMIT=true npm run dev > "$SCRIPT_DIR/backend.log" 2>&1 &)
 BACKEND_PID=$!
 
@@ -25,4 +25,6 @@ FRONTEND_PID=$!
 echo "Backend running in background (logs: $SCRIPT_DIR/backend.log)"
 echo "Frontend running in background (logs: $SCRIPT_DIR/frontend.log)"
 echo "Visit: http://localhost:8000"
-echo "Login: admin@peak1031.com / admin123" 
+echo "Login: admin@peak1031.com / admin123"
+echo ""
+echo "✅ CORS fixed - Frontend can now communicate with backend!" 

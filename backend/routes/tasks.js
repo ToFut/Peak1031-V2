@@ -4,6 +4,7 @@ const { checkPermission } = require('../middleware/rbac');
 const databaseService = require('../services/database');
 const { transformToCamelCase, transformToSnakeCase } = require('../utils/caseTransform');
 const { Op } = require('sequelize');
+const { Task, User, Exchange } = require('../models');
 
 const router = express.Router();
 
@@ -40,13 +41,13 @@ router.get('/', authenticateToken, async (req, res) => {
     if (req.user.role === 'client') {
       // Clients can only see tasks for their exchanges
       const userExchanges = await databaseService.getExchanges({
-        where: { clientId: req.user.id }
+        where: { client_id: req.user.id }
       });
       whereClause.exchange_id = { [Op.in]: userExchanges.map(e => e.id) };
     } else if (req.user.role === 'coordinator') {
       // Coordinators can see tasks for exchanges they coordinate
       const userExchanges = await databaseService.getExchanges({
-        where: { coordinatorId: req.user.id }
+        where: { coordinator_id: req.user.id }
       });
       whereClause.exchange_id = { [Op.in]: userExchanges.map(e => e.id) };
     }
@@ -77,8 +78,8 @@ router.get('/', authenticateToken, async (req, res) => {
 router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
   try {
     const tasks = await databaseService.getTasks({
-      where: { exchangeId: req.params.exchangeId },
-      orderBy: { column: 'dueDate', ascending: true }
+      where: { exchange_id: req.params.exchangeId },
+      orderBy: { column: 'due_date', ascending: true }
     });
 
     res.json(transformToCamelCase({ data: tasks }));

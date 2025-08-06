@@ -10,6 +10,36 @@ const supabase = createClient(
 );
 
 /**
+ * GET /api/exchanges/test
+ * Test endpoint to verify Supabase connection (no auth required)
+ */
+router.get('/test', async (req, res) => {
+  try {
+    const { count, error } = await supabase
+      .from('exchanges')
+      .select('*', { count: 'exact', head: true });
+      
+    if (error) {
+      return res.status(500).json({
+        error: 'Database connection failed',
+        message: error.message
+      });
+    }
+    
+    res.json({
+      message: 'Supabase connection successful',
+      totalExchanges: count,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Test failed',
+      message: error.message
+    });
+  }
+});
+
+/**
  * GET /api/exchanges
  * Get exchanges with proper joins and field transformation
  */
@@ -24,87 +54,153 @@ router.get('/', async (req, res) => {
       limit = 20 
     } = req.query;
 
-    // Build query with joins
-    let query = supabase
-      .from('exchanges')
-      .select(`
-        *,
-        client:contacts!client_id (
-          id,
-          first_name,
-          last_name,
-          email,
-          company,
-          phone
-        ),
-        coordinator:users!coordinator_id (
-          id,
-          first_name,
-          last_name,
-          email
-        )
-      `)
-      .eq('is_active', true);
+    // Try Supabase first
+    try {
+      // Build query with joins to people table
+      let query = supabase
+        .from('exchanges')
+        .select(`
+          *,
+          client:people!client_id (
+            id,
+            first_name,
+            last_name,
+            email,
+            company,
+            phone
+          ),
+          coordinator:people!coordinator_id (
+            id,
+            first_name,
+            last_name,
+            email
+          )
+        `)
+      ;
 
-    // Role-based filtering
-    if (req.user?.role === 'client') {
-      // Clients see only their exchanges
-      query = query.eq('client_id', req.user.contact_id);
-    } else if (req.user?.role === 'coordinator') {
-      // Coordinators see assigned exchanges
-      query = query.eq('coordinator_id', req.user.id);
-    }
-
-    // Apply filters
-    if (status) {
-      query = query.eq('status', status);
-    }
-    if (coordinator_id) {
-      query = query.eq('coordinator_id', coordinator_id);
-    }
-    if (client_id) {
-      query = query.eq('client_id', client_id);
-    }
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,notes.ilike.%${search}%`);
-    }
-
-    // Add pagination
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    query = query.range(offset, offset + parseInt(limit) - 1);
-
-    // Order by creation date
-    query = query.order('created_at', { ascending: false });
-
-    const { data: exchanges, error, count } = await query;
-
-    if (error) {
-      console.error('Supabase error:', error);
-      return res.status(500).json({
-        error: 'Failed to fetch exchanges',
-        message: error.message
-      });
-    }
-
-    // Transform data for frontend
-    const transformedExchanges = exchanges.map(exchange => 
-      transformApiResponse(exchange, { includeComputed: true })
-    );
-
-    // Calculate pagination
-    const totalPages = Math.ceil(count / parseInt(limit));
-
-    res.json(transformToCamelCase({
-      exchanges: transformedExchanges,
-      pagination: {
-        current_page: parseInt(page),
-        total_pages: totalPages,
-        total_items: count,
-        items_per_page: parseInt(limit),
-        has_next: parseInt(page) < totalPages,
-        has_previous: parseInt(page) > 1
+      // Role-based filtering
+      if (req.user?.role === 'client') {
+        // Clients see only their exchanges
+        query = query.eq('client_id', req.user.contact_id);
+      } else if (req.user?.role === 'coordinator') {
+        // Coordinators see assigned exchanges
+        query = query.eq('coordinator_id', req.user.id);
       }
-    }));
+
+      // Apply filters
+      if (status) {
+        query = query.eq('status', status);
+      }
+      if (coordinator_id) {
+        query = query.eq('coordinator_id', coordinator_id);
+      }
+      if (client_id) {
+        query = query.eq('client_id', client_id);
+      }
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,notes.ilike.%${search}%`);
+      }
+
+      // Add pagination
+      const offset = (parseInt(page) - 1) * parseInt(limit);
+      query = query.range(offset, offset + parseInt(limit) - 1);
+
+      // Order by creation date
+      query = query.order('created_at', { ascending: false });
+
+      const { data: exchanges, error, count } = await query;
+
+      if (error) {
+        console.log('⚠️ Supabase error, falling back to local database:', error.message);
+        throw error; // Fall back to local database
+      }
+
+      // Transform data for frontend
+      const transformedExchanges = exchanges.map(exchange => 
+        transformApiResponse(exchange, { includeComputed: true })
+      );
+
+      // Calculate pagination
+      const totalPages = Math.ceil(count / parseInt(limit));
+
+      return res.json(transformToCamelCase({
+        exchanges: transformedExchanges,
+        pagination: {
+          current_page: parseInt(page),
+          total_pages: totalPages,
+          total_items: count,
+          items_per_page: parseInt(limit),
+          has_next: parseInt(page) < totalPages,
+          has_previous: parseInt(page) > 1
+        }
+      }));
+
+    } catch (supabaseError) {
+      // Fall back to local database
+      console.log('📋 Using local database fallback for exchanges list');
+      
+      const { Exchange, User, Contact } = require('../models');
+      const { Op } = require('sequelize');
+      
+      // Build where clause
+      const whereClause = {};
+      
+      // Role-based filtering
+      if (req.user?.role === 'client') {
+        whereClause.client_id = req.user.contact_id;
+      } else if (req.user?.role === 'coordinator') {
+        whereClause.coordinator_id = req.user.id;
+      }
+
+      // Apply filters
+      if (status) {
+        whereClause.status = status;
+      }
+      if (coordinator_id) {
+        whereClause.coordinator_id = coordinator_id;
+      }
+      if (client_id) {
+        whereClause.client_id = client_id;
+      }
+      if (search) {
+        whereClause[Op.or] = [
+          { name: { [Op.like]: `%${search}%` } },
+          { notes: { [Op.like]: `%${search}%` } }
+        ];
+      }
+
+      // Get exchanges with pagination
+      const { count, rows: exchanges } = await Exchange.findAndCountAll({
+        where: whereClause,
+        include: [
+          { model: Contact, as: 'client' },
+          { model: User, as: 'coordinator' }
+        ],
+        order: [['created_at', 'DESC']],
+        limit: parseInt(limit),
+        offset: (parseInt(page) - 1) * parseInt(limit)
+      });
+
+      // Transform data for frontend
+      const transformedExchanges = exchanges.map(exchange => 
+        transformApiResponse(exchange.toJSON(), { includeComputed: true })
+      );
+
+      // Calculate pagination
+      const totalPages = Math.ceil(count / parseInt(limit));
+
+      res.json(transformToCamelCase({
+        exchanges: transformedExchanges,
+        pagination: {
+          current_page: parseInt(page),
+          total_pages: totalPages,
+          total_items: count,
+          items_per_page: parseInt(limit),
+          has_next: parseInt(page) < totalPages,
+          has_previous: parseInt(page) > 1
+        }
+      }));
+    }
 
   } catch (error) {
     console.error('Error fetching exchanges:', error);
@@ -121,84 +217,134 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
   try {
-    const { data: exchange, error } = await supabase
-      .from('exchanges')
-      .select(`
-        *,
-        client:contacts!client_id (
-          id,
-          first_name,
-          last_name,
-          email,
-          company,
-          phone,
-          address
-        ),
-        coordinator:users!coordinator_id (
-          id,
-          first_name,
-          last_name,
-          email
-        )
-      `)
-      .eq('id', req.params.id)
-      .single();
+    // Try Supabase first
+    try {
+      const { data: exchange, error } = await supabase
+        .from('exchanges')
+        .select(`
+          *,
+          client:people!client_id (
+            id,
+            first_name,
+            last_name,
+            email,
+            company,
+            phone,
+            address_street
+          ),
+          coordinator:people!coordinator_id (
+            id,
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('id', req.params.id)
+        .single();
 
-    if (error) {
-      console.error('Supabase error:', error);
-      return res.status(404).json({
-        error: 'Exchange not found',
-        message: error.message
-      });
-    }
-
-    // Get related tasks
-    const { data: tasks } = await supabase
-      .from('tasks')
-      .select(`
-        *,
-        assignedUser:users!assigned_to (
-          id,
-          first_name,
-          last_name,
-          email
-        )
-      `)
-      .eq('exchange_id', req.params.id)
-      .order('due_date', { ascending: true });
-
-    // Get recent messages
-    const { data: messages } = await supabase
-      .from('messages')
-      .select(`
-        id,
-        content,
-        message_type,
-        created_at,
-        sender:users!sender_id (
-          id,
-          first_name,
-          last_name
-        )
-      `)
-      .eq('exchange_id', req.params.id)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    // Transform and enhance data
-    const enhancedExchange = {
-      ...transformApiResponse(exchange),
-      tasks: tasks ? tasks.map(task => transformApiResponse(task)) : [],
-      recentMessages: messages ? messages.map(msg => transformToCamelCase(msg)) : [],
-      statistics: {
-        totalTasks: tasks?.length || 0,
-        completedTasks: tasks?.filter(t => t.status === 'COMPLETED').length || 0,
-        pendingTasks: tasks?.filter(t => t.status === 'PENDING').length || 0,
-        recentActivityCount: messages?.length || 0
+      if (error) {
+        console.log('⚠️ Supabase error, falling back to local database:', error.message);
+        throw error; // Fall back to local database
       }
-    };
 
-    res.json(transformToCamelCase(enhancedExchange));
+      // Get related tasks
+      const { data: tasks } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          assignedUser:people!assigned_to (
+            id,
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('exchange_id', req.params.id)
+        .order('due_date', { ascending: true });
+
+      // Get recent messages
+      const { data: messages } = await supabase
+        .from('messages')
+        .select(`
+          id,
+          content,
+          message_type,
+          created_at,
+          sender:people!sender_id (
+            id,
+            first_name,
+            last_name
+          )
+        `)
+        .eq('exchange_id', req.params.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      // Transform and enhance data
+      const enhancedExchange = {
+        ...transformApiResponse(exchange),
+        tasks: tasks ? tasks.map(task => transformApiResponse(task)) : [],
+        recentMessages: messages ? messages.map(msg => transformToCamelCase(msg)) : [],
+        statistics: {
+          totalTasks: tasks?.length || 0,
+          completedTasks: tasks?.filter(t => t.status === 'COMPLETED').length || 0,
+          pendingTasks: tasks?.filter(t => t.status === 'PENDING').length || 0,
+          recentActivityCount: messages?.length || 0
+        }
+      };
+
+      return res.json(transformToCamelCase(enhancedExchange));
+
+    } catch (supabaseError) {
+      // Fall back to local database
+      console.log('📋 Using local database fallback for exchange details');
+      
+      const { Exchange, User, Contact, Task, Message } = require('../models');
+      
+      const exchange = await Exchange.findByPk(req.params.id, {
+        include: [
+          { model: Contact, as: 'client' },
+          { model: User, as: 'coordinator' }
+        ]
+      });
+
+      if (!exchange) {
+        return res.status(404).json({
+          error: 'Exchange not found',
+          message: 'Exchange not found in local database'
+        });
+      }
+
+      // Get related tasks
+      const tasks = await Task.findAll({
+        where: { exchange_id: req.params.id },
+        include: [{ model: User, as: 'assignedUser' }],
+        order: [['due_date', 'ASC']]
+      });
+
+      // Get recent messages
+      const messages = await Message.findAll({
+        where: { exchange_id: req.params.id },
+        include: [{ model: User, as: 'sender' }],
+        order: [['created_at', 'DESC']],
+        limit: 10
+      });
+
+      // Transform and enhance data
+      const enhancedExchange = {
+        ...transformApiResponse(exchange.toJSON()),
+        tasks: tasks.map(task => transformApiResponse(task.toJSON())),
+        recentMessages: messages.map(msg => transformToCamelCase(msg.toJSON())),
+        statistics: {
+          totalTasks: tasks.length,
+          completedTasks: tasks.filter(t => t.status === 'COMPLETED').length,
+          pendingTasks: tasks.filter(t => t.status === 'PENDING').length,
+          recentActivityCount: messages.length
+        }
+      };
+
+      res.json(transformToCamelCase(enhancedExchange));
+    }
 
   } catch (error) {
     console.error('Error fetching exchange details:', error);
@@ -245,7 +391,7 @@ router.put('/:id/status', async (req, res) => {
           email,
           company
         ),
-        coordinator:users!coordinator_id (
+        coordinator:people!coordinator_id (
           id,
           first_name,
           last_name,
@@ -277,6 +423,166 @@ router.put('/:id/status', async (req, res) => {
 });
 
 /**
+ * GET /api/exchanges/:id/participants
+ * Get exchange participants
+ */
+router.get('/:id/participants', async (req, res) => {
+  try {
+    console.log('🎯 PARTICIPANTS ROUTE HIT:', req.params.id);
+    
+    const { data: participants, error } = await supabase
+      .from('exchange_participants')
+      .select('*')
+      .eq('exchange_id', req.params.id);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(500).json({
+        error: 'Failed to fetch participants',
+        message: error.message
+      });
+    }
+
+    const transformedParticipants = participants.map(participant => 
+      transformApiResponse(participant)
+    );
+
+    res.json({
+      participants: transformedParticipants || []
+    });
+
+  } catch (error) {
+    console.error('Error fetching exchange participants:', error);
+    res.status(500).json({
+      error: 'Failed to fetch participants',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/exchanges/:id/documents
+ * Get documents for a specific exchange
+ */
+router.get('/:id/documents', async (req, res) => {
+  try {
+    console.log('🎯 DOCUMENTS ROUTE HIT:', req.params.id);
+    
+    const { data: documents, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('exchange_id', req.params.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(500).json({
+        error: 'Failed to fetch documents',
+        message: error.message
+      });
+    }
+
+    const transformedDocuments = documents.map(doc => 
+      transformApiResponse(doc)
+    );
+
+    res.json(transformToCamelCase({
+      success: true,
+      documents: transformedDocuments || []
+    }));
+
+  } catch (error) {
+    console.error('Error fetching exchange documents:', error);
+    res.status(500).json({
+      error: 'Failed to fetch documents',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/exchanges/:id/messages
+ * Get messages for a specific exchange
+ */
+router.get('/:id/messages', async (req, res) => {
+  try {
+    console.log('🎯 MESSAGES ROUTE HIT:', req.params.id);
+    
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('exchange_id', req.params.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(500).json({
+        error: 'Failed to fetch messages',
+        message: error.message
+      });
+    }
+
+    const transformedMessages = messages.map(msg => 
+      transformApiResponse(msg)
+    );
+
+    res.json(transformToCamelCase({
+      success: true,
+      messages: transformedMessages || []
+    }));
+
+  } catch (error) {
+    console.error('Error fetching exchange messages:', error);
+    res.status(500).json({
+      error: 'Failed to fetch messages',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/exchanges/:id/audit-logs
+ * Get audit logs for a specific exchange
+ */
+router.get('/:id/audit-logs', async (req, res) => {
+  try {
+    console.log('🎯 AUDIT-LOGS ROUTE HIT:', req.params.id);
+    
+    const { data: auditLogs, error } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .eq('entity_id', req.params.id)
+      .eq('entity_type', 'exchange')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(500).json({
+        error: 'Failed to fetch audit logs',
+        message: error.message
+      });
+    }
+
+    const transformedAuditLogs = auditLogs.map(log => 
+      transformApiResponse(log)
+    );
+
+    res.json(transformToCamelCase({
+      success: true,
+      auditLogs: transformedAuditLogs || []
+    }));
+
+  } catch (error) {
+    console.error('Error fetching exchange audit logs:', error);
+    res.status(500).json({
+      error: 'Failed to fetch audit logs',
+      message: error.message
+    });
+  }
+});
+
+/**
  * GET /api/exchanges/:id/tasks
  * Get tasks for specific exchange
  */
@@ -286,7 +592,7 @@ router.get('/:id/tasks', async (req, res) => {
       .from('tasks')
       .select(`
         *,
-        assignedUser:users!assigned_to (
+        assignedUser:people!assigned_to (
           id,
           first_name,
           last_name,

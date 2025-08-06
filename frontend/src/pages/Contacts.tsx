@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { apiService } from '../services/api';
+import { roleBasedApiService } from '../services/roleBasedApiService';
 import { useAuth } from '../hooks/useAuth';
 
 const Contacts: React.FC = () => {
@@ -12,16 +12,34 @@ const Contacts: React.FC = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    loadContacts();
-  }, [filter]);
+    // Only load contacts if user is authenticated
+    if (user) {
+      loadContacts();
+    }
+  }, [filter, user]);
 
   const loadContacts = async () => {
+    if (!user) return;
+    
     try {
       setLoading(true);
       setError(null);
-      const endpoint = filter !== 'all' ? `/contacts?type=${filter}` : '/contacts';
-      const response = await apiService.get(endpoint);
-      setContacts(response.contacts || response || []);
+      
+      const response = await roleBasedApiService.getContacts({
+        userContext: {
+          id: user.id,
+          email: user.email,
+          role: user.role as any,
+          company: user.company || ''
+        }
+      });
+      const contactsData = response.contacts || [];
+      setContacts(Array.isArray(contactsData) ? contactsData : []);
+      
+      // Show message if using fallback data
+      if (contactsData.some((c: any) => c._isFallback)) {
+        setError('Using cached data - backend connection unavailable');
+      }
     } catch (err: any) {
       console.error('Error loading contacts:', err);
       setError(err.message || 'Failed to load contacts');
@@ -101,13 +119,23 @@ const Contacts: React.FC = () => {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-600 mb-2">{error}</p>
+          <div className={`border rounded-lg p-4 ${
+            error.includes('cached') 
+              ? 'bg-yellow-50 border-yellow-200' 
+              : 'bg-red-50 border-red-200'
+          }`}>
+            <p className={`mb-2 ${
+              error.includes('cached') ? 'text-yellow-600' : 'text-red-600'
+            }`}>{error}</p>
             <button
               onClick={loadContacts}
-              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
+              className={`px-4 py-2 rounded-md text-white ${
+                error.includes('cached') 
+                  ? 'bg-yellow-600 hover:bg-yellow-700' 
+                  : 'bg-red-600 hover:bg-red-700'
+              }`}
             >
-              Try Again
+              Refresh
             </button>
           </div>
         )}

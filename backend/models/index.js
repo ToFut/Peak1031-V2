@@ -37,6 +37,7 @@ Object.keys(models).forEach(modelName => {
 // Define associations manually
 function defineAssociations() {
   // User associations
+  // Removed contact_id association as it doesn't exist in the database
   User.hasMany(Exchange, { 
     foreignKey: 'coordinator_id', 
     as: 'coordinatedExchanges' 
@@ -46,7 +47,7 @@ function defineAssociations() {
     as: 'assignedTasks' 
   });
   User.hasMany(Document, { 
-    foreignKey: 'uploaded_by', 
+    foreignKey: 'uploadedBy', 
     as: 'uploadedDocuments' 
   });
   User.hasMany(Message, { 
@@ -59,6 +60,7 @@ function defineAssociations() {
   });
 
   // Contact associations
+  // Removed contact_id association as it doesn't exist in the database
   Contact.hasMany(Exchange, { 
     foreignKey: 'client_id', 
     as: 'clientExchanges' 
@@ -78,7 +80,7 @@ function defineAssociations() {
     as: 'tasks' 
   });
   Exchange.hasMany(Document, { 
-    foreignKey: 'exchange_id', 
+    foreignKey: 'exchangeId', 
     as: 'exchangeDocuments' 
   });
   Exchange.hasMany(Message, { 
@@ -102,11 +104,11 @@ function defineAssociations() {
 
   // Document associations
   Document.belongsTo(Exchange, { 
-    foreignKey: 'exchange_id', 
+    foreignKey: 'exchangeId', 
     as: 'exchange' 
   });
   Document.belongsTo(User, { 
-    foreignKey: 'uploaded_by', 
+    foreignKey: 'uploadedBy', 
     as: 'uploader' 
   });
   Document.hasMany(Message, { 

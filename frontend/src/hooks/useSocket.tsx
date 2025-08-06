@@ -81,7 +81,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     console.log('🔌 Initializing socket connection...');
     setConnectionStatus('connecting');
 
-    const socketUrl = process.env.REACT_APP_SOCKET_URL || 'http://localhost:8001';
+    const socketUrl = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5001';
     
     const newSocket = io(socketUrl, {
       auth: {

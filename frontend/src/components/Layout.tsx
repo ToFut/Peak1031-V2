@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useRolePermissions } from '../hooks/useRolePermissions';
 import { useSocket } from '../hooks/useSocket';
 import { apiService } from '../services/api';
 
@@ -16,11 +17,10 @@ import {
   BellIcon,
   ArrowRightOnRectangleIcon,
   ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   ExclamationTriangleIcon,
   InformationCircleIcon,
-  ShieldCheckIcon
+  ShieldCheckIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
 import {
   HomeIcon as HomeIconSolid,
@@ -30,6 +30,7 @@ import {
   DocumentDuplicateIcon as DocumentDuplicateIconSolid,
   CheckCircleIcon as CheckCircleIconSolid,
   CogIcon as CogIconSolid,
+  ChartBarIcon as ChartBarIconSolid,
 } from '@heroicons/react/24/solid';
 
 interface NavigationItem {
@@ -55,110 +56,163 @@ interface Notification {
 
 interface LayoutProps {
   children?: React.ReactNode;
+  headerContent?: React.ReactNode;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children }) => {
+const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   const { user, logout } = useAuth();
+  const { ui, getSidebarItems } = useRolePermissions();
   const { socket, connectionStatus } = useSocket();
+
+  // Debug: Log user data
+  console.log('Layout - User data:', user);
+  console.log('Layout - UI data:', ui);
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Start closed on mobile, will be controlled by responsive behavior
+  const [sidebarOpen, setSidebarOpen] = useState(true); // Start open by default
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Navigation configuration based on user role
+  // Navigation configuration based on user role using permissions system
   const getNavigation = (): NavigationItem[] => {
-    const dashboardPath = user?.role === 'admin' ? '/admin' : 
-                         user?.role === 'coordinator' ? '/coordinator' :
-                         user?.role === 'client' ? '/client' :
-                         user?.role === 'third_party' ? '/third-party' :
-                         user?.role === 'agency' ? '/agency' : '/dashboard';
+    if (!user?.role) return [];
+
+    // Get role-based sidebar items
+    const sidebarItems = getSidebarItems();
     
-    const baseNavigation: NavigationItem[] = [
-      {
-        name: 'Dashboard',
-        href: dashboardPath,
+    // Debug: Log sidebar items
+    console.log('Sidebar items for role', user.role, ':', sidebarItems);
+    
+    // Map sidebar items to navigation configuration
+    const navigationMap: Record<string, NavigationItem> = {
+      overview: {
+        name: ui.page_titles.overview || 'Overview',
+        href: '/dashboard',
         icon: HomeIcon,
         iconSolid: HomeIconSolid,
-        roles: ['admin', 'client', 'coordinator', 'third_party', 'agency']
+        roles: [user.role]
       },
-      {
-        name: 'Exchanges',
+      exchanges: {
+        name: ui.page_titles.exchanges || 'Exchanges',
         href: '/exchanges',
         icon: DocumentTextIcon,
         iconSolid: DocumentTextIconSolid,
-        roles: ['admin', 'client', 'coordinator', 'third_party', 'agency']
+        roles: [user.role]
       },
-      {
-        name: 'Tasks',
+      my_exchanges: {
+        name: ui.page_titles.exchanges || 'My Exchanges',
+        href: '/exchanges',
+        icon: DocumentTextIcon,
+        iconSolid: DocumentTextIconSolid,
+        roles: [user.role]
+      },
+      tasks: {
+        name: ui.page_titles.tasks || 'Tasks',
         href: '/tasks',
         icon: CheckCircleIcon,
         iconSolid: CheckCircleIconSolid,
-        roles: ['admin', 'coordinator', 'client']
+        roles: [user.role]
       },
-      {
-        name: 'Documents',
+      my_tasks: {
+        name: ui.page_titles.tasks || 'My Tasks',
+        href: '/tasks',
+        icon: CheckCircleIcon,
+        iconSolid: CheckCircleIconSolid,
+        roles: [user.role]
+      },
+      users: {
+        name: ui.page_titles.users || 'Users',
+        href: '/admin/users',
+        icon: UsersIcon,
+        iconSolid: UsersIconSolid,
+        roles: [user.role]
+      },
+      contacts: {
+        name: ui.page_titles.contacts || 'Contacts',
+        href: '/contacts',
+        icon: UsersIcon,
+        iconSolid: UsersIconSolid,
+        roles: [user.role]
+      },
+      documents: {
+        name: ui.page_titles.documents || 'Documents',
         href: '/documents',
         icon: DocumentDuplicateIcon,
         iconSolid: DocumentDuplicateIconSolid,
-        roles: ['admin', 'client', 'coordinator', 'third_party', 'agency']
+        roles: [user.role]
       },
-      {
-        name: 'Messages',
+      messages: {
+        name: ui.page_titles.messages || 'Messages',
         href: '/messages',
         icon: ChatBubbleLeftRightIcon,
         iconSolid: ChatIconSolid,
-        roles: ['admin', 'client', 'coordinator', 'agency', 'third_party'],
+        roles: [user.role],
         badge: unreadCount
+      },
+      system: {
+        name: ui.page_titles.system || 'System',
+        href: '/admin/system',
+        icon: CogIcon,
+        iconSolid: CogIconSolid,
+        roles: [user.role]
+      },
+      reports: {
+        name: ui.page_titles.reports || 'Reports',
+        href: '/reports',
+        icon: ChartBarIcon,
+        iconSolid: ChartBarIconSolid,
+        roles: [user.role]
+      },
+      settings: {
+        name: 'Settings',
+        href: '/settings',
+        icon: CogIcon,
+        iconSolid: CogIconSolid,
+        roles: [user.role]
       }
-    ];
+    };
 
-    // Admin-specific navigation
-    if (user?.role === 'admin') {
-      baseNavigation.push(
+    // Return only the items that are in the user's sidebar configuration
+    const filteredItems = sidebarItems
+      .map(itemKey => navigationMap[itemKey])
+      .filter(item => item !== undefined);
+    
+    // Debug: Log filtered items
+    console.log('Filtered navigation items:', filteredItems);
+    
+    // Fallback: if no items found, show basic navigation
+    if (filteredItems.length === 0) {
+      console.log('No sidebar items found, showing fallback navigation');
+      return [
         {
-          name: 'User Management',
-          href: '/admin/users',
-          icon: UsersIcon,
-          iconSolid: UsersIconSolid,
-          roles: ['admin']
+          name: 'Dashboard',
+          href: '/dashboard',
+          icon: HomeIcon,
+          iconSolid: HomeIconSolid,
+          roles: [user.role]
         },
         {
-          name: 'Document Templates',
-          href: '/admin/templates',
-          icon: DocumentDuplicateIcon,
-          iconSolid: DocumentDuplicateIconSolid,
-          roles: ['admin']
+          name: 'Exchanges',
+          href: '/exchanges',
+          icon: DocumentTextIcon,
+          iconSolid: DocumentTextIconSolid,
+          roles: [user.role]
         },
         {
-          name: 'Audit Logs',
-          href: '/admin/audit',
-          icon: ShieldCheckIcon,
-          iconSolid: ShieldCheckIcon,
-          roles: ['admin']
-        },
-        {
-          name: 'System',
-          href: '/admin/system',
-          icon: CogIcon,
-          iconSolid: CogIconSolid,
-          roles: ['admin'],
-          children: [
-            { name: 'Sync Status', href: '/admin/system/sync', icon: CogIcon, iconSolid: CogIconSolid, roles: ['admin'] },
-            { name: 'Settings', href: '/admin/system/settings', icon: CogIcon, iconSolid: CogIconSolid, roles: ['admin'] }
-          ]
+          name: 'Tasks',
+          href: '/tasks',
+          icon: CheckCircleIcon,
+          iconSolid: CheckCircleIconSolid,
+          roles: [user.role]
         }
-      );
+      ];
     }
-
-    // Filter navigation based on user role
-    return baseNavigation.filter(item => 
-      user?.role && item.roles.includes(user.role)
-    );
+    
+    return filteredItems;
   };
 
   // Handle real-time notifications
@@ -278,8 +332,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-80 bg-white shadow-xl transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:w-64 lg:flex-shrink-0 ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      <div className={`fixed inset-y-0 left-0 z-50 w-80 bg-white shadow-xl transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:w-64 lg:flex-shrink-0 border-r-2 border-red-500 ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       }`}>
         {/* Sidebar Header */}
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 bg-white">
@@ -306,6 +360,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6">
+          {/* Debug: Show navigation items count */}
+          <div className="text-xs text-red-500 mb-4 p-2 bg-red-50 border border-red-200 rounded">
+            Debug: {getNavigation().length} navigation items loaded
+          </div>
           <div className="space-y-2">
             {getNavigation().map((item) => {
               const Icon = isCurrentPath(item.href) ? item.iconSolid : item.icon;
@@ -409,27 +467,34 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="flex-1 min-w-0">
         {/* Top navigation */}
         <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="flex justify-between items-center px-6 py-4">
+          <div className="flex justify-between items-center px-6 py-4 min-h-[64px]">
             <div className="flex items-center">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 mr-4"
+                className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
-              <h1 className="text-2xl font-semibold text-gray-900">
-                {getNavigation().find(item => isCurrentPath(item.href))?.name || 'Dashboard'}
-              </h1>
+              {/* Page-specific header content */}
+              {headerContent && (
+                <div className="lg:flex items-center flex-1 ml-4 hidden">
+                  {headerContent}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center space-x-4">
+              {/* Debug: Show user info */}
+              <div className="text-xs text-gray-500 mr-4">
+                User: {user?.first_name} {user?.last_name} ({user?.role})
+              </div>
               {/* Notifications */}
               <div className="relative">
                 <button
                   onClick={() => setNotificationsOpen(!notificationsOpen)}
-                  className="p-2 rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 relative"
+                  className="p-2 rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 relative border border-gray-200"
                 >
                   <BellIcon className="h-6 w-6" />
                   {unreadCount > 0 && (
@@ -500,14 +565,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200"
                 >
                   <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
                     <span className="text-white font-medium text-sm">
                       {user.first_name?.[0]}{user.last_name?.[0]}
                     </span>
                   </div>
-                  <div className="hidden md:block text-left">
+                  <div className="text-left">
                     <p className="text-sm font-medium text-gray-900">
                       {user.first_name} {user.last_name}
                     </p>

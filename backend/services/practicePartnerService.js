@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 class PracticePartnerService {
   constructor() {
@@ -91,7 +92,8 @@ class PracticePartnerService {
         return null;
       }
 
-      const { data, error } = await this.supabase
+      // First try to get the most recent active token
+      let { data, error } = await this.supabase
         .from('oauth_tokens')
         .select('*')
         .eq('provider', 'practicepanther')
@@ -100,9 +102,23 @@ class PracticePartnerService {
         .limit(1)
         .single();
 
+      // If no active token, get the most recent token regardless of status
       if (error || !data) {
-        console.log('🔍 PP: No stored token found');
-        return null;
+        console.log('🔍 PP: No active token found, looking for any recent token...');
+        const { data: recentData, error: recentError } = await this.supabase
+          .from('oauth_tokens')
+          .select('*')
+          .eq('provider', 'practicepanther')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (recentError || !recentData) {
+          console.log('🔍 PP: No stored token found');
+          return null;
+        }
+
+        data = recentData;
       }
 
       // Check if token is still valid
@@ -116,7 +132,10 @@ class PracticePartnerService {
       // Try to refresh token if available
       if (data.refresh_token) {
         console.log('🔄 PP: Refreshing expired token...');
-        return await this.refreshToken(data.refresh_token);
+        const refreshResult = await this.refreshToken(data.refresh_token);
+        if (refreshResult) {
+          return refreshResult;
+        }
       }
 
       console.log('⚠️ PP: Stored token expired and no refresh token available');
@@ -136,6 +155,12 @@ class PracticePartnerService {
         console.log('⚠️ PP: Supabase not available, cannot store token');
         return false;
       }
+
+      // First, deactivate all existing tokens
+      await this.supabase
+        .from('oauth_tokens')
+        .update({ is_active: false })
+        .eq('provider', 'practicepanther');
 
       const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000));
       
@@ -278,19 +303,53 @@ class PracticePartnerService {
    * Ensure we have a valid access token
    */
   async ensureValidToken() {
-    // First try to get a stored valid token
-    const storedToken = await this.getStoredToken();
-    if (storedToken && this.accessToken) {
-      console.log('🔑 PP: Using stored valid token');
-      return;
-    }
+    try {
+      // First try to get a stored token
+      const storedToken = await this.getStoredToken();
+      
+      if (!storedToken) {
+        console.error('❌ PP: No stored token found. OAuth authorization required.');
+        console.log('🔗 PP: Use the following URL to authorize the application:');
+        console.log(this.generateAuthUrl());
+        throw new Error('PracticePanther authorization required. Please complete OAuth flow first.');
+      }
 
-    // If no valid token available, we need to go through OAuth flow
-    console.error('❌ PP: No valid access token available. OAuth authorization required.');
-    console.log('🔗 PP: Use the following URL to authorize the application:');
-    console.log(this.generateAuthUrl());
-    
-    throw new Error('PracticePanther authorization required. Please complete OAuth flow first.');
+      // Check if current token is still valid (with 5 minute buffer)
+      const now = Date.now();
+      const tokenExpiry = storedToken.expires_at ? new Date(storedToken.expires_at).getTime() : 0;
+      
+      if (tokenExpiry > now + 300000) { // 5 minutes buffer
+        // Token is still valid
+        this.accessToken = storedToken.access_token;
+        this.tokenExpiry = tokenExpiry;
+        console.log('🔑 PP: Using stored valid token');
+        return;
+      }
+
+      // Token is expired, try to refresh it
+      if (storedToken.refresh_token) {
+        console.log('🔄 PP: Token expired, attempting to refresh...');
+        const refreshResult = await this.refreshToken(storedToken.refresh_token);
+        
+        if (refreshResult) {
+          console.log('✅ PP: Token refreshed successfully');
+          return;
+        } else {
+          console.log('❌ PP: Token refresh failed');
+        }
+      }
+
+      // If refresh failed or no refresh token, need new OAuth flow
+      console.error('❌ PP: Token refresh failed. OAuth authorization required.');
+      console.log('🔗 PP: Use the following URL to authorize the application:');
+      console.log(this.generateAuthUrl());
+      
+      throw new Error('PracticePanther authorization required. Please complete OAuth flow first.');
+      
+    } catch (error) {
+      console.error('❌ PP: Error ensuring valid token:', error.message);
+      throw error;
+    }
   }
 
   /**
@@ -497,11 +556,15 @@ class PracticePartnerService {
       email: ppContact.email || `unknown_${ppContact.id}@example.com`,
       phone: ppContact.phone || null,
       company: ppContact.company || null,
-      address: ppContact.address ? JSON.stringify(ppContact.address) : null,
-      position: ppContact.position || ppContact.title || null,
-      contact_type: this.mapContactType(ppContact.type || ppContact.category),
-      notes: ppContact.notes || ppContact.description || null,
-      pp_data: ppContact,
+      // Store additional data in pp_data JSONB field
+      pp_data: {
+        ...ppContact,
+        address: ppContact.address,
+        position: ppContact.position || ppContact.title,
+        contact_type: this.mapContactType(ppContact.type || ppContact.category),
+        notes: ppContact.notes || ppContact.description
+      },
+      source: 'practice_partner',
       last_sync_at: new Date().toISOString(),
       created_at: ppContact.created_at || new Date().toISOString(),
       updated_at: ppContact.updated_at || new Date().toISOString()
@@ -682,7 +745,7 @@ class PracticePartnerService {
   async findClientByPPId(ppContactId) {
     try {
       const { data, error } = await this.supabase
-        .from('contacts')
+        .from('people')
         .select('id')
         .eq('pp_contact_id', ppContactId.toString())
         .single();
@@ -736,17 +799,22 @@ class PracticePartnerService {
     try {
       const contactData = this.transformContact(ppContact);
       
-      // Check if contact exists
-      const { data: existing } = await this.supabase
-        .from('contacts')
+      // Use direct SQL query to bypass cache issues
+      const { data: existing, error: checkError } = await this.supabase
+        .from('people')
         .select('id, updated_at')
         .eq('pp_contact_id', contactData.pp_contact_id)
-        .single();
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing contact:', checkError);
+        return { action: 'error', error: checkError.message };
+      }
 
       if (existing) {
         // Update existing contact
         const { data, error } = await this.supabase
-          .from('contacts')
+          .from('people')
           .update(contactData)
           .eq('id', existing.id)
           .select()
@@ -761,7 +829,7 @@ class PracticePartnerService {
       } else {
         // Create new contact
         const { data, error } = await this.supabase
-          .from('contacts')
+          .from('people')
           .insert(contactData)
           .select()
           .single();
@@ -979,75 +1047,97 @@ class PracticePartnerService {
   }
 
   /**
-   * Sync contact-exchange relationships
+   * Sync contact-exchange relationships with roles
    */
   async syncContactExchangeLinks(exchangeId, ppMatter) {
     try {
-      const contactIds = this.extractContactIdsFromMatter(ppMatter);
+      const participants = this.extractParticipantsFromMatter(ppMatter);
       
-      if (!contactIds || contactIds.length === 0) {
-        return { action: 'no_contacts', count: 0 };
+      if (!participants || participants.length === 0) {
+        return { action: 'no_participants', count: 0 };
       }
 
       const results = [];
       
-      for (const ppContactId of contactIds) {
+      for (const participant of participants) {
         try {
           // Find the local contact ID by PP contact ID
-          const localContactId = await this.findClientByPPId(ppContactId);
+          const localContactId = await this.findClientByPPId(participant.ppContactId);
           
           if (!localContactId) {
-            console.log(`Contact with PP ID ${ppContactId} not found locally, skipping link`);
+            console.log(`Contact with PP ID ${participant.ppContactId} not found locally, skipping participant`);
             results.push({ 
               action: 'skipped', 
-              pp_contact_id: ppContactId, 
+              pp_contact_id: participant.ppContactId, 
+              role: participant.role,
               reason: 'Contact not found locally' 
             });
             continue;
           }
 
-          // Check if link already exists
+          // Check if participant already exists
           const { data: existing } = await this.supabase
-            .from('contact_exchange_links')
+            .from('exchange_participants')
             .select('id')
             .eq('contact_id', localContactId)
             .eq('exchange_id', exchangeId)
             .single();
 
           if (!existing) {
-            // Create new contact-exchange link
+            // Create new exchange participant
             const { data, error } = await this.supabase
-              .from('contact_exchange_links')
+              .from('exchange_participants')
               .insert({
                 contact_id: localContactId,
                 exchange_id: exchangeId,
+                role: participant.role,
                 created_at: new Date().toISOString()
               })
               .select()
               .single();
 
             if (error) {
-              console.error('Error creating contact-exchange link:', error);
+              console.error('Error creating exchange participant:', error);
               results.push({ 
                 action: 'error', 
-                pp_contact_id: ppContactId, 
+                pp_contact_id: participant.ppContactId,
+                role: participant.role, 
                 error: error.message 
               });
             } else {
               results.push({ action: 'created', data });
             }
           } else {
-            results.push({ 
-              action: 'exists', 
-              pp_contact_id: ppContactId,
-              link_id: existing.id 
-            });
+            // Update role if changed
+            const { data, error } = await this.supabase
+              .from('exchange_participants')
+              .update({ role: participant.role })
+              .eq('id', existing.id)
+              .select()
+              .single();
+
+            if (error) {
+              console.error('Error updating participant role:', error);
+              results.push({ 
+                action: 'error', 
+                pp_contact_id: participant.ppContactId,
+                role: participant.role,
+                error: error.message 
+              });
+            } else {
+              results.push({ 
+                action: 'updated', 
+                data,
+                participant_id: existing.id 
+              });
+            }
           }
         } catch (error) {
-          console.error('Error processing contact-exchange link:', error);
+          console.error('Error processing exchange participant:', error);
           results.push({ 
             action: 'error', 
-            pp_contact_id: ppContactId, 
+            pp_contact_id: participant.ppContactId,
+            role: participant.role, 
             error: error.message 
           });
         }
@@ -1060,58 +1150,127 @@ class PracticePartnerService {
       };
 
     } catch (error) {
-      console.error('Error syncing contact-exchange links:', error);
+      console.error('Error syncing exchange participants:', error);
       return { action: 'error', error: error.message };
     }
   }
 
   /**
-   * Extract contact IDs from PP matter data
+   * Extract participants with roles from PP matter data
    */
-  extractContactIdsFromMatter(ppMatter) {
-    const contactIds = [];
+  extractParticipantsFromMatter(ppMatter) {
+    const participants = [];
+    const seenIds = new Set();
+    
+    // Helper to add participant if not already added
+    const addParticipant = (ppContactId, role) => {
+      if (ppContactId && !seenIds.has(ppContactId)) {
+        seenIds.add(ppContactId);
+        participants.push({
+          ppContactId: ppContactId.toString(),
+          role: role
+        });
+      }
+    };
     
     // Add the primary client
     if (ppMatter.client_id) {
-      contactIds.push(ppMatter.client_id.toString());
+      addParticipant(ppMatter.client_id, 'Client');
     }
     
-    // Add any additional contacts from participants or custom fields
+    // Add participants from participants array with their roles
     if (ppMatter.participants && Array.isArray(ppMatter.participants)) {
       ppMatter.participants.forEach(participant => {
         if (participant.contact_id) {
-          contactIds.push(participant.contact_id.toString());
+          // Use participant's role or type, default to 'Other'
+          const role = participant.role || participant.type || 'Other';
+          addParticipant(participant.contact_id, this.normalizeParticipantRole(role));
         }
       });
     }
     
-    // Check for other contact fields
-    const contactFields = [
-      'attorney_id', 'cpa_id', 'broker_id', 'agent_id', 
-      'coordinator_id', 'intermediary_id', 'qi_id'
+    // Check for specific role fields
+    const roleFieldMappings = [
+      { field: 'attorney_id', role: 'Attorney' },
+      { field: 'cpa_id', role: 'CPA' },
+      { field: 'broker_id', role: 'Broker' },
+      { field: 'agent_id', role: 'Agent' },
+      { field: 'coordinator_id', role: 'Coordinator' },
+      { field: 'intermediary_id', role: 'Intermediary' },
+      { field: 'qi_id', role: 'Qualified Intermediary' }
     ];
     
-    contactFields.forEach(field => {
+    roleFieldMappings.forEach(({ field, role }) => {
       if (ppMatter[field]) {
-        contactIds.push(ppMatter[field].toString());
+        addParticipant(ppMatter[field], role);
       }
     });
     
-    // Look in custom fields for additional contacts
+    // Look in custom fields for additional contacts with roles
     if (ppMatter.custom_fields) {
       Object.keys(ppMatter.custom_fields).forEach(key => {
-        if (key.toLowerCase().includes('contact') && ppMatter.custom_fields[key]) {
-          // Assume it's a contact ID if it's numeric
+        const lowerKey = key.toLowerCase();
+        
+        // Try to extract role from field name
+        if (lowerKey.includes('contact') || lowerKey.includes('_id')) {
           const value = ppMatter.custom_fields[key];
           if (value && !isNaN(value)) {
-            contactIds.push(value.toString());
+            let role = 'Other';
+            
+            // Try to determine role from field name
+            if (lowerKey.includes('attorney')) role = 'Attorney';
+            else if (lowerKey.includes('broker')) role = 'Broker';
+            else if (lowerKey.includes('agent')) role = 'Agent';
+            else if (lowerKey.includes('cpa') || lowerKey.includes('accountant')) role = 'CPA';
+            else if (lowerKey.includes('coordinator')) role = 'Coordinator';
+            else if (lowerKey.includes('intermediary')) role = 'Intermediary';
+            else if (lowerKey.includes('client')) role = 'Client';
+            
+            addParticipant(value, role);
           }
         }
       });
     }
     
-    // Remove duplicates and return
-    return [...new Set(contactIds)];
+    return participants;
+  }
+
+  /**
+   * Normalize participant role to match our system
+   */
+  normalizeParticipantRole(ppRole) {
+    if (!ppRole) return 'Other';
+    
+    const roleMap = {
+      'client': 'Client',
+      'customer': 'Client',
+      'buyer': 'Client',
+      'seller': 'Client',
+      'attorney': 'Attorney',
+      'lawyer': 'Attorney',
+      'legal': 'Attorney',
+      'counsel': 'Attorney',
+      'cpa': 'CPA',
+      'accountant': 'CPA',
+      'tax': 'CPA',
+      'broker': 'Broker',
+      'realtor': 'Broker',
+      'real_estate_broker': 'Broker',
+      'real_estate_agent': 'Agent',
+      'agent': 'Agent',
+      'coordinator': 'Coordinator',
+      'exchange_coordinator': 'Coordinator',
+      'intermediary': 'Intermediary',
+      'qualified_intermediary': 'Qualified Intermediary',
+      'qi': 'Qualified Intermediary',
+      'escrow': 'Escrow Agent',
+      'title': 'Title Company',
+      'lender': 'Lender',
+      'bank': 'Lender'
+    };
+    
+    const normalized = ppRole.toLowerCase().replace(/[\s-_]+/g, '_');
+    return roleMap[normalized] || ppRole;
   }
 
   /**

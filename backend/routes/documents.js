@@ -5,33 +5,24 @@ const fs = require('fs').promises;
 const { authenticateToken } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 const databaseService = require('../services/database');
-const DocumentTemplateService = require('../services/documentTemplates');
+const supabaseService = require('../services/supabase');
+// const DocumentTemplateService = require('../services/documentTemplates'); // Uses Sequelize
 const bcrypt = require('bcryptjs');
-const { Op } = require('sequelize');
+// const { Op } = require('sequelize'); // Not needed with Supabase
+// const { Document, Exchange, User } = require('../models'); // Using Supabase instead
 
 const router = express.Router();
+const { createClient } = require('@supabase/supabase-js');
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: async (req, file, cb) => {
-    const exchangeId = req.body.exchangeId;
-    const uploadDir = path.join(__dirname, '../uploads/exchanges', exchangeId);
-    
-    try {
-      await fs.mkdir(uploadDir, { recursive: true });
-      cb(null, uploadDir);
-    } catch (error) {
-      cb(error);
-    }
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
 
+// Configure multer for memory storage (Supabase upload)
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 50 * 1024 * 1024 // 50MB limit
   },
@@ -44,7 +35,11 @@ const upload = multer({
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      'text/csv',
+      'application/zip',
+      'application/x-zip-compressed'
     ];
     
     if (allowedTypes.includes(file.mimetype)) {
@@ -55,15 +50,56 @@ const upload = multer({
   }
 });
 
+// Test endpoint for debugging uploads (bypass auth)
+router.post('/test-upload', upload.single('file'), async (req, res) => {
+  console.log('\n🧪 TEST UPLOAD ENDPOINT HIT');
+  console.log('📤 File received:', req.file ? req.file.originalname : 'No file');
+  console.log('📋 Body data:', req.body);
+  
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  const exchangeId = req.body.exchangeId || 'test-exchange';
+  const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+  const fileExtension = path.extname(req.file.originalname);
+  const storedFilename = `${uniqueSuffix}${fileExtension}`;
+  const supabaseFilePath = `exchanges/${exchangeId}/${storedFilename}`;
+
+  console.log(`🔄 Testing Supabase upload: ${supabaseFilePath}`);
+  console.log(`🔧 Supabase client status: ${supabaseService.client ? 'Initialized' : 'Not initialized'}`);
+
+  try {
+    const bucketName = 'documents';
+    await supabaseService.uploadFile(bucketName, supabaseFilePath, req.file.buffer, {
+      contentType: req.file.mimetype
+    });
+
+    console.log('✅ Test upload successful');
+    res.json({ 
+      success: true, 
+      message: 'Test upload successful',
+      filename: req.file.originalname,
+      storedAs: supabaseFilePath
+    });
+  } catch (error) {
+    console.error('❌ Test upload failed:', error);
+    res.status(500).json({ 
+      error: 'Test upload failed', 
+      details: error.message 
+    });
+  }
+});
+
 // Get all documents (role-filtered)
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, category, exchangeId, pinRequired, sortBy = 'createdAt', sortOrder = 'DESC' } = req.query;
+    const { page = 1, limit = 20, search, category, exchangeId, pinRequired, sortBy = 'created_at', sortOrder = 'DESC' } = req.query;
     
     const whereClause = {};
     if (search) {
       whereClause[Op.or] = [
-        { originalFilename: { [Op.like]: `%${search}%` } },
+        { original_filename: { [Op.like]: `%${search}%` } },
         { category: { [Op.like]: `%${search}%` } }
       ];
     }
@@ -73,24 +109,24 @@ router.get('/', authenticateToken, async (req, res) => {
     }
     
     if (exchangeId) {
-      whereClause.exchangeId = exchangeId;
+      whereClause.exchange_id = exchangeId;
     }
     
     if (pinRequired !== undefined) {
-      whereClause.pinRequired = pinRequired === 'true';
+      whereClause.pin_required = pinRequired === 'true';
     }
 
     // Role-based filtering
     if (req.user.role === 'client') {
       const userExchanges = await databaseService.getExchanges({
-        where: { clientId: req.user.id }
+        where: { client_id: req.user.id }
       });
-      whereClause.exchangeId = { [Op.in]: userExchanges.map(e => e.id) };
+      whereClause.exchange_id = { [Op.in]: userExchanges.map(e => e.id) };
     } else if (req.user.role === 'coordinator') {
       const userExchanges = await databaseService.getExchanges({
-        where: { coordinatorId: req.user.id }
+        where: { coordinator_id: req.user.id }
       });
-      whereClause.exchangeId = { [Op.in]: userExchanges.map(e => e.id) };
+      whereClause.exchange_id = { [Op.in]: userExchanges.map(e => e.id) };
     }
 
     const documents = await databaseService.getDocuments({
@@ -117,13 +153,74 @@ router.get('/', authenticateToken, async (req, res) => {
 // Get documents for specific exchange
 router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
   try {
+    const exchangeId = req.params.exchangeId;
+    console.log(`📋 Fetching documents for exchange: ${exchangeId}`);
+
+    // Get regular documents
     const documents = await databaseService.getDocuments({
-      where: { exchangeId: req.params.exchangeId },
-      orderBy: { column: 'createdAt', ascending: false }
+      where: { exchange_id: exchangeId },
+      orderBy: { column: 'created_at', ascending: false }
     });
 
-    res.json({ data: documents });
+    // Get generated documents from templates
+    const { data: generatedDocs, error: genError } = await supabase
+      .from('generated_documents')
+      .select(`
+        *,
+        template:template_id(name, category, description)
+      `)
+      .eq('exchange_id', exchangeId)
+      .order('created_at', { ascending: false });
+
+    if (genError) {
+      console.error('❌ Error fetching generated documents:', genError);
+      // Continue without generated docs rather than failing completely
+    }
+
+    // Combine and format all documents
+    const allDocuments = [
+      // Regular documents
+      ...documents.map(doc => ({
+        ...doc,
+        document_type: 'uploaded',
+        source: 'manual_upload'
+      })),
+      // Generated documents
+      ...(generatedDocs || []).map(doc => ({
+        id: doc.id,
+        name: doc.name,
+        file_path: doc.file_path,
+        file_url: doc.file_url,
+        exchange_id: doc.exchange_id,
+        category: doc.template?.category || 'generated',
+        description: doc.template?.description || doc.name,
+        created_at: doc.created_at,
+        updated_at: doc.updated_at,
+        document_type: 'generated',
+        source: 'template_generation',
+        template_id: doc.template_id,
+        template_name: doc.template?.name,
+        auto_generated: doc.auto_generated || false,
+        trigger_stage: doc.trigger_stage,
+        generated_by: doc.generated_by
+      }))
+    ];
+
+    // Sort all documents by creation date
+    allDocuments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    console.log(`✅ Found ${documents.length} regular + ${generatedDocs?.length || 0} generated documents`);
+
+    res.json({ 
+      data: allDocuments,
+      summary: {
+        total: allDocuments.length,
+        uploaded: documents.length,
+        generated: generatedDocs?.length || 0
+      }
+    });
   } catch (error) {
+    console.error('❌ Error fetching exchange documents:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -137,27 +234,103 @@ router.post('/', authenticateToken, checkPermission('documents', 'write'), uploa
 
     const { exchangeId, category, description, pinRequired, pin } = req.body;
     
+    if (!exchangeId) {
+      return res.status(400).json({ error: 'Exchange ID is required' });
+    }
+
+    // Generate unique filename
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const fileExtension = path.extname(req.file.originalname);
+    const storedFilename = `${uniqueSuffix}${fileExtension}`;
+    const supabaseFilePath = `exchanges/${exchangeId}/${storedFilename}`;
+
+    let finalFilePath = supabaseFilePath;
+    let storageProvider = 'supabase';
+    let uploadMessage = 'Document uploaded successfully to Supabase storage';
+
+    try {
+      // Try to upload file to Supabase storage first
+      const bucketName = 'documents';
+      console.log(`🔄 Attempting Supabase upload: ${supabaseFilePath}`);
+      console.log(`📊 File info: ${req.file.originalname}, Size: ${req.file.size}, Type: ${req.file.mimetype}`);
+      console.log(`🔧 Supabase client status: ${supabaseService.client ? 'Initialized' : 'Not initialized'}`);
+      
+      if (!supabaseService.client) {
+        throw new Error('Supabase client not initialized - check environment variables');
+      }
+      
+      await supabaseService.uploadFile(bucketName, supabaseFilePath, req.file.buffer, {
+        contentType: req.file.mimetype,
+        metadata: {
+          originalName: req.file.originalname,
+          uploadedBy: req.user.id,
+          exchangeId: exchangeId
+        }
+      });
+
+      console.log('✅ Supabase upload successful');
+    } catch (storageError) {
+      console.error('❌ Supabase storage failed, falling back to local storage:', storageError);
+      
+      // Fallback to local file storage
+      try {
+        console.log(`🔄 Attempting local storage fallback...`);
+        const uploadDir = path.join(__dirname, '../uploads/exchanges', exchangeId);
+        console.log(`📁 Creating directory: ${uploadDir}`);
+        await fs.mkdir(uploadDir, { recursive: true });
+        
+        const localFilePath = path.join(uploadDir, storedFilename);
+        console.log(`💾 Writing file to: ${localFilePath}`);
+        await fs.writeFile(localFilePath, req.file.buffer);
+        
+        finalFilePath = `uploads/exchanges/${exchangeId}/${storedFilename}`;
+        storageProvider = 'local';
+        uploadMessage = 'Document uploaded successfully to local storage (Supabase unavailable)';
+        
+        console.log('✅ Local storage fallback successful');
+      } catch (localError) {
+        console.error('❌ Both Supabase and local storage failed:', localError);
+        console.error('Local error details:', {
+          message: localError.message,
+          code: localError.code,
+          path: localError.path
+        });
+        return res.status(500).json({ 
+          error: 'Failed to upload file to any storage', 
+          details: `Supabase: ${storageError.message}, Local: ${localError.message}`
+        });
+      }
+    }
+
+    // Hash PIN if required
     let pinHash = null;
     if (pinRequired === 'true' && pin) {
       pinHash = await bcrypt.hash(pin, 12);
     }
 
+    // Save document metadata to database
     const document = await databaseService.createDocument({
-      originalFilename: req.file.originalname,
-      storedFilename: req.file.filename,
-      filePath: req.file.path,
-      fileSize: req.file.size,
-      mimeType: req.file.mimetype,
-      exchangeId,
-      uploadedBy: req.user.id,
+      original_filename: req.file.originalname,
+      stored_filename: storedFilename,
+      file_path: finalFilePath,
+      file_size: req.file.size,
+      mime_type: req.file.mimetype,
+      exchange_id: exchangeId,
+      uploaded_by: req.user.id,
       category: category || 'general',
       description,
-      pinRequired: pinRequired === 'true',
-      pinHash
+      pin_required: pinRequired === 'true',
+      pin_hash: pinHash,
+      storage_provider: storageProvider
     });
 
-    res.status(201).json({ data: document });
+    res.status(201).json({ 
+      data: document,
+      message: uploadMessage,
+      storage_provider: storageProvider
+    });
   } catch (error) {
+    console.error('Document upload error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -165,33 +338,58 @@ router.post('/', authenticateToken, checkPermission('documents', 'write'), uploa
 // Download document
 router.get('/:id/download', authenticateToken, async (req, res) => {
   try {
-    const document = await Document.findByPk(req.params.id);
+    const document = await databaseService.getDocumentById(req.params.id);
     
     if (!document) {
       return res.status(404).json({ error: 'Document not found' });
     }
 
     // Check if document requires PIN
-    if (document.pinRequired) {
+    if (document.pin_required) {
       const { pin } = req.query;
       if (!pin) {
         return res.status(400).json({ error: 'PIN required for this document' });
       }
 
-      const isValidPin = await bcrypt.compare(pin, document.pinHash);
+      const isValidPin = await bcrypt.compare(pin, document.pin_hash);
       if (!isValidPin) {
         return res.status(401).json({ error: 'Invalid PIN' });
       }
     }
 
-    const filePath = path.join(__dirname, '..', document.filePath);
-    
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'File not found' });
+    try {
+      // Check if using Supabase storage or local file
+      if (document.storage_provider === 'supabase' || document.file_path.startsWith('exchanges/')) {
+        // Download from Supabase storage
+        const bucketName = 'documents';
+        const fileData = await supabaseService.downloadFile(bucketName, document.file_path);
+        
+        // Set appropriate headers
+        res.setHeader('Content-Disposition', `attachment; filename="${document.original_filename}"`);
+        res.setHeader('Content-Type', document.mime_type || 'application/octet-stream');
+        res.setHeader('Content-Length', document.file_size);
+        
+        // Send file data
+        res.send(fileData);
+      } else {
+        // Fallback to local file system (for legacy documents)
+        const filePath = path.join(__dirname, '..', document.file_path);
+        
+        if (!await fs.access(filePath).then(() => true).catch(() => false)) {
+          return res.status(404).json({ error: 'File not found' });
+        }
+        
+        res.download(filePath, document.original_filename);
+      }
+    } catch (storageError) {
+      console.error('File download error:', storageError);
+      return res.status(500).json({ 
+        error: 'Failed to download file', 
+        details: storageError.message 
+      });
     }
-
-    res.download(filePath, document.originalFilename);
   } catch (error) {
+    console.error('Document download error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -199,21 +397,39 @@ router.get('/:id/download', authenticateToken, async (req, res) => {
 // Delete document
 router.delete('/:id', authenticateToken, checkPermission('documents', 'write'), async (req, res) => {
   try {
-    const document = await Document.findByPk(req.params.id);
+    const document = await databaseService.getDocumentById(req.params.id);
     
     if (!document) {
       return res.status(404).json({ error: 'Document not found' });
     }
 
-    // Delete file from filesystem
-    const filePath = path.join(__dirname, '..', document.filePath);
-    if (fs.existsSync(filePath)) {
-      await fs.unlink(filePath);
+    try {
+      // Delete file from storage
+      if (document.storage_provider === 'supabase' || document.file_path.startsWith('exchanges/')) {
+        // Delete from Supabase storage
+        const bucketName = 'documents';
+        await supabaseService.deleteFile(bucketName, document.file_path);
+      } else {
+        // Delete from local filesystem (legacy)
+        const filePath = path.join(__dirname, '..', document.file_path);
+        if (await fs.access(filePath).then(() => true).catch(() => false)) {
+          await fs.unlink(filePath);
+        }
+      }
+    } catch (storageError) {
+      console.warn('Failed to delete file from storage:', storageError.message);
+      // Continue with database deletion even if file deletion fails
     }
 
-    await document.destroy();
-    res.json({ message: 'Document deleted successfully' });
+    // Delete document record from database
+    await databaseService.delete('documents', { id: req.params.id });
+    
+    res.json({ 
+      message: 'Document deleted successfully',
+      deletedId: req.params.id
+    });
   } catch (error) {
+    console.error('Document deletion error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -505,9 +721,14 @@ router.post('/bulk-pin-update', authenticateToken, checkPermission('documents', 
 // Get available templates
 router.get('/templates', authenticateToken, async (req, res) => {
   try {
-    const templates = DocumentTemplateService.getAvailableTemplates();
-    res.json({ data: templates });
+    // Fetch templates from Supabase
+    const templates = await supabaseService.select('document_templates', {
+      where: { is_active: true },
+      orderBy: { column: 'created_at', ascending: false }
+    });
+    res.json(templates || []);
   } catch (error) {
+    console.error('Error fetching templates:', error);
     res.status(500).json({ error: error.message });
   }
 });

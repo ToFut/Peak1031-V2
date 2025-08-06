@@ -70,6 +70,11 @@ const Document = sequelize.define('Document', {
     type: DataTypes.JSONB,
     allowNull: true,
     defaultValue: {}
+  },
+  storage_provider: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    defaultValue: 'local'
   }
 }, {
   tableName: 'documents',

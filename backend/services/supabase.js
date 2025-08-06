@@ -56,6 +56,8 @@ class SupabaseService {
       throw new Error('Supabase client not initialized');
     }
 
+    console.log(`🔵 Supabase INSERT into ${table}:`, data);
+
     const { data: result, error } = await this.client
       .from(table)
       .insert(data)
@@ -63,9 +65,16 @@ class SupabaseService {
 
     if (error) {
       console.error(`❌ Supabase insert error for ${table}:`, error);
+      console.error('Error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       throw error;
     }
 
+    console.log(`✅ Supabase INSERT success:`, result);
     return result[0];
   }
 
@@ -139,12 +148,151 @@ class SupabaseService {
   }
 
   async getExchanges(options = {}) {
-    return await this.select('exchanges', options);
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      const { where = {}, orderBy = { column: 'created_at', ascending: false }, limit, offset } = options;
+      
+      // Build query with participants included
+      let query = this.client
+        .from('exchanges')
+        .select('*');
+
+      // Apply where conditions
+      if (where) {
+        Object.keys(where).forEach(key => {
+          query = query.eq(key, where[key]);
+        });
+      }
+
+      // Apply ordering
+      query = query.order(orderBy.column, { ascending: orderBy.ascending });
+
+      // Apply limit and offset
+      if (limit) {
+        query = query.limit(limit);
+      }
+      
+      if (offset !== undefined) {
+        query = query.range(offset, offset + (limit || 100) - 1);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('❌ Supabase getExchanges error:', error);
+        throw new Error(error.message);
+      }
+
+      // Transform the data to match expected format
+      // Manually fetch related data for each exchange
+      const exchangesWithData = [];
+      for (const exchange of (data || [])) {
+        // Fetch client data
+        let client = null;
+        if (exchange.client_id) {
+          const { data: clientData } = await this.client
+            .from('contacts')
+            .select('id, first_name, last_name, email, company')
+            .eq('id', exchange.client_id)
+            .single();
+          client = clientData;
+        }
+
+        // Fetch coordinator data  
+        let coordinator = null;
+        if (exchange.coordinator_id) {
+          const { data: coordData } = await this.client
+            .from('contacts')
+            .select('id, first_name, last_name, email')
+            .eq('id', exchange.coordinator_id)
+            .single();
+          coordinator = coordData;
+        }
+
+        // Fetch participants
+        const { data: participants } = await this.client
+          .from('exchange_participants')
+          .select('id, role, permissions, user_id, contact_id')
+          .eq('exchange_id', exchange.id);
+
+        exchangesWithData.push({
+          ...exchange,
+          client,
+          coordinator,
+          exchangeParticipants: participants || []
+        });
+      }
+      
+      const exchanges = exchangesWithData;
+
+      console.log(`✅ Fetched ${exchanges.length} exchanges with participants`);
+      return exchanges;
+    } catch (error) {
+      console.error('Error in getExchanges:', error);
+      throw error;
+    }
   }
 
   async getExchangeById(id) {
-    const exchanges = await this.select('exchanges', { where: { id } });
-    return exchanges[0] || null;
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      const { data, error } = await this.client
+        .from('exchanges')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        console.error('❌ Supabase getExchangeById error:', error);
+        throw new Error(error.message);
+      }
+
+      if (data) {
+        // Manually fetch related data
+        let client = null;
+        if (data.client_id) {
+          const { data: clientData } = await this.client
+            .from('contacts')
+            .select('id, first_name, last_name, email, company')
+            .eq('id', data.client_id)
+            .single();
+          client = clientData;
+        }
+
+        let coordinator = null;
+        if (data.coordinator_id) {
+          const { data: coordData } = await this.client
+            .from('contacts')
+            .select('id, first_name, last_name, email')
+            .eq('id', data.coordinator_id)
+            .single();
+          coordinator = coordData;
+        }
+
+        const { data: participants } = await this.client
+          .from('exchange_participants')
+          .select('id, role, permissions, user_id, contact_id')
+          .eq('exchange_id', data.id);
+
+        return {
+          ...data,
+          client,
+          coordinator,
+          exchangeParticipants: participants || []
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error in getExchangeById:', error);
+      throw error;
+    }
   }
 
   async createExchange(exchangeData) {
@@ -231,7 +379,63 @@ class SupabaseService {
   }
 
   async getMessages(options = {}) {
-    return await this.select('messages', options);
+    if (!this.client) {
+      console.warn('⚠️ Supabase client not initialized');
+      return [];
+    }
+
+    try {
+      const { where = {}, orderBy = { column: 'created_at', ascending: false }, limit } = options;
+      
+      let query = this.client
+        .from('messages')
+        .select(`
+          *,
+          sender:users(id, first_name, last_name, email),
+          exchange:exchanges(id, name, status)
+        `);
+
+      // Apply where conditions with column name conversion
+      if (where.exchangeId) {
+        query = query.eq('exchange_id', where.exchangeId);
+      }
+      if (where.senderId) {
+        query = query.eq('sender_id', where.senderId);
+      }
+      if (where.content) {
+        query = query.ilike('content', `%${where.content}%`);
+      }
+
+      // Apply ordering
+      if (orderBy) {
+        const columnMap = {
+          'createdAt': 'created_at',
+          'updatedAt': 'updated_at',
+          'content': 'content',
+          'senderId': 'sender_id',
+          'exchangeId': 'exchange_id'
+        };
+        const column = columnMap[orderBy.column] || orderBy.column;
+        query = query.order(column, { ascending: orderBy.ascending !== false });
+      }
+
+      // Apply limit
+      if (limit) {
+        query = query.limit(limit);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('❌ Supabase select error for messages:', error);
+        throw new Error(error.message);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getMessages:', error);
+      throw error;
+    }
   }
 
   async getMessageById(id) {
@@ -245,6 +449,68 @@ class SupabaseService {
 
   async updateMessage(id, messageData) {
     return await this.update('messages', messageData, { id });
+  }
+
+  async getMessageById(id) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      const { data, error } = await this.client
+        .from('messages')
+        .select(`
+          *,
+          sender:users!messages_sender_id_fkey(id, email, first_name, last_name, role)
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      console.error('Error getting message by ID:', error);
+      throw error;
+    }
+  }
+
+  async markMessageAsRead(messageId, userId) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      // Get current message
+      const { data: message, error: fetchError } = await this.client
+        .from('messages')
+        .select('read_by')
+        .eq('id', messageId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Add user to readBy array if not already present
+      const currentReadBy = message.read_by || [];
+      if (!currentReadBy.includes(userId)) {
+        currentReadBy.push(userId);
+      }
+
+      // Update message
+      const { data, error } = await this.client
+        .from('messages')
+        .update({ read_by: currentReadBy })
+        .eq('id', messageId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+      throw error;
+    }
   }
 
   async getDocuments(options = {}) {
@@ -416,6 +682,230 @@ class SupabaseService {
       return data || [];
     } catch (error) {
       console.error('Error in getExchangeParticipants:', error);
+      throw error;
+    }
+  }
+
+  async createExchangeParticipant(participantData) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      const { data, error } = await this.client
+        .from('exchange_participants')
+        .insert(participantData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      console.error('Error creating exchange participant:', error);
+      throw error;
+    }
+  }
+
+  async deleteExchangeParticipant(participantId) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      // Use soft delete by setting deleted_at timestamp
+      const { data, error } = await this.client
+        .from('exchange_participants')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', participantId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      console.error('Error deleting exchange participant:', error);
+      throw error;
+    }
+  }
+
+  // Storage operations
+  async uploadFile(bucketName, filePath, file, options = {}) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      // First, ensure the bucket exists
+      await this.ensureBucketExists(bucketName);
+
+      const { data, error } = await this.client.storage
+        .from(bucketName)
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+          ...options
+        });
+
+      if (error) {
+        console.error('❌ Supabase file upload error:', error);
+        console.error('Error details:', {
+          message: error.message,
+          statusCode: error.statusCode,
+          details: error.details
+        });
+        throw error;
+      }
+
+      console.log('✅ File uploaded successfully:', data.path);
+      return data;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      throw error;
+    }
+  }
+
+  async ensureBucketExists(bucketName) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      // Check if bucket exists
+      const { data: buckets, error: listError } = await this.client.storage.listBuckets();
+      
+      if (listError) {
+        console.warn('Could not list buckets:', listError);
+        return; // Continue anyway, maybe we don't have permission to list
+      }
+
+      const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
+      
+      if (!bucketExists) {
+        console.log(`📁 Creating bucket: ${bucketName}`);
+        const { data, error: createError } = await this.client.storage.createBucket(bucketName, {
+          public: false,
+          allowedMimeTypes: [
+            'application/pdf',
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/plain',
+            'text/csv',
+            'application/zip',
+            'application/x-zip-compressed'
+          ],
+          fileSizeLimit: 52428800 // 50MB
+        });
+
+        if (createError) {
+          console.warn('Could not create bucket (may already exist):', createError);
+          // Don't throw error here, bucket might exist but we can't list it
+        } else {
+          console.log('✅ Bucket created successfully:', bucketName);
+        }
+      }
+    } catch (error) {
+      console.warn('Error ensuring bucket exists:', error);
+      // Don't throw error, continue with upload attempt
+    }
+  }
+
+  async downloadFile(bucketName, filePath) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      const { data, error } = await this.client.storage
+        .from(bucketName)
+        .download(filePath);
+
+      if (error) {
+        console.error('❌ Supabase file download error:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      throw error;
+    }
+  }
+
+  async deleteFile(bucketName, filePath) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      const { data, error } = await this.client.storage
+        .from(bucketName)
+        .remove([filePath]);
+
+      if (error) {
+        console.error('❌ Supabase file deletion error:', error);
+        throw error;
+      }
+
+      console.log('✅ File deleted successfully:', filePath);
+      return data;
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      throw error;
+    }
+  }
+
+  async getFileUrl(bucketName, filePath, expiresIn = 3600) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      const { data, error } = await this.client.storage
+        .from(bucketName)
+        .createSignedUrl(filePath, expiresIn);
+
+      if (error) {
+        console.error('❌ Supabase signed URL error:', error);
+        throw error;
+      }
+
+      return data.signedUrl;
+    } catch (error) {
+      console.error('Error creating signed URL:', error);
+      throw error;
+    }
+  }
+
+  async listFiles(bucketName, folderPath = '', options = {}) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      const { data, error } = await this.client.storage
+        .from(bucketName)
+        .list(folderPath, {
+          limit: 100,
+          offset: 0,
+          sortBy: { column: 'name', order: 'asc' },
+          ...options
+        });
+
+      if (error) {
+        console.error('❌ Supabase file list error:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error listing files:', error);
       throw error;
     }
   }

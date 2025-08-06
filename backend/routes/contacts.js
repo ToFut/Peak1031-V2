@@ -1,42 +1,36 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
-const Contact = require('../models/Contact');
+const databaseService = require('../services/database');
+const { transformToCamelCase } = require('../utils/caseTransform');
 const { Op } = require('sequelize');
 
 const router = express.Router();
 
-// Get all contacts (read-only from PP)
+// Get all contacts (from Supabase)
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, sortBy = 'createdAt', sortOrder = 'DESC' } = req.query;
+    console.log('📥 Getting contacts from database service...');
     
-    const whereClause = {};
-    if (search) {
-      whereClause[Op.or] = [
-        { firstName: { [Op.iLike]: `%${search}%` } },
-        { lastName: { [Op.iLike]: `%${search}%` } },
-        { email: { [Op.iLike]: `%${search}%` } },
-        { company: { [Op.iLike]: `%${search}%` } }
-      ];
-    }
-
-    const contacts = await Contact.findAndCountAll({
-      where: whereClause,
-      order: [[sortBy, sortOrder]],
-      limit: parseInt(limit),
-      offset: (page - 1) * limit
-    });
-
+    const contacts = await databaseService.getContacts();
+    
+    console.log(`✅ Found ${contacts.length} contacts in database`);
+    
+    // Transform snake_case to camelCase for frontend
+    const transformedContacts = transformToCamelCase(contacts);
+    
+    // Return in the format frontend expects
     res.json({
-      data: contacts.rows,
+      contacts: transformedContacts,
+      data: transformedContacts,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: contacts.count,
-        totalPages: Math.ceil(contacts.count / limit)
+        page: 1,
+        limit: transformedContacts.length,
+        total: transformedContacts.length,
+        totalPages: 1
       }
     });
   } catch (error) {
+    console.error('❌ Error fetching contacts:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -44,7 +38,7 @@ router.get('/', authenticateToken, async (req, res) => {
 // Get contact by ID
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const contact = await Contact.findByPk(req.params.id);
+    const contact = await databaseService.getContactById(req.params.id);
     
     if (!contact) {
       return res.status(404).json({ error: 'Contact not found' });

@@ -19,7 +19,9 @@ import {
   ShieldCheckIcon,
   KeyIcon,
   ArrowDownTrayIcon,
-  ArrowUpTrayIcon
+  ArrowUpTrayIcon,
+  ViewColumnsIcon,
+  Squares2X2Icon
 } from '@heroicons/react/24/outline';
 
 import { User } from '../types';
@@ -46,6 +48,7 @@ const UserManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [formData, setFormData] = useState<UserFormData>({
     email: '',
     password: '',
@@ -307,6 +310,23 @@ const UserManagement: React.FC = () => {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
         <div className="flex gap-3">
+          {/* View Toggle */}
+          <button
+            onClick={() => setViewMode(viewMode === 'card' ? 'table' : 'card')}
+            className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            {viewMode === 'card' ? (
+              <>
+                <ViewColumnsIcon className="h-5 w-5" />
+                Table View
+              </>
+            ) : (
+              <>
+                <Squares2X2Icon className="h-5 w-5" />
+                Card View
+              </>
+            )}
+          </button>
           <button
             onClick={exportUsers}
             className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -356,10 +376,11 @@ const UserManagement: React.FC = () => {
         </div>
       </ModernCard>
 
-      {/* Users Table */}
+      {/* Users Display */}
       <ModernCard>
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        {viewMode === 'table' ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -483,6 +504,121 @@ const UserManagement: React.FC = () => {
             </div>
           )}
         </div>
+        ) : (
+          /* Card View */
+          <div className="p-6">
+            {users.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                No users found
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {users.map((user) => (
+                  <div key={user.id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+                    {/* User Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center">
+                        <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
+                          <UserIcon className="h-6 w-6 text-gray-500" />
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {user.first_name} {user.last_name}
+                          </h3>
+                          <p className="text-sm text-gray-500">{user.email}</p>
+                        </div>
+                      </div>
+                      <StatusBadge
+                        status={user.is_active ? 'Active' : 'Inactive'}
+                      />
+                    </div>
+
+                    {/* User Details */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Role:</span>
+                        <StatusBadge
+                          status={getRoleDisplayName(user.role)}
+                        />
+                      </div>
+                      
+                      {user.phone && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600">Phone:</span>
+                          <span className="text-sm text-gray-900">{user.phone}</span>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Created:</span>
+                        <span className="text-sm text-gray-900">
+                          {new Date(user.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Last Login:</span>
+                        <span className="text-sm text-gray-900">
+                          {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}
+                        </span>
+                      </div>
+
+                      {user.two_fa_enabled && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600">2FA:</span>
+                          <span className="inline-flex items-center gap-1 text-xs text-green-700">
+                            <ShieldCheckIcon className="h-3 w-3" />
+                            Enabled
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="mt-6 pt-4 border-t border-gray-100">
+                      <div className="flex justify-between items-center">
+                        <button
+                          onClick={() => openEditModal(user)}
+                          className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                        >
+                          Edit
+                        </button>
+                        {user.id !== currentUser?.id && (
+                          <div className="flex gap-2">
+                            {user.is_active ? (
+                              <button
+                                onClick={() => handleDeactivateUser(user.id)}
+                                className="text-yellow-600 hover:text-yellow-900 text-sm"
+                                title="Deactivate user"
+                              >
+                                <XMarkIcon className="h-4 w-4" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleActivateUser(user.id)}
+                                className="text-green-600 hover:text-green-900 text-sm"
+                                title="Activate user"
+                              >
+                                <CheckIcon className="h-4 w-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="text-red-600 hover:text-red-900 text-sm"
+                              title="Delete user"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Pagination */}
         {totalPages > 1 && (

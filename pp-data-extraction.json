@@ -1,0 +1,1440 @@
+{
+  "extractedData": [
+    {
+      "id": "9a95c705-e75b-48dd-ad93-dec84642bee5",
+      "name": "Sander - 3929 139th Street, Hawthorne",
+      "mainFields": {
+        "pp_id": "1d71ece5-ec25-4e0d-b99e-74c332f87dc2",
+        "pp_name": "Sander - 3929 139th Street, Hawthorne",
+        "rate": "Flat Rate",
+        "tags": [],
+        "notes": "per leg",
+        "number": 1001,
+        "status": "Closed",
+        "open_date": null,
+        "close_date": "2008-07-22T14:00:00",
+        "created_at": "2018-05-17T23:00:54.597",
+        "updated_at": "2018-05-17T23:00:54.597",
+        "display_name": "1001 - Sander - 3929 139th Street, Hawthorne",
+        "assigned_to_users": [
+          {
+            "id": "3caddd53-4514-4b34-918e-4ba5b5fca1cc",
+            "display_name": "Ariel Messian",
+            "email_address": "arielm@peakexchange.com"
+          }
+        ],
+        "statute_of_limitation_date": null,
+        "account_ref": {
+          "id": "441623eb-3d0d-4ea9-856d-b7621496f95f",
+          "display_name": "Sander, Andrzej"
+        }
+      },
+      "customFields": {
+        "Bank": {
+          "value": "IDB",
+          "type": "TextBox"
+        },
+        "Reason for Cancellation": {
+          "value": "CUST  CANCEL",
+          "type": "TextBox"
+        },
+        "Rel Property City": {
+          "value": "Hawthorne",
+          "type": "TextBox"
+        },
+        "Rel Property State": {
+          "value": "CA",
+          "type": "TextBox"
+        },
+        "Rel Property Zip": {
+          "value": "90250",
+          "type": "TextBox"
+        },
+        "Type of Exchange": {
+          "value": "DELAYED",
+          "type": "TextBox"
+        },
+        "Client Vesting": {
+          "value": "a sole proprietorship, D/B/A Preferred Precision Machining",
+          "type": "TextBox"
+        },
+        "Rel Property Address": {
+          "value": "3929 139th Street",
+          "type": "TextBox"
+        },
+        "Rel APN": {
+          "value": "4051-003-007",
+          "type": "TextBox"
+        },
+        "Rel Escrow Number": {
+          "value": "112283-EG",
+          "type": "TextBox"
+        },
+        "Rel Purchase Contract Title": {
+          "value": "Commercial Property Purchase Agreement & Joint Escrow Instructions",
+          "type": "TextBox"
+        },
+        "Rel Contract Date": {
+          "value": "2008-05-08T07:00:00",
+          "type": "Date"
+        },
+        "Rel Value": {
+          "value": 650000,
+          "type": "Currency"
+        },
+        "Buyer 1 Name": {
+          "value": "Alfred Shahmaram",
+          "type": "TextBox"
+        },
+        "Proceeds": {
+          "value": 0,
+          "type": "Currency"
+        },
+        "Identified?": {
+          "value": false,
+          "type": "Checkbox"
+        },
+        "Rep 1 Value": {
+          "value": 0,
+          "type": "Currency"
+        }
+      }
+    },
+    {
+      "id": "386fd91c-8c3b-4cad-8942-c78f89fe5fe1",
+      "name": "Younessi, Maria - 827 2nd Street",
+      "mainFields": {
+        "pp_id": "c6c4b247-56c5-4c36-8126-2843930bb0b5",
+        "pp_name": "Younessi, Maria - 827 2nd Street",
+        "rate": "Flat Rate",
+        "tags": [],
+        "notes": "per leg",
+        "number": 1002,
+        "status": "Closed",
+        "open_date": null,
+        "close_date": "2008-12-16T16:00:00",
+        "created_at": "2018-05-17T23:00:55.8",
+        "updated_at": "2018-05-17T23:00:55.8",
+        "display_name": "1002 - Younessi, Maria - 827 2nd Street",
+        "assigned_to_users": [
+          {
+            "id": "3caddd53-4514-4b34-918e-4ba5b5fca1cc",
+            "display_name": "Ariel Messian",
+            "email_address": "arielm@peakexchange.com"
+          }
+        ],
+        "statute_of_limitation_date": null,
+        "account_ref": {
+          "id": "c2d5ee90-e030-46e1-9b80-b0a571772c16",
+          "display_name": "Younessi, Maria"
+        }
+      },
+      "customFields": {
+        "Bank": {
+          "value": "IDB",
+          "type": "TextBox"
+        },
+        "Rel Property City": {
+          "value": "Santa Monica",
+          "type": "TextBox"
+        },
+        "Rel Property State": {
+          "value": "CA",
+          "type": "TextBox"
+        },
+        "Type of Exchange": {
+          "value": "DELAYED",
+          "type": "TextBox"
+        },
+        "Rel Property Address": {
+          "value": "827 2nd Street",
+          "type": "TextBox"
+        },
+        "Rel APN": {
+          "value": "4292-024-017",
+          "type": "TextBox"
+        },
+        "Rel Escrow Number": {
+          "value": "111812",
+          "type": "TextBox"
+        },
+        "Rel Purchase Contract Title": {
+          "value": "Commerical Property Purchase Agreement and Joint Escrow Instructions",
+          "type": "TextBox"
+        },
+        "Rel Value": {
+          "value": 587000,
+          "type": "Currency"
+        },
+        "Buyer Vesting": {
+          "value": "a California limited liability company",
+          "type": "TextBox"
+        },
+        "Buyer 1 Name": {
+          "value": "126 Company, LLC",
+          "type": "TextBox"
+        },
+        "Proceeds": {
+          "value": 361188.37,
+          "type": "Currency"
+        },
+        "Close of Escrow Date": {
+          "value": "2008-07-18T07:00:00",
+          "type": "Date"
+        },
+        "Day 45": {
+          "value": "2008-09-01T07:00:00",
+          "type": "Date"
+        },
+        "Day 180": {
+          "value": "2009-01-14T08:00:00",
+          "type": "Date"
+        },
+        "Identified?": {
+          "value": false,
+          "type": "Checkbox"
+        },
+        "Rep 1 Value": {
+          "value": 0,
+          "type": "Currency"
+        }
+      }
+    },
+    {
+      "id": "76c08932-ed59-467f-bcdb-19f968ea00e0",
+      "name": "Younessi, Matthew - 827 2nd Street",
+      "mainFields": {
+        "pp_id": "24d1f9b9-2418-404a-a0e5-af54b9619fb2",
+        "pp_name": "Younessi, Matthew - 827 2nd Street",
+        "rate": "Flat Rate",
+        "tags": [],
+        "notes": "per leg",
+        "number": 1003,
+        "status": "Closed",
+        "open_date": null,
+        "close_date": "2008-12-20T16:00:00",
+        "created_at": "2018-05-17T23:00:57.04",
+        "updated_at": "2018-05-17T23:00:57.04",
+        "display_name": "1003 - Younessi, Matthew - 827 2nd Street",
+        "assigned_to_users": [
+          {
+            "id": "3caddd53-4514-4b34-918e-4ba5b5fca1cc",
+            "display_name": "Ariel Messian",
+            "email_address": "arielm@peakexchange.com"
+          }
+        ],
+        "statute_of_limitation_date": null,
+        "account_ref": {
+          "id": "4a97cccb-47f5-4fa7-bf35-725fbc44c077",
+          "display_name": "Younessi, Matthew"
+        }
+      },
+      "customFields": {
+        "Bank": {
+          "value": "IDB",
+          "type": "TextBox"
+        },
+        "Rel Property City": {
+          "value": "Santa Monica",
+          "type": "TextBox"
+        },
+        "Rel Property State": {
+          "value": "CA",
+          "type": "TextBox"
+        },
+        "Type of Exchange": {
+          "value": "DELAYED",
+          "type": "TextBox"
+        },
+        "Rel Property Address": {
+          "value": "827 2nd Street",
+          "type": "TextBox"
+        },
+        "Rel APN": {
+          "value": "4292-024-017",
+          "type": "TextBox"
+        },
+        "Rel Escrow Number": {
+          "value": "111811",
+          "type": "TextBox"
+        },
+        "Rel Purchase Contract Title": {
+          "value": "Commercial Property Purchase Agreement and Joint Escrow Instructions",
+          "type": "TextBox"
+        },
+        "Rel Contract Date": {
+          "value": "2008-05-29T07:00:00",
+          "type": "Date"
+        },
+        "Rel Value": {
+          "value": 587000,
+          "type": "Currency"
+        },
+        "Buyer Vesting": {
+          "value": "a California limited liability company",
+          "type": "TextBox"
+        },
+        "Buyer 1 Name": {
+          "value": "126 Company, LLC",
+          "type": "TextBox"
+        },
+        "Proceeds": {
+          "value": 361188.37,
+          "type": "Currency"
+        },
+        "Close of Escrow Date": {
+          "value": "2008-07-18T07:00:00",
+          "type": "Date"
+        },
+        "Day 45": {
+          "value": "2008-09-01T07:00:00",
+          "type": "Date"
+        },
+        "Day 180": {
+          "value": "2009-01-14T08:00:00",
+          "type": "Date"
+        },
+        "Identified?": {
+          "value": false,
+          "type": "Checkbox"
+        },
+        "Rep 1 Value": {
+          "value": 0,
+          "type": "Currency"
+        }
+      }
+    },
+    {
+      "id": "32fd98c2-c835-4eba-85cd-efab3528cfa2",
+      "name": "Wilson - 4450 Kinsinton - #2",
+      "mainFields": {
+        "pp_id": "c0f955dc-9cb1-4b0a-ba0e-a8ee6a6d7ba4",
+        "pp_name": "Wilson - 4450 Kinsinton - #2",
+        "rate": "Flat Rate",
+        "tags": [],
+        "notes": "per leg - MBG",
+        "number": 1004,
+        "status": "Closed",
+        "open_date": null,
+        "close_date": "2015-05-01T14:00:00",
+        "created_at": "2018-05-17T23:00:58.32",
+        "updated_at": "2018-05-17T23:00:58.32",
+        "display_name": "1004 - Wilson - 4450 Kinsinton - #2",
+        "assigned_to_users": [
+          {
+            "id": "3caddd53-4514-4b34-918e-4ba5b5fca1cc",
+            "display_name": "Ariel Messian",
+            "email_address": "arielm@peakexchange.com"
+          }
+        ],
+        "statute_of_limitation_date": null,
+        "account_ref": {
+          "id": "100c89a1-b4da-4246-9050-5a2a45bd9f1b",
+          "display_name": "Wilson, George M."
+        }
+      },
+      "customFields": {
+        "Bank": {
+          "value": "CN",
+          "type": "TextBox"
+        },
+        "Reason for Cancellation": {
+          "value": "Failed Exchange",
+          "type": "TextBox"
+        },
+        "Rel Property City": {
+          "value": "Los Angeles",
+          "type": "TextBox"
+        },
+        "Rel Property State": {
+          "value": "CA",
+          "type": "TextBox"
+        },
+        "Type of Exchange": {
+          "value": "DELAYED",
+          "type": "TextBox"
+        },
+        "Client Vesting": {
+          "value": "husband and wife, as joint tenants",
+          "type": "TextBox"
+        },
+        "Rel Property Address": {
+          "value": "4450 Kensington Road, Unit 2",
+          "type": "TextBox"
+        },
+        "Rel APN": {
+          "value": "4233-02-035",
+          "type": "TextBox"
+        },
+        "Rel Escrow Number": {
+          "value": "280191-DG",
+          "type": "TextBox"
+        },
+        "Rel Purchase Contract Title": {
+          "value": "California Residential Purchase Agreement and Joint Escrow Instructions",
+          "type": "TextBox"
+        },
+        "Rel Contract Date": {
+          "value": "2008-06-12T07:00:00",
+          "type": "Date"
+        },
+        "Rel Value": {
+          "value": 400000,
+          "type": "Currency"
+        },
+        "Buyer Vesting": {
+          "value": "husband and wife",
+          "type": "TextBox"
+        },
+        "Buyer 1 Name": {
+          "value": "Alex Lev",
+          "type": "TextBox"
+        },
+        "Buyer 2 Name": {
+          "value": "Sara Lev",
+          "type": "TextBox"
+        },
+        "Proceeds": {
+          "value": 173252.62,
+          "type": "Currency"
+        },
+        "Close of Escrow Date": {
+          "value": "2008-07-11T07:00:00",
+          "type": "Date"
+        },
+        "Day 45": {
+          "value": "2008-08-25T07:00:00",
+          "type": "Date"
+        },
+        "Day 180": {
+          "value": "2009-01-07T08:00:00",
+          "type": "Date"
+        },
+        "Identified?": {
+          "value": false,
+          "type": "Checkbox"
+        },
+        "Rep 1 Value": {
+          "value": 0,
+          "type": "Currency"
+        }
+      }
+    },
+    {
+      "id": "91bf0100-d06a-4a35-8253-12f3ae961741",
+      "name": "4201 Beverly LLC, -4221 W. Beverly",
+      "mainFields": {
+        "pp_id": "4eb65fd7-746a-4f9d-9796-c3fb1d7acd37",
+        "pp_name": "4201 Beverly LLC, -4221 W. Beverly",
+        "rate": "Flat Rate",
+        "tags": [],
+        "notes": "Per leg",
+        "number": 1005,
+        "status": "Closed",
+        "open_date": null,
+        "close_date": "2008-09-18T14:00:00",
+        "created_at": "2018-05-17T23:00:59.57",
+        "updated_at": "2018-05-17T23:00:59.57",
+        "display_name": "1005 - 4201 Beverly LLC, -4221 W. Beverly",
+        "assigned_to_users": [
+          {
+            "id": "3caddd53-4514-4b34-918e-4ba5b5fca1cc",
+            "display_name": "Ariel Messian",
+            "email_address": "arielm@peakexchange.com"
+          }
+        ],
+        "statute_of_limitation_date": null,
+        "account_ref": {
+          "id": "ff1c7be1-cf5a-4fb4-958a-c2c52316dc40",
+          "display_name": "Kleinman, Jeffrey"
+        }
+      },
+      "customFields": {
+        "Bank": {
+          "value": "CN",
+          "type": "TextBox"
+        },
+        "Reason for Cancellation": {
+          "value": "Failed Exchange",
+          "type": "TextBox"
+        },
+        "Rel Property City": {
+          "value": "Los Angeles",
+          "type": "TextBox"
+        },
+        "Rel Property State": {
+          "value": "CA",
+          "type": "TextBox"
+        },
+        "Rel Property Zip": {
+          "value": "90004",
+          "type": "TextBox"
+        },
+        "Type of Exchange": {
+          "value": "DELAYED",
+          "type": "TextBox"
+        },
+        "Client Vesting": {
+          "value": "4201-4221 Beverly Blvd., LLC, a California  limited liability company",
+          "type": "TextBox"
+        },
+        "Rel Property Address": {
+          "value": "4201-4221 W. Beverly Blvd.",
+          "type": "TextBox"
+        },
+        "Rel APN": {
+          "value": "5520-026-018",
+          "type": "TextBox"
+        },
+        "Rel Escrow Number": {
+          "value": "4043-SN",
+          "type": "TextBox"
+        },
+        "Rel Purchase Contract Title": {
+          "value": "Commercial Property Purchase Agreement and Joint Escrow Instructions",
+          "type": "TextBox"
+        },
+        "Rel Contract Date": {
+          "value": "2008-05-02T07:00:00",
+          "type": "Date"
+        },
+        "Rel Value": {
+          "value": 6250000,
+          "type": "Currency"
+        },
+        "Buyer 1 Name": {
+          "value": "Dr. Edwin Kim",
+          "type": "TextBox"
+        },
+        "Proceeds": {
+          "value": 3497378.17,
+          "type": "Currency"
+        },
+        "Close of Escrow Date": {
+          "value": "2008-07-28T07:00:00",
+          "type": "Date"
+        },
+        "Day 45": {
+          "value": "2008-09-11T07:00:00",
+          "type": "Date"
+        },
+        "Day 180": {
+          "value": "2009-01-24T08:00:00",
+          "type": "Date"
+        },
+        "Identified?": {
+          "value": false,
+          "type": "Checkbox"
+        },
+        "Rep 1 Value": {
+          "value": 0,
+          "type": "Currency"
+        }
+      }
+    },
+    {
+      "id": "3cc0dfe5-e01b-4a47-a70e-c458d36ed0aa",
+      "name": "Fixel - 2946 Francis Avenue - Los Angeles",
+      "mainFields": {
+        "pp_id": "a04d1a9b-1391-4aa1-a589-20e46d0d75ff",
+        "pp_name": "Fixel - 2946 Francis Avenue - Los Angeles",
+        "rate": "Flat Rate",
+        "tags": [],
+        "notes": "per leg",
+        "number": 1006,
+        "status": "Closed",
+        "open_date": null,
+        "close_date": "2009-06-03T14:00:00",
+        "created_at": "2018-05-17T23:01:01",
+        "updated_at": "2018-05-17T23:01:01",
+        "display_name": "1006 - Fixel - 2946 Francis Avenue - Los Angeles",
+        "assigned_to_users": [
+          {
+            "id": "3caddd53-4514-4b34-918e-4ba5b5fca1cc",
+            "display_name": "Ariel Messian",
+            "email_address": "arielm@peakexchange.com"
+          }
+        ],
+        "statute_of_limitation_date": null,
+        "account_ref": {
+          "id": "6fe621c0-7813-4b68-9428-79e4690cc2fa",
+          "display_name": "Mozes, David"
+        }
+      },
+      "customFields": {
+        "Bank": {
+          "value": "IDB",
+          "type": "TextBox"
+        },
+        "Rel Property City": {
+          "value": "Los Angeles",
+          "type": "TextBox"
+        },
+        "Rel Property State": {
+          "value": "CA",
+          "type": "TextBox"
+        },
+        "Rep 1 City": {
+          "value": "Las Vegas",
+          "type": "TextBox"
+        },
+        "Rep 1 State": {
+          "value": "NV",
+          "type": "TextBox"
+        },
+        "Type of Exchange": {
+          "value": "DELAYED",
+          "type": "TextBox"
+        },
+        "Client Vesting": {
+          "value": "Fixel Investment Group, LLC, a California limited liability company",
+          "type": "TextBox"
+        },
+        "Rel Property Address": {
+          "value": "2946-2952 Francis Avenue",
+          "type": "TextBox"
+        },
+        "Rel APN": {
+          "value": "5077-024-007",
+          "type": "TextBox"
+        },
+        "Rel Escrow Number": {
+          "value": "37744-MM",
+          "type": "TextBox"
+        },
+        "Rel Purchase Contract Title": {
+          "value": "Residential Income Property Purchase Agreement and Joint Escrow Instructions",
+          "type": "TextBox"
+        },
+        "Rel Contract Date": {
+          "value": "2008-04-01T07:00:00",
+          "type": "Date"
+        },
+        "Rel Value": {
+          "value": 700000,
+          "type": "Currency"
+        },
+        "Buyer 1 Name": {
+          "value": "Scott Kim",
+          "type": "TextBox"
+        },
+        "Proceeds": {
+          "value": 140335.74,
+          "type": "Currency"
+        },
+        "Close of Escrow Date": {
+          "value": "2008-08-29T07:00:00",
+          "type": "Date"
+        },
+        "Day 45": {
+          "value": "2008-10-13T07:00:00",
+          "type": "Date"
+        },
+        "Day 180": {
+          "value": "2009-02-25T08:00:00",
+          "type": "Date"
+        },
+        "Identified?": {
+          "value": false,
+          "type": "Checkbox"
+        },
+        "Rep 1 Property Address": {
+          "value": "1017 South First Street, 1023 South First Street, 1025 South First Street & 1022 South Casino Center Blvd.",
+          "type": "TextBox"
+        },
+        "Rep 1 Purchase Contract Title": {
+          "value": "Purchase Agreement",
+          "type": "TextBox"
+        },
+        "Rep 1 Purchase Contract Date": {
+          "value": "2009-02-19T08:00:00",
+          "type": "Date"
+        },
+        "Rep 1 Value": {
+          "value": 649200,
+          "type": "Currency"
+        },
+        "Rep 1 Seller Vesting": {
+          "value": "a Nevada limited liability Company",
+          "type": "TextBox"
+        },
+        "Rep 1 Seller 1 Name": {
+          "value": "CMS Mission Arts, LLC,",
+          "type": "TextBox"
+        }
+      }
+    },
+    {
+      "id": "1f5dad67-3bc1-41da-ab6b-05ae3efef329",
+      "name": "Greene - 8047 Woodman Avenue",
+      "mainFields": {
+        "pp_id": "befec8e3-2494-47e0-86d5-a0e6b40831bd",
+        "pp_name": "Greene - 8047 Woodman Avenue",
+        "rate": "Flat Rate",
+        "tags": [],
+        "notes": "per leg",
+        "number": 1007,
+        "status": "Closed",
+        "open_date": null,
+        "close_date": "2008-10-24T14:00:00",
+        "created_at": "2018-05-17T23:01:02.36",
+        "updated_at": "2018-05-17T23:01:02.36",
+        "display_name": "1007 - Greene - 8047 Woodman Avenue",
+        "assigned_to_users": [
+          {
+            "id": "3caddd53-4514-4b34-918e-4ba5b5fca1cc",
+            "display_name": "Ariel Messian",
+            "email_address": "arielm@peakexchange.com"
+          }
+        ],
+        "statute_of_limitation_date": null,
+        "account_ref": {
+          "id": "b4a70413-46d6-40ac-84b0-f129b2d472b1",
+          "display_name": "Greene, Guy H."
+        }
+      },
+      "customFields": {
+        "Bank": {
+          "value": "IDB",
+          "type": "TextBox"
+        },
+        "Rel Property City": {
+          "value": "Van Nuys",
+          "type": "TextBox"
+        },
+        "Rel Property State": {
+          "value": "CA",
+          "type": "TextBox"
+        },
+        "Rel Property Zip": {
+          "value": "91402",
+          "type": "TextBox"
+        },
+        "Rep 1 City": {
+          "value": "Castaic",
+          "type": "TextBox"
+        },
+        "Rep 1 State": {
+          "value": "CA",
+          "type": "TextBox"
+        },
+        "Rep 1 Zip": {
+          "value": "91384",
+          "type": "TextBox"
+        },
+        "Type of Exchange": {
+          "value": "DELAYED",
+          "type": "TextBox"
+        },
+        "Client Vesting": {
+          "value": "Guy Greene and Dalia Greene, husband and wife as Joint Tenants",
+          "type": "TextBox"
+        },
+        "Rel Property Address": {
+          "value": "8047 Woodman Avenue",
+          "type": "TextBox"
+        },
+        "Rel APN": {
+          "value": "2213-017-012",
+          "type": "TextBox"
+        },
+        "Rel Escrow Number": {
+          "value": "SH-16349-LT",
+          "type": "TextBox"
+        },
+        "Rel Purchase Contract Title": {
+          "value": "California Residential Purchase Agreement and Joint Escrow Instructions",
+          "type": "TextBox"
+        },
+        "Rel Contract Date": {
+          "value": "2008-06-02T07:00:00",
+          "type": "Date"
+        },
+        "Rel Value": {
+          "value": 315000,
+          "type": "Currency"
+        },
+        "Buyer 1 Name": {
+          "value": "Sergio A. Gonzalez",
+          "type": "TextBox"
+        },
+        "Buyer 2 Name": {
+          "value": "Hortencia Gonzalez",
+          "type": "TextBox"
+        },
+        "Proceeds": {
+          "value": 288667.72,
+          "type": "Currency"
+        },
+        "Close of Escrow Date": {
+          "value": "2008-08-01T07:00:00",
+          "type": "Date"
+        },
+        "Day 45": {
+          "value": "2008-09-15T07:00:00",
+          "type": "Date"
+        },
+        "Day 180": {
+          "value": "2009-01-28T08:00:00",
+          "type": "Date"
+        },
+        "Identified?": {
+          "value": false,
+          "type": "Checkbox"
+        },
+        "Rep 1 Property Address": {
+          "value": "30390 Cedar Oak Lane",
+          "type": "TextBox"
+        },
+        "Rep 1 Escrow Number": {
+          "value": "2827941",
+          "type": "TextBox"
+        },
+        "Rep 1 Purchase Contract Title": {
+          "value": "California Residential Purchase Agreement and Joint Escrow Instructions",
+          "type": "TextBox"
+        },
+        "Rep 1 Purchase Contract Date": {
+          "value": "2008-08-20T07:00:00",
+          "type": "Date"
+        },
+        "Rep 1 Value": {
+          "value": 355418,
+          "type": "Currency"
+        },
+        "Rep 1 Seller 1 Name": {
+          "value": "First Federal Bank of California",
+          "type": "TextBox"
+        }
+      }
+    },
+    {
+      "id": "a2982609-a906-4259-b48f-ae5e94164feb",
+      "name": "Evenhaim - Vacant Land, Los Angeles, CA",
+      "mainFields": {
+        "pp_id": "73ba5243-b14a-452b-8d76-5e3cdd5b0216",
+        "pp_name": "Evenhaim - Vacant Land, Los Angeles, CA",
+        "rate": "Flat Rate",
+        "tags": [],
+        "notes": "per leg $350.00 Note and T?D processing fee",
+        "number": 1009,
+        "status": "Closed",
+        "open_date": null,
+        "close_date": "2009-01-20T16:00:00",
+        "created_at": "2018-05-17T23:01:05",
+        "updated_at": "2018-05-17T23:01:05",
+        "display_name": "1009 - Evenhaim - Vacant Land, Los Angeles, CA",
+        "assigned_to_users": [
+          {
+            "id": "3caddd53-4514-4b34-918e-4ba5b5fca1cc",
+            "display_name": "Ariel Messian",
+            "email_address": "arielm@peakexchange.com"
+          }
+        ],
+        "statute_of_limitation_date": null,
+        "account_ref": {
+          "id": "466de07d-10f4-45cd-9b37-5708dd36c1bb",
+          "display_name": "Evenhaim, Sharon"
+        }
+      },
+      "customFields": {
+        "Bank": {
+          "value": "IDB",
+          "type": "TextBox"
+        },
+        "Rel Property City": {
+          "value": "Los Angeles",
+          "type": "TextBox"
+        },
+        "Rel Property State": {
+          "value": "CA",
+          "type": "TextBox"
+        },
+        "Rep 1 City": {
+          "value": "Los Angeles",
+          "type": "TextBox"
+        },
+        "Rep 1 State": {
+          "value": "CA",
+          "type": "TextBox"
+        },
+        "Type of Exchange": {
+          "value": "DELAYED",
+          "type": "TextBox"
+        },
+        "Client Vesting": {
+          "value": "Sharon Evenhaim, Trustee of the Sharon and Dorit Evenhaim Living Trust dated July 24, 1997",
+          "type": "TextBox"
+        },
+        "Rel Property Address": {
+          "value": "Vacant Land 2533-029-006, 019, 022 and 023",
+          "type": "TextBox"
+        },
+        "Rel Escrow Number": {
+          "value": "4412-GO",
+          "type": "TextBox"
+        },
+        "Rel Purchase Contract Title": {
+          "value": "Vacant Land Purchase Agreement and Joint Escrow Instructions",
+          "type": "TextBox"
+        },
+        "Rel Contract Date": {
+          "value": "2008-07-01T07:00:00",
+          "type": "Date"
+        },
+        "Rel Value": {
+          "value": 2850000,
+          "type": "Currency"
+        },
+        "Buyer Vesting": {
+          "value": "a California limited partnership",
+          "type": "TextBox"
+        },
+        "Buyer 1 Name": {
+          "value": "C.F. Saticoy Limited Partnership",
+          "type": "TextBox"
+        },
+        "Proceeds": {
+          "value": 0,
+          "type": "Currency"
+        },
+        "Close of Escrow Date": {
+          "value": "2008-08-06T07:00:00",
+          "type": "Date"
+        },
+        "Day 45": {
+          "value": "2008-09-20T07:00:00",
+          "type": "Date"
+        },
+        "Day 180": {
+          "value": "2009-02-02T08:00:00",
+          "type": "Date"
+        },
+        "Identified?": {
+          "value": false,
+          "type": "Checkbox"
+        },
+        "Rep 1 Property Address": {
+          "value": "21510-21530 Roscoe Blvd.,",
+          "type": "TextBox"
+        },
+        "Rep 1 Escrow Number": {
+          "value": "5001-GO",
+          "type": "TextBox"
+        },
+        "Rep 1 Purchase Contract Title": {
+          "value": "Sale Escrow Instructions",
+          "type": "TextBox"
+        },
+        "Rep 1 Purchase Contract Date": {
+          "value": "2008-12-05T08:00:00",
+          "type": "Date"
+        },
+        "Rep 1 Value": {
+          "value": 3800000,
+          "type": "Currency"
+        },
+        "Rep 1 Seller 1 Name": {
+          "value": "S & R Properties Corp.",
+          "type": "TextBox"
+        }
+      }
+    },
+    {
+      "id": "f7c32e7a-17a5-4554-8ba5-5018bdb5867a",
+      "name": "7565 Holdings - 7565  N. San Fernando Road, Sun Valley",
+      "mainFields": {
+        "pp_id": "10932c38-a957-4489-8a61-9bc321dc1779",
+        "pp_name": "7565 Holdings - 7565  N. San Fernando Road, Sun Valley",
+        "rate": "Flat Rate",
+        "tags": [],
+        "notes": "per leg",
+        "number": 1010,
+        "status": "Closed",
+        "open_date": null,
+        "close_date": "2015-05-01T14:00:00",
+        "created_at": "2018-05-17T23:01:06.453",
+        "updated_at": "2018-05-21T19:13:03.547",
+        "display_name": "1010 - 7565 Holdings - 7565  N. San Fernando Road, Sun Valley",
+        "assigned_to_users": [
+          {
+            "id": "3caddd53-4514-4b34-918e-4ba5b5fca1cc",
+            "display_name": "Ariel Messian",
+            "email_address": "arielm@peakexchange.com"
+          }
+        ],
+        "statute_of_limitation_date": null,
+        "account_ref": {
+          "id": "03a25ab9-ccd6-42e4-a79a-ed68fce438e1",
+          "display_name": "Selig, Brock"
+        }
+      },
+      "customFields": {
+        "Bank": {
+          "value": "FCB",
+          "type": "TextBox"
+        },
+        "Rel Property City": {
+          "value": "Los Angeles",
+          "type": "TextBox"
+        },
+        "Rel Property State": {
+          "value": "CA",
+          "type": "TextBox"
+        },
+        "Rel Property Zip": {
+          "value": "91505",
+          "type": "TextBox"
+        },
+        "Type of Exchange": {
+          "value": "DELAYED",
+          "type": "TextBox"
+        },
+        "Client Vesting": {
+          "value": "7565 Holdings, LLC, a Nevada Limited Liability Company",
+          "type": "TextBox"
+        },
+        "Rel Property Address": {
+          "value": "7565 N. San Fernando Road (Burbank area)",
+          "type": "TextBox"
+        },
+        "Rel APN": {
+          "value": "2466-036-012",
+          "type": "TextBox"
+        },
+        "Rel Escrow Number": {
+          "value": "7581134-MYM",
+          "type": "TextBox"
+        },
+        "Rel Purchase Contract Title": {
+          "value": "Standard Offer, Agreement & Escrow Instructions for Purchase of Real Estate",
+          "type": "TextBox"
+        },
+        "Rel Contract Date": {
+          "value": "2008-06-05T07:00:00",
+          "type": "Date"
+        },
+        "Rel Value": {
+          "value": 2306000,
+          "type": "Currency"
+        },
+        "Buyer Vesting": {
+          "value": "of the Steven N. and Maria O. Feig Living Trust",
+          "type": "TextBox"
+        },
+        "Buyer 1 Name": {
+          "value": "Steven N. Feig and Maria O. Feig, Trustees",
+          "type": "TextBox"
+        },
+        "Proceeds": {
+          "value": 679535.77,
+          "type": "Currency"
+        },
+        "Close of Escrow Date": {
+          "value": "2008-08-26T07:00:00",
+          "type": "Date"
+        },
+        "Day 45": {
+          "value": "2008-10-10T07:00:00",
+          "type": "Date"
+        },
+        "Day 180": {
+          "value": "2009-02-22T08:00:00",
+          "type": "Date"
+        },
+        "Identified?": {
+          "value": false,
+          "type": "Checkbox"
+        },
+        "Rep 1 Value": {
+          "value": 0,
+          "type": "Currency"
+        }
+      }
+    },
+    {
+      "id": "c2691b9e-4b51-4df9-a9fb-c07c7a146eec",
+      "name": "Ron 10908 Rose I, LLC - 8640 S.E Causey, Happy Valley, OR",
+      "mainFields": {
+        "pp_id": "bf5f4f7a-cb11-46c5-af2a-40b008af3678",
+        "pp_name": "Ron 10908 Rose I, LLC - 8640 S.E Causey, Happy Valley, OR",
+        "rate": "Flat Rate",
+        "tags": [],
+        "notes": "per leg",
+        "number": 1011,
+        "status": "Closed",
+        "open_date": null,
+        "close_date": "2009-04-08T14:00:00",
+        "created_at": "2018-05-17T23:01:08.007",
+        "updated_at": "2018-05-17T23:01:08.007",
+        "display_name": "1011 - Ron 10908 Rose I, LLC - 8640 S.E Causey, Happy Valley, OR",
+        "assigned_to_users": [
+          {
+            "id": "3caddd53-4514-4b34-918e-4ba5b5fca1cc",
+            "display_name": "Ariel Messian",
+            "email_address": "arielm@peakexchange.com"
+          }
+        ],
+        "statute_of_limitation_date": null,
+        "account_ref": {
+          "id": "1f148e09-5534-47b8-ac31-43e7981df442",
+          "display_name": "Tamkin, Robert M."
+        }
+      },
+      "customFields": {
+        "Bank": {
+          "value": "IDB",
+          "type": "TextBox"
+        },
+        "Rel Property City": {
+          "value": "Happy Valley",
+          "type": "TextBox"
+        },
+        "Rel Property State": {
+          "value": "OR",
+          "type": "TextBox"
+        },
+        "Rep 1 City": {
+          "value": "Reno",
+          "type": "TextBox"
+        },
+        "Rep 1 State": {
+          "value": "NV",
+          "type": "TextBox"
+        },
+        "Type of Exchange": {
+          "value": "DELAYED",
+          "type": "TextBox"
+        },
+        "Client Vesting": {
+          "value": "Ron 10908 Rose I, LLC, a Delaware limited liability company",
+          "type": "TextBox"
+        },
+        "Rel Property Address": {
+          "value": "8640 S.E. Causey Avenue",
+          "type": "TextBox"
+        },
+        "Rel Escrow Number": {
+          "value": "627076-NP",
+          "type": "TextBox"
+        },
+        "Rel Purchase Contract Title": {
+          "value": "Reinstatement of and Second Amendment to Purchase and Sale and Escrow Instr",
+          "type": "TextBox"
+        },
+        "Rel Contract Date": {
+          "value": "2008-07-02T07:00:00",
+          "type": "Date"
+        },
+        "Rel Value": {
+          "value": 1798667,
+          "type": "Currency"
+        },
+        "Buyer Vesting": {
+          "value": "a Colorado limited liability company",
+          "type": "TextBox"
+        },
+        "Buyer 1 Name": {
+          "value": "Maxim Real Estate Investments, LLC",
+          "type": "TextBox"
+        },
+        "Proceeds": {
+          "value": 433254.16,
+          "type": "Currency"
+        },
+        "Close of Escrow Date": {
+          "value": "2008-08-14T07:00:00",
+          "type": "Date"
+        },
+        "Day 45": {
+          "value": "2008-09-28T07:00:00",
+          "type": "Date"
+        },
+        "Day 180": {
+          "value": "2009-02-10T08:00:00",
+          "type": "Date"
+        },
+        "Identified?": {
+          "value": false,
+          "type": "Checkbox"
+        },
+        "Rep 1 Property Address": {
+          "value": "6220 Meadowood Mall Circle",
+          "type": "TextBox"
+        },
+        "Rep 1 Escrow Number": {
+          "value": "627810-NP",
+          "type": "TextBox"
+        },
+        "Rep 1 Purchase Contract Title": {
+          "value": "Purchase  Agreement",
+          "type": "TextBox"
+        },
+        "Rep 1 Purchase Contract Date": {
+          "value": "2008-10-02T07:00:00",
+          "type": "Date"
+        },
+        "Rep 1 Value": {
+          "value": 31800000,
+          "type": "Currency"
+        },
+        "Rep 1 Seller 1 Name": {
+          "value": "Apex Properties Fund I, LLC",
+          "type": "TextBox"
+        }
+      }
+    }
+  ],
+  "fieldMapping": {
+    "Bank": {
+      "type": "TextBox",
+      "count": 982,
+      "examples": {}
+    },
+    "Reason for Cancellation": {
+      "type": "TextBox",
+      "count": 132,
+      "examples": {}
+    },
+    "Rel Property City": {
+      "type": "TextBox",
+      "count": 996,
+      "examples": {}
+    },
+    "Rel Property State": {
+      "type": "TextBox",
+      "count": 997,
+      "examples": {}
+    },
+    "Rel Property Zip": {
+      "type": "TextBox",
+      "count": 887,
+      "examples": {}
+    },
+    "Type of Exchange": {
+      "type": "TextBox",
+      "count": 1001,
+      "examples": {}
+    },
+    "Client Vesting": {
+      "type": "TextBox",
+      "count": 994,
+      "examples": {}
+    },
+    "Rel Property Address": {
+      "type": "TextBox",
+      "count": 998,
+      "examples": {}
+    },
+    "Rel APN": {
+      "type": "TextBox",
+      "count": 881,
+      "examples": {}
+    },
+    "Rel Escrow Number": {
+      "type": "TextBox",
+      "count": 964,
+      "examples": {}
+    },
+    "Rel Purchase Contract Title": {
+      "type": "TextBox",
+      "count": 997,
+      "examples": {}
+    },
+    "Rel Contract Date": {
+      "type": "Date",
+      "count": 895,
+      "examples": {}
+    },
+    "Rel Value": {
+      "type": "Currency",
+      "count": 1000,
+      "examples": {}
+    },
+    "Buyer 1 Name": {
+      "type": "TextBox",
+      "count": 997,
+      "examples": {}
+    },
+    "Proceeds": {
+      "type": "Currency",
+      "count": 1000,
+      "examples": {}
+    },
+    "Identified?": {
+      "type": "Checkbox",
+      "count": 1000,
+      "examples": {}
+    },
+    "Rep 1 Value": {
+      "type": "Currency",
+      "count": 1000,
+      "examples": {}
+    },
+    "Buyer Vesting": {
+      "type": "TextBox",
+      "count": 89,
+      "examples": {}
+    },
+    "Close of Escrow Date": {
+      "type": "Date",
+      "count": 842,
+      "examples": {}
+    },
+    "Day 45": {
+      "type": "Date",
+      "count": 854,
+      "examples": {}
+    },
+    "Day 180": {
+      "type": "Date",
+      "count": 854,
+      "examples": {}
+    },
+    "Buyer 2 Name": {
+      "type": "TextBox",
+      "count": 326,
+      "examples": {}
+    },
+    "Rep 1 City": {
+      "type": "TextBox",
+      "count": 737,
+      "examples": {}
+    },
+    "Rep 1 State": {
+      "type": "TextBox",
+      "count": 737,
+      "examples": {}
+    },
+    "Rep 1 Property Address": {
+      "type": "TextBox",
+      "count": 743,
+      "examples": {}
+    },
+    "Rep 1 Purchase Contract Title": {
+      "type": "TextBox",
+      "count": 744,
+      "examples": {}
+    },
+    "Rep 1 Purchase Contract Date": {
+      "type": "Date",
+      "count": 619,
+      "examples": {}
+    },
+    "Rep 1 Seller Vesting": {
+      "type": "TextBox",
+      "count": 91,
+      "examples": {}
+    },
+    "Rep 1 Seller 1 Name": {
+      "type": "TextBox",
+      "count": 740,
+      "examples": {}
+    },
+    "Rep 1 Zip": {
+      "type": "TextBox",
+      "count": 623,
+      "examples": {}
+    },
+    "Rep 1 Escrow Number": {
+      "type": "TextBox",
+      "count": 675,
+      "examples": {}
+    },
+    "Rep 1 Seller 2 Name": {
+      "type": "TextBox",
+      "count": 225,
+      "examples": {}
+    },
+    "Rep 1 APN": {
+      "type": "TextBox",
+      "count": 185,
+      "examples": {}
+    },
+    "Bank Referral?": {
+      "type": "Checkbox",
+      "count": 2,
+      "examples": {}
+    },
+    "Client 1 Signatory Title": {
+      "type": "TextBox",
+      "count": 2,
+      "examples": {}
+    },
+    "Client 2 Name": {
+      "type": "TextBox",
+      "count": 2,
+      "examples": {}
+    },
+    "Client 2 Signatory Title": {
+      "type": "TextBox",
+      "count": 2,
+      "examples": {}
+    },
+    "Buyer 1 Signatory Title": {
+      "type": "TextBox",
+      "count": 2,
+      "examples": {}
+    },
+    "Buyer 2 Signatory Title": {
+      "type": "TextBox",
+      "count": 2,
+      "examples": {}
+    },
+    "Rel Settlement Agent": {
+      "type": "Contact",
+      "count": 2,
+      "examples": {}
+    },
+    "Exchange Agreement Drafted On": {
+      "type": "Date",
+      "count": 2,
+      "examples": {}
+    },
+    "Date Proceeds Received": {
+      "type": "Date",
+      "count": 2,
+      "examples": {}
+    },
+    "Receipt Drafted On": {
+      "type": "Date",
+      "count": 2,
+      "examples": {}
+    },
+    "Rep 1 Docs Drafted on": {
+      "type": "Date",
+      "count": 2,
+      "examples": {}
+    },
+    "Rep 1 Seller 1 Signatory Title": {
+      "type": "TextBox",
+      "count": 2,
+      "examples": {}
+    },
+    "Rep 1 Seller 2 Signatory Title": {
+      "type": "TextBox",
+      "count": 2,
+      "examples": {}
+    },
+    "Rep 1 Settlement Agent": {
+      "type": "Contact",
+      "count": 2,
+      "examples": {}
+    },
+    "Failed Exchange?": {
+      "type": "Checkbox",
+      "count": 1,
+      "examples": {}
+    },
+    "Exchange Closed On": {
+      "type": "Date",
+      "count": 1,
+      "examples": {}
+    },
+    "Tax ID": {
+      "type": "TextBox",
+      "count": 1,
+      "examples": {}
+    }
+  }
+}

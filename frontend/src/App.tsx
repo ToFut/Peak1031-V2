@@ -3,12 +3,14 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { SocketProvider } from './hooks/useSocket';
 import Layout from './components/Layout';
+import ConnectionStatus from './components/ConnectionStatus';
+import DebugPanel from './components/DebugPanel';
 
 // Pages
 import Login from './pages/Login';
-import AdminDashboard from './pages/AdminDashboard';
-import ClientDashboard from './pages/ClientDashboard';
-import CoordinatorDashboard from './pages/CoordinatorDashboard';
+import AdminDashboard from './pages/EnhancedAdminDashboard';
+import ClientDashboard from './pages/EnhancedClientDashboard';
+import CoordinatorDashboard from './pages/EnhancedCoordinatorDashboard';
 import ThirdPartyDashboard from './pages/ThirdPartyDashboard';
 import AgencyDashboard from './pages/AgencyDashboard';
 import Messages from './pages/Messages';
@@ -20,6 +22,9 @@ import Documents from './pages/Documents';
 import Users from './pages/Users';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import AuthTest from './pages/AuthTest';
+import TemplateManager from './components/TemplateManager';
+import TemplateDocumentManager from './pages/TemplateDocumentManager';
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -87,6 +92,8 @@ const App: React.FC = () => {
       <SocketProvider>
         <Router>
           <div className="App">
+            <ConnectionStatus />
+            {process.env.NODE_ENV === 'development' && <DebugPanel />}
             <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
@@ -179,17 +186,22 @@ const App: React.FC = () => {
                 } 
               />
 
+              {/* Template Document Manager - Admin only */}
+              <Route 
+                path="/templates" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <TemplateDocumentManager />
+                  </ProtectedRoute>
+                } 
+              />
+
               {/* Admin-specific routes */}
               <Route 
                 path="/admin/templates" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
-                    <Layout>
-                      <div className="p-8">
-                        <h1 className="text-2xl font-bold mb-4">Document Templates</h1>
-                        <p className="text-gray-600">Document template management coming soon...</p>
-                      </div>
-                    </Layout>
+                    <TemplateManager />
                   </ProtectedRoute>
                 } 
               />
@@ -268,6 +280,12 @@ const App: React.FC = () => {
                     <Settings />
                   </ProtectedRoute>
                 } 
+              />
+              
+              {/* Auth Test - Development only */}
+              <Route 
+                path="/auth-test" 
+                element={<AuthTest />}
               />
 
               {/* Catch all - redirect to dashboard */}

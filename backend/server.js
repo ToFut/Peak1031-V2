@@ -11,7 +11,7 @@ const compression = require('compression');
 const morgan = require('morgan');
 const path = require('path');
 
-const { sequelize } = require('./models');
+// const { sequelize } = require('./models'); // Not needed - using Supabase
 const config = require('./config/database');
 const { authenticateToken } = require('./middleware/auth');
 const { authenticateSupabaseToken } = require('./middleware/supabase-auth');
@@ -23,16 +23,22 @@ const authRoutes = require('./routes/auth');
 const supabaseAuthRoutes = require('./routes/supabase-auth');
 const workingAuthRoutes = require('./routes/working-auth');
 const contactRoutes = require('./routes/contacts');
-const exchangeRoutes = require('./routes/exchanges');
+const exchangeRoutes = require('./routes/supabase-exchanges');
 const taskRoutes = require('./routes/tasks');
 const documentRoutes = require('./routes/documents');
 const messageRoutes = require('./routes/messages');
+const testMessageRoutes = require('./routes/test-message');
 const syncRoutes = require('./routes/sync');
 const adminRoutes = require('./routes/admin');
 const notificationRoutes = require('./routes/notifications');
 const oauthRoutes = require('./routes/oauth');
 const exportRoutes = require('./routes/exports');
 const { router: exchangeParticipantsRoutes } = require('./routes/exchange-participants');
+const templateRoutes = require('./routes/templates');
+
+// Enterprise routes
+const enterpriseExchangesRoutes = require('./routes/enterprise-exchanges');
+const accountManagementRoutes = require('./routes/account-management');
 
 // Import services
 const MessageService = require('./services/messages');
@@ -78,7 +84,10 @@ class PeakServer {
       process.env.FRONTEND_URL || "http://localhost:3000",
       "http://localhost:3001", // Allow port 3001 for development
       "http://localhost:3002", // Allow port 3002 for development
-      "http://localhost:3003"  // Allow port 3003 for development
+      "http://localhost:3003", // Allow port 3003 for development
+      "http://localhost:8000", // Allow port 8000 for development
+      "http://localhost:9000", // Allow port 9000 for development
+      "http://localhost:9001"  // Allow port 9001 for development
     ];
     
     this.app.use(cors({
@@ -146,6 +155,16 @@ class PeakServer {
         version: process.env.npm_package_version || '1.0.0'
       });
     });
+    
+    // API health check endpoint (before auth)
+    this.app.get('/api/health', (req, res) => {
+      console.log('🏥 API health check');
+      res.status(200).json({ 
+        status: 'healthy',
+        api: 'online',
+        timestamp: new Date().toISOString()
+      });
+    });
   }
 
   initializeRoutes() {
@@ -183,6 +202,56 @@ class PeakServer {
       });
     });
 
+    // Debug routes (no auth required)
+    this.app.get('/api/debug/users', async (req, res) => {
+      try {
+        const databaseService = require('./services/database');
+        const users = await databaseService.getUsers();
+        res.json({
+          success: true,
+          users: users.map(user => ({
+            id: user.id,
+            email: user.email,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            role: user.role,
+            is_active: user.is_active || user.isActive
+          }))
+        });
+      } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+      }
+    });
+
+    this.app.get('/api/debug/token', (req, res) => {
+      try {
+        const jwt = require('jsonwebtoken');
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+        
+        if (!token) {
+          return res.json({ success: false, error: 'No token provided' });
+        }
+        
+        const decoded = jwt.decode(token);
+        let verified = null;
+        try {
+          verified = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (verifyError) {
+          console.log('Token verification failed:', verifyError.message);
+        }
+        
+        res.json({
+          success: true,
+          decoded,
+          verified,
+          isExpired: decoded && decoded.exp && decoded.exp < Date.now() / 1000
+        });
+      } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+      }
+    });
+
     // API routes - Use working auth for now
     this.app.use('/api/auth', workingAuthRoutes);
     this.app.use('/api/auth/supabase', supabaseAuthRoutes); // Keep Supabase auth available
@@ -191,12 +260,18 @@ class PeakServer {
     this.app.use('/api/contacts', authenticateToken, contactRoutes);
     this.app.use('/api/exchanges', authenticateToken, exchangeRoutes);
     this.app.use('/api/tasks', authenticateToken, taskRoutes);
+    this.app.use('/api/documents/templates', authenticateToken, templateRoutes);
     this.app.use('/api/documents', authenticateToken, documentRoutes);
     this.app.use('/api/messages', authenticateToken, messageRoutes);
+    this.app.use('/api/test-messages', authenticateToken, testMessageRoutes);
     this.app.use('/api/notifications', authenticateToken, notificationRoutes);
     this.app.use('/api/exports', authenticateToken, exportRoutes);
     this.app.use('/api/sync', authenticateToken, syncRoutes);
     this.app.use('/api/admin', authenticateToken, adminRoutes);
+    
+    // Enterprise routes
+    this.app.use('/api/enterprise-exchanges', authenticateToken, enterpriseExchangesRoutes);
+    this.app.use('/api/account', authenticateToken, accountManagementRoutes);
 
     // Serve uploaded files with authentication
     this.app.use('/api/files', authenticateToken, express.static(
@@ -231,10 +306,10 @@ class PeakServer {
 
         console.log('🔍 Token received, verifying...');
         // Use same JWT verification as API routes
-        const AuthService = require('./services/auth');
+        const jwt = require('jsonwebtoken');
         const { User } = require('./models');
         
-        const decoded = AuthService.verifyToken(token);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         console.log('✅ Token verified, user ID:', decoded.userId);
         
         // Check if token is expired
@@ -487,21 +562,31 @@ class PeakServer {
 
   async start() {
     try {
-      // Test database connection
-      await sequelize.authenticate();
-      console.log('✅ Database connection established successfully');
+      // Using Supabase - no need for Sequelize connection
+      // await sequelize.authenticate(); // Removed - using Supabase
+      console.log('✅ Using Supabase for database operations');
 
-      // Skip database sync to avoid constraint issues
-      // Database schema is already set up
-      console.log('✅ Database models loaded (sync skipped)');
+      // Database models are for reference only
+      console.log('✅ Server ready (Supabase mode)');
 
       // Start server
-      const PORT = process.env.PORT || 8001;
-      this.server.listen(PORT, () => {
+      const PORT = process.env.PORT || 5000;
+      this.server.listen(PORT, async () => {
         console.log(`🚀 Peak 1031 Server running on port ${PORT}`);
         console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
         console.log(`🌐 API Base URL: http://localhost:${PORT}/api`);
         console.log(`💬 Socket.IO enabled for real-time messaging`);
+        
+        // Initialize scheduled sync service
+        try {
+          const scheduledSyncService = require('./services/scheduledSyncService');
+          if (scheduledSyncService) {
+            await scheduledSyncService.initialize();
+            console.log('✅ Automatic PP sync scheduling started');
+          }
+        } catch (error) {
+          console.error('⚠️ Failed to start scheduled sync:', error.message);
+        }
       });
 
       // Graceful shutdown handling
@@ -525,8 +610,8 @@ class PeakServer {
       console.log('✅ HTTP server closed');
 
       // Close database connections
-      await sequelize.close();
-      console.log('✅ Database connections closed');
+      // await sequelize.close(); // Removed - using Supabase
+      console.log('✅ Supabase connections managed automatically');
 
       console.log('✅ Graceful shutdown completed');
       process.exit(0);

@@ -13,6 +13,122 @@ const databaseService = require('../services/database');
 
 const router = express.Router();
 
+// Test route to verify routing is working
+router.get('/test', (req, res) => {
+  res.json({ message: 'Exchange routes are working!' });
+});
+
+/**
+ * GET /api/exchanges/:id/participants
+ * Get exchange participants
+ */
+router.get('/:id/participants', [
+  param('id').isUUID(),
+  authenticateToken
+], async (req, res) => {
+  console.log('🎯 PARTICIPANTS ROUTE HIT:', req.params.id);
+  try {
+    const participants = await databaseService.getExchangeParticipants({
+      where: { exchange_id: req.params.id }
+    });
+
+    res.json({
+      participants: participants || []
+    });
+
+  } catch (error) {
+    console.error('Error fetching exchange participants:', error);
+    res.status(500).json({
+      error: 'Failed to fetch participants',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/exchanges/:id/documents
+ * Get documents for a specific exchange
+ */
+router.get('/:id/documents', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  authenticateToken
+], async (req, res) => {
+  try {
+    const documents = await databaseService.getDocuments({
+      where: { exchange_id: req.params.id },
+      orderBy: { column: 'created_at', ascending: false }
+    });
+
+    res.json(transformToCamelCase({
+      success: true,
+      documents: documents || []
+    }));
+
+  } catch (error) {
+    console.error('Error fetching exchange documents:', error);
+    res.status(500).json({
+      error: 'Failed to fetch documents',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/exchanges/:id/audit-logs
+ * Get audit logs for a specific exchange
+ */
+router.get('/:id/audit-logs', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  authenticateToken
+], async (req, res) => {
+  try {
+    const auditLogs = await AuditService.getAuditLogs({
+      entityType: 'exchange',
+      entityId: req.params.id
+    });
+
+    res.json(transformToCamelCase({
+      success: true,
+      auditLogs: auditLogs || []
+    }));
+
+  } catch (error) {
+    console.error('Error fetching exchange audit logs:', error);
+    res.status(500).json({
+      error: 'Failed to fetch audit logs',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/exchanges/:id/tasks
+ * Get tasks for a specific exchange
+ */
+router.get('/:id/tasks', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  authenticateToken
+], async (req, res) => {
+  try {
+    const tasks = await databaseService.getTasks({
+      where: { exchange_id: req.params.id },
+      orderBy: { column: 'due_date', ascending: true }
+    });
+
+    res.json(transformToCamelCase({
+      success: true,
+      tasks: tasks || []
+    }));
+
+  } catch (error) {
+    console.error('Error fetching exchange tasks:', error);
+    res.status(500).json({
+      error: 'Failed to fetch tasks',
+      message: error.message
+    });
+  }
+});
+
 /**
  * GET /api/exchanges
  * Get exchanges with filtering, searching, and pagination
@@ -166,44 +282,8 @@ router.get('/:id', [
       });
     }
 
-    const exchange = await Exchange.findByPk(req.params.id, {
-      include: [
-        {
-          model: Contact,
-          as: 'client',
-          attributes: ['id', 'first_name', 'last_name', 'email', 'company', 'phone']
-        },
-        {
-          model: User,
-          as: 'coordinator',
-          attributes: ['id', 'first_name', 'last_name', 'email']
-        },
-        {
-          model: ExchangeParticipant,
-          as: 'exchangeParticipants',
-          include: [
-            { model: Contact, as: 'contact' },
-            { model: User, as: 'user', attributes: { exclude: ['password_hash', 'two_fa_secret'] } }
-          ]
-        },
-        {
-          model: Task,
-          as: 'tasks',
-          where: { is_active: true },
-          required: false,
-          include: [
-            { model: User, as: 'assignedUser', attributes: ['id', 'first_name', 'last_name', 'email'] }
-          ]
-        },
-        {
-          model: Document,
-          as: 'exchangeDocuments',
-          where: { is_active: true },
-          required: false,
-          attributes: ['id', 'filename', 'category', 'created_at', 'file_size', 'pin_required']
-        }
-      ]
-    });
+    // Use database service instead of direct Sequelize
+    const exchange = await databaseService.getExchangeById(req.params.id);
 
     if (!exchange) {
       return res.status(404).json({
@@ -211,34 +291,27 @@ router.get('/:id', [
       });
     }
 
-    // Get recent activity/messages
-    const recentMessages = await Message.findAll({
-      where: { exchange_id: exchange.id },
-      include: [
-        { model: User, as: 'sender', attributes: ['id', 'first_name', 'last_name'] }
-      ],
-      order: [['created_at', 'DESC']],
-      limit: 10
-    });
+    // Get related data using database service
+    const tasks = await databaseService.getTasks({ where: { exchange_id: exchange.id } });
+    const documents = await databaseService.getDocuments({ where: { exchange_id: exchange.id } });
+    const recentMessages = await databaseService.getMessages({ where: { exchange_id: exchange.id }, limit: 10 });
 
     // Build comprehensive response
     const responseData = {
-      ...exchange.toJSON(),
-      progress: exchange.calculateProgress(),
-      deadlines: exchange.getDaysToDeadline(),
-      urgency_level: exchange.getUrgencyLevel(),
-      is_overdue: exchange.isOverdue(),
+      ...exchange,
+      tasks: tasks,
+      documents: documents,
       statistics: {
-        total_tasks: exchange.tasks?.length || 0,
-        completed_tasks: exchange.tasks?.filter(t => t.status === 'COMPLETED').length || 0,
-        pending_tasks: exchange.tasks?.filter(t => t.status === 'PENDING').length || 0,
-        total_documents: exchange.exchangeDocuments?.length || 0,
-        total_participants: exchange.exchangeParticipants?.length || 0,
+        total_tasks: tasks.length || 0,
+        completed_tasks: tasks.filter(t => t.status === 'COMPLETED').length || 0,
+        pending_tasks: tasks.filter(t => t.status === 'PENDING').length || 0,
+        total_documents: documents.length || 0,
+        total_participants: 0,
         recent_activity_count: recentMessages.length
       },
       recent_messages: recentMessages.map(msg => ({
         id: msg.id,
-        content: msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : ''),
+        content: msg.content?.substring(0, 100) + (msg.content?.length > 100 ? '...' : ''),
         sender: msg.sender,
         created_at: msg.created_at,
         message_type: msg.message_type
@@ -598,26 +671,91 @@ router.delete('/:id', [
 });
 
 /**
- * GET /api/exchanges/:id/participants
- * Get exchange participants
+ * GET /api/exchanges/:id/available-members
+ * Get available users and contacts that can be added to exchange (admin/coordinator only)
  */
-router.get('/:id/participants', [
+router.get('/:id/available-members', [
   param('id').isUUID(),
-  requireResourceAccess('exchange')
+  authenticateToken,
+  requireRole(['admin', 'coordinator'])
 ], async (req, res) => {
   try {
-    const participants = await databaseService.getExchangeParticipants({
-      where: { exchangeId: req.params.id }
+    const { search = '' } = req.query;
+    
+    // Get current participants to exclude them
+    const currentParticipants = await databaseService.getExchangeParticipants({
+      where: { exchange_id: req.params.id }
     });
+    
+    const excludeUserIds = currentParticipants
+      .filter(p => p.user_id)
+      .map(p => p.user_id);
+    
+    const excludeContactIds = currentParticipants
+      .filter(p => p.contact_id)
+      .map(p => p.contact_id);
 
-    res.json({
-      participants: participants || []
-    });
+    // For Supabase, we need to use simpler queries
+    let users = [];
+    let contacts = [];
+    
+    try {
+      // Get all active users first, then filter in JavaScript
+      const allUsers = await databaseService.getUsers({
+        where: { is_active: true },
+        limit: 100
+      });
+      
+      users = (allUsers || []).filter(u => {
+        // Exclude current participants
+        if (excludeUserIds.includes(u.id)) return false;
+        
+        // Apply search filter
+        if (search) {
+          const searchLower = search.toLowerCase();
+          const fullName = `${u.first_name} ${u.last_name}`.toLowerCase();
+          const email = (u.email || '').toLowerCase();
+          return fullName.includes(searchLower) || email.includes(searchLower);
+        }
+        
+        return true;
+      }).slice(0, 20);
+
+      // Get all contacts, then filter in JavaScript
+      const allContacts = await databaseService.getContacts({
+        limit: 100
+      });
+      
+      contacts = (allContacts || []).filter(c => {
+        // Exclude current participants
+        if (excludeContactIds.includes(c.id)) return false;
+        
+        // Apply search filter
+        if (search) {
+          const searchLower = search.toLowerCase();
+          const fullName = `${c.first_name} ${c.last_name}`.toLowerCase();
+          const email = (c.email || '').toLowerCase();
+          const company = (c.company || '').toLowerCase();
+          return fullName.includes(searchLower) || email.includes(searchLower) || company.includes(searchLower);
+        }
+        
+        return true;
+      }).slice(0, 20);
+    } catch (error) {
+      console.error('Error fetching members:', error);
+      // Continue with empty arrays
+    }
+
+    res.json(transformToCamelCase({
+      available_users: users || [],
+      available_contacts: contacts || [],
+      current_participant_count: currentParticipants.length
+    }));
 
   } catch (error) {
-    console.error('Error fetching exchange participants:', error);
+    console.error('Error fetching available members:', error);
     res.status(500).json({
-      error: 'Failed to fetch participants',
+      error: 'Failed to fetch available members',
       message: error.message
     });
   }
@@ -625,13 +763,14 @@ router.get('/:id/participants', [
 
 /**
  * POST /api/exchanges/:id/participants
- * Add participant to exchange
+ * Add participant to exchange (supports existing users and email invitations)
  */
 router.post('/:id/participants', [
   param('id').isUUID(),
-  requireResourceAccess('exchange', { permission: 'manage' }),
+  requireRole(['admin', 'coordinator']), // Only admin and coordinators can add participants
   body('contact_id').optional().isUUID(),
   body('user_id').optional().isUUID(),
+  body('email').optional().isEmail(),
   body('role').isLength({ min: 1, max: 50 }),
   body('permissions').isObject()
 ], async (req, res) => {
@@ -644,44 +783,73 @@ router.post('/:id/participants', [
       });
     }
 
-    const { contact_id, user_id, role, permissions } = req.body;
+    const { contact_id, user_id, email, role, permissions } = req.body;
 
-    if (!contact_id && !user_id) {
+    // Validate that at least one identifier is provided
+    if (!contact_id && !user_id && !email) {
       return res.status(400).json({
-        error: 'Either contact_id or user_id must be provided'
+        error: 'Either contact_id, user_id, or email must be provided'
       });
     }
 
+    // If email is provided, try to find existing user or create invitation
+    let targetUserId = user_id;
+    let targetContactId = contact_id;
+    
+    if (email && !user_id && !contact_id) {
+      // Look for existing user with this email
+      const existingUser = await databaseService.getUserByEmail(email);
+      if (existingUser) {
+        targetUserId = existingUser.id;
+      } else {
+        // Look for existing contact with this email
+        const existingContact = await databaseService.getContacts({
+          where: { email: email }
+        });
+        if (existingContact && existingContact.length > 0) {
+          targetContactId = existingContact[0].id;
+        } else {
+          // Create a new contact entry for the email invitation
+          const newContact = await databaseService.createContact({
+            email: email,
+            first_name: email.split('@')[0], // Use email prefix as temporary name
+            last_name: 'Invited User',
+            company: 'Invited User', // Use company field to mark as invited
+            phone: '' // Required field
+          });
+          targetContactId = newContact.id;
+        }
+      }
+    }
+
     // Check if participant already exists
-    const existingParticipant = await ExchangeParticipant.findOne({
+    const existingParticipants = await databaseService.getExchangeParticipants({
       where: {
         exchange_id: req.params.id,
-        ...(contact_id ? { contact_id } : { user_id })
+        ...(targetContactId ? { contact_id: targetContactId } : { user_id: targetUserId })
       }
     });
 
-    if (existingParticipant) {
+    if (existingParticipants && existingParticipants.length > 0) {
       return res.status(409).json({
         error: 'Participant already exists in this exchange'
       });
     }
 
     // Create participant
-    const participant = await ExchangeParticipant.create({
+    const participant = await databaseService.createExchangeParticipant({
       exchange_id: req.params.id,
-      contact_id,
-      user_id,
+      contact_id: targetContactId,
+      user_id: targetUserId,
       role,
       permissions
     });
 
-    // Load participant with associations
-    const completeParticipant = await ExchangeParticipant.findByPk(participant.id, {
-      include: [
-        { model: Contact, as: 'contact' },
-        { model: User, as: 'user', attributes: { exclude: ['password_hash', 'two_fa_secret'] } }
-      ]
+    // For Supabase, we need to load the participant with associations manually
+    const completeParticipant = await databaseService.getExchangeParticipants({
+      where: { id: participant.id }
     });
+    const participantData = completeParticipant && completeParticipant.length > 0 ? completeParticipant[0] : participant;
 
     // Log the addition
     await AuditService.log({
@@ -701,7 +869,7 @@ router.post('/:id/participants', [
 
     res.status(201).json({
       message: 'Participant added successfully',
-      participant: completeParticipant
+      participant: participantData
     });
 
   } catch (error) {
@@ -715,29 +883,49 @@ router.post('/:id/participants', [
 
 /**
  * DELETE /api/exchanges/:id/participants/:participantId
- * Remove participant from exchange
+ * Remove participant from exchange (admin/coordinator only)
  */
 router.delete('/:id/participants/:participantId', [
   param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
   param('participantId').isUUID().withMessage('Participant ID must be a valid UUID'),
   authenticateToken,
-  requireResourceAccess('exchange', { permission: 'edit' })
+  requireRole(['admin', 'coordinator']) // Only admin and coordinators can remove participants
 ], async (req, res) => {
   try {
-    const participant = await ExchangeParticipant.findOne({
+    // Find the participant to remove
+    const participants = await databaseService.getExchangeParticipants({
       where: {
         id: req.params.participantId,
         exchange_id: req.params.id
       }
     });
 
-    if (!participant) {
+    if (!participants || participants.length === 0) {
       return res.status(404).json({
         error: 'Participant not found'
       });
     }
 
-    await participant.destroy();
+    const participant = participants[0];
+
+    // Prevent removing the last admin/coordinator from exchange
+    if (['admin', 'coordinator'].includes(participant.role)) {
+      const adminParticipants = await databaseService.getExchangeParticipants({
+        where: {
+          exchange_id: req.params.id,
+          role: ['admin', 'coordinator']
+        }
+      });
+      
+      if (adminParticipants.length <= 1) {
+        return res.status(400).json({
+          error: 'Cannot remove the last coordinator from this exchange'
+        });
+      }
+    }
+
+    // Remove the participant (using soft delete for Supabase)
+    await databaseService.deleteExchangeParticipant(req.params.participantId);
 
     // Log participant removal
     await AuditService.log({
@@ -997,8 +1185,8 @@ router.get('/:id/tasks', [
 ], async (req, res) => {
   try {
     const tasks = await databaseService.getTasks({
-      where: { exchangeId: req.params.id },
-      orderBy: { column: 'dueDate', ascending: true }
+      where: { exchange_id: req.params.id },
+      orderBy: { column: 'due_date', ascending: true }
     });
 
     res.json(transformToCamelCase({
@@ -1021,13 +1209,12 @@ router.get('/:id/tasks', [
  */
 router.get('/:id/documents', [
   param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
-  authenticateToken,
-  requireResourceAccess('exchange', { permission: 'view' })
+  authenticateToken
 ], async (req, res) => {
   try {
     const documents = await databaseService.getDocuments({
-      where: { exchangeId: req.params.id },
-      orderBy: { column: 'createdAt', ascending: false }
+      where: { exchange_id: req.params.id },
+      orderBy: { column: 'created_at', ascending: false }
     });
 
     res.json(transformToCamelCase({
@@ -1050,8 +1237,7 @@ router.get('/:id/documents', [
  */
 router.get('/:id/audit-logs', [
   param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
-  authenticateToken,
-  requireResourceAccess('exchange', { permission: 'view' })
+  authenticateToken
 ], async (req, res) => {
   try {
     const auditLogs = await AuditService.getAuditLogs({
@@ -1086,17 +1272,97 @@ async function buildExchangeWhereClause(user, filters) {
 
   // Role-based filtering
   if (user.role === 'client') {
-    // Clients can only see exchanges they're involved in
-    const userContact = await Contact.findOne({ where: { user_id: user.id } });
-    if (userContact) {
-      whereClause.client_id = userContact.id;
+    // Use the user's linked contact_id directly
+    if (user.contact_id) {
+      console.log(`✅ User ${user.email} has linked contact: ${user.contact_id}`);
+      
+      // Find exchanges where this contact is either the primary client or a participant
+      const participants = await databaseService.getExchangeParticipants({
+        where: { contact_id: user.contact_id }
+      });
+        
+        const exchangeIds = participants.map(p => p.exchange_id);
+        console.log(`📋 Contact is participant in ${exchangeIds.length} exchanges`);
+        
+        // Include exchanges where they are the primary client OR a participant
+        if (exchangeIds.length > 0) {
+          whereClause[Op.or] = [
+            { client_id: user.contact_id },
+            { id: { [Op.in]: exchangeIds } }
+          ];
+        } else {
+          // Only show exchanges where they are the primary client
+          whereClause.client_id = user.contact_id;
+        }
     } else {
-      // If no contact record, user sees nothing
-      whereClause.id = null;
+      // FALLBACK: Try to find contact by email (for backward compatibility)
+      try {
+        const contacts = await databaseService.getContacts({ where: { email: user.email } });
+        const contact = contacts && contacts.length > 0 ? contacts[0] : null;
+        
+        if (contact) {
+          console.log(`⚠️ Found contact by email for ${user.email}: ${contact.id} - User should be linked!`);
+          
+          // Update the user with the contact_id for future requests
+          await databaseService.updateUser(user.id, { contact_id: contact.id });
+          
+          // Continue with the logic
+          const participants = await databaseService.getExchangeParticipants({
+            where: { contact_id: contact.id }
+          });
+          
+          const exchangeIds = participants.map(p => p.exchange_id);
+          
+          if (exchangeIds.length > 0) {
+            whereClause[Op.or] = [
+              { client_id: contact.id },
+              { id: { [Op.in]: exchangeIds } }
+            ];
+          } else {
+            whereClause.client_id = contact.id;
+          }
+        } else {
+          // If no contact found, show no exchanges
+          whereClause.id = null; // This ensures no exchanges are returned
+          console.log(`❌ No contact found for client user: ${user.email}`);
+        }
+      } catch (error) {
+        console.error('Error finding contact for client:', error);
+        whereClause.id = null; // Show no exchanges on error
+      }
     }
   } else if (user.role === 'coordinator') {
     // Coordinators see assigned exchanges
     whereClause.coordinator_id = user.id;
+  } else if (user.role === 'third_party' || user.role === 'agency') {
+    // Third parties and agencies see exchanges they participate in
+    if (user.contact_id) {
+      // Find exchanges where their contact is a participant
+      const participants = await databaseService.getExchangeParticipants({
+        where: { contact_id: user.contact_id }
+      });
+      
+      const exchangeIds = participants.map(p => p.exchange_id);
+      
+      if (exchangeIds.length > 0) {
+        whereClause.id = { [Op.in]: exchangeIds };
+      } else {
+        whereClause.id = null; // No exchanges
+      }
+    } else {
+      // Check by user_id in participants
+      const participants = await databaseService.getExchangeParticipants({
+        where: { user_id: user.id }
+      });
+      
+      const exchangeIds = participants.map(p => p.exchange_id);
+      
+      if (exchangeIds.length > 0) {
+        whereClause.id = { [Op.in]: exchangeIds };
+      } else {
+        whereClause.id = null; // No exchanges
+      }
+    }
   }
   // Admin and staff see all exchanges (filtered by other criteria only)
 

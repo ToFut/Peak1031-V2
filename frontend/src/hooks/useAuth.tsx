@@ -30,13 +30,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         const token = localStorage.getItem('token');
         if (token) {
+          console.log('🔐 Found stored token, verifying...');
+          
+          // First check if token is structurally valid
+          try {
+            const tokenParts = token.split('.');
+            if (tokenParts.length !== 3) {
+              throw new Error('Invalid token format');
+            }
+            
+            // Decode payload to check expiry
+            const payload = JSON.parse(atob(tokenParts[1]));
+            console.log('🔍 Token payload:', { userId: payload.userId, email: payload.email, exp: payload.exp });
+            
+            if (payload.exp && payload.exp < Date.now() / 1000) {
+              throw new Error('Token expired');
+            }
+          } catch (tokenError: any) {
+            console.log('❌ Token is malformed or expired:', tokenError?.message || 'Unknown error');
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            setUser(null);
+            setLoading(false);
+            return;
+          }
+          
           // Verify token with backend and get user data
           const userData = await apiService.getCurrentUser();
+          console.log('✅ Token valid, user:', userData.email);
           setUser(userData);
+        } else {
+          console.log('🔐 No stored token found');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error initializing auth:', error);
-        // Clear invalid tokens immediately
+        // Clear tokens on any auth error
+        console.log('🔑 Clearing invalid tokens due to error:', error.message);
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
         setUser(null);

@@ -1,4 +1,4 @@
-const { Message, User, Exchange } = require('../models');
+const { Message, User, Exchange, Contact } = require('../models');
 
 class MessageService {
   constructor(io) {
