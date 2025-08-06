@@ -3,11 +3,25 @@ const { createClient } = require('@supabase/supabase-js');
 const { transformToCamelCase, transformApiResponse } = require('../utils/caseTransform');
 const router = express.Router();
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+// Initialize Supabase client with error handling
+let supabase;
+try {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+    console.error('❌ Supabase environment variables not found:');
+    console.error('SUPABASE_URL:', process.env.SUPABASE_URL ? 'Set' : 'Missing');
+    console.error('SUPABASE_SERVICE_KEY:', process.env.SUPABASE_SERVICE_KEY ? 'Set' : 'Missing');
+    throw new Error('Supabase environment variables are required');
+  }
+  
+  supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_KEY
+  );
+  console.log('✅ Supabase client initialized successfully');
+} catch (error) {
+  console.error('❌ Failed to initialize Supabase client:', error.message);
+  // Don't throw here - let the routes handle the error gracefully
+}
 
 /**
  * GET /api/exchanges/test
@@ -15,6 +29,13 @@ const supabase = createClient(
  */
 router.get('/test', async (req, res) => {
   try {
+    if (!supabase) {
+      return res.status(500).json({
+        error: 'Supabase client not initialized',
+        message: 'Check environment variables SUPABASE_URL and SUPABASE_SERVICE_KEY'
+      });
+    }
+
     const { count, error } = await supabase
       .from('exchanges')
       .select('*', { count: 'exact', head: true });
@@ -53,6 +74,14 @@ router.get('/', async (req, res) => {
       page = 1, 
       limit = 20 
     } = req.query;
+
+    // Check if Supabase client is initialized
+    if (!supabase) {
+      return res.status(500).json({
+        error: 'Database service unavailable',
+        message: 'Supabase client not initialized. Check environment variables.'
+      });
+    }
 
     // Try Supabase first
     try {

@@ -1,5 +1,5 @@
-// Load environment variables from .env file
-require('dotenv').config();
+// Load environment variables from .env file in the parent directory
+require('dotenv').config({ path: '../.env' });
 
 const express = require('express');
 const http = require('http');
@@ -570,7 +570,7 @@ class PeakServer {
       console.log('✅ Server ready (Supabase mode)');
 
       // Start server
-      const PORT = process.env.PORT || 5000;
+      const PORT = process.env.PORT || 5001;
       this.server.listen(PORT, async () => {
         console.log(`🚀 Peak 1031 Server running on port ${PORT}`);
         console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
