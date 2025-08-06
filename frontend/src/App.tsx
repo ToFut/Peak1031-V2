@@ -7,14 +7,15 @@ import ConnectionStatus from './components/ConnectionStatus';
 import DebugPanel from './components/DebugPanel';
 
 // Pages
-// OLD: import Login from './pages/Login';
-// NEW V2-style import (testing Login migration)
+// V2-style auth import
 import Login from './features/auth/pages/Login';
-import AdminDashboard from './pages/EnhancedAdminDashboard';
-import ClientDashboard from './pages/EnhancedClientDashboard';
-import CoordinatorDashboard from './pages/EnhancedCoordinatorDashboard';
-import ThirdPartyDashboard from './pages/ThirdPartyDashboard';
-import AgencyDashboard from './pages/AgencyDashboard';
+
+// NEW: Standardized dashboard components with consistent UX
+import AdminDashboard from './components/dashboard/StandardizedAdminDashboard';
+import ClientDashboard from './components/dashboard/StandardizedClientDashboard';
+import CoordinatorDashboard from './components/dashboard/StandardizedCoordinatorDashboard';
+import ThirdPartyDashboard from './components/dashboard/StandardizedThirdPartyDashboard';
+import AgencyDashboard from './components/dashboard/StandardizedAgencyDashboard';
 // OLD: import Messages from './pages/Messages';
 // NEW V2-style import (testing Messages migration)
 import Messages from './features/messages/pages/Messages';
