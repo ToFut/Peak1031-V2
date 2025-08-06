@@ -1,0 +1,972 @@
+{
+  "passed": 6,
+  "failed": 3,
+  "total": 9,
+  "details": [
+    {
+      "endpoint": "/api/health",
+      "method": "GET",
+      "status": 200,
+      "success": true,
+      "response": {
+        "status": "healthy",
+        "api": "online",
+        "timestamp": "2025-08-06T16:41:14.744Z"
+      },
+      "error": null,
+      "timestamp": "2025-08-06T16:41:14.764Z"
+    },
+    {
+      "endpoint": "/api",
+      "method": "GET",
+      "status": 200,
+      "success": true,
+      "response": {
+        "name": "Peak 1031 Exchange Platform API",
+        "version": "1.0.0",
+        "documentation": "/api/docs",
+        "endpoints": {
+          "auth": "/api/auth",
+          "legacy-auth": "/api/auth/legacy",
+          "contacts": "/api/contacts",
+          "exchanges": "/api/exchanges",
+          "tasks": "/api/tasks",
+          "documents": "/api/documents",
+          "messages": "/api/messages",
+          "notifications": "/api/notifications",
+          "exports": "/api/exports",
+          "sync": "/api/sync",
+          "admin": "/api/admin"
+        }
+      },
+      "error": null,
+      "timestamp": "2025-08-06T16:41:14.771Z"
+    },
+    {
+      "endpoint": "/api/debug/users",
+      "method": "GET",
+      "status": 200,
+      "success": true,
+      "response": {
+        "success": true,
+        "users": [
+          {
+            "id": "2df8ea64-a15f-4ce8-ad6b-f893257a85b8",
+            "email": "rosalee@capitalforesight.com",
+            "first_name": "",
+            "last_name": "The Capital Foresight",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "17a5ffbb-5579-40e8-a3a5-63d29dfa6aa0",
+            "email": "john@biggbusiness.com",
+            "first_name": "",
+            "last_name": "Bedder Management, LLC",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "8e22d174-b917-45b8-a13a-39318174dff1",
+            "email": "rdavidoff@davidofflaw.com",
+            "first_name": "",
+            "last_name": "BMB Investment Corp.",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "7bd2820b-9127-42ac-96ee-ca732b505a4a",
+            "email": "amy@kingabstract.com",
+            "first_name": "Amy",
+            "last_name": "Gunter",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "a429d8dc-d704-4a70-a2f9-bda2a88d034b",
+            "email": "unknown_f44c4818-123c-40d8-b5dc-0a30c98ca4ca@example.com",
+            "first_name": "",
+            "last_name": "",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "1044109a-faee-486d-b03f-3f2827526453",
+            "email": "unknown_01974fdb-95fc-41b9-8780-ef97efbe636f@example.com",
+            "first_name": "",
+            "last_name": "NORTH AMERICAN TITLE GROUP",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "60b17fe3-06cc-4492-8658-d24d98ed57fe",
+            "email": "unknown_5f5b6a66-cd9d-4ebf-9b61-262efc20b9d9@example.com",
+            "first_name": "",
+            "last_name": "Accommodator Finance Company",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "f1313c39-96ba-4e4f-82be-decbbefff890",
+            "email": "escrowdivision@aol.com",
+            "first_name": "",
+            "last_name": "American Eagle Escrow",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "1feff2ea-ca84-4b97-875f-fd8072990926",
+            "email": "tedbosley@yahoo.com",
+            "first_name": "",
+            "last_name": "Bosley",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "3a939fff-7e51-417e-8538-ccd74faa8374",
+            "email": "unknown_aade04c4-53be-40f9-ba57-1510222ddb9f@example.com",
+            "first_name": "",
+            "last_name": "Dora",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "830a9b56-7a53-4e00-8601-1a2ca39e564f",
+            "email": "mellsworth@fahtco.com",
+            "first_name": "",
+            "last_name": "FIRST AMERICAN HERITAGE TITLE",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "7bc066e9-cfcc-48e0-a7b0-6cdfb87f1b97",
+            "email": "unknown_af802125-794d-4064-82fe-c1cb8b418aa1@example.com",
+            "first_name": "",
+            "last_name": "GLENOAKS ESCROW",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "64e6698d-135c-4fd7-8f94-1b6c4d388f82",
+            "email": "unknown_84bfb7cc-5195-4632-857b-5896c545ea5d@example.com",
+            "first_name": "",
+            "last_name": "GOLDSTAR REALTY",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "01df6192-1a18-40d7-8156-868587c16ad0",
+            "email": "sosik@rbescrow.com",
+            "first_name": "",
+            "last_name": "Law Office of Olga Moretti",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "614d4c28-442a-44ed-a322-0fa884e4afab",
+            "email": "mireyar@mbescrow.com",
+            "first_name": "",
+            "last_name": "MB ESCROW",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "bf84fd27-c73d-4a26-ad5c-7e0f6340a0e8",
+            "email": "unknown_fe62a3b3-b036-4e9c-b7ee-a363410e4791@example.com",
+            "first_name": "",
+            "last_name": "INTERVALLEY ESCROW",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "7b301311-6465-4558-9aa9-ac4b6fa4ac80",
+            "email": "FESCARIO@ORTC.COM",
+            "first_name": "",
+            "last_name": "OLD REPUBLIC TITLE & ESCROW OF HAWAII,",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "081c4611-b0d3-4a40-af34-76236ced325c",
+            "email": "erik@oldtownescrow.com",
+            "first_name": "",
+            "last_name": "Old Town Escrow",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "4fb3613f-cda0-425b-a45c-9e343ffc54f0",
+            "email": "unknown_31460d1f-e65d-4ebb-a693-adc0a6c24253@example.com",
+            "first_name": "",
+            "last_name": "PACIFIC INTEGRATED CAPITAL ESCROW DIVION",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "b5db213c-9694-43f5-8e31-4307d39acac1",
+            "email": "unknown_8d170f32-4625-4501-8e8f-5f1639b24964@example.com",
+            "first_name": "",
+            "last_name": "Reunion Title",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "8f629159-4986-43e9-9919-2b8cb2ae8e4e",
+            "email": "unknown_64a3c830-4e70-4d6a-a59e-afaf7216049e@example.com",
+            "first_name": "",
+            "last_name": "SHERWOOD ESCROW",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "73a8327a-b483-451d-955b-e594382f6433",
+            "email": "alexkrin@firstteam.com",
+            "first_name": "Alex",
+            "last_name": "Krin",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "7d899cb9-64b4-414f-98c0-2b335f8d1ed9",
+            "email": "mhoberman@yahoo.com",
+            "first_name": "",
+            "last_name": "Chariton Garth Apts,LLC",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "a8d38134-ea43-4b5b-abd8-7f8a10984353",
+            "email": "bcoffman@fnf.com",
+            "first_name": "",
+            "last_name": "FIDELITY NATIONAL TITLE COMPANY",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "656a3e19-b037-48a7-9a8f-2237cf397f3f",
+            "email": "unknown_6c90625a-f4e4-447b-8a3d-09102320a1de@example.com",
+            "first_name": "",
+            "last_name": "Yehezkel",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "2f3b19b2-3a4b-4373-905b-a99996b9d060",
+            "email": "unknown_6a218be4-7957-47ff-a5ec-1d48d1de8e53@example.com",
+            "first_name": "",
+            "last_name": "",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "c44be022-6883-44d4-83cb-171310cf0e1c",
+            "email": "unknown_cf0791eb-71a3-4958-8b2d-2988bbde2c88@example.com",
+            "first_name": "",
+            "last_name": "",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "94aa6ff2-771d-4c87-b7b6-c77c379e80c4",
+            "email": "cheldani@ctt.com",
+            "first_name": "",
+            "last_name": "ChelDani Team",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "3a16bb1f-76a3-4fe6-8ddb-f67019c40939",
+            "email": "unknown_cba11ec1-7f10-4781-a3ab-90dbdce83cab@example.com",
+            "first_name": "",
+            "last_name": "",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "dff9ab7a-4906-4870-a636-77df3340df55",
+            "email": "ajskorneck@live.com",
+            "first_name": "A. Jeffrey",
+            "last_name": "Skorneck",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "a8c6659d-85c0-481c-9f3b-7fa088406ff5",
+            "email": "unknown_75173c9d-8bf2-4a23-9f5d-c7537ee4272d@example.com",
+            "first_name": "A.C.",
+            "last_name": "Escrow  Inc.",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "2aeb679a-b50e-4e14-ada5-449439585d94",
+            "email": "ajtartt@landam.com",
+            "first_name": "A.J.",
+            "last_name": "Tartt",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "6fd1e9f3-51b1-447d-855a-d56449afbeca",
+            "email": "bermanshrira@att.net",
+            "first_name": "Aaron",
+            "last_name": "Shrira",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "f396d2d7-251d-4e1d-a49e-f2c5f25f3ad7",
+            "email": "aaron.anderson@cbre.com",
+            "first_name": "Aaron",
+            "last_name": "Anderson",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "ba737df1-51b3-4b90-b90e-668ba286213f",
+            "email": "unknown_91239b53-7fa6-416a-8135-7136c9094d1f@example.com",
+            "first_name": "Aaron",
+            "last_name": "Robertshaw",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "87899d2c-72a3-4180-b775-ea71386f6abd",
+            "email": "aaron@dxbind.com",
+            "first_name": "Aaron",
+            "last_name": "Menche",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "b5244c1f-ed93-4f02-afd2-7c730348c675",
+            "email": "unknown_00eaf22c-612d-4a02-9d94-389ec5a71ff1@example.com",
+            "first_name": "Alex",
+            "last_name": "Lindig",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "ac19f37e-a0ae-4430-9fa2-fcc58fe8c955",
+            "email": "Ana.Morales@PortfolioEscrow.com",
+            "first_name": "Ana",
+            "last_name": "Morales",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "2ae2b51b-b1ed-40fc-81f9-dde656504c09",
+            "email": "Aaron.Bean@fntg.com",
+            "first_name": "Aaron",
+            "last_name": "Bean",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "29c6d70b-b11f-498e-92b7-c9890520c499",
+            "email": "aortega7004@gmail.com",
+            "first_name": "Aaron",
+            "last_name": "Ortega",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "cedb088a-3a65-487b-80dc-9572d4a571ad",
+            "email": "alopez@premieroneescrow.com",
+            "first_name": "Ana",
+            "last_name": "Lopez",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "0b4e49db-73aa-4441-aec1-680e9063c7ef",
+            "email": "ab.tovar@chartertitle.com",
+            "first_name": "AB",
+            "last_name": "Tovar",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "67ad551a-52a9-40f6-ba6f-3e1762e6db8b",
+            "email": "Aba@mariposaictc.com",
+            "first_name": "Aba",
+            "last_name": "Monroy",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "65404e12-4e0b-4106-8012-2e1e6cb4fadf",
+            "email": "abbegreen@sbcglobal.net",
+            "first_name": "Abbe",
+            "last_name": "Green",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "d22c1094-81e6-4a9a-8aa5-27bb385dece1",
+            "email": "shifmanalan@msn.com",
+            "first_name": "Alan",
+            "last_name": "Shifman",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "17869a5c-3a94-4546-8cf2-7cbe81b76d21",
+            "email": "abbi@atlastitle.com",
+            "first_name": "Abbi",
+            "last_name": "Phillips",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "77bae665-2965-42e9-a790-1f34f81934e0",
+            "email": "unknown_c1e0688e-1f7d-4885-aa8c-f29edb5bacb6@example.com",
+            "first_name": "Abbott",
+            "last_name": "Antin",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "032a71ed-deb5-4fa4-b645-53e8618c57b6",
+            "email": "alawson@esigntitle.com",
+            "first_name": "Abby",
+            "last_name": "Lawson",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "c4a90efd-9a59-409e-9f0a-233635680ac7",
+            "email": "abdi@acelegal.com",
+            "first_name": "Abdi",
+            "last_name": "Mohammed",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "1690f580-2637-4bb4-9e90-316c1939bd85",
+            "email": "unknown_1aacc392-5062-484a-8530-f2ece85781d0@example.com",
+            "first_name": "Abdul H.",
+            "last_name": "Faouri",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "cb11ecb3-f0cd-40bc-9906-7a1633fdd252",
+            "email": "singhaj4@gmail.com",
+            "first_name": "Abhaijeet",
+            "last_name": "Singh",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "135ae60d-6c36-4a76-ad75-5102224d798a",
+            "email": "ananddesai@aol.com",
+            "first_name": "Anand",
+            "last_name": "Desai",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "0b0c7f32-6792-4bf5-b489-85327789fbd9",
+            "email": "nabid26@yahoo.com",
+            "first_name": "Abid",
+            "last_name": "Hussain",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "43f1f2af-64fb-4ea0-bb26-809dc8ee1ba0",
+            "email": "Abigail.Boley@pioneertitleagency.com",
+            "first_name": "Abigail",
+            "last_name": "Boley",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "e6a22fb5-ebf8-4d93-9e2f-fc406b39da74",
+            "email": "adaguilar@firstam.com",
+            "first_name": "Adriana",
+            "last_name": "Aguilar",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "c8e732a2-a422-426c-a946-651e087d72ca",
+            "email": "AES5678@AOL.COM",
+            "first_name": "Abraham E.",
+            "last_name": "Sylvia",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "4bde290c-5f49-402f-af36-bff29964f84b",
+            "email": "rodriguezlegal@hotmail.com",
+            "first_name": "Ada",
+            "last_name": "Rodriguez",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "3c31f784-9110-46cf-a052-9a97a2730c76",
+            "email": "ada@castleheadescrows.com",
+            "first_name": "Ada M.",
+            "last_name": "Flores",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "6bf0f95a-9b05-4525-aa6f-e7c56f5da8de",
+            "email": "alanterry@kw.com",
+            "first_name": "Alan",
+            "last_name": "Terry",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "ab50153b-5357-4d8e-a329-d7aebd55ace3",
+            "email": "adam.daneshgar@cbre.com",
+            "first_name": "Adam",
+            "last_name": "Daneshgar",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "4de780d7-b362-4be8-bc16-0d88f6648808",
+            "email": "adam.deierling@cbre.com",
+            "first_name": "Adam",
+            "last_name": "Deierling",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "dcc6b715-6eb2-481e-8184-bc4d7024242e",
+            "email": "adam@nadiasescrow.com",
+            "first_name": "Adam",
+            "last_name": "Musavvir",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "ee74a8ea-141b-44db-8112-9f070a0f010f",
+            "email": "aullsmith@hltco.com",
+            "first_name": "Andie",
+            "last_name": "Ullsmith",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "cabed2aa-13f6-4f20-b965-f4973888ce79",
+            "email": "unknown_def9d8a4-65cb-4f8a-9c05-c57ff2f74d64@example.com",
+            "first_name": "",
+            "last_name": "FIDELITY NATIONAL TITLE INS COMPANY",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "e1953bf0-c68f-4be7-aacc-ea09311407fc",
+            "email": "dakota@pcatc.org",
+            "first_name": "",
+            "last_name": "",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "a4c5c4a5-054c-496e-8c50-8610fcd71ff4",
+            "email": "BMyers@CoastCitiesEscrow.com",
+            "first_name": "",
+            "last_name": "Barbara",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "c2f2835a-169a-4c0a-857f-bf335b3c2b8d",
+            "email": "amybitton@kw.com",
+            "first_name": "Amy",
+            "last_name": "Ickovics",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "aad22bcc-978c-4341-a155-a84ea5ee622e",
+            "email": "ana@anescrow.com",
+            "first_name": "Ana",
+            "last_name": "Ortega",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "79a4deb6-7901-4f75-a9a7-10a87ee0a337",
+            "email": "AGunning@firstam.com",
+            "first_name": "Amy",
+            "last_name": "Gunning",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "e8e1b5b7-79c6-4058-83a7-407d89892e2f",
+            "email": "analuisamorales@msn.com",
+            "first_name": "Ana Luisa",
+            "last_name": "Morales",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "6d1dc20a-70de-4157-9bfb-b0572c0b523d",
+            "email": "lienfung3@yahoo.com",
+            "first_name": "Anchalee",
+            "last_name": "Sukolchairerngrithi",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "00e84e76-74c5-4ac2-8198-72d7ff3dd614",
+            "email": "andre_automotive@yahoo.com",
+            "first_name": "Andre",
+            "last_name": "Petrossian",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "8f6261ea-8e06-4877-ab5c-95ab9ab6488b",
+            "email": "coordinator@peak1031.com",
+            "first_name": "Exchange",
+            "last_name": "Coordinator",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "5d8cd54b-9eee-4d76-878b-3694e6665775",
+            "email": "client@peak1031.com",
+            "first_name": "Client",
+            "last_name": "User",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "3d0fdc05-b59b-4489-a983-d10a3a4afeda",
+            "email": "agency@peak1031.com",
+            "first_name": "Agency",
+            "last_name": "User",
+            "role": "agency",
+            "is_active": true
+          },
+          {
+            "id": "8b470c17-9433-45e5-be8e-2b14beb82a70",
+            "email": "thirdparty@peak1031.com",
+            "first_name": "Third",
+            "last_name": "Party",
+            "role": "third_party",
+            "is_active": true
+          },
+          {
+            "id": "12134f94-f3b1-4379-a97b-6f96d5804683",
+            "email": "amayo67@gmail.com",
+            "first_name": "Aaron",
+            "last_name": "Mayoral",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "9c4b1e9a-8ff4-4730-ace9-5c8cceab3b8e",
+            "email": "adasyang@yahoo.com",
+            "first_name": "Ada S.",
+            "last_name": "Yang-Cheong",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "dea7c902-6011-4bb1-a2f1-07c1276bd9b4",
+            "email": "aklute@dbllaw.com",
+            "first_name": "Amy",
+            "last_name": "Klute",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "b9e573cd-9f74-476a-944b-a016d18c9542",
+            "email": "unknown_5afa0e7a-dfdb-4dda-8b3c-31a090493cf4@example.com",
+            "first_name": "Anatoly",
+            "last_name": "Sedler",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "eded0420-08b7-430e-9e98-484592ea1d24",
+            "email": "unknown_ca860301-6a37-4356-b424-629a2e27e9b8@example.com",
+            "first_name": "",
+            "last_name": "",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "81e8d413-ae27-4810-be94-cff6026aac59",
+            "email": "Darci@firstamsd.com",
+            "first_name": "",
+            "last_name": "",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "d3af6a77-6766-435f-8313-a3be252f269f",
+            "email": "admin@peak1031.com",
+            "first_name": "System",
+            "last_name": "Administrator",
+            "role": "admin",
+            "is_active": true
+          },
+          {
+            "id": "763bd620-a059-4b45-9930-bc12e7219ea1",
+            "email": "unknown_2ac1ca81-8829-4765-8d2f-9f5c98562f01@example.com",
+            "first_name": "",
+            "last_name": "NORTH AMERICAN TITLE GROUP",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "d7e118d6-63d9-4628-abc0-e121d75bf567",
+            "email": "teamsteph@prominentescrow.com",
+            "first_name": "Abigail",
+            "last_name": "Adams",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "5b7b216e-37d7-487d-bb69-d09e57e7c7b3",
+            "email": "agonzalez@nat.com",
+            "first_name": "Ada",
+            "last_name": "Gonzalez",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "42e37d79-4e7a-4d7c-aacc-78cbbdb92de3",
+            "email": "avaughan@marinersescrow.com",
+            "first_name": "Adam",
+            "last_name": "Vaughan",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "53aadc14-bbc0-4696-9006-e1b32a4f6516",
+            "email": "Amy.Duffield@pioneertitleagency.com",
+            "first_name": "Amy",
+            "last_name": "Duffield",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "7409e5fa-2209-4597-ad26-9bc4b2db2cf1",
+            "email": "amy@ridgegateescrow.com",
+            "first_name": "Amy",
+            "last_name": "Chong",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "ecfe5e65-232c-4342-b4e9-dd88c7e2ed2d",
+            "email": "amysusanne@hotmail.com",
+            "first_name": "Amy",
+            "last_name": "Moccardini",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "568b16c2-b344-4b3c-b8ef-f58f3b7b4b7e",
+            "email": "asmusselman@cltic.com",
+            "first_name": "Amy",
+            "last_name": "Musselman",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "ded43237-b326-4820-ba62-87301cf868d3",
+            "email": "amyk@legendaryescrow.com",
+            "first_name": "Amy",
+            "last_name": "King",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "64b0b894-d4e0-4f4e-9394-dbd33419ce48",
+            "email": "avidal@premescrow.com",
+            "first_name": "Ana",
+            "last_name": "Vidal",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "cbd3e7a0-7f20-4a78-a962-2b46fbcdfe7b",
+            "email": "taso@lockarate.com",
+            "first_name": "Anastasios",
+            "last_name": "Nikolaou",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "edf92151-c4a8-456c-9639-b76df2a3a83f",
+            "email": "agnlac@msn.com",
+            "first_name": "Anatoly",
+            "last_name": "Neyman",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "f903908e-b325-434b-b95e-d59a52857673",
+            "email": "amendoza@stewart.com",
+            "first_name": "Andrea",
+            "last_name": "Mendoza",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "b5c406b3-87b5-4ec6-9011-23e493f75dbc",
+            "email": "scouch@landtitlenv.com",
+            "first_name": "",
+            "last_name": "LAND TITLE OF NEVADA, INC.",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "0d7e5cb6-5b63-44ea-a68c-b3b405699e56",
+            "email": "mgilbert@lonestartitle.com",
+            "first_name": "",
+            "last_name": "LONE START TITLE COMPANY OF EL PASO",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "9e093019-2e95-4aea-ad0f-f3bbaed417c4",
+            "email": "apena@sepulvedaescrow.net",
+            "first_name": "",
+            "last_name": "Sepulveda Escrow Corporation",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "bbfbd730-adfd-48d7-809d-36b2c441267c",
+            "email": "Aaronmthom@gmail.com",
+            "first_name": "Aaron",
+            "last_name": "Thom",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "4755bfd3-b463-4d96-8ade-c47893ef338b",
+            "email": "afinders@aresmgmt.com",
+            "first_name": "Aaron",
+            "last_name": "Finders",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "be730246-3582-4441-b874-a9eb8c3fe955",
+            "email": "Palprops1714@gmail.com",
+            "first_name": "Abby",
+            "last_name": "Jenson",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "939b9c55-550e-41e4-8b2c-25fabb0fbe2d",
+            "email": "aazcorp@aol.com",
+            "first_name": "Abdulali",
+            "last_name": "Mithani",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "60b34c6f-b35f-491c-8b50-f82b36485a8a",
+            "email": "unknown_effb4772-97aa-472d-98ff-3f14842c2266@example.com",
+            "first_name": "ABE",
+            "last_name": "Miller",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "52e686a4-24b9-4a9a-b741-a439c851c644",
+            "email": "tmc.gc@verizon.net",
+            "first_name": "",
+            "last_name": "714 Ocampo Drive, LLC",
+            "role": "client",
+            "is_active": true
+          }
+        ]
+      },
+      "error": null,
+      "timestamp": "2025-08-06T16:41:15.303Z"
+    },
+    {
+      "endpoint": "/api/debug/token",
+      "method": "GET",
+      "status": 200,
+      "success": true,
+      "response": {
+        "success": false,
+        "error": "No token provided"
+      },
+      "error": null,
+      "timestamp": "2025-08-06T16:41:15.310Z"
+    },
+    {
+      "endpoint": "/api/auth/login",
+      "method": "POST",
+      "status": 200,
+      "success": true,
+      "response": {
+        "user": {
+          "id": "d3af6a77-6766-435f-8313-a3be252f269f",
+          "email": "admin@peak1031.com",
+          "first_name": "Admin",
+          "last_name": "User",
+          "role": "admin",
+          "is_active": true,
+          "email_verified": true,
+          "two_fa_enabled": false,
+          "last_login": "2025-08-06T16:41:16.010Z"
+        },
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJkM2FmNmE3Ny02NzY2LTQzNWYtODMxMy1hM2JlMjUyZjI2OWYiLCJlbWFpbCI6ImFkbWluQHBlYWsxMDMxLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc1NDQ5ODQ3NiwiZXhwIjoxNzU0NDk5Mzc2LCJhdWQiOiJwZWFrMTAzMS11c2VycyIsImlzcyI6InBlYWsxMDMxIn0.rxMQgNxc5bb1GFdgWvY8KpJnYCvu_4sK9OzSLdwGEE0",
+        "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJkM2FmNmE3Ny02NzY2LTQzNWYtODMxMy1hM2JlMjUyZjI2OWYiLCJlbWFpbCI6ImFkbWluQHBlYWsxMDMxLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc1NDQ5ODQ3NiwiZXhwIjoxNzU1MTAzMjc2LCJhdWQiOiJwZWFrMTAzMS11c2VycyIsImlzcyI6InBlYWsxMDMxIn0.jvSWDdCazmpdDw-mXT5QAmXsLJ7es9B7IL4HM57piHc"
+      },
+      "error": null,
+      "timestamp": "2025-08-06T16:41:16.013Z"
+    },
+    {
+      "endpoint": "/api/auth/logout",
+      "method": "POST",
+      "status": 200,
+      "success": true,
+      "response": {
+        "message": "Logged out successfully"
+      },
+      "error": null,
+      "timestamp": "2025-08-06T16:41:16.021Z"
+    },
+    {
+      "endpoint": "/api/contacts",
+      "method": "GET",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-06T16:41:16.027Z"
+    },
+    {
+      "endpoint": "/api/exchanges",
+      "method": "GET",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-06T16:41:16.033Z"
+    },
+    {
+      "endpoint": "/api/exchanges?page=1&limit=10",
+      "method": "GET",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-06T16:41:16.037Z"
+    }
+  ]
+}

@@ -186,47 +186,56 @@ class SupabaseService {
         throw new Error(error.message);
       }
 
-      // Transform the data to match expected format
-      // Manually fetch related data for each exchange
-      const exchangesWithData = [];
-      for (const exchange of (data || [])) {
-        // Fetch client data
-        let client = null;
-        if (exchange.client_id) {
-          const { data: clientData } = await this.client
+      // For performance, return exchanges without related data when fetching many
+      // Frontend can fetch details when needed
+      const exchanges = data || [];
+      
+      // Only fetch related data for small result sets (< 10 exchanges)
+      if (exchanges.length <= 10 && exchanges.length > 0) {
+        // Batch fetch all client and coordinator IDs
+        const clientIds = [...new Set(exchanges.filter(e => e.client_id).map(e => e.client_id))];
+        const coordinatorIds = [...new Set(exchanges.filter(e => e.coordinator_id).map(e => e.coordinator_id))];
+        
+        let clientsMap = {};
+        let coordinatorsMap = {};
+        
+        // Fetch all clients in one query
+        if (clientIds.length > 0) {
+          const { data: clients } = await this.client
             .from('contacts')
             .select('id, first_name, last_name, email, company')
-            .eq('id', exchange.client_id)
-            .single();
-          client = clientData;
+            .in('id', clientIds);
+          
+          if (clients) {
+            clientsMap = clients.reduce((acc, client) => {
+              acc[client.id] = client;
+              return acc;
+            }, {});
+          }
         }
-
-        // Fetch coordinator data  
-        let coordinator = null;
-        if (exchange.coordinator_id) {
-          const { data: coordData } = await this.client
-            .from('contacts')
+        
+        // Fetch all coordinators in one query
+        if (coordinatorIds.length > 0) {
+          const { data: coordinators } = await this.client
+            .from('users')
             .select('id, first_name, last_name, email')
-            .eq('id', exchange.coordinator_id)
-            .single();
-          coordinator = coordData;
+            .in('id', coordinatorIds);
+          
+          if (coordinators) {
+            coordinatorsMap = coordinators.reduce((acc, coord) => {
+              acc[coord.id] = coord;
+              return acc;
+            }, {});
+          }
         }
-
-        // Fetch participants
-        const { data: participants } = await this.client
-          .from('exchange_participants')
-          .select('id, role, permissions, user_id, contact_id')
-          .eq('exchange_id', exchange.id);
-
-        exchangesWithData.push({
-          ...exchange,
-          client,
-          coordinator,
-          exchangeParticipants: participants || []
-        });
+        
+        // Add related data to exchanges
+        for (let exchange of exchanges) {
+          exchange.client = clientsMap[exchange.client_id] || null;
+          exchange.coordinator = coordinatorsMap[exchange.coordinator_id] || null;
+          exchange.exchangeParticipants = []; // Skip participants for performance
+        }
       }
-      
-      const exchanges = exchangesWithData;
 
       console.log(`✅ Fetched ${exchanges.length} exchanges with participants`);
       return exchanges;

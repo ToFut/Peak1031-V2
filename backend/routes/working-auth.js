@@ -43,44 +43,34 @@ router.post('/login', [
       if (!error && supabaseUser && session) {
         console.log(`✅ Supabase authentication successful for: ${email}`);
         
-        // Sync/create user in local database
-        let localUser = await User.findOne({ where: { email } });
+        // Get user details from database (not Supabase users table)
+        const dbUser = await databaseService.getUserByEmail(email);
         
-        if (!localUser) {
-          console.log(`Creating local user for: ${email}`);
-          localUser = await User.create({
-            id: supabaseUser.id,
-            email: supabaseUser.email,
-            passwordHash: 'supabase_managed',
-            firstName: supabaseUser.user_metadata?.first_name || 'Admin',
-            lastName: supabaseUser.user_metadata?.last_name || 'User',
-            role: supabaseUser.user_metadata?.role || 'admin',
-            isActive: true,
-            emailVerified: true
-          });
+        if (!dbUser) {
+          console.log('❌ User not found in database after Supabase auth');
+          return res.status(401).json({ error: 'User not found in database' });
         }
-
-        // Update last login
-        await localUser.update({ lastLogin: new Date() });
-
-        // Generate local JWT tokens
-        const { token, refreshToken } = AuthService.generateTokens(localUser);
+        
+        console.log('✅ User found in database:', dbUser.email, 'ID:', dbUser.id);
+        
+        // Generate local JWT tokens using the database user
+        const { token, refreshToken } = AuthService.generateTokens(dbUser);
 
         console.log(`✅ Login successful for: ${email}`);
 
         return res.json({
           user: {
-            id: localUser.id,
-            email: localUser.email,
-            first_name: localUser.firstName,
-            last_name: localUser.lastName,
-            role: localUser.role,
-            is_active: localUser.isActive,
-            email_verified: localUser.emailVerified,
-            two_fa_enabled: localUser.twoFaEnabled || false,
-            last_login: localUser.lastLogin,
-            created_at: localUser.createdAt,
-            updated_at: localUser.updatedAt
+            id: dbUser.id,
+            email: dbUser.email,
+            first_name: dbUser.first_name,
+            last_name: dbUser.last_name,
+            role: dbUser.role,
+            is_active: dbUser.is_active,
+            email_verified: dbUser.email_verified || true,
+            two_fa_enabled: dbUser.two_fa_enabled || false,
+            last_login: new Date(),
+            created_at: dbUser.created_at,
+            updated_at: dbUser.updated_at
           },
           token,
           refreshToken

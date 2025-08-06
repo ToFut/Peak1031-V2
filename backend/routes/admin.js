@@ -2,6 +2,7 @@ const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const User = require('../models/User');
+const Contact = require('../models/Contact');
 const AuditLog = require('../models/AuditLog');
 const Exchange = require('../models/Exchange');
 const Task = require('../models/Task');
@@ -23,19 +24,69 @@ router.get('/stats', authenticateToken, requireRole(['admin']), async (req, res)
         const users = await supabaseService.getUsers();
         userCount = users.length;
       } catch (supabaseError) {
-        console.log('⚠️ Falling back to local database for user count:', supabaseError.message);
-        userCount = await User.count();
+        console.log('⚠️ Could not get user count:', supabaseError.message);
+        userCount = 0;
       }
     } else {
-      userCount = await User.count();
+      userCount = 0;
+    }
+    
+    // Get exchange count from Supabase
+    let exchangeCount = 0;
+    if (supabaseService.client) {
+      try {
+        const { count } = await supabaseService.client
+          .from('exchanges')
+          .select('*', { count: 'exact', head: true });
+        exchangeCount = count || 0;
+      } catch (supabaseError) {
+        console.log('⚠️ Could not get exchange count:', supabaseError.message);
+        exchangeCount = 0;
+      }
+    } else {
+      exchangeCount = 0;
+    }
+    
+    // Get other counts from Supabase
+    let documentCount = 0;
+    let taskCount = 0;
+    let messageCount = 0;
+    
+    if (supabaseService.client) {
+      try {
+        const { count: docCount } = await supabaseService.client
+          .from('documents')
+          .select('*', { count: 'exact', head: true });
+        documentCount = docCount || 0;
+      } catch (err) {
+        console.log('Documents table not found:', err.message);
+      }
+      
+      try {
+        const { count: tCount } = await supabaseService.client
+          .from('tasks')
+          .select('*', { count: 'exact', head: true });
+        taskCount = tCount || 0;
+      } catch (err) {
+        console.log('Tasks table not found:', err.message);
+      }
+      
+      try {
+        const { count: mCount } = await supabaseService.client
+          .from('messages')
+          .select('*', { count: 'exact', head: true });
+        messageCount = mCount || 0;
+      } catch (err) {
+        console.log('Messages table not found:', err.message);
+      }
     }
     
     const stats = {
       users: userCount,
-      exchanges: await Exchange.count(),
-      documents: await Document.count(),
-      tasks: await Task.count(),
-      messages: await Message.count()
+      exchanges: exchangeCount,
+      documents: documentCount,
+      tasks: taskCount,
+      messages: messageCount
     };
 
     res.json({ data: stats });
@@ -55,19 +106,69 @@ router.get('/dashboard-stats', authenticateToken, requireRole(['admin']), async 
         const users = await supabaseService.getUsers();
         userCount = users.length;
       } catch (supabaseError) {
-        console.log('⚠️ Falling back to local database for user count:', supabaseError.message);
-        userCount = await User.count();
+        console.log('⚠️ Could not get user count:', supabaseError.message);
+        userCount = 0;
       }
     } else {
-      userCount = await User.count();
+      userCount = 0;
+    }
+    
+    // Get exchange count from Supabase
+    let exchangeCount = 0;
+    if (supabaseService.client) {
+      try {
+        const { count } = await supabaseService.client
+          .from('exchanges')
+          .select('*', { count: 'exact', head: true });
+        exchangeCount = count || 0;
+      } catch (supabaseError) {
+        console.log('⚠️ Could not get exchange count:', supabaseError.message);
+        exchangeCount = 0;
+      }
+    } else {
+      exchangeCount = 0;
+    }
+    
+    // Get other counts from Supabase
+    let documentCount = 0;
+    let taskCount = 0;
+    let messageCount = 0;
+    
+    if (supabaseService.client) {
+      try {
+        const { count: docCount } = await supabaseService.client
+          .from('documents')
+          .select('*', { count: 'exact', head: true });
+        documentCount = docCount || 0;
+      } catch (err) {
+        console.log('Documents table not found:', err.message);
+      }
+      
+      try {
+        const { count: tCount } = await supabaseService.client
+          .from('tasks')
+          .select('*', { count: 'exact', head: true });
+        taskCount = tCount || 0;
+      } catch (err) {
+        console.log('Tasks table not found:', err.message);
+      }
+      
+      try {
+        const { count: mCount } = await supabaseService.client
+          .from('messages')
+          .select('*', { count: 'exact', head: true });
+        messageCount = mCount || 0;
+      } catch (err) {
+        console.log('Messages table not found:', err.message);
+      }
     }
     
     const stats = {
       users: userCount,
-      exchanges: await Exchange.count(),
-      documents: await Document.count(),
-      tasks: await Task.count(),
-      messages: await Message.count()
+      exchanges: exchangeCount,
+      documents: documentCount,
+      tasks: taskCount,
+      messages: messageCount
     };
 
     res.json({ data: stats });
@@ -98,17 +199,61 @@ router.get('/users', authenticateToken, requireRole(['admin']), async (req, res)
           if (status) options.where.is_active = status === 'active';
         }
 
-        // Use the 'people' table which has all users
+        // Get users from 'people' table and associated contacts
         const users = await supabaseService.select('people', options);
         
+        // Get contacts for each user (where user_id matches)
+        const contactsMap = {};
+        if (users.length > 0) {
+          try {
+            const contacts = await supabaseService.select('contacts', {
+              where: {
+                user_id: { in: users.map(u => u.id) }
+              }
+            });
+            
+            // Group contacts by user_id
+            contacts.forEach(contact => {
+              if (!contactsMap[contact.user_id]) {
+                contactsMap[contact.user_id] = [];
+              }
+              contactsMap[contact.user_id].push(contact);
+            });
+          } catch (contactError) {
+            console.log('⚠️ Could not fetch contacts:', contactError.message);
+          }
+        }
+        
+        // Merge user and contact data, prioritizing contact email over placeholder
+        const usersWithContacts = users.map(user => {
+          const contacts = contactsMap[user.id] || [];
+          const primaryContact = contacts.find(c => c.is_primary) || contacts[0] || null;
+          
+          return {
+            ...user,
+            // Use contact email if user email is placeholder
+            email: (user.email && !user.email.includes('@imported.com')) 
+              ? user.email 
+              : (primaryContact?.email || user.email),
+            // Use contact name if available
+            first_name: primaryContact?.firstName || user.first_name,
+            last_name: primaryContact?.lastName || user.last_name,
+            phone: primaryContact?.phone || user.phone,
+            contacts: contacts,
+            primaryContact: primaryContact
+          };
+        });
+        
         // Apply search filter on the results if needed
-        let filteredUsers = users;
+        let filteredUsers = usersWithContacts;
         if (search) {
           const searchLower = search.toLowerCase();
-          filteredUsers = users.filter(user => 
+          filteredUsers = usersWithContacts.filter(user => 
             user.first_name?.toLowerCase().includes(searchLower) ||
             user.last_name?.toLowerCase().includes(searchLower) ||
-            user.email?.toLowerCase().includes(searchLower)
+            user.email?.toLowerCase().includes(searchLower) ||
+            user.primaryContact?.company?.toLowerCase().includes(searchLower) ||
+            user.primaryContact?.contact_type?.toLowerCase().includes(searchLower)
           );
         }
 
@@ -147,13 +292,45 @@ router.get('/users', authenticateToken, requireRole(['admin']), async (req, res)
 
     const users = await User.findAndCountAll({
       where: whereClause,
+      include: [{
+        model: Contact,
+        as: 'contacts',
+        required: false, // LEFT JOIN to include users without contacts
+        attributes: [
+          'id', 'firstName', 'lastName', 'email', 'phone', 'company', 
+          'position', 'contactType', 'addressStreet', 'addressCity', 
+          'addressState', 'addressZip', 'source', 'tags', 'notes', 
+          'preferredContactMethod', 'isPrimary', 'ppData', 'relatedExchanges'
+        ]
+      }],
       order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
       offset: (page - 1) * limit
     });
 
+    // Transform data to match frontend expectations
+    const transformedUsers = users.rows.map(user => {
+      const userData = user.toJSON();
+      const contacts = userData.contacts || [];
+      const primaryContact = contacts.find(c => c.isPrimary) || contacts[0] || null;
+      
+      return {
+        ...userData,
+        // Use contact email if user email is placeholder
+        email: (userData.email && !userData.email.includes('@imported.com')) 
+          ? userData.email 
+          : (primaryContact?.email || userData.email),
+        // Use contact name if available  
+        first_name: primaryContact?.firstName || userData.firstName,
+        last_name: primaryContact?.lastName || userData.lastName,
+        phone: primaryContact?.phone || userData.phone,
+        contacts: contacts,
+        primaryContact: primaryContact
+      };
+    });
+
     res.json({
-      data: users.rows,
+      data: transformedUsers,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),

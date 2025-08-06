@@ -135,7 +135,7 @@ router.get('/:id/tasks', [
  */
 router.get('/', [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+  query('limit').optional().isInt({ min: 1, max: 5000 }).withMessage('Limit must be between 1 and 5000'),
   query('status').optional().isIn(['PENDING', '45D', '180D', 'COMPLETED', 'TERMINATED', 'ON_HOLD']),
   query('priority').optional().isIn(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
   query('search').optional().isLength({ min: 1, max: 100 }),
