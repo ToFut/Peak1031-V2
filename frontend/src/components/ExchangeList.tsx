@@ -144,7 +144,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // const { user } = useAuth(); // Unused variable
+  const { user } = useAuth();
   const { isAdmin, isCoordinator } = usePermissions();
   const navigate = useNavigate();
 
@@ -192,7 +192,37 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
       setLoading(true);
       setError(null);
       
-      // Use smart API to fetch data
+      // For admin users, fetch ALL exchanges directly from Supabase
+      if (user?.role === 'admin') {
+        try {
+          // Try to get Supabase client from the service
+          const { createClient } = await import('@supabase/supabase-js');
+          const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+          const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+          
+          if (supabaseUrl && supabaseKey) {
+            const supabase = createClient(supabaseUrl, supabaseKey);
+            
+            // Fetch ALL exchanges for admin (no limit)
+            const { data, error } = await supabase
+              .from('exchanges')
+              .select('*')
+              .order('created_at', { ascending: false });
+            
+            if (error) throw error;
+            
+            if (data) {
+              console.log(`✅ Admin loaded ${data.length} exchanges directly from Supabase`);
+              setExchanges(data);
+              return;
+            }
+          }
+        } catch (supabaseError) {
+          console.warn('Direct Supabase fetch failed, falling back to API:', supabaseError);
+        }
+      }
+      
+      // Fallback to regular API for non-admins or if direct fetch fails
       const response = await smartApi.getExchanges();
       const exchangesData = response.exchanges || response || [];
       setExchanges(Array.isArray(exchangesData) ? exchangesData : []);
@@ -208,7 +238,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.role]);
 
   useEffect(() => {
     loadExchanges();
@@ -348,6 +378,11 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
           <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
           <p className="text-gray-600 mt-1">
             {filteredExchanges.length} of {exchanges.length} exchanges
+            {user?.role === 'admin' && exchanges.length >= 100 && (
+              <span className="ml-2 text-green-600 font-semibold">
+                (Admin View - All System Exchanges)
+              </span>
+            )}
           </p>
         </div>
         

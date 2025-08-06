@@ -151,9 +151,13 @@ router.get('/', [
       });
     }
 
+    // For admins, default to showing all exchanges unless specifically limited
+    const isAdmin = req.user && req.user.role === 'admin';
+    const defaultLimit = isAdmin ? 1000 : 20;
+    
     const {
       page = 1,
-      limit = 20,
+      limit = defaultLimit,
       status,
       priority,
       search,

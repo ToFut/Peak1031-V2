@@ -829,14 +829,10 @@ router.post('/generate', async (req, res) => {
       });
     }
 
-    // Get exchange info with related data
+    // Get exchange info - simplified query without joins
     const { data: exchange, error: exchangeError } = await supabase
       .from('exchanges')
-      .select(`
-        *,
-        client:clientId(*),
-        coordinator:coordinatorId(*)
-      `)
+      .select('*')
       .eq('id', exchange_id)
       .single();
 
@@ -1266,30 +1262,38 @@ router.post('/check-auto-generation', async (req, res) => {
 
 // Helper function to build replacement data with #field# format
 function buildReplacementData(exchange, additionalData = {}) {
+  // Try to get client data from various possible fields
+  const clientName = exchange.client_name || exchange.clientName || '';
+  const clientFirstName = exchange.client?.firstName || exchange.client?.first_name || '';
+  const clientLastName = exchange.client?.lastName || exchange.client?.last_name || '';
+  const clientEmail = exchange.client?.email || exchange.client_email || '';
+  const clientPhone = exchange.client?.phone || exchange.client_phone || '';
+  const clientCompany = exchange.client?.company || exchange.client_company || '';
+  
   const data = {
     // Matter/Exchange fields
-    '#Matter.Number#': exchange.exchangeNumber || exchange.id,
-    '#Matter.Name#': exchange.exchangeName || exchange.name || '',
+    '#Matter.Number#': exchange.exchange_number || exchange.exchangeNumber || exchange.id,
+    '#Matter.Name#': exchange.exchange_name || exchange.exchangeName || exchange.name || '',
     '#Exchange.ID#': exchange.id,
-    '#Exchange.Number#': exchange.exchangeNumber || '',
-    '#Exchange.Name#': exchange.exchangeName || exchange.name || '',
-    '#Exchange.Type#': exchange.exchangeType || '',
+    '#Exchange.Number#': exchange.exchange_number || exchange.exchangeNumber || '',
+    '#Exchange.Name#': exchange.exchange_name || exchange.exchangeName || exchange.name || '',
+    '#Exchange.Type#': exchange.exchange_type || exchange.exchangeType || '',
     '#Exchange.Status#': exchange.status || '',
-    '#Exchange.Value#': formatCurrency(exchange.exchangeValue),
+    '#Exchange.Value#': formatCurrency(exchange.exchange_value || exchange.exchangeValue),
     
     // Client fields
-    '#Client.Name#': '',
-    '#Client.FirstName#': '',
-    '#Client.LastName#': '',
-    '#Client.Email#': '',
-    '#Client.Phone#': '',
-    '#Client.Company#': '',
+    '#Client.Name#': clientName || `${clientFirstName} ${clientLastName}`.trim() || 'N/A',
+    '#Client.FirstName#': clientFirstName || 'N/A',
+    '#Client.LastName#': clientLastName || 'N/A',
+    '#Client.Email#': clientEmail || 'N/A',
+    '#Client.Phone#': clientPhone || 'N/A',
+    '#Client.Company#': clientCompany || 'N/A',
     
     // Property fields
-    '#Property.Address#': exchange.propertyAddress || exchange.relinquishedPropertyAddress || '',
-    '#Property.RelinquishedAddress#': exchange.relinquishedPropertyAddress || '',
-    '#Property.SalePrice#': formatCurrency(exchange.relinquishedSalePrice || exchange.relinquishedValue),
-    '#Property.ReplacementValue#': formatCurrency(exchange.replacementValue),
+    '#Property.Address#': exchange.property_address || exchange.propertyAddress || exchange.relinquished_property_address || exchange.relinquishedPropertyAddress || '',
+    '#Property.RelinquishedAddress#': exchange.relinquished_property_address || exchange.relinquishedPropertyAddress || '',
+    '#Property.SalePrice#': formatCurrency(exchange.relinquished_sale_price || exchange.relinquishedSalePrice || exchange.relinquished_value || exchange.relinquishedValue),
+    '#Property.ReplacementValue#': formatCurrency(exchange.replacement_value || exchange.replacementValue),
     
     // Financial fields
     '#Financial.ExchangeValue#': formatCurrency(exchange.exchangeValue),

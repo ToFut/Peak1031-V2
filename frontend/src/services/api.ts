@@ -182,7 +182,21 @@ class ApiService {
   }
 
   async getExchanges(): Promise<Exchange[]> {
-    const response = await this.request<any>('/exchanges');
+    // Check if user is admin to request all exchanges
+    const userStr = localStorage.getItem('user');
+    let limit = '20';
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.role === 'admin') {
+          limit = '1000'; // Admin gets all exchanges
+        }
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+    }
+    
+    const response = await this.request<any>(`/exchanges?limit=${limit}`);
     // Handle both array response and paginated response
     if (Array.isArray(response)) {
       return response;
