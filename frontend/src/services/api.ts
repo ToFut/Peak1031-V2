@@ -690,6 +690,192 @@ class ApiService {
 
     return response.blob();
   }
+
+  // ===========================================
+  // V2 DASHBOARD ENDPOINTS (High Value!)
+  // ===========================================
+
+  /**
+   * Get comprehensive dashboard overview in single call
+   * Replaces multiple separate API calls
+   */
+  async getDashboardOverview(): Promise<{
+    exchanges: { total: number; active: number; completed: number };
+    users: { total: number; active: number };
+    tasks: { total: number; pending: number; completed: number };
+  }> {
+    return this.get('/dashboard/overview');
+  }
+
+  /**
+   * Get exchange performance metrics
+   */
+  async getExchangeMetrics(): Promise<{
+    total: number;
+    active: number;
+    completed: number;
+    pending: number;
+  }> {
+    return this.get('/dashboard/exchange-metrics');
+  }
+
+  /**
+   * Get upcoming 1031 exchange deadlines (CRITICAL for compliance)
+   */
+  async getDeadlines(): Promise<{
+    deadlines: Array<{
+      id: string;
+      type: '45-day' | '180-day';
+      deadline: string;
+      exchangeName: string;
+      daysRemaining?: number;
+    }>;
+  }> {
+    return this.get('/dashboard/deadlines');
+  }
+
+  /**
+   * Get financial summary across all exchanges
+   */
+  async getFinancialSummary(): Promise<{
+    totalValue: number;
+    completedValue: number;
+    pendingValue: number;
+    averageExchangeValue: number;
+  }> {
+    return this.get('/dashboard/financial-summary');
+  }
+
+  /**
+   * Get recent activity feed
+   */
+  async getRecentActivity(): Promise<{
+    activities: Array<{
+      id: string;
+      type: string;
+      description: string;
+      timestamp: string;
+      userId?: string;
+      exchangeId?: string;
+    }>;
+  }> {
+    return this.get('/dashboard/recent-activity');
+  }
+
+  /**
+   * Get system alerts and notifications
+   */
+  async getAlerts(): Promise<{
+    alerts: Array<{
+      id: string;
+      type: 'deadline' | 'compliance' | 'system';
+      level: 'info' | 'warning' | 'error' | 'critical';
+      message: string;
+      exchangeId?: string;
+      deadline?: string;
+      read: boolean;
+    }>;
+  }> {
+    return this.get('/dashboard/alerts');
+  }
+
+  /**
+   * Get user activity tracking
+   */
+  async getUserActivity(): Promise<{
+    activity: Array<{
+      action: string;
+      timestamp: string;
+      details?: any;
+    }>;
+  }> {
+    return this.get('/dashboard/user-activity');
+  }
+
+  // ===========================================
+  // ENHANCED EXCHANGE MANAGEMENT
+  // ===========================================
+
+  /**
+   * Get exchange workflow status and available actions
+   */
+  async getExchangeWorkflow(exchangeId: string): Promise<{
+    currentStage: string;
+    availableActions: string[];
+    nextStages: string[];
+    requirements: string[];
+    progress: number;
+  }> {
+    return this.get(`/exchanges/${exchangeId}/workflow`);
+  }
+
+  // ===========================================
+  // ENHANCED NOTIFICATIONS
+  // ===========================================
+
+  /**
+   * Update notification preferences
+   */
+  async updateNotificationPreferences(preferences: {
+    email: boolean;
+    sms: boolean;
+    deadlineAlerts: boolean;
+    taskAssignments: boolean;
+    exchangeUpdates: boolean;
+  }): Promise<any> {
+    return this.post('/notifications/preferences', preferences);
+  }
+
+  // ===========================================
+  // ENHANCED SECURITY & AUDIT
+  // ===========================================
+
+  /**
+   * Get user permissions for RBAC
+   */
+  async getUserPermissions(): Promise<{
+    role: string;
+    permissions: string[];
+  }> {
+    return this.get('/auth/permissions');
+  }
+
+  /**
+   * Get comprehensive audit logs with filters
+   */
+  async getAuditLogsFiltered(filters?: {
+    entityType?: string;
+    entityId?: string;
+    userId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<{
+    auditLogs: AuditLog[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+    };
+  }> {
+    const queryParams = filters ? '?' + new URLSearchParams(filters).toString() : '';
+    return this.get(`/audit-logs${queryParams}`);
+  }
+
+  // Utility methods
+  getAuthType(): string {
+    return localStorage.getItem('authType') || 'local';
+  }
+
+  isAuthenticated(): boolean {
+    return !!localStorage.getItem('token');
+  }
+
+  getCurrentUserId(): string | null {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return null;
+    const user = JSON.parse(userStr);
+    return user.id;
+  }
 }
 
 export const apiService = new ApiService();

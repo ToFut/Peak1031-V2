@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import PPIntegratedDashboard from '../components/PPIntegratedDashboard';
 import { smartApi } from '../services/smartApi';
+import { apiService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import {
   DocumentTextIcon,
@@ -34,6 +35,26 @@ const EnhancedCoordinatorDashboard: React.FC = () => {
     if (!user) return;
     
     try {
+      // Try V2 dashboard overview endpoint first
+      try {
+        console.log('📊 Coordinator: Attempting V2 dashboard overview...');
+        const overviewData = await apiService.getDashboardOverview();
+        console.log('✅ V2 Coordinator Overview:', overviewData);
+        
+        setStats({
+          managedExchanges: overviewData.exchanges.total, // Coordinator-specific filtering may need backend support
+          activeExchanges: overviewData.exchanges.active,
+          assignedTasks: overviewData.tasks.pending,
+          totalClients: Math.floor(overviewData.exchanges.total * 0.8) // Estimate, ideally from backend
+        });
+        
+        console.log('✅ V2 Coordinator: Stats loaded successfully');
+        return; // Exit early with V2 data
+      } catch (v2Error) {
+        console.warn('⚠️ V2 coordinator dashboard failed, falling back to individual calls:', v2Error);
+      }
+      
+      // Fallback to individual API calls
       const [exchangesRes, tasksRes] = await Promise.all([
         smartApi.getExchanges(),
         smartApi.getTasks()

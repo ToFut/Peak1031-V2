@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { apiService } from '../services/api';
 import Layout from '../components/Layout';
-import { ExchangeChatBox } from '../components/ExchangeChatBox';
+import { ExchangeChatBox } from '../features/messages/components/ExchangeChatBox';
 import {
   ArrowLeft, Clock, AlertCircle, CheckCircle, TrendingUp,
   Users, FileText, MessageSquare, BarChart3, Settings,

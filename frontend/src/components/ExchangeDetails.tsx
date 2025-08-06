@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Exchange, Task, Document } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { apiService } from '../services/api';
-import { ExchangeChatBox } from './ExchangeChatBox';
+import { ExchangeChatBox } from '../features/messages/components/ExchangeChatBox';
 import { TaskBoard } from './TaskBoard';
 import {
   ArrowLeftIcon,

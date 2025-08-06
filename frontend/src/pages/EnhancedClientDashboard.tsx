@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { smartApi } from '../services/smartApi';
+import { apiService } from '../services/api';
 import { ExchangeCard } from '../components/ExchangeCard';
 import {
   DocumentTextIcon,
@@ -67,6 +68,73 @@ const EnhancedClientDashboard: React.FC = () => {
     
     setLoading(true);
     try {
+      // Try V2 dashboard overview endpoint first
+      try {
+        console.log('📊 Client: Attempting V2 dashboard overview...');
+        const overviewData = await apiService.getDashboardOverview();
+        console.log('✅ V2 Client Overview:', overviewData);
+        
+        // Set basic stats from V2 data (client-specific filtering may need backend support)
+        setStats({
+          exchanges: {
+            total: overviewData.exchanges.total,
+            active: overviewData.exchanges.active,
+            completed: overviewData.exchanges.completed,
+            pending: Math.max(0, overviewData.exchanges.total - overviewData.exchanges.active - overviewData.exchanges.completed)
+          },
+          tasks: {
+            total: overviewData.tasks.total,
+            urgent: 0, // Will need overdue tasks endpoint
+            thisWeek: overviewData.tasks.pending,
+            completed: overviewData.tasks.completed
+          },
+          documents: {
+            total: 0, // Will need documents API
+            requireSignature: 0,
+            recent: 0
+          },
+          messages: {
+            unread: 0, // Will need messages API
+            recent: 0
+          }
+        });
+        
+        // Still need to get actual exchanges and tasks for display
+        const [exchangesRes, tasksRes] = await Promise.all([
+          smartApi.getExchanges(),
+          smartApi.getTasks()
+        ]);
+        
+        const allExchanges = exchangesRes.exchanges || exchangesRes || [];
+        const allTasks = tasksRes.tasks || tasksRes || [];
+        
+        // Filter for client's data
+        const myExchanges = allExchanges.filter((ex: any) => {
+          if (ex.clientId === user.id) return true;
+          if (ex.coordinatorId === user.id) return true;
+          if (ex.exchangeParticipants) {
+            return ex.exchangeParticipants.some((p: any) => 
+              p.contact?.email === user.email || p.user?.id === user.id
+            );
+          }
+          return false;
+        });
+        
+        const myTasks = allTasks.filter((task: any) => 
+          task.assignedTo === user.id || 
+          myExchanges.some((ex: any) => ex.id === task.exchangeId)
+        );
+        
+        setExchanges(myExchanges);
+        setTasks(myTasks);
+        
+        console.log('✅ V2 Client: Data loaded successfully');
+        return; // Exit early with V2 data
+      } catch (v2Error) {
+        console.warn('⚠️ V2 client dashboard failed, falling back to individual calls:', v2Error);
+      }
+      
+      // Fallback to individual API calls
       const [exchangesRes, tasksRes] = await Promise.all([
         smartApi.getExchanges(),
         smartApi.getTasks()

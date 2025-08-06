@@ -7,24 +7,48 @@ import ConnectionStatus from './components/ConnectionStatus';
 import DebugPanel from './components/DebugPanel';
 
 // Pages
-import Login from './pages/Login';
+// OLD: import Login from './pages/Login';
+// NEW V2-style import (testing Login migration)
+import Login from './features/auth/pages/Login';
 import AdminDashboard from './pages/EnhancedAdminDashboard';
 import ClientDashboard from './pages/EnhancedClientDashboard';
 import CoordinatorDashboard from './pages/EnhancedCoordinatorDashboard';
 import ThirdPartyDashboard from './pages/ThirdPartyDashboard';
 import AgencyDashboard from './pages/AgencyDashboard';
-import Messages from './pages/Messages';
-import Exchanges from './pages/Exchanges';
+// OLD: import Messages from './pages/Messages';
+// NEW V2-style import (testing Messages migration)
+import Messages from './features/messages/pages/Messages';
+// OLD: import Exchanges from './pages/Exchanges';
+// NEW V2-style import (testing Exchanges migration)
+import Exchanges from './features/exchanges/pages/Exchanges';
 import ExchangeDetailsPage from './pages/ExchangeDetailsPage';
-import Tasks from './pages/Tasks';
-import Contacts from './pages/Contacts';
-import Documents from './pages/Documents';
-import Users from './pages/Users';
-import Reports from './pages/Reports';
-import Settings from './pages/Settings';
-import Profile from './pages/Profile';
-import Preferences from './pages/Preferences';
-import AuthTest from './pages/AuthTest';
+// OLD: import Tasks from './pages/Tasks';
+// NEW V2-style import (testing Tasks migration)
+import Tasks from './features/tasks/pages/Tasks';
+// OLD: import Contacts from './pages/Contacts';
+// NEW V2-style import (testing Contacts migration)
+import Contacts from './features/contacts/pages/Contacts';
+// OLD: import Documents from './pages/Documents';
+// NEW V2-style import (testing Documents migration)
+import Documents from './features/documents/pages/Documents';
+// OLD: import Users from './pages/Users';
+// NEW V2-style import (testing Users migration)  
+import Users from './features/users/pages/Users';
+// OLD: import Reports from './pages/Reports';
+// NEW V2-style import (testing Reports migration)
+import Reports from './features/reports/pages/Reports';
+// OLD: import Settings from './pages/Settings';
+// NEW V2-style import (testing Settings migration)
+import Settings from './features/settings/pages/Settings';
+// OLD: import Profile from './pages/Profile';
+// OLD: import Preferences from './pages/Preferences';
+
+// NEW V2-style imports (testing migration)
+import Profile from './features/settings/pages/Profile';
+import Preferences from './features/settings/pages/Preferences';
+// OLD: import AuthTest from './pages/AuthTest';
+// NEW V2-style import (testing AuthTest migration)
+import AuthTest from './features/auth/pages/AuthTest';
 import TemplateManager from './components/TemplateManager';
 import TemplateDocumentManager from './pages/TemplateDocumentManager';
 

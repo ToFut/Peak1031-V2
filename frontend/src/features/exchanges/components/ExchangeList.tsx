@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Exchange } from '../types';
-import { smartApi } from '../services/smartApi';
-import { useAuth } from '../hooks/useAuth';
-import { usePermissions } from '../hooks/usePermissions';
+import { Exchange } from '../../../types';
+import { smartApi } from '../../../services/smartApi';
+import { useAuth } from '../../../hooks/useAuth';
+import { usePermissions } from '../../../hooks/usePermissions';
 import { ExchangeCard } from './ExchangeCard';
-import ModernDropdown from './ui/ModernDropdown';
+import ModernDropdown from './ModernDropdown';
 import { VirtualizedList } from './VirtualizedList';
 import {
   Search,

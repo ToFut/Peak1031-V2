@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { usePermissions } from '../hooks/usePermissions';
 import { apiService } from '../services/api';
 import Layout from '../components/Layout';
-import { ExchangeChatBox } from '../components/ExchangeChatBox';
+import { ExchangeChatBox } from '../features/messages/components/ExchangeChatBox';
 import EnterpriseParticipantsManager from '../components/EnterpriseParticipantsManager';
 import {
   ArrowLeft,

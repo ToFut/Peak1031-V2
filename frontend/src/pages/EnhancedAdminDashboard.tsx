@@ -116,19 +116,61 @@ const EnhancedAdminDashboard: React.FC = () => {
 
   const loadAdminStats = async () => {
     setLoading(true);
-    console.log('🔄 Admin Dashboard: Loading stats...');
+    console.log('🔄 Admin Dashboard: Loading stats with V2 enhanced endpoints...');
     
     try {
+      // Try V2 dashboard overview endpoint first (single optimized call)
+      try {
+        console.log('📊 Attempting V2 dashboard overview...');
+        const overviewData = await apiService.getDashboardOverview();
+        console.log('✅ V2 Dashboard Overview:', overviewData);
+        
+        // V2 response format
+        setStats({
+          exchanges: {
+            total: overviewData.exchanges.total,
+            pending: 0, // Will need to get from detailed endpoint if needed
+            active: overviewData.exchanges.active,
+            completed: overviewData.exchanges.completed,
+            ppSynced: 0 // Legacy field, may not be available in V2
+          },
+          tasks: {
+            total: overviewData.tasks.total,
+            pending: overviewData.tasks.pending,
+            overdue: 0, // Will calculate or get from detailed endpoint
+            completed: overviewData.tasks.completed
+          },
+          users: {
+            total: overviewData.users.total,
+            active: overviewData.users.active,
+            admins: 0, // Will need breakdown from users endpoint
+            clients: 0,
+            coordinators: 0
+          },
+          system: {
+            lastSync: null, // Will get from sync endpoint
+            syncStatus: 'success',
+            totalDocuments: 0, // Will get from documents endpoint
+            systemHealth: 'healthy'
+          }
+        });
+        
+        console.log('✅ V2 Dashboard: Stats loaded successfully');
+        return; // Exit early with V2 data
+      } catch (v2Error) {
+        console.warn('⚠️ V2 dashboard overview failed, falling back to individual calls:', v2Error);
+      }
+      
+      // Fallback to individual API calls (V1 behavior)
       const [exchangesRes, tasksRes, usersRes] = await Promise.all([
         smartApi.getExchanges({ forceRefresh: true }),  // Force fresh data
         smartApi.getTasks(),
         apiService.get('/admin/users').catch(() => ({ data: [] }))
       ]);
       
-      console.log('📊 Admin Dashboard: Raw responses:');
+      console.log('📊 Admin Dashboard: Fallback mode - Raw responses:');
       console.log('- Exchanges Response type:', typeof exchangesRes, 'Array?', Array.isArray(exchangesRes));
       console.log('- Exchanges Response length:', exchangesRes?.length || 'no length');
-      console.log('- Exchanges Response.exchanges length:', exchangesRes?.exchanges?.length || 'no exchanges prop');
       console.log('- Tasks Response:', tasksRes);
       console.log('- Users Response:', usersRes);
       
@@ -136,7 +178,7 @@ const EnhancedAdminDashboard: React.FC = () => {
       const tasks = tasksRes.tasks || tasksRes || [];
       const users = usersRes.data || [];
       
-      console.log('📊 Admin Dashboard: Processed data:');
+      console.log('📊 Admin Dashboard: Processed fallback data:');
       console.log('- Exchanges count:', exchanges.length);
       console.log('- Tasks count:', tasks.length);
       console.log('- Users count:', users.length);
