@@ -1,85 +1,76 @@
 import React from 'react';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 interface StatCardProps {
   title: string;
   value: string | number;
-  subtitle?: string;
-  icon: React.ComponentType<{ className?: string }>;
-  trend?: 'up' | 'down' | 'neutral';
-  trendValue?: string;
-  color?: 'blue' | 'green' | 'yellow' | 'red' | 'purple' | 'gray';
-  className?: string;
+  change?: number;
+  changeLabel?: string;
+  icon?: React.ReactNode;
+  color?: 'blue' | 'green' | 'red' | 'yellow' | 'purple' | 'gray';
+  onClick?: () => void;
 }
 
-const StatCard: React.FC<StatCardProps> = ({
+export const StatCard: React.FC<StatCardProps> = ({
   title,
   value,
-  subtitle,
-  icon: Icon,
-  trend,
-  trendValue,
+  change,
+  changeLabel,
+  icon,
   color = 'blue',
-  className = ''
+  onClick
 }) => {
   const colorClasses = {
-    blue: 'text-blue-600 bg-blue-50',
-    green: 'text-green-600 bg-green-50',
-    yellow: 'text-yellow-600 bg-yellow-50',
-    red: 'text-red-600 bg-red-50',
-    purple: 'text-purple-600 bg-purple-50',
-    gray: 'text-gray-600 bg-gray-50'
+    blue: 'bg-blue-100 text-blue-600',
+    green: 'bg-green-100 text-green-600',
+    red: 'bg-red-100 text-red-600',
+    yellow: 'bg-yellow-100 text-yellow-600',
+    purple: 'bg-purple-100 text-purple-600',
+    gray: 'bg-gray-100 text-gray-600'
   };
 
   const getTrendIcon = () => {
-    if (trend === 'up') return '↗';
-    if (trend === 'down') return '↘';
-    return '→';
+    if (change === undefined || change === 0) return <Minus className="w-4 h-4" />;
+    return change > 0 ? 
+      <TrendingUp className="w-4 h-4 text-green-600" /> : 
+      <TrendingDown className="w-4 h-4 text-red-600" />;
   };
 
   const getTrendColor = () => {
-    if (trend === 'up') return 'text-green-600';
-    if (trend === 'down') return 'text-red-600';
-    return 'text-gray-600';
+    if (change === undefined || change === 0) return 'text-gray-600';
+    return change > 0 ? 'text-green-600' : 'text-red-600';
   };
 
   return (
-    <div className={`bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200 hover:shadow-md transition-shadow duration-200 ${className}`}>
-      <div className="p-5">
-        <div className="flex items-center">
-          <div className="flex-shrink-0">
-            <div className={`w-10 h-10 rounded-lg ${colorClasses[color]} flex items-center justify-center`}>
-              <Icon className="w-5 h-5" />
+    <div 
+      className={`bg-white rounded-lg shadow-md p-6 ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-sm font-medium text-gray-600">{title}</span>
+        {icon && (
+          <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
+            {icon}
+          </div>
+        )}
+      </div>
+      
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="text-2xl font-bold text-gray-900">{value}</p>
+          {change !== undefined && (
+            <div className="flex items-center gap-1 mt-2">
+              {getTrendIcon()}
+              <span className={`text-sm font-medium ${getTrendColor()}`}>
+                {Math.abs(change)}%
+              </span>
+              {changeLabel && (
+                <span className="text-sm text-gray-500">{changeLabel}</span>
+              )}
             </div>
-          </div>
-          <div className="ml-5 w-0 flex-1">
-            <dl>
-              <dt className="text-sm font-medium text-gray-500 truncate">
-                {title}
-              </dt>
-              <dd className="text-2xl font-bold text-gray-900">
-                {value}
-              </dd>
-            </dl>
-          </div>
+          )}
         </div>
       </div>
-      {(subtitle || trend) && (
-        <div className="bg-gray-50 px-5 py-3">
-          <div className="text-sm flex items-center justify-between">
-            {subtitle && (
-              <span className="text-gray-600">{subtitle}</span>
-            )}
-            {trend && trendValue && (
-              <span className={`flex items-center ${getTrendColor()}`}>
-                <span className="mr-1">{getTrendIcon()}</span>
-                {trendValue}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
-
-export default StatCard;

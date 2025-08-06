@@ -10,6 +10,7 @@
     "@testing-library/user-event": "^13.5.0",
     "@types/jest": "^27.5.2",
     "@types/node": "^16.11.56",
+    "clsx": "^2.1.1",
     "lucide-react": "^0.525.0",
     "pdfjs-dist": "^5.4.54",
     "react": "^18.2.0",
@@ -20,9 +21,9 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
+    "start": "craco start",
+    "build": "craco build",
+    "test": "craco test",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -44,6 +45,7 @@
     ]
   },
   "devDependencies": {
+    "@craco/craco": "^7.1.0",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@types/react-router-dom": "^5.3.3",

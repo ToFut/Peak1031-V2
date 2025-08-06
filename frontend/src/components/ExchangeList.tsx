@@ -2,11 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Exchange } from '../types';
 import { smartApi } from '../services/smartApi';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '@/shared/hooks/useAuth';
 import { usePermissions } from '../hooks/usePermissions';
-import { ExchangeCard } from './ExchangeCard';
-import ModernDropdown from './ui/ModernDropdown';
-import { VirtualizedList } from './VirtualizedList';
+import { ExchangeCard } from '@/features/exchanges/components/ExchangeCard';
+import ModernDropdown from '@/shared/ui/components/ModernDropdown';
+import { VirtualizedList } from '@/shared/ui/components/VirtualizedList';
 import {
   Search,
   Plus,
@@ -404,7 +404,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
           </p>
         </div>
         
-        {showCreateButton && (isAdmin() || isCoordinator()) && (
+        {showCreateButton && (isAdmin || isCoordinator) && (
           <button
             onClick={handleCreateExchange}
             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"

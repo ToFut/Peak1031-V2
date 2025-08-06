@@ -52,9 +52,18 @@ class AuthService {
 
       return user;
     } catch (error) {
-      console.log('⚠️ Supabase auth failed, trying local auth:', error.message);
+      console.log('❌ AUTH SERVICE: Supabase authentication failed:', error.message);
       
-      // Fallback to local database
+      // Check if we're using Supabase - if so, don't fall back to SQLite
+      const { useSupabase } = require('../config/database');
+      
+      if (useSupabase) {
+        console.log('❌ AUTH SERVICE: In Supabase mode - no SQLite fallback available');
+        throw new Error('Invalid login credentials');
+      }
+      
+      // Only use SQLite fallback if we're not in Supabase mode
+      console.log('🔄 AUTH SERVICE: Trying SQLite fallback...');
       const user = await User.findOne({ where: { email, isActive: true } });
       
       if (!user) {

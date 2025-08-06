@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import Layout from '../components/Layout';
-import { apiService } from '../services/api';
-import { useAuth } from '../hooks/useAuth';
+import { apiService } from '@/shared/services/api';
+import { useAuth } from '@/shared/hooks/useAuth';
 import { usePermissions } from '../hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -110,14 +109,12 @@ const Users: React.FC = () => {
   // Don't load users if user is not admin
   if (!isAdmin()) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Checking permissions...</p>
-          </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Checking permissions...</p>
         </div>
-      </Layout>
+      </div>
     );
   }
 
@@ -289,24 +286,21 @@ const Users: React.FC = () => {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="space-y-4">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-gray-200 rounded-lg h-20"></div>
-            ))}
-          </div>
+      <div className="animate-pulse">
+        <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+        <div className="space-y-4">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="bg-gray-200 rounded-lg h-20"></div>
+          ))}
         </div>
-      </Layout>
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
             <p className="text-gray-600 mt-1">Manage users, roles, and permissions</p>
@@ -514,8 +508,8 @@ const Users: React.FC = () => {
           </div>
         )}
 
-        {/* Slide-in Profile Drawer */}
-        {showProfileDrawer && selectedUser && (
+      {/* Slide-in Profile Drawer */}
+      {showProfileDrawer && selectedUser && (
           <div className="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white shadow-2xl z-50 transition-transform duration-300 animate-slide-in overflow-y-auto">
             <button 
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl" 
@@ -714,18 +708,17 @@ const Users: React.FC = () => {
           </div>
         )}
 
-        {/* Error Display */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
-              <span className="text-red-800 font-medium">Error</span>
-            </div>
-            <p className="text-red-700 mt-1">{error}</p>
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-red-600" />
+            <span className="text-red-800 font-medium">Error</span>
           </div>
-        )}
-      </div>
-    </Layout>
+          <p className="text-red-700 mt-1">{error}</p>
+        </div>
+      )}
+    </div>
   );
 };
 

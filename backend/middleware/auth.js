@@ -23,7 +23,16 @@ async function authenticateToken(req, res, next) {
     }
 
     // Verify and decode token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    } catch (jwtError) {
+      console.log('❌ JWT verification failed:', jwtError.message);
+      return res.status(401).json({
+        error: 'Invalid token',
+        message: 'The provided token is malformed or invalid'
+      });
+    }
     
     // Check if token is expired
     if (decoded.exp && decoded.exp < Date.now() / 1000) {
@@ -98,21 +107,14 @@ async function authenticateToken(req, res, next) {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         error: 'Token expired',
-        message: 'Your session has expired. Please log in again.'
+        message: 'Please refresh your authentication token'
       });
     }
 
-    if (error.name === 'NotBeforeError') {
-      return res.status(401).json({
-        error: 'Token not active',
-        message: 'Token is not active yet'
-      });
-    }
-
-    console.error('Authentication error:', error);
+    console.error('❌ AUTH MIDDLEWARE: Unexpected error:', error);
     return res.status(500).json({
       error: 'Authentication error',
-      message: 'An error occurred during authentication'
+      message: 'An unexpected error occurred during authentication'
     });
   }
 }

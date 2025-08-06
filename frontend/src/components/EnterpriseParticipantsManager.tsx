@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { apiService } from '../services/api';
-import { User } from '../types';
+import { useAuth } from '@/shared/hooks/useAuth';
+import { apiService } from '@/shared/services/api';
+import { User } from '@/shared/types';
 import {
   UserPlusIcon,
   UserMinusIcon,

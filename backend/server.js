@@ -1,5 +1,5 @@
-// Load environment variables from .env file in the parent directory
-require('dotenv').config({ path: '../.env' });
+// Load environment variables from .env file in the backend directory
+require('dotenv').config();
 
 const express = require('express');
 const http = require('http');
@@ -35,6 +35,10 @@ const oauthRoutes = require('./routes/oauth');
 const exportRoutes = require('./routes/exports');
 const { router: exchangeParticipantsRoutes } = require('./routes/exchange-participants');
 const templateRoutes = require('./routes/templates');
+
+// New routes
+const userRoutes = require('./routes/users');
+const dashboardRoutes = require('./routes/dashboard-new');
 
 // Enterprise routes
 const enterpriseExchangesRoutes = require('./routes/enterprise-exchanges');
@@ -268,6 +272,11 @@ class PeakServer {
     this.app.use('/api/exports', authenticateToken, exportRoutes);
     this.app.use('/api/sync', authenticateToken, syncRoutes);
     this.app.use('/api/admin', authenticateToken, adminRoutes);
+    this.app.use('/api/users', authenticateToken, userRoutes);
+    this.app.use('/api/dashboard', authenticateToken, dashboardRoutes);
+    
+    // Additional routes
+    this.app.use('/api/exchange-participants', authenticateToken, exchangeParticipantsRoutes);
     
     // Enterprise routes
     this.app.use('/api/enterprise-exchanges', authenticateToken, enterpriseExchangesRoutes);

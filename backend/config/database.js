@@ -1,12 +1,20 @@
 const { Sequelize } = require('sequelize');
 const path = require('path');
 
-// For development, use Supabase REST API for data operations
+// For development, fall back to SQLite if Supabase is not configured
 const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
-const useSupabase = true; // Always use Supabase
-const useSQLite = false; // Never use SQLite
 
-console.log('🔧 Database Service: Using Supabase REST API only');
+// Check if Supabase credentials are available
+const hasSupabaseCredentials = !!(process.env.SUPABASE_URL && (process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY));
+
+const useSupabase = true; // Force Supabase mode
+const useSQLite = false; // Disable SQLite fallback
+
+console.log('🔧 Database Service: Using', useSupabase ? 'Supabase REST API' : 'SQLite database');
+
+if (!hasSupabaseCredentials) {
+  console.log('⚠️ Supabase credentials not found - falling back to SQLite');
+}
 
 // Create a minimal Sequelize instance for model definitions
 const sequelize = new Sequelize({

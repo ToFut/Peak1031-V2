@@ -1,0 +1,1 @@
+const axios = require("axios"); axios.post("http://localhost:5001/api/auth/login", {email: "admin@peak1031.com", password: "admin123"}).then(r => console.log("Success:", r.status)).catch(e => console.log("Error:", e.message))

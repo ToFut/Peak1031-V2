@@ -58,9 +58,16 @@ function defineAssociations() {
     foreignKey: 'user_id', 
     as: 'auditLogs' 
   });
+  User.hasMany(Contact, { 
+    foreignKey: 'userId', 
+    as: 'contacts' 
+  });
 
   // Contact associations
-  // Removed contact_id association as it doesn't exist in the database
+  Contact.belongsTo(User, { 
+    foreignKey: 'userId', 
+    as: 'user' 
+  });
   Contact.hasMany(Exchange, { 
     foreignKey: 'client_id', 
     as: 'clientExchanges' 

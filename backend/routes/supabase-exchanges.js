@@ -459,6 +459,7 @@ router.get('/:id/participants', async (req, res) => {
   try {
     console.log('🎯 PARTICIPANTS ROUTE HIT:', req.params.id);
     
+    // First get participants with contact/user relationships
     const { data: participants, error } = await supabase
       .from('exchange_participants')
       .select('*')
@@ -472,12 +473,69 @@ router.get('/:id/participants', async (req, res) => {
       });
     }
 
-    const transformedParticipants = participants.map(participant => 
-      transformApiResponse(participant)
-    );
+    // Now fetch the related contact/user details
+    const enrichedParticipants = await Promise.all(participants.map(async (participant) => {
+      let name = 'Unknown';
+      let email = '';
+      let avatar = '';
+      
+      // Try to get contact details
+      if (participant.contact_id) {
+        const { data: contact } = await supabase
+          .from('people')
+          .select('full_name, email, role')
+          .eq('id', participant.contact_id)
+          .single();
+          
+        if (contact) {
+          name = contact.full_name || 'Unknown';
+          // Filter out placeholder emails
+          if (contact.email && !contact.email.includes('@imported.com') && 
+              !contact.email.includes('@example.com') && 
+              !contact.email.includes('@placeholder.com')) {
+            email = contact.email;
+          }
+          avatar = (contact.full_name || 'U').charAt(0).toUpperCase();
+        }
+      }
+      
+      // Try to get user details if no contact
+      if (!name && participant.user_id) {
+        const { data: user } = await supabase
+          .from('users')
+          .select('first_name, last_name, email')
+          .eq('id', participant.user_id)
+          .single();
+          
+        if (user) {
+          name = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown';
+          // Filter out placeholder emails
+          if (user.email && !user.email.includes('@imported.com') && 
+              !user.email.includes('@example.com') && 
+              !user.email.includes('@placeholder.com')) {
+            email = user.email;
+          }
+          avatar = name.charAt(0).toUpperCase();
+        }
+      }
+      
+      return {
+        ...transformApiResponse(participant),
+        name,
+        email: email || 'No email available',
+        avatar,
+        status: participant.is_active ? 'active' : 'inactive',
+        permissions: {
+          canView: participant.permissions?.includes('view') || false,
+          canMessage: participant.permissions?.includes('message') || false,
+          canUpload: participant.permissions?.includes('upload') || false,
+          canManage: participant.permissions?.includes('manage') || false
+        }
+      };
+    }));
 
     res.json({
-      participants: transformedParticipants || []
+      participants: enrichedParticipants || []
     });
 
   } catch (error) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { smartApi } from '../services/smartApi';
-import { apiService } from '../services/api';
+import { smartApi } from '@/shared/services/smartApi';
+import { apiService } from '@/shared/services/api';
 
 const DebugPanel: React.FC = () => {
   const [debugInfo, setDebugInfo] = useState<any>({});
@@ -42,7 +42,7 @@ const DebugPanel: React.FC = () => {
           status: '✅ Working',
           contactsCount: smartContacts.contacts?.length || 0,
           firstContact: smartContacts.contacts?.[0] || null,
-          usingFallback: smartContacts.contacts?.[0]?._isFallback || false
+          usingFallback: (smartContacts.contacts?.[0] as any)?._isFallback || false
         };
       } catch (error: any) {
         results.smartApi = {

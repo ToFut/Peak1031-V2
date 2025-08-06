@@ -1,32 +1,34 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './hooks/useAuth';
-import { SocketProvider } from './hooks/useSocket';
-import Layout from './components/Layout';
-import ConnectionStatus from './components/ConnectionStatus';
-import DebugPanel from './components/DebugPanel';
+import { AuthProvider, useAuth } from '@/shared/hooks/useAuth';
+import { SocketProvider } from '@/shared/hooks/useSocket';
+import Layout from './shared/ui/organisms/Layout';
+import ConnectionStatus from './shared/ui/molecules/ConnectionStatus';
+import DebugPanel from './shared/ui/organisms/DebugPanel';
 
 // Pages
-import Login from './pages/Login';
-import AdminDashboard from './pages/EnhancedAdminDashboard';
-import ClientDashboard from './pages/EnhancedClientDashboard';
-import CoordinatorDashboard from './pages/EnhancedCoordinatorDashboard';
-import ThirdPartyDashboard from './pages/ThirdPartyDashboard';
-import AgencyDashboard from './pages/AgencyDashboard';
-import Messages from './pages/Messages';
-import Exchanges from './pages/Exchanges';
-import ExchangeDetailsPage from './pages/ExchangeDetailsPage';
-import Tasks from './pages/Tasks';
-import Contacts from './pages/Contacts';
-import Documents from './pages/Documents';
-import Users from './pages/Users';
-import Reports from './pages/Reports';
-import Settings from './pages/Settings';
-import Profile from './pages/Profile';
-import Preferences from './pages/Preferences';
-import AuthTest from './pages/AuthTest';
-import TemplateManager from './components/TemplateManager';
-import TemplateDocumentManager from './pages/TemplateDocumentManager';
+import Login from './features/auth/pages/Login';
+import AdminDashboard from './features/dashboard/pages/AdminDashboard';
+import ClientDashboard from './features/dashboard/pages/ClientDashboard';
+import CoordinatorDashboard from './features/dashboard/pages/CoordinatorDashboard';
+import ThirdPartyDashboard from './features/dashboard/pages/ThirdPartyDashboard';
+import AgencyDashboard from './features/dashboard/pages/AgencyDashboard';
+import Messages from './features/messages/pages/Messages';
+import Exchanges from './features/exchanges/pages/Exchanges';
+import ExchangeDetailsPage from './features/exchanges/pages/ExchangeDetailsPage';
+import Tasks from './features/tasks/pages/Tasks';
+import Contacts from './features/contacts/pages/Contacts';
+import Documents from './features/documents/pages/Documents';
+import Users from './features/users/pages/Users';
+import Reports from './features/reports/pages/Reports';
+import Settings from './features/settings/pages/Settings';
+import Profile from './features/settings/pages/Profile';
+import Preferences from './features/settings/pages/Preferences';
+import AuthTest from './features/auth/pages/AuthTest';
+import TemplateManager from './features/documents/components/TemplateManager';
+import TemplateDocumentManager from './features/documents/pages/TemplateDocumentManager';
+import AgenciesPage from './features/admin/pages/AgenciesPage';
+import DeepDivePage from './features/admin/pages/DeepDivePage';
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -100,12 +102,14 @@ const App: React.FC = () => {
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
               
-              {/* Protected Routes */}
+              {/* Protected Routes with Centralized Layout */}
               <Route 
                 path="/" 
                 element={
                   <ProtectedRoute>
-                    <Navigate to="/dashboard" replace />
+                    <Layout>
+                      <Navigate to="/dashboard" replace />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -114,7 +118,9 @@ const App: React.FC = () => {
                 path="/dashboard" 
                 element={
                   <ProtectedRoute>
-                    <DashboardRoute />
+                    <Layout>
+                      <DashboardRoute />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -124,7 +130,9 @@ const App: React.FC = () => {
                 path="/messages" 
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client', 'agency', 'third_party']}>
-                    <Messages />
+                    <Layout>
+                      <Messages />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -134,7 +142,9 @@ const App: React.FC = () => {
                 path="/exchanges" 
                 element={
                   <ProtectedRoute>
-                    <Exchanges />
+                    <Layout>
+                      <Exchanges />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -143,7 +153,9 @@ const App: React.FC = () => {
                 path="/exchanges/:id" 
                 element={
                   <ProtectedRoute>
-                    <ExchangeDetailsPage />
+                    <Layout>
+                      <ExchangeDetailsPage />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -153,7 +165,9 @@ const App: React.FC = () => {
                 path="/tasks" 
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client']}>
-                    <Tasks />
+                    <Layout>
+                      <Tasks />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -163,7 +177,9 @@ const App: React.FC = () => {
                 path="/contacts" 
                 element={
                   <ProtectedRoute>
-                    <Contacts />
+                    <Layout>
+                      <Contacts />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -173,7 +189,9 @@ const App: React.FC = () => {
                 path="/documents" 
                 element={
                   <ProtectedRoute>
-                    <Documents />
+                    <Layout>
+                      <Documents />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -183,7 +201,9 @@ const App: React.FC = () => {
                 path="/admin/users" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
-                    <Users />
+                    <Layout>
+                      <Users />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -193,17 +213,43 @@ const App: React.FC = () => {
                 path="/templates" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
-                    <TemplateDocumentManager />
+                    <Layout>
+                      <TemplateDocumentManager />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
 
               {/* Admin-specific routes */}
               <Route 
+                path="/admin/agencies" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <AgenciesPage />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              
+              <Route 
+                path="/admin/deepdive" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <DeepDivePage />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
                 path="/admin/templates" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
-                    <TemplateManager />
+                    <Layout>
+                      <TemplateManager />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
