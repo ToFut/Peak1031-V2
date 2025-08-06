@@ -178,7 +178,33 @@ class ApiService {
   }
 
   async getContacts(): Promise<Contact[]> {
-    return await this.request('/contacts');
+    // Check if user is admin to request all contacts
+    const userStr = localStorage.getItem('user');
+    let endpoint = '/contacts';
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.role === 'admin') {
+          endpoint = '/contacts?limit=2000'; // Admin gets ALL contacts
+          console.log('📊 Admin requesting all contacts');
+        }
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+    }
+    
+    const response = await this.request<any>(endpoint);
+    if (Array.isArray(response)) {
+      console.log(`✅ Received ${response.length} contacts`);
+      return response;
+    } else if (response && response.contacts) {
+      console.log(`✅ Received ${response.contacts.length} contacts`);
+      return response.contacts;
+    } else if (response && response.data) {
+      console.log(`✅ Received ${response.data.length} contacts`);
+      return response.data;
+    }
+    return [];
   }
 
   async getExchanges(): Promise<Exchange[]> {
@@ -189,7 +215,8 @@ class ApiService {
       try {
         const user = JSON.parse(userStr);
         if (user.role === 'admin') {
-          limit = '1000'; // Admin gets all exchanges
+          limit = '2000'; // Admin gets ALL exchanges (increased to ensure we get all)
+          console.log('📊 Admin requesting all exchanges with limit:', limit);
         }
       } catch (e) {
         console.error('Error parsing user data:', e);
@@ -199,8 +226,10 @@ class ApiService {
     const response = await this.request<any>(`/exchanges?limit=${limit}`);
     // Handle both array response and paginated response
     if (Array.isArray(response)) {
+      console.log(`✅ Received ${response.length} exchanges`);
       return response;
     } else if (response && response.exchanges) {
+      console.log(`✅ Received ${response.exchanges.length} exchanges`);
       return response.exchanges;
     } else {
       return [];

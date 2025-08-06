@@ -153,7 +153,7 @@ router.get('/', [
 
     // For admins, default to showing all exchanges unless specifically limited
     const isAdmin = req.user && req.user.role === 'admin';
-    const defaultLimit = isAdmin ? 1000 : 20;
+    const defaultLimit = isAdmin ? 2000 : 20; // Increased to ensure we get all exchanges
     
     const {
       page = 1,
@@ -177,6 +177,11 @@ router.get('/', [
       client_id,
       include_inactive: include_inactive === 'true'
     });
+    
+    // Log for debugging
+    if (req.user && req.user.role === 'admin') {
+      console.log(`📊 Admin ${req.user.email} requesting exchanges with limit: ${limit}`);
+    }
 
     // Build include array for associations
     const includeArray = [

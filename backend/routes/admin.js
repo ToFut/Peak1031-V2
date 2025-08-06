@@ -79,9 +79,10 @@ router.get('/dashboard-stats', authenticateToken, requireRole(['admin']), async 
 // Get all users (admin only)
 router.get('/users', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, role, status } = req.query;
+    // Admin gets all users by default (limit 1000)
+    const { page = 1, limit = 1000, search, role, status } = req.query;
     
-    // Try to get users from Supabase first
+    // Try to get users from Supabase first - use 'people' table
     if (supabaseService.client) {
       try {
         const options = {
@@ -97,7 +98,8 @@ router.get('/users', authenticateToken, requireRole(['admin']), async (req, res)
           if (status) options.where.is_active = status === 'active';
         }
 
-        const users = await supabaseService.getUsers(options);
+        // Use the 'people' table which has all users
+        const users = await supabaseService.select('people', options);
         
         // Apply search filter on the results if needed
         let filteredUsers = users;
