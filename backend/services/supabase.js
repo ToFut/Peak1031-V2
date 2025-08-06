@@ -340,11 +340,7 @@ class SupabaseService {
       
       let query = this.client
         .from('tasks')
-        .select(`
-          *,
-          exchange:exchanges(id, name, status),
-          assigned_user:users(id, first_name, last_name, email)
-        `);
+        .select('*');
 
       // Apply where conditions
       if (where.exchangeId) {

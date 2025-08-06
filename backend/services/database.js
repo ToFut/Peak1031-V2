@@ -19,18 +19,7 @@ class DatabaseService {
 
   async getUserById(id) {
     if (this.useSupabase) {
-      try {
-        const user = await supabaseService.getUserById(id);
-        if (user) {
-          return user;
-        }
-        // If not found in Supabase, fall back to Sequelize
-        console.log('🔄 User not found in Supabase, trying Sequelize fallback for ID:', id);
-        return await User.findByPk(id);
-      } catch (error) {
-        console.log('⚠️ Supabase error, falling back to Sequelize:', error.message);
-        return await User.findByPk(id);
-      }
+      return await supabaseService.getUserById(id);
     } else {
       return await User.findByPk(id);
     }
@@ -38,18 +27,7 @@ class DatabaseService {
 
   async getUserByEmail(email) {
     if (this.useSupabase) {
-      try {
-        const user = await supabaseService.getUserByEmail(email);
-        if (user) {
-          return user;
-        }
-        // If not found in Supabase, fall back to Sequelize
-        console.log('🔄 User not found in Supabase, trying Sequelize fallback for email:', email);
-        return await User.findOne({ where: { email } });
-      } catch (error) {
-        console.log('⚠️ Supabase error, falling back to Sequelize:', error.message);
-        return await User.findOne({ where: { email } });
-      }
+      return await supabaseService.getUserByEmail(email);
     } else {
       return await User.findOne({ where: { email } });
     }
@@ -170,28 +148,22 @@ class DatabaseService {
   // Task operations
   async getTasks(options = {}) {
     if (this.useSupabase) {
-      try {
-        // Convert camelCase column names to snake_case for Supabase
-        const supabaseOptions = { ...options };
-        if (supabaseOptions.orderBy) {
-          const columnMap = {
-            'dueDate': 'due_date',
-            'createdAt': 'created_at',
-            'updatedAt': 'updated_at',
-            'assignedTo': 'assigned_to',
-            'exchangeId': 'exchange_id',
-            'priority': 'priority',
-            'status': 'status',
-            'title': 'title'
-          };
-          supabaseOptions.orderBy.column = columnMap[supabaseOptions.orderBy.column] || supabaseOptions.orderBy.column;
-        }
-        return await supabaseService.getTasks(supabaseOptions);
-      } catch (error) {
-        console.log('⚠️ Supabase error, falling back to Sequelize for tasks:', error.message);
-        // Fall back to Sequelize
-        this.useSupabase = false;
+      // Convert camelCase column names to snake_case for Supabase
+      const supabaseOptions = { ...options };
+      if (supabaseOptions.orderBy) {
+        const columnMap = {
+          'dueDate': 'due_date',
+          'createdAt': 'created_at',
+          'updatedAt': 'updated_at',
+          'assignedTo': 'assigned_to',
+          'exchangeId': 'exchange_id',
+          'priority': 'priority',
+          'status': 'status',
+          'title': 'title'
+        };
+        supabaseOptions.orderBy.column = columnMap[supabaseOptions.orderBy.column] || supabaseOptions.orderBy.column;
       }
+      return await supabaseService.getTasks(supabaseOptions);
     }
     
     // Use Sequelize (either as primary or fallback)
