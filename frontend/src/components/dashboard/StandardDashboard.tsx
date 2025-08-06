@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
-import { useDashboardData } from '../../hooks/useDashboardData';
+import { useDashboardData } from '../../shared/hooks/useDashboardData';
 import {
   DashboardLayout,
   EnhancedStatCard,
