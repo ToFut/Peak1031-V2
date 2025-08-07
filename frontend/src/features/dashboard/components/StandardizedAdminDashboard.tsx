@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import StandardDashboard from './StandardDashboard';
 import { EnhancedStatCard, QuickAction } from './SharedDashboardComponents';
-import UnifiedChatInterface from '../../../components/UnifiedChatInterface';
-import EnterpriseDocumentManager from '../../../components/EnterpriseDocumentManager';
-import UserManagement from '../../../components/UserManagement';
-import TemplateManager from '../../../components/TemplateManager';
+import UnifiedChatInterface from '../../messages/components/UnifiedChatInterface';
+import EnterpriseDocumentManager from '../../documents/components/EnterpriseDocumentManager';
+import UserManagement from '../../users/components/UserManagement';
+import TemplateManager from '../../documents/components/TemplateManager';
 import { ExchangeList } from '../../exchanges/components/ExchangeList';
-import { TaskBoard } from '../../../components/TaskBoard';
+import { TaskBoard } from '../../tasks/components/TaskBoard';
 import {
   ChartBarIcon,
   UsersIcon,

@@ -27,64 +27,34 @@ import {
 } from '@heroicons/react/24/outline';
 
 const Documents: React.FC = () => {
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [exchanges, setExchanges] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('all');
   const [showEnterpriseManager, setShowEnterpriseManager] = useState(false);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  
   const { user } = useAuth();
   const { isAdmin, isCoordinator } = usePermissions();
-
   const canManage = isAdmin() || isCoordinator();
 
-  const loadDocuments = useCallback(async () => {
-    try {
-    setLoading(true);
-    setError(null);
-    
-    const endpoint = filter !== 'all' ? `/documents?category=${filter}` : '/documents';
-    const response = await apiService.get(endpoint);
-    setDocuments(response.data || response.documents || response || []);
-    } catch (err: any) {
-    console.error('Error loading documents:', err);
-    setError(err.message || 'Failed to load documents');
-    } finally {
-    setLoading(false);
-    }
-  }, [filter]);
+  // Use cached data hooks
+  const { data: documents = [], loading, error, refetch } = useDocuments(filter);
+  const { data: exchanges = [] } = useExchanges();
 
-  const loadExchanges = useCallback(async () => {
-    try {
-    const response = await apiService.get('/exchanges');
-    setExchanges(response.exchanges || []);
-    } catch (err: any) {
-    console.error('Error loading exchanges:', err);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadDocuments();
-    loadExchanges();
-  }, [loadDocuments, loadExchanges]);
-
-  // Professional document stats
-  const documentStats = {
+  // Professional document stats - memoized for performance
+  const documentStats = useMemo(() => ({
     total: documents.length,
     byCategory: documents.reduce((acc: any, doc) => {
-    acc[doc.category || 'general'] = (acc[doc.category || 'general'] || 0) + 1;
-    return acc;
+      acc[doc.category || 'general'] = (acc[doc.category || 'general'] || 0) + 1;
+      return acc;
     }, {}),
     totalSize: documents.reduce((acc, doc) => acc + (doc.fileSize || doc.file_size || 0), 0),
     recentUploads: documents.filter(doc => {
-    const uploadDate = new Date(doc.createdAt || doc.created_at);
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    return uploadDate > sevenDaysAgo;
+      const uploadDate = new Date(doc.createdAt || doc.created_at);
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      return uploadDate > sevenDaysAgo;
     }).length
-  };
+  }), [documents]);
 
   const getDocumentIcon = (filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase();
@@ -137,29 +107,53 @@ const Documents: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const filteredDocuments = documents.filter(doc => {
-    const matchesSearch = searchTerm === '' || 
-    (doc.fileName || doc.filename || doc.original_filename || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (doc.category || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesFilter = filter === 'all' || doc.category === filter;
-    
-    return matchesSearch && matchesFilter;
-  });
+  const filteredDocuments = useMemo(() => 
+    documents.filter(doc => {
+      const matchesSearch = searchTerm === '' || 
+        (doc.fileName || doc.filename || doc.original_filename || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (doc.category || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesFilter = filter === 'all' || doc.category === filter;
+      
+      return matchesSearch && matchesFilter;
+    }), [documents, searchTerm, filter]);
 
 
   if (loading) {
     return (
-    
-      <div className="animate-pulse space-y-6">
-        <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-gray-200 rounded-lg h-32"></div>
-          ))}
+      <div className="space-y-8">
+        <div className="animate-pulse">
+          <div className="h-12 bg-gray-200 rounded-lg w-1/3 mb-8"></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-gray-200 rounded-xl h-24"></div>
+            ))}
+          </div>
+          <div className="bg-gray-200 rounded-xl h-96"></div>
         </div>
       </div>
-    
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+          <div className="flex items-center">
+            <ExclamationTriangleIcon className="w-6 h-6 text-red-600 mr-3" />
+            <div>
+              <h3 className="text-lg font-medium text-red-800">Error Loading Documents</h3>
+              <p className="text-red-600 mt-1">{error}</p>
+              <button 
+                onClick={refetch}
+                className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -495,7 +489,7 @@ const Documents: React.FC = () => {
       isOpen={showEnterpriseManager}
       onClose={() => setShowEnterpriseManager(false)}
       onDocumentChange={() => {
-        loadDocuments();
+        refetch();
       }}
     />
 
@@ -504,7 +498,7 @@ const Documents: React.FC = () => {
       isOpen={showTemplateManager}
       onClose={() => setShowTemplateManager(false)}
       onTemplateChange={() => {
-        loadDocuments();
+        refetch();
       }}
     />
       </div>

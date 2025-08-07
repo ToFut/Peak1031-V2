@@ -90,7 +90,7 @@ export const LazyGrid = ({ children }: { children: React.ReactNode }) => (
 );
 
 // Lazy load specific components
-export const LazyDocuments = lazy(() => import('../documents/EnterpriseDocumentManager'));
-export const LazyExchanges = lazy(() => import('../exchanges/ExchangeList'));
-export const LazyUsers = lazy(() => import('../UserManagement'));
-export const LazyTemplates = lazy(() => import('../TemplateManager')); 
+export const LazyDocuments = lazy(() => import('../../features/documents/components/EnterpriseDocumentManager'));
+export const LazyExchanges = lazy(() => import('../../features/exchanges/components/ExchangeList'));
+export const LazyUsers = lazy(() => import('../../features/users/components/UserManagement'));
+export const LazyTemplates = lazy(() => import('../../features/documents/components/TemplateManager')); 

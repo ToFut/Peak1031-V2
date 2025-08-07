@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { SocketProvider } from './hooks/useSocket';
@@ -6,16 +6,13 @@ import Layout from './components/Layout';
 import ConnectionStatus from './components/ConnectionStatus';
 import DebugPanel from './components/DebugPanel';
 
-// Pages
-// V2-style auth import
-import Login from './features/auth/pages/Login';
-
-// NEW: Standardized dashboard components with consistent UX
-import AdminDashboard from './features/dashboard/components/StandardizedAdminDashboard';
-import ClientDashboard from './features/dashboard/components/StandardizedClientDashboard';
-import CoordinatorDashboard from './features/dashboard/components/StandardizedCoordinatorDashboard';
-import ThirdPartyDashboard from './features/dashboard/components/StandardizedThirdPartyDashboard';
-import AgencyDashboard from './features/dashboard/components/StandardizedAgencyDashboard';
+// Lazy load heavy components for better performance
+const Login = lazy(() => import('./features/auth/pages/Login'));
+const AdminDashboard = lazy(() => import('./features/dashboard/components/StandardizedAdminDashboard'));
+const ClientDashboard = lazy(() => import('./features/dashboard/components/StandardizedClientDashboard'));
+const CoordinatorDashboard = lazy(() => import('./features/dashboard/components/StandardizedCoordinatorDashboard'));
+const ThirdPartyDashboard = lazy(() => import('./features/dashboard/components/StandardizedThirdPartyDashboard'));
+const AgencyDashboard = lazy(() => import('./features/dashboard/components/StandardizedAgencyDashboard'));
 // OLD: import Messages from './pages/Messages';
 // NEW V2-style import (testing Messages migration)
 import Messages from './features/messages/pages/Messages';
@@ -59,15 +56,21 @@ interface ProtectedRouteProps {
   allowedRoles?: string[];
 }
 
+// Loading fallback for lazy components
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+      <p className="text-gray-600">Loading...</p>
+    </div>
+  </div>
+);
+
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles = [] }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+    return <LoadingFallback />;
   }
 
   if (!user) {
@@ -121,7 +124,8 @@ const App: React.FC = () => {
           <div className="App">
             <ConnectionStatus />
             {process.env.NODE_ENV === 'development' && <DebugPanel />}
-            <Routes>
+            <Suspense fallback={<LoadingFallback />}>
+              <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
               
@@ -361,6 +365,7 @@ const App: React.FC = () => {
                 } 
               />
             </Routes>
+            </Suspense>
           </div>
         </Router>
       </SocketProvider>

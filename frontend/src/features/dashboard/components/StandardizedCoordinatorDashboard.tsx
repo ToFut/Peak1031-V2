@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import StandardDashboard from './StandardDashboard';
 import { EnhancedStatCard } from './SharedDashboardComponents';
-import { TaskBoard } from '../../../components/TaskBoard';
+import { TaskBoard } from '../../tasks/components/TaskBoard';
 import { ExchangeList } from '../../exchanges/components/ExchangeList';
 // import KanbanTaskBoard from '../../../components/dashboard/KanbanTaskBoard';
 import {
