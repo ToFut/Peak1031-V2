@@ -50,7 +50,7 @@ router.post('/login', [
     console.log('✅ Tokens generated successfully');
 
     const responseData = {
-      user: transformToCamelCase(user.toJSON()),
+      user: transformToCamelCase(user.toJSON ? user.toJSON() : user),
       token,
       refreshToken
     };
@@ -93,7 +93,7 @@ router.post('/register', [
     const { token, refreshToken } = AuthService.generateTokens(user);
 
     res.status(201).json({
-      user: transformToCamelCase(user.toJSON()),
+      user: transformToCamelCase(user.toJSON ? user.toJSON() : user),
       token,
       refreshToken
     });
