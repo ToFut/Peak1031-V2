@@ -27,7 +27,7 @@ class ApiServiceV2Enhanced {
   // Helper method for HTTP requests
   private async request<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
-    console.log(`🔗 API Request: ${options.method || 'GET'} ${url}`);
+    
     
     const response = await fetch(url, {
       ...options,
@@ -56,13 +56,13 @@ class ApiServiceV2Enhanced {
     }
 
     const responseData = await response.json();
-    console.log(`✅ API Response: ${url} - Status: ${response.status}`);
+    
     return responseData;
   }
 
   // Authentication methods (enhanced for V2 hybrid auth)
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    console.log('🔐 Attempting login...');
+    
     
     const response = await this.request<LoginResponse>('/auth/login', {
       method: 'POST',
@@ -70,7 +70,7 @@ class ApiServiceV2Enhanced {
     });
 
     if (response.user && response.token) {
-      console.log('✅ Login successful:', response.user.email);
+      
       localStorage.setItem('user', JSON.stringify(response.user));
       localStorage.setItem('token', response.token);
       localStorage.setItem('authType', (response as any).authType || 'local');

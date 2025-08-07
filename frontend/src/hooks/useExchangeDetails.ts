@@ -38,7 +38,7 @@ export function useExchangeDetails(exchangeId: string | undefined): UseExchangeD
       setLoading(true);
       setError(null);
 
-      console.log('Loading exchange details for ID:', exchangeId);
+      
 
       // Try enterprise endpoints first, fallback to regular endpoints
       let exchangeData, participantsData, tasksData, documentsData, auditData, timelineData, complianceData;
@@ -67,7 +67,7 @@ export function useExchangeDetails(exchangeId: string | undefined): UseExchangeD
         complianceData = null;
       }
 
-      console.log('Exchange details loaded successfully:', exchangeData);
+      
 
       setExchange(exchangeData);
       setParticipants(participantsData?.participants || participantsData || []);

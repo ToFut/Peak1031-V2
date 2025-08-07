@@ -21,9 +21,13 @@ import {
   UsersIcon,
   LockClosedIcon,
   LinkIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  BuildingOfficeIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 import { apiService } from '../../../services/api';
+import { useAuth } from '../../../hooks/useAuth';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 interface DocumentVersion {
   id: string;
@@ -55,6 +59,8 @@ interface Document {
 }
 
 const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId }) => {
+  const { user } = useAuth();
+  const { isAdmin, isCoordinator, isClient } = usePermissions();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,29 +75,77 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
   });
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [activeTab, setActiveTab] = useState<'documents' | 'versions' | 'shared'>('documents');
+  const [filterBy, setFilterBy] = useState<'all' | 'user' | 'exchange' | 'thirdparty'>('all');
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [selectedExchangeId, setSelectedExchangeId] = useState<string>(exchangeId || '');
+  const [users, setUsers] = useState<any[]>([]);
+  const [exchanges, setExchanges] = useState<any[]>([]);
   
   const categories = ['all', 'contract', 'financial', 'legal', 'identification', 'deed', 'other'];
 
   useEffect(() => {
     loadDocuments();
-  }, [exchangeId]);
+    if (isAdmin()) {
+      loadUsers();
+      loadExchanges();
+    } else if (isClient() || isCoordinator()) {
+      // Non-admin users also need to load their exchanges
+      loadExchanges();
+    }
+  }, [exchangeId, filterBy, selectedUserId, selectedExchangeId]);
 
   useEffect(() => {
     filterDocuments();
   }, [documents, searchTerm, selectedCategory]);
 
   const loadDocuments = async () => {
+    setIsLoading(true);
+    let response: any;
+    
     try {
-      setIsLoading(true);
-      const response = exchangeId 
-        ? await apiService.getGeneratedDocuments(exchangeId)
-        : await apiService.getDocuments();
+      if (exchangeId || selectedExchangeId) {
+        response = exchangeId || selectedExchangeId
+          ? await apiService.getGeneratedDocuments(exchangeId || selectedExchangeId)
+          : await apiService.getDocuments();
+      } else {
+        response = [];
+      }
       
-      setDocuments(Array.isArray(response) ? response : []);
+      // Handle different response formats
+      if (Array.isArray(response)) {
+        setDocuments(response);
+      } else if (response && typeof response === 'object') {
+        setDocuments(response.documents || response.data || []);
+      } else {
+        setDocuments([]);
+      }
     } catch (error) {
       console.error('Failed to load documents:', error);
+      setDocuments([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadUsers = async () => {
+    try {
+      const response = await apiService.getUsers();
+      // getUsers returns User[] directly
+      setUsers(Array.isArray(response) ? response : []);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+      setUsers([]);
+    }
+  };
+
+  const loadExchanges = async () => {
+    try {
+      const response = await apiService.getExchanges();
+      // getExchanges returns Exchange[] directly
+      setExchanges(Array.isArray(response) ? response : []);
+    } catch (error) {
+      console.error('Failed to load exchanges:', error);
+      setExchanges([]);
     }
   };
 
@@ -240,13 +294,24 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-              <DocumentTextIcon className="h-8 w-8 text-blue-600 mr-3" />
-              Enhanced Document Manager
+            <h1 className="text-2xl font-bold text-gray-900">
+              Document Manager
             </h1>
-            <p className="text-gray-600 mt-2">
-              Advanced document management with versioning, sharing, and bulk operations
-            </p>
+            {/* Show current filter context */}
+            <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
+              {isAdmin() && filterBy !== 'all' && (
+                <span>
+                  Filtering by: <span className="font-medium capitalize">{filterBy}</span>
+                  {filterBy === 'user' && selectedUserId && ` (User ID: ${selectedUserId})`}
+                  {filterBy === 'exchange' && selectedExchangeId && ` (Exchange ID: ${selectedExchangeId})`}
+                  {filterBy === 'thirdparty' && selectedUserId && ` (Third Party ID: ${selectedUserId})`}
+                </span>
+              )}
+              {!isAdmin() && selectedExchangeId && (
+                <span>Exchange: <span className="font-medium">{exchanges.find(e => e.id === selectedExchangeId)?.name || selectedExchangeId}</span></span>
+              )}
+              <span>{filteredDocuments.length} documents</span>
+            </div>
           </div>
           
           <div className="flex items-center space-x-3">
@@ -295,6 +360,125 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
 
       {/* Search and Filters */}
       <div className="mb-6 space-y-4">
+        {/* Admin Filtering Options */}
+        {isAdmin() && (
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <div className="flex items-center space-x-4">
+              <label className="text-sm font-medium text-gray-700">Filter by:</label>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setFilterBy('all')}
+                  className={`px-3 py-1 rounded-md text-sm ${
+                    filterBy === 'all' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  All Documents
+                </button>
+                <button
+                  onClick={() => setFilterBy('user')}
+                  className={`px-3 py-1 rounded-md text-sm flex items-center ${
+                    filterBy === 'user' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <UserIcon className="h-4 w-4 mr-1" />
+                  By User
+                </button>
+                <button
+                  onClick={() => setFilterBy('exchange')}
+                  className={`px-3 py-1 rounded-md text-sm flex items-center ${
+                    filterBy === 'exchange' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <BuildingOfficeIcon className="h-4 w-4 mr-1" />
+                  By Exchange
+                </button>
+                <button
+                  onClick={() => setFilterBy('thirdparty')}
+                  className={`px-3 py-1 rounded-md text-sm flex items-center ${
+                    filterBy === 'thirdparty' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <UsersIcon className="h-4 w-4 mr-1" />
+                  By Third Party
+                </button>
+              </div>
+              
+              {/* Conditional Selectors */}
+              {filterBy === 'user' && (
+                <select
+                  value={selectedUserId}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select User</option>
+                  {users.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.name || user.email} ({user.role})
+                    </option>
+                  ))}
+                </select>
+              )}
+              
+              {filterBy === 'exchange' && (
+                <select
+                  value={selectedExchangeId}
+                  onChange={(e) => setSelectedExchangeId(e.target.value)}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Exchange</option>
+                  {exchanges.map(exchange => (
+                    <option key={exchange.id} value={exchange.id}>
+                      {exchange.name || exchange.exchangeName}
+                    </option>
+                  ))}
+                </select>
+              )}
+              
+              {filterBy === 'thirdparty' && (
+                <select
+                  value={selectedUserId}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Third Party</option>
+                  {users.filter(u => u.role === 'third_party').map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.name || user.email}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* User Exchange Filter */}
+        {!isAdmin() && (isClient() || isCoordinator()) && exchanges && exchanges.length > 0 && (
+          <div className="flex items-center space-x-4">
+            <label className="text-sm font-medium text-gray-700">Select Exchange:</label>
+            <select
+              value={selectedExchangeId || exchangeId || ''}
+              onChange={(e) => setSelectedExchangeId(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All My Exchanges</option>
+              {exchanges.map(exchange => (
+                <option key={exchange.id} value={exchange.id}>
+                  {exchange.name || exchange.exchangeName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="flex items-center space-x-4">
           <div className="flex-1 max-w-lg relative">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -426,14 +610,14 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <DocumentTextIcon className="h-8 w-8 text-gray-400 mr-3" />
+                          <DocumentTextIcon className="h-6 w-6 text-gray-400 mr-3" />
                           <div>
                             <div className="text-sm font-medium text-gray-900">
                               {document.fileName}
                             </div>
-                            {document.versions && document.versions > 1 && (
-                              <div className="text-xs text-blue-600">
-                                {document.versions} versions
+                            {document.uploadedBy && (
+                              <div className="text-xs text-gray-500">
+                                By: {document.uploadedBy}
                               </div>
                             )}
                           </div>

@@ -24,14 +24,14 @@ const Login: React.FC = () => {
 
     try {
       if (isSignUp) {
-        console.log('🔧 Signup form submitted for:', email);
+        
         // For now, just show a message that signup will be handled by admin
         setError('Account creation will be handled by your administrator. Please contact them to create your account.');
         setIsSignUp(false);
       } else {
-        console.log('🔐 Login form submitted for:', email);
+        
         await login(email, password);
-        console.log('✅ Login successful, redirecting to:', from);
+        
         navigate(from, { replace: true });
       }
     } catch (err: any) {

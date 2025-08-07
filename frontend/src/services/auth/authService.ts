@@ -9,14 +9,14 @@ import { httpClient } from '../base/httpClient';
 export class AuthService {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
-      console.log('🔐 Auth Service: Starting login process...');
-      console.log('📧 Email:', credentials.email);
+      
+      
       
       const response = await httpClient.post<LoginResponse>('/auth/login', credentials);
 
-      console.log('✅ Auth Service: Login successful!');
-      console.log('👤 User:', response.user.email, 'Role:', response.user.role);
-      console.log('🔑 Token received:', response.token ? 'Yes' : 'No');
+      
+      
+      
       return response;
     } catch (error: any) {
       console.error('❌ Auth Service login error:', error);

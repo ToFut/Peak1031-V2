@@ -84,11 +84,11 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
     try {
       // Try V2 dashboard overview endpoint first
       try {
-        console.log(`🔍 Attempting V2 dashboard overview for role: ${role}`);
+        
         const overviewData = await apiService.getDashboardOverview();
         
         if (overviewData && typeof overviewData === 'object') {
-          console.log('✅ V2 dashboard overview successful');
+          
           
           // Map V2 response to our standard format
           const mappedStats: DashboardStats = {
@@ -143,22 +143,22 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
           return; // Success, no need for fallback
         }
       } catch (v2Error) {
-        console.log('⚠️ V2 dashboard overview failed, falling back to V1:', v2Error);
+        
       }
 
       // Fallback to V1 individual calls (Enhanced pattern)
-      console.log('📡 Using V1 fallback - loading individual endpoints');
+      
       
       const apiToUse = role === 'admin' ? apiService : roleBasedApiService;
       
       // Load all data in parallel for better performance
       const [exchangesRes, tasksRes, docsRes, messagesRes, usersRes] = await Promise.allSettled([
         apiToUse.getExchanges().catch(err => {
-          console.log('Exchanges API failed:', err);
+          
           return [];
         }),
         apiToUse.getTasks().catch(err => {
-          console.log('Tasks API failed:', err);
+          
           return [];
         }),
         Promise.resolve([]), // Documents placeholder
@@ -193,7 +193,7 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
         exchanges: {
           total: filteredExchanges.length,
           pending: filteredExchanges.filter((e: any) => e.status === 'PENDING').length,
-          active: filteredExchanges.filter((e: any) => e.status === 'ACTIVE').length,
+          active: filteredExchanges.filter((e: any) => e.status === 'In Progress' || e.status === '45D' || e.status === '180D').length,
           completed: filteredExchanges.filter((e: any) => e.status === 'COMPLETED').length,
           ppSynced: filteredExchanges.filter((e: any) => e.ppId).length,
         },

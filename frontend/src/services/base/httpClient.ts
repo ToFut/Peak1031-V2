@@ -16,7 +16,7 @@ export class HttpClient {
 
   async request<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
-    console.log(`🔗 API Request: ${options.method || 'GET'} ${url}`);
+    
     
     const response = await fetch(url, {
       ...options,
@@ -54,7 +54,7 @@ export class HttpClient {
     }
 
     const data = await response.json();
-    console.log(`✅ API Response from ${endpoint}:`, data);
+    
     
     return data.data || data;
   }

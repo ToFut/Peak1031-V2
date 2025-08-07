@@ -5,6 +5,7 @@
 
 import { Contact } from '../../types';
 import { httpClient } from '../base/httpClient';
+import { safeJsonParse } from '../../utils/validation';
 
 export class ContactService {
   async getContacts(): Promise<Contact[]> {
@@ -13,27 +14,22 @@ export class ContactService {
     let endpoint = '/contacts';
     
     if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        if (user.role === 'admin') {
-          endpoint = '/contacts?limit=2000'; // Admin gets ALL contacts
-          console.log('📊 Admin requesting all contacts');
-        }
-      } catch (e) {
-        console.error('Error parsing user data:', e);
+      const user = safeJsonParse<{ role: string }>(userStr);
+      if (user && user.role === 'admin') {
+        endpoint = '/contacts?limit=2000'; // Admin gets ALL contacts
       }
     }
     
     const response = await httpClient.get<any>(endpoint);
     
     if (Array.isArray(response)) {
-      console.log(`✅ Received ${response.length} contacts`);
+      
       return response;
     } else if (response && response.contacts) {
-      console.log(`✅ Received ${response.contacts.length} contacts`);
+      
       return response.contacts;
     } else if (response && response.data) {
-      console.log(`✅ Received ${response.data.length} contacts`);
+      
       return response.data;
     }
     return [];

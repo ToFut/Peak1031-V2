@@ -262,12 +262,12 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
                     }
                   } catch (e) {
                     // Ignore cross-origin errors - try fallback
-                    console.log('PDF.js not available, using fallback viewer');
+                    
                   }
                 }, 1000);
               }}
               onError={() => {
-                console.log('PDF.js viewer failed, trying fallback...');
+                
                 // Fallback to direct PDF viewing
                 if (iframeRef.current && url) {
                   iframeRef.current.src = url;

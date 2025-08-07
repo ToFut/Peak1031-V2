@@ -183,10 +183,6 @@ export const ExchangeChatBox: React.FC<ExchangeChatBoxProps> = ({ exchange, clas
     scrollToBottom();
   }, [messages]);
 
-
-
-
-
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     

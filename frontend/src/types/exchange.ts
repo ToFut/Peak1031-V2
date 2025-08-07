@@ -5,7 +5,7 @@ export interface Exchange {
   exchangeNumber: string; // Unique exchange number
   name: string; // Exchange name/title
   exchangeName: string; // Display name for the exchange
-  status: 'PENDING' | '45D' | '180D' | 'COMPLETED' | 'TERMINATED' | 'ON_HOLD' | 'In Progress' | 'Completed' | 'Cancelled' | 'Draft';
+  status: 'PENDING' | '45D' | '180D' | 'COMPLETED' | 'TERMINATED' | 'ON_HOLD' | 'In Progress' | 'Completed' | 'Cancelled' | 'Draft' | 'ACTIVE';
   
   // Relationships
   clientId: string; // UUID
@@ -16,6 +16,7 @@ export interface Exchange {
   identificationDeadline?: string; // ISO date string
   completionDeadline?: string; // ISO date string
   completionDate?: string; // ISO date string
+  expectedClosingDate?: string; // ISO date string for expected closing
   
   // Financial Information
   exchangeValue?: number;
@@ -56,6 +57,10 @@ export interface Exchange {
   buyerName?: string;
   deadline45?: string;
   deadline180?: string;
+  
+  // Count properties for UI display
+  taskCount?: number;
+  documentCount?: number;
   
   // Timestamps
   createdAt: string; // ISO date-time string

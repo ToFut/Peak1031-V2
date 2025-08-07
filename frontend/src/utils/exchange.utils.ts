@@ -22,8 +22,6 @@ export const getExchangeStage = (exchange: any): string => {
   return exchange?.lifecycle_stage || exchange?.stage || 'Unknown';
 };
 
-
-
 export const getStageColorClass = (stage: string | undefined): string => {
   switch (stage?.toLowerCase()) {
     case 'initiation':
@@ -88,7 +86,6 @@ export const getComplianceColorClass = (complianceStatus?: string): string => {
       return 'text-gray-600 bg-gray-100';
   }
 };
-
 
 export function getExchangeProgress(exchange: EnterpriseExchange): number {
   // If enterprise exchange has stage_progress, use it

@@ -57,7 +57,7 @@ const Users: React.FC = () => {
   // Check if user has admin access
   useEffect(() => {
     if (!isAdmin()) {
-    console.log('❌ Access denied: User is not admin');
+    
     navigate('/dashboard');
     return;
     }
@@ -67,14 +67,14 @@ const Users: React.FC = () => {
     try {
     setLoading(true);
     setError(null);
-    console.log('🔍 Loading users...');
+    
     
     const response = await apiService.get('/admin/users');
-    console.log('📦 API response:', response);
+    
     
     // Handle both direct array and paginated response
     const usersData = response.users || response.data || response || [];
-    console.log('👥 Users data:', usersData);
+    
     
     setUsers(usersData);
     } catch (err: any) {

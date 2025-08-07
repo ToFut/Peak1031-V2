@@ -13,16 +13,16 @@ export class ExchangeService {
     let limit = '20';
     let isAdmin = false;
     
-    console.log('🔍 Checking user for exchanges request...');
+    
     
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
-        console.log('Parsed user role:', user.role);
+        
         if (user.role === 'admin') {
           limit = '2000'; // Admin gets ALL exchanges
           isAdmin = true;
-          console.log('📊 ADMIN DETECTED! Requesting all exchanges with limit:', limit);
+          
         }
       } catch (e) {
         console.error('Error parsing user data:', e);
@@ -30,19 +30,19 @@ export class ExchangeService {
     }
     
     const endpoint = `/exchanges?limit=${limit}`;
-    console.log('Making request to:', endpoint);
+    
     
     const response = await httpClient.get<any>(endpoint);
     
     // Handle both array response and paginated response
     if (Array.isArray(response)) {
-      console.log(`✅ ${isAdmin ? 'ADMIN' : 'USER'} received ${response.length} exchanges`);
+      
       return response;
     } else if (response && response.exchanges) {
-      console.log(`✅ ${isAdmin ? 'ADMIN' : 'USER'} received ${response.exchanges.length} exchanges`);
+      
       return response.exchanges;
     } else {
-      console.log('⚠️ Unexpected response format:', response);
+      
       return [];
     }
   }

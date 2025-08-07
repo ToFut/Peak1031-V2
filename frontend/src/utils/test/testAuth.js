@@ -41,13 +41,20 @@ export const testAuth = async () => {
   localStorage.removeItem('refreshToken');
   
   try {
-    // Test login
-          const loginResponse = await fetch('http://localhost:5000/api/auth/login', {
+    // Test login - credentials should be provided via environment or test config
+    const testEmail = process.env.REACT_APP_TEST_EMAIL || prompt('Enter test email:');
+    const testPassword = process.env.REACT_APP_TEST_PASSWORD || prompt('Enter test password:');
+    
+    if (!testEmail || !testPassword) {
+      throw new Error('Test credentials required');
+    }
+    
+    const loginResponse = await fetch('http://localhost:5000/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'admin@peak1031.com',
-        password: 'admin123'
+        email: testEmail,
+        password: testPassword
       })
     });
     

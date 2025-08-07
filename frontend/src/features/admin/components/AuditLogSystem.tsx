@@ -129,8 +129,8 @@ const AuditLogSystem: React.FC = () => {
         filteredLogs = logs.filter(log => 
           log.action === 'security_alert' ||
           log.userName === user.first_name + ' ' + user.last_name ||
-          log.details.includes('Coordinator') ||
-          log.details.includes('Exchange')
+          (typeof log.details === 'object' && log.details && JSON.stringify(log.details).includes('Coordinator')) ||
+          (typeof log.details === 'object' && log.details && JSON.stringify(log.details).includes('Exchange'))
         );
         break;
       case 'agency':
@@ -138,22 +138,22 @@ const AuditLogSystem: React.FC = () => {
         filteredLogs = logs.filter(log => 
           log.action === 'security_alert' ||
           log.userName === user.first_name + ' ' + user.last_name ||
-          log.details.includes('Agency') ||
-          log.details.includes('Third Party')
+          (typeof log.details === 'object' && log.details && JSON.stringify(log.details).includes('Agency')) ||
+          (typeof log.details === 'object' && log.details && JSON.stringify(log.details).includes('Third Party'))
         );
         break;
       case 'third_party':
         // Third Parties see their own activities and their clients' activities
         filteredLogs = logs.filter(log => 
           log.userName === user.first_name + ' ' + user.last_name ||
-          log.details.includes('Third Party')
+          (typeof log.details === 'object' && log.details && JSON.stringify(log.details).includes('Third Party'))
         );
         break;
       case 'client':
         // Clients see only their own activities and their exchange activities
         filteredLogs = logs.filter(log => 
           log.userName === user.first_name + ' ' + user.last_name ||
-          (log.exchangeId && log.details.includes('exchange'))
+          (log.exchangeId && typeof log.details === 'object' && log.details && JSON.stringify(log.details).includes('exchange'))
         );
         break;
       default:
@@ -184,7 +184,7 @@ const AuditLogSystem: React.FC = () => {
 
     if (filters.search) {
       filtered = filtered.filter(log => 
-        log.details.toLowerCase().includes(filters.search.toLowerCase()) ||
+        (typeof log.details === 'object' && log.details && JSON.stringify(log.details).toLowerCase().includes(filters.search.toLowerCase())) ||
         log.userName?.toLowerCase().includes(filters.search.toLowerCase())
       );
     }
@@ -489,7 +489,7 @@ const AuditLogSystem: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm text-gray-900 max-w-md truncate">
-                      {log.details}
+                      {log.details ? (typeof log.details === 'object' ? JSON.stringify(log.details) : String(log.details)) : 'N/A'}
                     </div>
                     {log.exchangeId && (
                       <div className="text-xs text-blue-600">Exchange: {log.exchangeId}</div>
@@ -588,7 +588,9 @@ const AuditLogSystem: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Details</label>
                 <div className="p-4 bg-gray-50 rounded-lg border">
-                  <p className="text-sm text-gray-800">{selectedLog.details}</p>
+                  <p className="text-sm text-gray-800">
+                    {selectedLog.details ? (typeof selectedLog.details === 'object' ? JSON.stringify(selectedLog.details, null, 2) : String(selectedLog.details)) : 'N/A'}
+                  </p>
                 </div>
               </div>
 

@@ -108,14 +108,17 @@ export const ROLE_CONFIGS: Record<UserRole, RoleConfig> = {
       }
     },
     ui: {
-      sidebar_items: ['overview', 'exchanges', 'tasks', 'users', 'documents', 'messages', 'system', 'templates', 'audit', 'sync'],
+      sidebar_items: ['overview', 'exchanges', 'tasks', 'users', 'documents', 'messages', 'reports', 'ai_gpt', 'pp_management', 'system', 'templates', 'audit', 'sync'],
       dashboard_widgets: ['system_stats', 'exchange_analytics', 'user_management', 'quick_actions', 'audit_logs'],
       page_titles: {
         exchanges: 'Exchange Management',
         tasks: 'Task Management',
         documents: 'Document Center',
         messages: 'Messages',
-        contacts: 'Contact Management'
+        contacts: 'Contact Management',
+        reports: 'Reports & Analytics',
+        ai_gpt: 'AI Assistant',
+        pp_management: 'PracticePanther Management'
       },
       action_buttons: {
         exchanges: ['create', 'bulk_edit', 'export', 'sync'],

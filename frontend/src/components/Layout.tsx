@@ -21,7 +21,11 @@ import {
   InformationCircleIcon,
   ShieldCheckIcon,
   ChartBarIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  Bars3Icon,
+  XMarkIcon,
+  SparklesIcon,
+  BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
 import {
   HomeIcon as HomeIconSolid,
@@ -33,6 +37,8 @@ import {
   CogIcon as CogIconSolid,
   ChartBarIcon as ChartBarIconSolid,
   ArrowPathIcon as ArrowPathIconSolid,
+  SparklesIcon as SparklesIconSolid,
+  BuildingOfficeIcon as BuildingOfficeIconSolid,
 } from '@heroicons/react/24/solid';
 
 interface NavigationItem {
@@ -44,8 +50,6 @@ interface NavigationItem {
   badge?: number;
   children?: NavigationItem[];
 }
-
-
 
 interface Notification {
   id: string;
@@ -67,8 +71,8 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   const { socket, connectionStatus } = useSocket();
 
   // Debug: Log user data
-  console.log('Layout - User data:', user);
-  console.log('Layout - UI data:', ui);
+  
+  
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -80,6 +84,17 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // State for desktop sidebar collapse - persist in localStorage
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  // Save sidebar collapsed state to localStorage
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(isDesktopSidebarCollapsed));
+  }, [isDesktopSidebarCollapsed]);
+
   // Navigation configuration based on user role using permissions system
   const getNavigation = (): NavigationItem[] => {
     if (!user?.role) return [];
@@ -88,7 +103,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
     const sidebarItems = getSidebarItems();
     
     // Debug: Log sidebar items
-    console.log('Sidebar items for role', user.role, ':', sidebarItems);
+    
     
     // Map sidebar items to navigation configuration
     const navigationMap: Record<string, NavigationItem> = {
@@ -191,6 +206,20 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
         iconSolid: ArrowPathIconSolid,
         roles: [user.role]
       },
+      ai_gpt: {
+        name: 'AI GPT',
+        href: '/admin/ai-gpt',
+        icon: SparklesIcon,
+        iconSolid: SparklesIconSolid,
+        roles: ['admin']
+      },
+      pp_management: {
+        name: 'PP Management',
+        href: '/admin/practice-panther',
+        icon: BuildingOfficeIcon,
+        iconSolid: BuildingOfficeIconSolid,
+        roles: ['admin']
+      },
       settings: {
         name: 'Settings',
         href: '/settings',
@@ -206,11 +235,11 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
       .filter(item => item !== undefined);
     
     // Debug: Log filtered items
-    console.log('Filtered navigation items:', filteredItems);
+    
     
     // Fallback: if no items found, show basic navigation
     if (filteredItems.length === 0) {
-      console.log('No sidebar items found, showing fallback navigation');
+      
       return [
         {
           name: 'Dashboard',
@@ -356,22 +385,27 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-80 bg-white shadow-xl transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:w-64 lg:flex-shrink-0 border-r-2 border-red-500 ${
+      <div className={`fixed inset-y-0 left-0 z-50 w-80 bg-white shadow-xl transform transition-all duration-300 ease-in-out lg:relative lg:translate-x-0 lg:flex-shrink-0 border-r-2 border-red-500 ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      } ${
+        isDesktopSidebarCollapsed ? 'lg:w-16' : 'lg:w-64'
       }`}>
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 bg-white">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 bg-white">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="h-10 w-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
+              <div className="h-10 w-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center shadow-sm">
                 <span className="text-white font-bold text-lg">P</span>
               </div>
             </div>
-            <div className="ml-3">
-              <h1 className="text-lg font-bold text-gray-900">Peak 1031</h1>
-              <p className="text-xs text-gray-500">Exchange Platform</p>
-            </div>
+            {!isDesktopSidebarCollapsed && (
+              <div className="ml-3">
+                <h1 className="text-lg font-bold text-gray-900">Peak 1031</h1>
+                <p className="text-xs text-gray-500">Exchange Platform</p>
+              </div>
+            )}
           </div>
+          {/* Mobile close button only */}
           <button
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -392,28 +426,38 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
               if (item.children) {
                 return (
                   <div key={item.name} className="space-y-2">
-                    <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                      {item.name}
-                    </div>
+                    {!isDesktopSidebarCollapsed && (
+                      <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        {item.name}
+                      </div>
+                    )}
                     {item.children.map((child) => {
                       const ChildIcon = isCurrentPath(child.href) ? child.iconSolid : child.icon;
                       const isChildActive = isCurrentPath(child.href);
                       return (
-                        <button
-                          key={child.href}
-                          onClick={() => {
-                            navigate(child.href);
-                            setSidebarOpen(false); // Close sidebar on mobile after navigation
-                          }}
-                          className={`w-full group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
-                            isChildActive
-                              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
-                              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                          }`}
-                        >
-                          <ChildIcon className={`flex-shrink-0 h-5 w-5 mr-3 ${isChildActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                          {child.name}
-                        </button>
+                        <div key={child.href} className="relative group">
+                          <button
+                            onClick={() => {
+                              navigate(child.href);
+                              setSidebarOpen(false); // Close sidebar on mobile after navigation
+                            }}
+                            className={`w-full group flex items-center ${isDesktopSidebarCollapsed ? 'justify-center px-2' : 'px-4'} py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
+                              isChildActive
+                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
+                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                            }`}
+                          >
+                            <ChildIcon className={`flex-shrink-0 h-5 w-5 ${isDesktopSidebarCollapsed ? '' : 'mr-3'} ${isChildActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                            {!isDesktopSidebarCollapsed && child.name}
+                          </button>
+                          {/* Tooltip for collapsed state */}
+                          {isDesktopSidebarCollapsed && (
+                            <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                              {child.name}
+                              <div className="absolute top-1/2 right-full transform -translate-y-1/2 border-4 border-transparent border-r-gray-900"></div>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -421,30 +465,42 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
               }
 
               return (
-                <button
-                  key={item.href}
-                  onClick={() => {
-                    navigate(item.href);
-                    setSidebarOpen(false); // Close sidebar on mobile after navigation
-                  }}
-                  className={`w-full group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
-                    isActive
-                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <Icon className={`flex-shrink-0 h-5 w-5 mr-3 ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                  <span className="flex-1 text-left">{item.name}</span>
-                  {item.badge && item.badge > 0 && (
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      isActive 
-                        ? 'bg-white bg-opacity-20 text-white' 
-                        : 'bg-red-100 text-red-600'
-                    }`}>
-                      {item.badge > 99 ? '99+' : item.badge}
-                    </span>
+                <div key={item.href} className="relative group">
+                  <button
+                    onClick={() => {
+                      navigate(item.href);
+                      setSidebarOpen(false); // Close sidebar on mobile after navigation
+                    }}
+                    className={`w-full group flex items-center ${isDesktopSidebarCollapsed ? 'justify-center px-2' : 'px-4'} py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
+                      isActive
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                  >
+                    <Icon className={`flex-shrink-0 h-5 w-5 ${isDesktopSidebarCollapsed ? '' : 'mr-3'} ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                    {!isDesktopSidebarCollapsed && (
+                      <>
+                        <span className="flex-1 text-left">{item.name}</span>
+                        {item.badge && item.badge > 0 && (
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            isActive 
+                              ? 'bg-white bg-opacity-20 text-white' 
+                              : 'bg-red-100 text-red-600'
+                          }`}>
+                            {item.badge > 99 ? '99+' : item.badge}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </button>
+                  {/* Tooltip for collapsed state */}
+                  {isDesktopSidebarCollapsed && (
+                    <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                      {item.name}
+                      <div className="absolute top-1/2 right-full transform -translate-y-1/2 border-4 border-transparent border-r-gray-900"></div>
+                    </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -452,13 +508,22 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
 
         {/* Connection Status & User Info */}
         <div className="border-t border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-500 rounded-full flex items-center justify-center">
+          <div className={`flex items-center ${isDesktopSidebarCollapsed ? 'justify-center' : 'justify-between'} mb-3`}>
+            <div className="relative group">
+              <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-500 rounded-full flex items-center justify-center shadow-sm">
                 <span className="text-white text-xs font-medium">
                   {user.first_name?.[0]}{user.last_name?.[0]}
                 </span>
               </div>
+              {/* Tooltip for collapsed state */}
+              {isDesktopSidebarCollapsed && (
+                <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                  {user.first_name} {user.last_name}
+                  <div className="absolute top-1/2 right-full transform -translate-y-1/2 border-4 border-transparent border-r-gray-900"></div>
+                </div>
+              )}
+            </div>
+            {!isDesktopSidebarCollapsed && (
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-900">
                   {user.first_name} {user.last_name}
@@ -467,28 +532,33 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
                   {getRoleDisplayName(user.role)}
                 </p>
               </div>
-            </div>
+            )}
           </div>
           
-          <div className={`flex items-center text-xs ${
-            connectionStatus === 'connected' ? 'text-green-600' : 'text-red-600'
-          }`}>
-            <div className={`w-2 h-2 rounded-full mr-2 ${
-              connectionStatus === 'connected' ? 'bg-green-400' : 'bg-red-400'
-            }`}></div>
-            <span className="font-medium">
-              {connectionStatus === 'connected' ? 'Connected' : 'Reconnecting...'}
-            </span>
-          </div>
+          {!isDesktopSidebarCollapsed && (
+            <div className={`flex items-center text-xs ${
+              connectionStatus === 'connected' ? 'text-green-600' : 'text-red-600'
+            }`}>
+              <div className={`w-2 h-2 rounded-full mr-2 ${
+                connectionStatus === 'connected' ? 'bg-green-400' : 'bg-red-400'
+              }`}></div>
+              <span className="font-medium">
+                {connectionStatus === 'connected' ? 'Connected' : 'Reconnecting...'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Main content */}
-      <div className="flex-1 min-w-0">
+      <div className={`flex-1 min-w-0 transition-all duration-300 ease-in-out ${
+        isDesktopSidebarCollapsed ? 'lg:ml-16' : 'lg:ml-0'
+      }`}>
         {/* Top navigation */}
         <header className="bg-white shadow-sm border-b border-gray-200">
           <div className="flex justify-between items-center px-6 py-4 min-h-[64px]">
             <div className="flex items-center">
+              {/* Mobile menu button */}
               <button
                 onClick={() => setSidebarOpen(true)}
                 className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -496,6 +566,14 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
+              </button>
+              {/* Desktop sidebar toggle */}
+              <button
+                onClick={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
+                className="hidden lg:flex h-10 w-10 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 items-center justify-center transition-colors"
+                title={isDesktopSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              >
+                <Bars3Icon className="h-5 w-5" />
               </button>
               {/* Page-specific header content */}
               {headerContent && (

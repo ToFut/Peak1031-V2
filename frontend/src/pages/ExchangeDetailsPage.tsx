@@ -143,61 +143,30 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
 
       console.log('Loading exchange details for ID:', id);
 
-      // Load data with better error handling
+      // Try enterprise endpoints first, fallback to regular endpoints
       let exchangeData, participantsData, tasksData, documentsData, auditData, timelineData, complianceData;
       
       try {
-        // Load exchange data first
-        exchangeData = await apiService.get(`/exchanges/${id}`);
-        console.log('Exchange data loaded:', exchangeData);
+        // Try enterprise endpoints
+        [exchangeData, participantsData, tasksData, documentsData, auditData, timelineData, complianceData] = await Promise.all([
+          apiService.get(`/enterprise-exchanges/${id}`).catch(() => apiService.get(`/exchanges/${id}`)),
+          apiService.get(`/exchanges/${id}/participants`),
+          apiService.get(`/exchanges/${id}/tasks`),
+          apiService.get(`/documents/exchange/${id}`),
+          apiService.get(`/exchanges/${id}/audit-logs`),
+          apiService.get(`/enterprise-exchanges/${id}/timeline`).catch(() => []),
+          apiService.get(`/enterprise-exchanges/${id}/compliance`).catch(() => null)
+        ]);
       } catch (error) {
-        console.error('Failed to load exchange data:', error);
-        setError('Failed to load exchange details');
-        setLoading(false);
-        return;
-      }
-
-      // Load other data with individual error handling
-      try {
-        participantsData = await apiService.get(`/exchanges/${id}/participants`);
-      } catch (error) {
-        console.warn('Failed to load participants:', error);
-        participantsData = [];
-      }
-
-      try {
-        tasksData = await apiService.get(`/exchanges/${id}/tasks`);
-      } catch (error) {
-        console.warn('Failed to load tasks:', error);
-        tasksData = [];
-      }
-
-      try {
-        documentsData = await apiService.get(`/documents/exchange/${id}`);
-      } catch (error) {
-        console.warn('Failed to load documents:', error);
-        documentsData = [];
-      }
-
-      try {
-        auditData = await apiService.get(`/exchanges/${id}/audit-logs`);
-      } catch (error) {
-        console.warn('Failed to load audit logs:', error);
-        auditData = [];
-      }
-
-      // Try enterprise endpoints for additional data
-      try {
-        timelineData = await apiService.get(`/enterprise-exchanges/${id}/timeline`);
-      } catch (error) {
-        console.warn('Failed to load timeline:', error);
+        // Fallback to regular endpoints
+        [exchangeData, participantsData, tasksData, documentsData, auditData] = await Promise.all([
+          apiService.get(`/exchanges/${id}`),
+          apiService.get(`/exchanges/${id}/participants`),
+          apiService.get(`/exchanges/${id}/tasks`),
+          apiService.get(`/documents/exchange/${id}`),
+          apiService.get(`/exchanges/${id}/audit-logs`)
+        ]);
         timelineData = [];
-      }
-
-      try {
-        complianceData = await apiService.get(`/enterprise-exchanges/${id}/compliance`);
-      } catch (error) {
-        console.warn('Failed to load compliance data:', error);
         complianceData = null;
       }
 
@@ -1312,7 +1281,9 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
                             <span className="text-sm text-gray-500">•</span>
                             <span className="text-sm text-gray-500">{log.timestamp ? new Date(log.timestamp).toLocaleString() : new Date(log.createdAt).toLocaleString()}</span>
                           </div>
-                          <p className="text-gray-700">{log.details}</p>
+                          <p className="text-gray-700">
+                            {log.details ? (typeof log.details === 'object' ? JSON.stringify(log.details, null, 2) : String(log.details)) : 'N/A'}
+                          </p>
                           <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
                             <span>IP: {log.ip || log.ipAddress}</span>
                             <span>Severity: {log.severity}</span>

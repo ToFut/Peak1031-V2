@@ -184,7 +184,6 @@ const StandardDashboard: React.FC<StandardDashboardProps> = ({
     refreshInterval: 300000 // 5 minutes
   });
 
-
   const handleQuickAction = async (actionId: string, action: string) => {
     try {
       switch (action) {
@@ -214,7 +213,7 @@ const StandardDashboard: React.FC<StandardDashboardProps> = ({
           window.location.href = '/contacts';
           break;
         default:
-          console.log(`Quick action not implemented: ${action}`);
+          
       }
     } catch (error) {
       console.error('Quick action failed:', error);
@@ -352,7 +351,6 @@ const StandardDashboard: React.FC<StandardDashboardProps> = ({
       </div>
     );
   };
-
 
   return (
     <div className="space-y-6">

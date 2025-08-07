@@ -41,7 +41,7 @@ class ApiService {
   private setConnectionStatus(online: boolean) {
     if (this.isOnline !== online) {
       this.isOnline = online;
-      console.log(`🔗 Connection status changed: ${online ? 'ONLINE' : 'OFFLINE'}`);
+      
       this.connectionListeners.forEach(listener => listener(online));
     }
   }
@@ -130,13 +130,13 @@ class ApiService {
       if (useCache && !forceRefresh) {
         const cached = cacheService.get<T>(cacheKey);
         if (cached) {
-          console.log(`📦 Using cached data for ${endpoint}`);
+          
           return cached;
         }
       }
     }
     
-    console.log(`🔗 API Request: ${method} ${url}`);
+    
     
     try {
       const response = await fetch(url, {
@@ -162,8 +162,8 @@ class ApiService {
           // If refresh fails, clear tokens and throw original error
           localStorage.removeItem('token');
           localStorage.removeItem('refreshToken');
-          // Redirect to login or dispatch logout action
-          window.location.href = '/login';
+          localStorage.removeItem('user');
+          
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.message || 'Authentication failed. Please login again.');
         }
@@ -175,19 +175,27 @@ class ApiService {
         throw new Error('Too many requests. Please wait a moment and try again.');
       }
       
+      // Handle missing endpoints (404) gracefully
+      if (response.status === 404) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.message || `API endpoint not found: ${endpoint}`;
+        console.warn('⚠️', errorMessage);
+        throw new Error(errorMessage);
+      }
+      
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
     }
 
     const data = await response.json();
-    console.log(`✅ API Response from ${endpoint}:`, data);
+    
     
     // Cache GET responses if caching is enabled
     if (method === 'GET' && apiOptions?.useCache !== false) {
       const cacheKey = `api:${endpoint}`;
       const cacheDuration = apiOptions?.cacheDuration || 5 * 60 * 1000; // 5 minutes default
       cacheService.set(cacheKey, data.data || data, cacheDuration);
-      console.log(`💾 Cached response for ${endpoint}`);
+      
       }
     
       // Return data.data if it exists (backend format), otherwise return the whole response
@@ -202,8 +210,17 @@ class ApiService {
         const cacheKey = `api:${endpoint}`;
         const cached = cacheService.get<T>(cacheKey);
         if (cached) {
-          console.log(`🔄 Using fallback cached data for ${endpoint} due to network error`);
+          
           return cached;
+        }
+      }
+      
+      // For missing API endpoints (404), provide a more helpful error
+      if (networkError.message?.includes('404')) {
+        console.warn(`⚠️ API endpoint not found: ${endpoint}. This feature may not be implemented yet.`);
+        // Return empty data for GET requests to prevent crashes
+        if (method === 'GET') {
+          return [] as T;
         }
       }
       
@@ -215,18 +232,18 @@ class ApiService {
   // Authentication methods
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
-      console.log('🔐 API Service: Starting login process...');
-      console.log('📧 Email:', credentials.email);
-      console.log('🌐 API URL:', `${this.baseURL}/auth/login`);
+      
+      
+      
       
       const response = await this.request<LoginResponse>('/auth/login', {
         method: 'POST',
         body: JSON.stringify(credentials)
       });
 
-      console.log('✅ API Service: Login successful!');
-      console.log('👤 User:', response.user.email, 'Role:', response.user.role);
-      console.log('🔑 Token received:', response.token ? 'Yes' : 'No');
+      
+      
+      
       return response;
     } catch (error: any) {
       console.error('❌ API Service login error:', error);
@@ -289,8 +306,6 @@ class ApiService {
     }
   }
 
-
-
   // Data methods - now using backend API
   async getUsers(): Promise<User[]> {
     return await this.request('/users');
@@ -303,24 +318,25 @@ class ApiService {
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
-        if (user.role === 'admin') {
+        if (user?.role === 'admin') {
           endpoint = '/contacts?limit=2000'; // Admin gets ALL contacts
-          console.log('📊 Admin requesting all contacts');
+          
         }
       } catch (e) {
-        console.error('Error parsing user data:', e);
+        console.error('Error parsing user data for contacts:', e);
+        // Continue with default endpoint
       }
     }
     
     const response = await this.request<any>(endpoint);
     if (Array.isArray(response)) {
-      console.log(`✅ Received ${response.length} contacts`);
+      
       return response;
     } else if (response && response.contacts) {
-      console.log(`✅ Received ${response.contacts.length} contacts`);
+      
       return response.contacts;
     } else if (response && response.data) {
-      console.log(`✅ Received ${response.data.length} contacts`);
+      
       return response.data;
     }
     return [];
@@ -332,36 +348,34 @@ class ApiService {
     let limit = '20';
     let isAdmin = false;
     
-    console.log('🔍 Checking user for exchanges request...');
-    console.log('User in localStorage:', userStr?.substring(0, 100) + '...');
-    
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
-        console.log('Parsed user role:', user.role);
-        if (user.role === 'admin') {
+        
+        if (user?.role === 'admin') {
           limit = '2000'; // Admin gets ALL exchanges (increased to ensure we get all)
           isAdmin = true;
-          console.log('📊 ADMIN DETECTED! Requesting all exchanges with limit:', limit);
+          
         }
       } catch (e) {
-        console.error('Error parsing user data:', e);
+        console.error('Error parsing user data for exchanges:', e);
+        // Continue with default limit
       }
     }
     
     const endpoint = `/exchanges?limit=${limit}`;
-    console.log('Making request to:', endpoint);
+    
     
     const response = await this.request<any>(endpoint, {}, false, options);
     // Handle both array response and paginated response
     if (Array.isArray(response)) {
-      console.log(`✅ ${isAdmin ? 'ADMIN' : 'USER'} received ${response.length} exchanges`);
+      
       return response;
     } else if (response && response.exchanges) {
-      console.log(`✅ ${isAdmin ? 'ADMIN' : 'USER'} received ${response.exchanges.length} exchanges`);
+      
       return response.exchanges;
     } else {
-      console.log('⚠️ Unexpected response format:', response);
+      
       return [];
     }
   }
@@ -697,6 +711,14 @@ class ApiService {
     return this.request<any[]>(endpoint);
   }
 
+  async getDocumentsByUser(userId: string): Promise<any[]> {
+    return await this.request(`/documents?userId=${userId}`);
+  }
+
+  async getDocumentsByThirdParty(thirdPartyId: string): Promise<any[]> {
+    return await this.request(`/documents?thirdPartyId=${thirdPartyId}`);
+  }
+
   async checkAutoGeneration(data: {
     exchange_id: string;
     new_status: string;
@@ -998,8 +1020,13 @@ class ApiService {
   getCurrentUserId(): string | null {
     const userStr = localStorage.getItem('user');
     if (!userStr) return null;
-    const user = JSON.parse(userStr);
-    return user.id;
+    try {
+      const user = JSON.parse(userStr);
+      return user?.id || null;
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      return null;
+    }
   }
 
   // Generic HTTP methods with caching support

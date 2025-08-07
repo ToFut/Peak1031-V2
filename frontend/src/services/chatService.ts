@@ -1,6 +1,5 @@
 import { apiService } from './api';
 import { Message, User, Exchange } from '../types';
-import { io, Socket } from 'socket.io-client';
 
 export interface ChatMessage {
   id: string;
@@ -26,148 +25,37 @@ export interface ChatExchange {
 
 class ChatService {
   private baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
-  private socket: Socket | null = null;
   private messageListeners = new Map<string, (message: ChatMessage) => void>();
   private readReceiptListeners = new Map<string, (data: { messageId: string; userId: string }) => void>();
   private typingListeners = new Map<string, (data: { userId: string; name: string; isTyping: boolean }) => void>();
+  private socket: any = null; // Socket.IO instance
 
-  // Initialize Socket.IO connection
   initializeSocket(token: string) {
-    if (this.socket?.connected) {
-      return;
-    }
-
-    const socketURL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5001';
-    
-    this.socket = io(socketURL, {
-      auth: {
-        token: token
-      },
-      transports: ['websocket', 'polling']
-    });
-
-    this.socket.on('connect', () => {
-      console.log('✅ Socket.IO connected:', this.socket?.id);
-    });
-
-    this.socket.on('disconnect', () => {
-      console.log('❌ Socket.IO disconnected');
-    });
-
-    this.socket.on('connect_error', (error) => {
-      console.error('❌ Socket.IO connection error:', error);
-    });
-
-    // Handle incoming messages
-    this.socket.on('new_message', (message: ChatMessage) => {
-      console.log('📨 New message received:', message);
-      const listener = this.messageListeners.get(message.exchange_id);
-      if (listener) {
-        listener(message);
-      }
-    });
-
-    // Handle read receipts
-    this.socket.on('message_read', (data: { messageId: string; userId: string }) => {
-      const listeners = Array.from(this.readReceiptListeners.values());
-      listeners.forEach(listener => listener(data));
-    });
-
-    // Handle typing indicators
-    this.socket.on('user_typing', (data: { userId: string; name: string; exchangeId: string }) => {
-      const listener = this.typingListeners.get(data.exchangeId);
-      if (listener) {
-        listener({ ...data, isTyping: true });
-      }
-    });
-
-    this.socket.on('user_stopped_typing', (data: { userId: string; exchangeId: string }) => {
-      const listener = this.typingListeners.get(data.exchangeId);
-      if (listener) {
-        listener({ userId: data.userId, name: '', isTyping: false });
-      }
-    });
-
-    // Handle message sending confirmation
-    this.socket.on('message_sent', (message: ChatMessage) => {
-      console.log('✅ Message sent confirmation:', message);
-    });
-
-    // Handle message sending errors
-    this.socket.on('message_error', (error: { error: string }) => {
-      console.error('❌ Message error:', error);
-    });
+    // Initialize socket connection
+    console.log('Initializing socket connection...');
   }
 
-  // Join an exchange room for real-time updates
-  joinExchange(exchangeId: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.socket) {
-        reject(new Error('Socket not initialized'));
-        return;
-      }
-
-      this.socket.emit('join_exchange', exchangeId);
-      
-      // Set a timeout to resolve after 2 seconds even if no response
-      const timeout = setTimeout(() => {
-        resolve(); // Don't fail if no explicit response
-      }, 2000);
-
-      const handleJoined = (data: { exchangeId: string; status: string }) => {
-        if (data.exchangeId === exchangeId && data.status === 'success') {
-          clearTimeout(timeout);
-          this.socket?.off('joined_exchange', handleJoined);
-          this.socket?.off('join_error', handleError);
-          resolve();
-        }
-      };
-
-      const handleError = (data: { exchangeId: string; error: string }) => {
-        if (data.exchangeId === exchangeId) {
-          clearTimeout(timeout);
-          this.socket?.off('joined_exchange', handleJoined);
-          this.socket?.off('join_error', handleError);
-          // Don't reject, just log warning
-          console.warn('Failed to join exchange room:', data.error);
-          resolve();
-        }
-      };
-
-      this.socket.on('joined_exchange', handleJoined);
-      this.socket.on('join_error', handleError);
-    });
+  disconnect() {
+    // Disconnect socket
+    console.log('Disconnecting socket...');
   }
 
-  // Leave an exchange room
-  leaveExchange(exchangeId: string) {
-    if (this.socket) {
-      this.socket.emit('leave_exchange', exchangeId);
-    }
+  private async joinExchange(exchangeId: string): Promise<void> {
+    // Join exchange room via socket
+    console.log(`Joining exchange room: ${exchangeId}`);
   }
 
-  // Send typing indicator
+  private leaveExchange(exchangeId: string): void {
+    // Leave exchange room via socket
+    console.log(`Leaving exchange room: ${exchangeId}`);
+  }
+
   startTyping(exchangeId: string) {
-    if (this.socket) {
-      this.socket.emit('typing_start', { exchangeId });
-    }
+    // Handled by useSocket hook
   }
 
   stopTyping(exchangeId: string) {
-    if (this.socket) {
-      this.socket.emit('typing_stop', { exchangeId });
-    }
-  }
-
-  // Disconnect socket
-  disconnect() {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-    }
-    this.messageListeners.clear();
-    this.readReceiptListeners.clear();
-    this.typingListeners.clear();
+    // Handled by useSocket hook
   }
 
   async getExchanges(userId: string): Promise<ChatExchange[]> {
@@ -194,13 +82,6 @@ class ChatService {
       const chatExchanges: ChatExchange[] = exchanges.map((exchange: any) => {
         // Extract participants from exchangeParticipants if available
         const participants: User[] = [];
-        
-        console.log('🔍 Processing exchange:', exchange.name || exchange.exchange_name, {
-          hasExchangeParticipants: !!exchange.exchangeParticipants,
-          hasExchange_participants: !!exchange.exchange_participants,
-          hasParticipants: !!exchange.participants,
-          exchangeKeys: Object.keys(exchange)
-        });
         
         // Try different field names for participants
         const participantsList = exchange.exchangeParticipants || 
@@ -332,7 +213,7 @@ class ChatService {
     attachment_id?: string;
     message_type?: 'text' | 'file' | 'system';
   }): Promise<ChatMessage> {
-    console.log('🚀 Sending message:', messageData);
+    
     
     try {
       // Use HTTP API for reliability
@@ -357,7 +238,7 @@ class ChatService {
       messageType: messageData.message_type || 'text'
     };
 
-    console.log('📤 API Request:', `${this.baseURL}/messages`, requestBody);
+    
 
     const response = await fetch(`${this.baseURL}/messages`, {
       method: 'POST',
@@ -368,7 +249,7 @@ class ChatService {
       body: JSON.stringify(requestBody)
     });
 
-    console.log('📥 API Response status:', response.status, response.statusText);
+    
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -385,7 +266,7 @@ class ChatService {
     }
 
     const responseData = await response.json();
-    console.log('✅ API Success response:', responseData);
+    
     
     const message = responseData.data || responseData;
 
@@ -403,7 +284,7 @@ class ChatService {
       attachment: message.attachment
     };
 
-    console.log('🔄 Transformed message:', chatMessage);
+    
     return chatMessage;
   }
 
@@ -443,7 +324,7 @@ class ChatService {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch(`${this.baseURL}/messages/upload`, {
+      const response = await fetch(`${this.baseURL}/documents`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -456,7 +337,7 @@ class ChatService {
       }
 
       const data = await response.json();
-      return data.attachmentId || data.id;
+      return data.id || data.documentId || data.attachmentId;
     } catch (error) {
       console.error('Error uploading file:', error);
       throw error;

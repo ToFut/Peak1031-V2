@@ -28,7 +28,7 @@ export const useChat = () => {
       setLoading(true);
       setError(null);
       const chatExchanges = await chatService.getExchanges(user.id);
-      console.log('📋 Loaded exchanges:', chatExchanges);
+      
       setExchanges(chatExchanges);
       
       // Return exchanges for auto-selection logic
@@ -91,12 +91,6 @@ export const useChat = () => {
       return;
     }
 
-    console.log('🚀 useChat: Starting to send message:', {
-      content: content.trim(),
-      exchangeId: selectedExchange.id,
-      userId: user.id
-    });
-
     try {
       setSending(true);
       setError(null);
@@ -109,16 +103,14 @@ export const useChat = () => {
         message_type: 'text' as const
       };
 
-      console.log('📤 useChat: Calling chatService.sendMessage with:', messageData);
-      
       const newMessage = await chatService.sendMessage(messageData);
 
-      console.log('✅ useChat: Message sent successfully:', newMessage);
+      
 
       // Add the new message to the local state
       setMessages(prev => {
         const updated = [...prev, newMessage];
-        console.log('📝 useChat: Updated messages state:', updated.length, 'messages');
+        
         return updated;
       });
       
@@ -129,7 +121,7 @@ export const useChat = () => {
           : ex
       ));
 
-      console.log('✅ useChat: Message send complete');
+      
     } catch (err: any) {
       console.error('❌ useChat: Error sending message:', err);
       setError(err.message || 'Failed to send message');
@@ -257,7 +249,7 @@ export const useChat = () => {
       
       // Auto-select first exchange if none selected
       if (exchanges && exchanges.length > 0 && !selectedExchange) {
-        console.log('🎯 Auto-selecting first exchange:', exchanges[0]);
+        
         await selectExchange(exchanges[0]);
       }
     };

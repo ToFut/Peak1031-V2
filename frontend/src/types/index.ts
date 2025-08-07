@@ -38,7 +38,7 @@ export interface Task {
   assignedTo?: string;
   dueDate?: string;
   completedAt?: string;
-  ppData: any;
+  ppData: PracticePantherTaskData;
   lastSyncAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -60,7 +60,7 @@ export interface Document {
   pinRequired: boolean;
   pinHash?: string;
   isTemplate: boolean;
-  templateData: any;
+  templateData: DocumentTemplateData;
   createdAt: string;
   updatedAt: string;
   exchange?: Exchange;
@@ -94,7 +94,7 @@ export interface AuditLog {
   userId?: string;
   ipAddress?: string;
   userAgent?: string;
-  details: any;
+  details: Record<string, unknown>;
   createdAt: string;
   user?: User;
   // Additional properties used in the frontend
@@ -121,9 +121,40 @@ export interface SyncLog {
   recordsUpdated: number;
   recordsCreated: number;
   errorMessage?: string;
-  details: any;
+  details: SyncDetails;
   triggeredBy?: string;
   user?: User;
+}
+
+// Type definitions for previously 'any' types
+export interface PracticePantherTaskData {
+  id?: string;
+  matter_id?: string;
+  description?: string;
+  due_date?: string;
+  completed?: boolean;
+  assigned_to?: string;
+  priority?: string;
+  [key: string]: unknown;
+}
+
+export interface DocumentTemplateData {
+  fields?: Record<string, string | number | boolean>;
+  variables?: Record<string, unknown>;
+  template_id?: string;
+  version?: string;
+}
+
+export interface SyncDetails {
+  service?: string;
+  records_synced?: number;
+  errors?: Array<{
+    message: string;
+    code?: string;
+    record_id?: string;
+  }>;
+  duration_ms?: number;
+  [key: string]: unknown;
 }
 
 // Enums

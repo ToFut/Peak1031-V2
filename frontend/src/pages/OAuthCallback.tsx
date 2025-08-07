@@ -12,7 +12,7 @@ const OAuthCallback: React.FC = () => {
   useEffect(() => {
     const handleOAuthCallback = async () => {
       try {
-        console.log('🔄 Processing PracticePanther OAuth callback...');
+        
         
         // Get parameters from URL
         const code = searchParams.get('code');
@@ -46,20 +46,15 @@ const OAuthCallback: React.FC = () => {
           return;
         }
 
-        console.log('✅ Authorization code received:', code.substring(0, 10) + '...');
-        console.log('✅ State parameter received:', state.substring(0, 10) + '...');
-
         // Update status
         setMessage('Exchanging authorization code for access tokens...');
 
         // OAuth Step 2 - Exchange code for tokens
-        console.log('🔄 Starting token exchange (OAuth Step 2)...');
-        
         const tokenData = await oauthService.exchangeCodeForTokens(code, state);
         
-        console.log('✅ OAuth flow completed successfully!');
-        console.log('🔑 Access token obtained and stored securely');
-        console.log('⏰ Token expires in:', tokenData.expires_in, 'seconds');
+        
+        
+        
 
         // Success!
         setStatus('success');

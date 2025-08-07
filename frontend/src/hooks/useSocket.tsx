@@ -57,15 +57,13 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   // Disconnect socket function
   const disconnectSocket = useCallback(() => {
     if (socket) {
-      console.log('🔌 Disconnecting socket...');
+      
       socket.disconnect();
       setSocket(null);
     }
     setConnectionStatus('disconnected');
     setTypingUsers(new Map());
   }, [socket]);
-
-
 
   const initializeSocket = useCallback(() => {
     if (socket) {
@@ -78,7 +76,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       return;
     }
 
-    console.log('🔌 Initializing socket connection...');
+    
     setConnectionStatus('connecting');
 
          const socketUrl = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5001';
@@ -97,7 +95,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     // Connection event handlers
     newSocket.on('connect', () => {
-      console.log('✅ Socket connected:', newSocket.id);
+      
       setConnectionStatus('connected');
       setReconnectAttempts(0);
       
@@ -108,7 +106,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     });
 
     newSocket.on('disconnect', (reason) => {
-      console.log('❌ Socket disconnected:', reason);
+      
       setConnectionStatus('disconnected');
       
       if (reason === 'io server disconnect') {
@@ -124,7 +122,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     });
 
     newSocket.on('reconnect', (attemptNumber) => {
-      console.log(`🔄 Socket reconnected after ${attemptNumber} attempts`);
+      
       setConnectionStatus('connected');
       setReconnectAttempts(0);
     });
@@ -147,7 +145,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const setupMessageHandlers = useCallback((socket: Socket) => {
     // New message received
     socket.on('new_message', (message: MessageData) => {
-      console.log('💬 New message received:', message);
+      
       
       // Dispatch custom event for components to listen to
       const event = new CustomEvent('socket_new_message', {
@@ -158,7 +156,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     // Exchange joined successfully
     socket.on('joined_exchange', (data: { exchangeId: string; status: string }) => {
-      console.log('🏢 Joined exchange:', data.exchangeId);
+      
       
       const event = new CustomEvent('socket_joined_exchange', {
         detail: data
@@ -178,7 +176,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     // User typing indicators
     socket.on('user_typing', (data: TypingData) => {
-      console.log('⌨️ User typing:', data);
+      
       
       setTypingUsers(prev => {
         const newMap = new Map(prev);
@@ -220,7 +218,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     // User online/offline status
     socket.on('user_online', (data: UserStatusData) => {
-      console.log('🟢 User online:', data);
+      
       
       const event = new CustomEvent('socket_user_online', {
         detail: data
@@ -229,7 +227,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     });
 
     socket.on('user_offline', (data: UserStatusData) => {
-      console.log('🔴 User offline:', data);
+      
       
       const event = new CustomEvent('socket_user_offline', {
         detail: data
@@ -257,7 +255,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     // System notifications
     socket.on('notification', (notification: any) => {
-      console.log('🔔 Notification received:', notification);
+      
       
       const event = new CustomEvent('socket_notification', {
         detail: notification
@@ -267,7 +265,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     // Exchange updates
     socket.on('exchange_updated', (data: any) => {
-      console.log('🏢 Exchange updated:', data);
+      
       
       const event = new CustomEvent('socket_exchange_updated', {
         detail: data
@@ -277,7 +275,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     // Document updates
     socket.on('document_processed', (data: any) => {
-      console.log('📄 Document processed:', data);
+      
       
       const event = new CustomEvent('socket_document_processed', {
         detail: data
@@ -287,7 +285,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     // Task updates
     socket.on('task_updated', (data: any) => {
-      console.log('✅ Task updated:', data);
+      
       
       const event = new CustomEvent('socket_task_updated', {
         detail: data
@@ -311,7 +309,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   const joinExchange = useCallback((exchangeId: string) => {
     if (socket && connectionStatus === 'connected') {
-      console.log('🏢 Joining exchange:', exchangeId);
+      
       socket.emit('join_exchange', exchangeId);
     } else {
       console.warn('Cannot join exchange: socket not connected');
@@ -320,14 +318,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   const leaveExchange = useCallback((exchangeId: string) => {
     if (socket && connectionStatus === 'connected') {
-      console.log('🏢 Leaving exchange:', exchangeId);
+      
       socket.emit('leave_exchange', exchangeId);
     }
   }, [socket, connectionStatus]);
 
   const sendMessage = useCallback((exchangeId: string, content: string, attachmentId?: string) => {
     if (socket && connectionStatus === 'connected') {
-      console.log('💬 Sending message to exchange:', exchangeId);
+      
       
       const messageData = {
         exchangeId,

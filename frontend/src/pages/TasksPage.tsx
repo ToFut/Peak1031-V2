@@ -44,7 +44,7 @@ const TasksPage: React.FC = () => {
 
   const handleTaskSelect = (task: Task) => {
     // Could navigate to task details or open a modal
-    console.log('Selected task:', task);
+    
   };
 
   if (loading) {

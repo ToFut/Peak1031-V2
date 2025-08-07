@@ -32,7 +32,6 @@ const Documents: React.FC = () => {
   const [filter, setFilter] = useState('all');
   const [showEnterpriseManager, setShowEnterpriseManager] = useState(false);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
-  const [showEnhancedManager, setShowEnhancedManager] = useState(false);
   const [useEnhancedManager, setUseEnhancedManager] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -126,7 +125,6 @@ const Documents: React.FC = () => {
         return matchesSearch && matchesFilter;
       });
     }, [documents, searchTerm, filter]);
-
 
   if (loading) {
     return (
@@ -252,7 +250,7 @@ const Documents: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Exchanges</p>
-              <p className="text-2xl font-bold text-orange-600">{exchanges.length}</p>
+              <p className="text-2xl font-bold text-orange-600">{exchanges?.length || 0}</p>
             </div>
             <div className="p-3 bg-orange-100 rounded-xl">
               <BuildingOfficeIcon className="w-6 h-6 text-orange-600" />
@@ -530,25 +528,6 @@ const Documents: React.FC = () => {
         }}
       />
 
-      {/* Enhanced Document Manager Modal */}
-      {showEnhancedManager && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative min-h-screen">
-            <div className="bg-white">
-              <div className="flex items-center justify-between p-6 border-b">
-                <h2 className="text-xl font-semibold text-gray-900">Enhanced Document Manager</h2>
-                <button
-                  onClick={() => setShowEnhancedManager(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <XMarkIcon className="h-6 w-6" />
-                </button>
-              </div>
-              <EnhancedDocumentManager />
-            </div>
-          </div>
-        </div>
-      )}
         </>
       )}
     </div>

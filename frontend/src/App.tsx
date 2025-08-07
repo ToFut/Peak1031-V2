@@ -10,7 +10,7 @@ import { ErrorBoundary, RouteErrorBoundary } from './components/ErrorBoundary';
 // Feature imports
 import Messages from './features/messages/pages/Messages';
 import Exchanges from './features/exchanges/pages/Exchanges';
-import ExchangeDetailsPage from './pages/ExchangeDetailsPage';
+import ExchangeDetail from './features/exchanges/pages/ExchangeDetail';
 import Tasks from './features/tasks/pages/Tasks';
 import Contacts from './features/contacts/pages/Contacts';
 import Documents from './features/documents/pages/Documents';
@@ -171,11 +171,9 @@ const App: React.FC = () => {
                 path="/exchanges/:id" 
                 element={
                   <ProtectedRoute>
-                    <Layout>
-                      <RouteErrorBoundary routeName="ExchangeDetails">
-                        <ExchangeDetailsPage />
-                      </RouteErrorBoundary>
-                    </Layout>
+                    <RouteErrorBoundary routeName="ExchangeDetails">
+                      <ExchangeDetail />
+                    </RouteErrorBoundary>
                   </ProtectedRoute>
                 } 
               />
@@ -272,6 +270,19 @@ const App: React.FC = () => {
 
               <Route 
                 path="/admin/gpt" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <RouteErrorBoundary routeName="AdminGPT">
+                        <AdminGPT />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/admin/ai-gpt" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>

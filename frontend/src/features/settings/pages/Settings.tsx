@@ -26,7 +26,25 @@ const Settings: React.FC = () => {
       setSettings(response || {});
     } catch (err: any) {
       console.error('Error loading settings:', err);
-      setError(err.message || 'Failed to load settings');
+      
+      // Provide default settings if API fails
+      if (err.message?.includes('not found')) {
+        
+        setSettings({
+          profile: {
+            firstName: user?.firstName || '',
+            lastName: user?.lastName || '',
+            email: user?.email || '',
+            role: user?.role || ''
+          },
+          preferences: {
+            notifications: { email: true, sms: false },
+            dashboard: { theme: 'light', language: 'en' }
+          }
+        });
+      } else {
+        setError(err.message || 'Failed to load settings');
+      }
     } finally {
       setLoading(false);
     }

@@ -30,12 +30,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         const token = localStorage.getItem('token');
         if (token) {
-          console.log('🔐 Found stored token, verifying with backend...');
+          
           
           // SECURITY FIX: Remove client-side JWT parsing - let backend validate
           // Only perform basic format check without decoding sensitive data
           if (!token || typeof token !== 'string' || !token.includes('.')) {
-            console.log('❌ Token format invalid');
+            
             localStorage.removeItem('token');
             localStorage.removeItem('refreshToken');
             localStorage.removeItem('user');
@@ -46,15 +46,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // Verify token with backend and get user data - backend handles expiry
           const userData = await apiService.getCurrentUser();
-          console.log('✅ Token valid, user:', userData.email);
+          
           setUser(userData);
         } else {
-          console.log('🔐 No stored token found');
+          
         }
       } catch (error: any) {
         console.error('Error initializing auth:', error);
         // Clear tokens on any auth error
-        console.log('🔑 Clearing invalid tokens due to error:', error.message);
+        
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
@@ -70,7 +70,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string): Promise<void> => {
     try {
       setLoading(true);
-      console.log('🔐 Attempting login for:', email);
+      
       
       const response = await apiService.login({ email, password });
       
@@ -85,7 +85,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Set user state
       setUser(response.user);
-      console.log('✅ Login successful for:', response.user.email);
+      
     } catch (error: any) {
       console.error('❌ Login failed:', error);
       throw error;
@@ -96,7 +96,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async (): Promise<void> => {
     try {
-      console.log('👋 Logging out...');
+      
       
       // Call backend logout endpoint
       await apiService.logout();
@@ -108,7 +108,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Clear user state
       setUser(null);
-      console.log('✅ Logout successful');
+      
     } catch (error: any) {
       console.error('❌ Logout failed:', error);
       // Even if logout fails, clear local state
@@ -122,7 +122,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const refreshToken = async (): Promise<void> => {
     try {
       await apiService.refreshToken();
-      console.log('✅ Token refreshed successfully');
+      
     } catch (error: any) {
       console.error('❌ Token refresh failed:', error);
       // Clear tokens and redirect to login
@@ -141,7 +141,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       const updatedUser = await apiService.updateUser(user.id, userData);
       setUser(updatedUser);
-      console.log('✅ User updated successfully');
+      
     } catch (error: any) {
       console.error('❌ User update failed:', error);
       throw error;

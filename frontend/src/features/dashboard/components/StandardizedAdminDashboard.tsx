@@ -200,21 +200,21 @@ const AdminTabContent: React.FC<AdminTabContentProps> = ({ activeTab, role }) =>
                   title="View Audit Logs"
                   description="System activity history"
                   icon={EyeIcon}
-                  onClick={() => console.log('View audit logs')}
+                  onClick={() => console.log('View Audit Logs clicked')}
                   color="purple"
                 />
                 <QuickAction
                   title="Backup System"
                   description="Create system backup"
                   icon={CircleStackIcon}
-                  onClick={() => console.log('Backup system')}
+                  onClick={() => console.log('Backup System clicked')}
                   color="blue"
                 />
                 <QuickAction
                   title="Refresh Cache"
                   description="Clear and refresh cache"
                   icon={ArrowPathIcon}
-                  onClick={() => console.log('Refresh cache')}
+                  onClick={() => console.log('Refresh Cache clicked')}
                   color="green"
                 />
               </div>
