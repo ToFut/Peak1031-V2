@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Exchange } from '../../../types';
-import { smartApi } from '../../../services/smartApi';
 import { useAuth } from '../../../hooks/useAuth';
 import { usePermissions } from '../../../hooks/usePermissions';
+import { useExchanges } from '../hooks/useExchanges';
 import { ExchangeCard } from './ExchangeCard';
 import ModernDropdown from './ModernDropdown';
 import { VirtualizedList } from './VirtualizedList';
@@ -142,12 +142,18 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
   showSearch = true,
   showStats = true
 }) => {
-  const [exchanges, setExchanges] = useState<Exchange[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const { isAdmin, isCoordinator } = usePermissions();
   const navigate = useNavigate();
+  
+  // Use the exchanges hook instead of manual state management
+  const {
+    exchanges,
+    loading,
+    error,
+    refresh: refreshExchanges,
+    clearError
+  } = useExchanges(filters);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -188,79 +194,10 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
     { value: 'year', label: 'This Year' }
   ];
 
-  const loadExchanges = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Debug user detection
-      console.log('🔍 ExchangeList: Current user:', user);
-      console.log('🔍 ExchangeList: User role:', user?.role);
-      console.log('🔍 ExchangeList: Is admin?', user?.role === 'admin');
-      
-      // For admin users, fetch ALL exchanges directly from Supabase
-      if (user?.role === 'admin') {
-        console.log('👑 ExchangeList: Admin detected - attempting direct Supabase fetch');
-        try {
-          // Try to get Supabase client from the service
-          const { createClient } = await import('@supabase/supabase-js');
-          const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-          const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
-          
-          console.log('🔍 ExchangeList: Supabase URL exists?', !!supabaseUrl);
-          console.log('🔍 ExchangeList: Supabase Key exists?', !!supabaseKey);
-          
-          if (supabaseUrl && supabaseKey) {
-            const supabase = createClient(supabaseUrl, supabaseKey);
-            
-            console.log('📡 ExchangeList: Making direct Supabase query...');
-            // Fetch ALL exchanges for admin (no limit)
-            const { data, error } = await supabase
-              .from('exchanges')
-              .select('*')
-              .order('created_at', { ascending: false });
-            
-            if (error) {
-              console.error('❌ ExchangeList: Supabase error:', error);
-              throw error;
-            }
-            
-            if (data) {
-              console.log(`✅ ExchangeList: Admin loaded ${data.length} exchanges directly from Supabase`);
-              setExchanges(data);
-              return;
-            }
-          } else {
-            console.warn('⚠️ ExchangeList: Missing Supabase credentials');
-          }
-        } catch (supabaseError) {
-          console.warn('❌ ExchangeList: Direct Supabase fetch failed, falling back to API:', supabaseError);
-        }
-      } else {
-        console.log('👤 ExchangeList: Non-admin user, using regular API');
-      }
-      
-      // Fallback to regular API for non-admins or if direct fetch fails
-      const response = await smartApi.getExchanges();
-      const exchangesData = response.exchanges || response || [];
-      setExchanges(Array.isArray(exchangesData) ? exchangesData : []);
-      
-      // Check if using fallback data
-      if (exchangesData.some((e: any) => e._isFallback)) {
-        setError('Using cached data - backend connection unavailable');
-      }
-      
-    } catch (err: any) {
-      console.error('Error loading exchanges:', err);
-      setError(err.message || 'Failed to load exchanges from Practice Partner database');
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.role]);
-
-  useEffect(() => {
-    loadExchanges();
-  }, [loadExchanges]);
+  // Debug user detection
+  console.log('🔍 ExchangeList: Current user:', user);
+  console.log('🔍 ExchangeList: User role:', user?.role);
+  console.log('🔍 ExchangeList: Is admin?', user?.role === 'admin');
 
   // Filter exchanges based on current filters - memoized to prevent unnecessary re-computations
   const filteredExchanges = useMemo(() => {
@@ -362,7 +299,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
           <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Exchanges</h3>
           <p className="text-gray-500 mb-4">{error}</p>
           <button
-            onClick={loadExchanges}
+            onClick={refreshExchanges}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
           >
             Try Again
@@ -382,7 +319,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
             <p className="text-yellow-800">{error}</p>
           </div>
           <button
-            onClick={loadExchanges}
+            onClick={refreshExchanges}
             className="bg-yellow-600 text-white px-3 py-1 rounded-md hover:bg-yellow-700 text-sm"
           >
             Refresh

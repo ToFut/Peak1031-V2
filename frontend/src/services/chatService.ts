@@ -1,4 +1,3 @@
-import { supabase } from './supabase';
 import { apiService } from './api';
 import { Message, User, Exchange } from '../types';
 import { io, Socket } from 'socket.io-client';

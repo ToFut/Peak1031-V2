@@ -1,4 +1,4 @@
-import { User, Contact, Exchange, Task, Document, Message, AuditLog, SyncLog } from './supabase';
+import { User, Contact, Exchange, Task, Document, Message, AuditLog, SyncLog } from '../types';
 
 // Mock Users
 export const mockUsers: User[] = [

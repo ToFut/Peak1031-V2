@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+// import { supabase } from './supabase'; // TODO: Remove direct Supabase access - should use backend API
 
 interface OAuthTokenResponse {
   access_token: string;
@@ -138,7 +138,8 @@ class PracticePartnerOAuthService {
    * Store OAuth tokens securely in Supabase
    */
   private async storeTokens(tokenData: OAuthTokenResponse): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    // const { data: { user } } = await supabase.auth.getUser(); // TODO: Use backend API
+    const user = null; // Temporarily disabled
     
     if (!user) {
       throw new Error('User not authenticated');
@@ -168,7 +169,8 @@ class PracticePartnerOAuthService {
    * Get current access token (refresh if needed)
    */
   async getAccessToken(): Promise<string | null> {
-    const { data: { user } } = await supabase.auth.getUser();
+    // const { data: { user } } = await supabase.auth.getUser(); // TODO: Use backend API
+    const user = null; // Temporarily disabled
     
     if (!user) {
       return null;
@@ -244,7 +246,8 @@ class PracticePartnerOAuthService {
    * Disconnect PracticePanther account
    */
   async disconnect(): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    // const { data: { user } } = await supabase.auth.getUser(); // TODO: Use backend API
+    const user = null; // Temporarily disabled
     
     if (!user) {
       return;
@@ -289,7 +292,8 @@ class PracticePartnerOAuthService {
    * Get connection information
    */
   async getConnectionInfo(): Promise<{ connected: boolean; expiresAt?: string; userId?: string } | null> {
-    const { data: { user } } = await supabase.auth.getUser();
+    // const { data: { user } } = await supabase.auth.getUser(); // TODO: Use backend API
+    const user = null; // Temporarily disabled
     
     if (!user) {
       return null;
