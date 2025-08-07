@@ -490,6 +490,10 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
               <div className="text-xs text-gray-500 mr-4">
                 User: {user?.first_name} {user?.last_name} ({user?.role})
               </div>
+              {/* Debug: Force show user menu */}
+              <div className="text-xs text-red-500 mr-4 bg-red-100 p-1 rounded">
+                MENU SHOULD BE HERE →
+              </div>
               {/* Notifications */}
               <div className="relative">
                 <button
@@ -565,7 +569,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200"
+                  className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200 bg-yellow-100"
                 >
                   <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
                     <span className="text-white font-medium text-sm">
@@ -578,6 +582,9 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
                     </p>
                     <p className="text-xs text-gray-500">
                       {getRoleDisplayName(user.role)}
+                    </p>
+                    <p className="text-xs text-red-600 font-bold">
+                      CLICK ME!
                     </p>
                   </div>
                   <ChevronDownIcon className="h-4 w-4 text-gray-400" />

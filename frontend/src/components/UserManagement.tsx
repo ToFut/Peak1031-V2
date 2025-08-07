@@ -285,7 +285,9 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const getRoleDisplayName = (role: string) => {
+  const getRoleDisplayName = (role: string | null | undefined) => {
+    if (!role) return 'Unknown';
+    
     switch (role) {
       case 'admin': return 'Admin';
       case 'coordinator': return 'Coordinator';

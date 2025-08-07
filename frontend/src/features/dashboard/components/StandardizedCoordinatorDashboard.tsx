@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import StandardDashboard from './StandardDashboard';
 import { EnhancedStatCard } from './SharedDashboardComponents';
-import { TaskBoard } from '../TaskBoard';
-import { ExchangeList } from '../ExchangeList';
-import KanbanTaskBoard from './KanbanTaskBoard';
+import { TaskBoard } from '../../../components/TaskBoard';
+import { ExchangeList } from '../../exchanges/components/ExchangeList';
+// import KanbanTaskBoard from '../../../components/dashboard/KanbanTaskBoard';
 import {
   ChartBarIcon,
   DocumentTextIcon,
@@ -98,11 +98,9 @@ const CoordinatorTabContent: React.FC<CoordinatorTabContentProps> = ({ activeTab
                 </p>
               </div>
               <div className="p-6">
-                <KanbanTaskBoard 
-                  tasks={[]}
-                  onTaskUpdate={(taskId, newStatus) => console.log('Task updated:', taskId, newStatus)}
-                  onTaskReassign={(taskId, newAssignee) => console.log('Task reassigned:', taskId, newAssignee)}
-                />
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-gray-500">Kanban Task Board - Coming Soon</p>
+                </div>
               </div>
             </div>
           </div>

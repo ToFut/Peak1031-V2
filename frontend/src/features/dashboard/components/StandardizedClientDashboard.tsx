@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import StandardDashboard from './StandardDashboard';
 import { EnhancedStatCard } from './SharedDashboardComponents';
-import UnifiedChatInterface from '../UnifiedChatInterface';
-import { ExchangeList } from '../ExchangeList';
-import { TaskBoard } from '../TaskBoard';
+import UnifiedChatInterface from '../../../components/UnifiedChatInterface';
+import { ExchangeList } from '../../exchanges/components/ExchangeList';
+import { TaskBoard } from '../../../components/TaskBoard';
 import {
   ChartBarIcon,
   DocumentTextIcon,

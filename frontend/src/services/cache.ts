@@ -1,56 +1,95 @@
 interface CacheItem<T> {
   data: T;
   timestamp: number;
-  expiresIn: number;
+  ttl: number;
+}
+
+interface CacheOptions {
+  ttl?: number; // Time to live in milliseconds
+  maxSize?: number; // Maximum number of items in cache
 }
 
 class CacheService {
-  private cache: Map<string, CacheItem<any>> = new Map();
-  private readonly DEFAULT_EXPIRY = 5 * 60 * 1000; // 5 minutes
+  private cache = new Map<string, CacheItem<any>>();
+  private defaultTTL = 5 * 60 * 1000; // 5 minutes
+  private maxSize = 100;
 
-  // Set data in cache
-  set<T>(key: string, data: T, expiresIn: number = this.DEFAULT_EXPIRY): void {
+  constructor(options: CacheOptions = {}) {
+    this.defaultTTL = options.ttl || this.defaultTTL;
+    this.maxSize = options.maxSize || this.maxSize;
+  }
+
+  set<T>(key: string, data: T, ttl?: number): void {
+    // Clean expired items first
+    this.cleanup();
+
+    // Remove oldest items if cache is full
+    if (this.cache.size >= this.maxSize) {
+      const oldestKey = this.cache.keys().next().value;
+      this.cache.delete(oldestKey);
+    }
+
     this.cache.set(key, {
       data,
       timestamp: Date.now(),
-      expiresIn
+      ttl: ttl || this.defaultTTL
     });
   }
 
-  // Get data from cache
   get<T>(key: string): T | null {
     const item = this.cache.get(key);
     
     if (!item) return null;
-    
-    // Check if expired
-    if (Date.now() - item.timestamp > item.expiresIn) {
+
+    // Check if item is expired
+    if (Date.now() - item.timestamp > item.ttl) {
       this.cache.delete(key);
       return null;
     }
-    
-    return item.data as T;
+
+    return item.data;
   }
 
-  // Check if cache has valid data
   has(key: string): boolean {
     return this.get(key) !== null;
   }
 
-  // Clear specific key
-  clear(key: string): void {
-    this.cache.delete(key);
+  delete(key: string): boolean {
+    return this.cache.delete(key);
   }
 
-  // Clear all cache
-  clearAll(): void {
+  clear(): void {
     this.cache.clear();
   }
 
-  // Get all keys
-  keys(): string[] {
-    return Array.from(this.cache.keys());
+  private cleanup(): void {
+    const now = Date.now();
+    for (const [key, item] of this.cache.entries()) {
+      if (now - item.timestamp > item.ttl) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  // Cache with automatic key generation
+  cacheWithKey<T>(fn: () => string, data: T, ttl?: number): void {
+    this.set(fn(), data, ttl);
+  }
+
+  // Get cache stats
+  getStats() {
+    return {
+      size: this.cache.size,
+      maxSize: this.maxSize,
+      keys: Array.from(this.cache.keys())
+    };
   }
 }
 
-export const cacheService = new CacheService();
+// Create singleton instances for different data types
+export const documentsCache = new CacheService({ ttl: 2 * 60 * 1000 }); // 2 minutes
+export const exchangesCache = new CacheService({ ttl: 10 * 60 * 1000 }); // 10 minutes
+export const userCache = new CacheService({ ttl: 30 * 60 * 1000 }); // 30 minutes
+export const generalCache = new CacheService({ ttl: 5 * 60 * 1000 }); // 5 minutes
+
+export default CacheService;

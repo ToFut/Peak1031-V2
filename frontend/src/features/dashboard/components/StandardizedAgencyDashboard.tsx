@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import StandardDashboard from './StandardDashboard';
 import { EnhancedStatCard } from './SharedDashboardComponents';
-import { ExchangeList } from '../ExchangeList';
+import { ExchangeList } from '../../exchanges/components/ExchangeList';
 import {
   ChartBarIcon,
   DocumentTextIcon,

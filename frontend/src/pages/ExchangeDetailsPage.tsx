@@ -4,7 +4,6 @@ import { Exchange, Task, Document, AuditLog } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { usePermissions } from '../hooks/usePermissions';
 import { apiService } from '../services/api';
-import Layout from '../components/Layout';
 import { ExchangeChatBox } from '../features/messages/components/ExchangeChatBox';
 import EnterpriseParticipantsManager from '../components/EnterpriseParticipantsManager';
 import {
@@ -366,23 +365,20 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="animate-pulse">
+      <div className="animate-pulse">
           <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
           <div className="space-y-4">
             {[...Array(5)].map((_, i) => (
               <div key={i} className="bg-gray-200 rounded-lg h-24"></div>
             ))}
           </div>
-        </div>
-      </Layout>
+      </div>
     );
   }
 
   if (error || !exchange) {
     return (
-      <Layout>
-        <div className="text-center py-12">
+      <div className="text-center py-12">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Exchange</h3>
           <p className="text-gray-500 mb-4">{error || 'Exchange not found'}</p>
@@ -392,14 +388,12 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
           >
             Back to Exchanges
           </button>
-        </div>
-      </Layout>
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -1457,8 +1451,7 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
             }}
           />
         )}
-      </div>
-    </Layout>
+    </div>
   );
 };
 

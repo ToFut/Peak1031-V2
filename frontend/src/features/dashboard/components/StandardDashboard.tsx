@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../hooks/useAuth';
-import { useRolePermissions } from '../../hooks/useRolePermissions';
-import { useDashboardData } from '../../hooks/useDashboardData';
+import { useAuth } from '../../../hooks/useAuth';
+import { useRolePermissions } from '../../../hooks/useRolePermissions';
+import { useDashboardData } from '../../../hooks/useDashboardData';
 import {
   DashboardLayout,
   EnhancedStatCard,
@@ -15,8 +15,7 @@ import {
   ChartBarIcon,
   DocumentTextIcon,
   CheckCircleIcon,
-  ClockIcon,
-  ExclamationTriangleIcon,
+
   UsersIcon,
   ChatBubbleLeftRightIcon,
   CogIcon,
@@ -449,34 +448,39 @@ const StandardDashboard: React.FC<StandardDashboardProps> = ({
   const tabs = buildTabs();
 
   return (
-    <DashboardLayout
-      title={config.title}
-      subtitle={`Welcome back, ${user?.first_name || 'User'}. ${config.subtitle}`}
-      headerActions={
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={refreshData}
-            disabled={loading}
-            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            <ArrowPathIcon className={`-ml-0.5 mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+    <div className="space-y-6">
+      {/* Dashboard Header */}
+      <div className="mb-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{config.title}</h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Welcome back, {user?.first_name || 'User'}. {config.subtitle}
+            </p>
+          </div>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={refreshData}
+              disabled={loading}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              <ArrowPathIcon className={`-ml-0.5 mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
         </div>
-      }
-    >
-      <div className="space-y-6">
-        {/* Tab Navigation */}
-        <TabNavigation
-          tabs={tabs}
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-        />
-
-        {/* Tab Content */}
-        {renderTabContent()}
       </div>
-    </DashboardLayout>
+
+      {/* Tab Navigation */}
+      <TabNavigation
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+      />
+
+      {/* Tab Content */}
+      {renderTabContent()}
+    </div>
   );
 };
 

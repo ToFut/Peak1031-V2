@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface StatusBadgeProps {
-  status: string;
+  status?: string | null;
   variant?: 'default' | 'pill' | 'dot';
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -13,6 +13,24 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({
   size = 'md',
   className = ''
 }) => {
+  // Handle null/undefined status
+  if (!status) {
+    return (
+      <span className={`
+        inline-flex 
+        items-center 
+        font-medium 
+        border
+        px-2.5 py-1 text-sm
+        rounded-md
+        bg-gray-100 text-gray-800 border-gray-200
+        ${className}
+      `}>
+        Unknown
+      </span>
+    );
+  }
+
   const getStatusColors = (status: string) => {
     const normalizedStatus = status.toLowerCase().replace(/[_\s]/g, '');
     

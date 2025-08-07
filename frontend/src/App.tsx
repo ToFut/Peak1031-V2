@@ -11,11 +11,11 @@ import DebugPanel from './components/DebugPanel';
 import Login from './features/auth/pages/Login';
 
 // NEW: Standardized dashboard components with consistent UX
-import AdminDashboard from './components/dashboard/StandardizedAdminDashboard';
-import ClientDashboard from './components/dashboard/StandardizedClientDashboard';
-import CoordinatorDashboard from './components/dashboard/StandardizedCoordinatorDashboard';
-import ThirdPartyDashboard from './components/dashboard/StandardizedThirdPartyDashboard';
-import AgencyDashboard from './components/dashboard/StandardizedAgencyDashboard';
+import AdminDashboard from './features/dashboard/components/StandardizedAdminDashboard';
+import ClientDashboard from './features/dashboard/components/StandardizedClientDashboard';
+import CoordinatorDashboard from './features/dashboard/components/StandardizedCoordinatorDashboard';
+import ThirdPartyDashboard from './features/dashboard/components/StandardizedThirdPartyDashboard';
+import AgencyDashboard from './features/dashboard/components/StandardizedAgencyDashboard';
 // OLD: import Messages from './pages/Messages';
 // NEW V2-style import (testing Messages migration)
 import Messages from './features/messages/pages/Messages';
@@ -139,7 +139,9 @@ const App: React.FC = () => {
                 path="/dashboard" 
                 element={
                   <ProtectedRoute>
-                    <DashboardRoute />
+                    <Layout>
+                      <DashboardRoute />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -149,7 +151,9 @@ const App: React.FC = () => {
                 path="/messages" 
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client', 'agency', 'third_party']}>
-                    <Messages />
+                    <Layout>
+                      <Messages />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -159,7 +163,9 @@ const App: React.FC = () => {
                 path="/exchanges" 
                 element={
                   <ProtectedRoute>
-                    <Exchanges />
+                    <Layout>
+                      <Exchanges />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -168,7 +174,9 @@ const App: React.FC = () => {
                 path="/exchanges/:id" 
                 element={
                   <ProtectedRoute>
-                    <ExchangeDetailsPage />
+                    <Layout>
+                      <ExchangeDetailsPage />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -178,7 +186,9 @@ const App: React.FC = () => {
                 path="/tasks" 
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client']}>
-                    <Tasks />
+                    <Layout>
+                      <Tasks />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -188,7 +198,9 @@ const App: React.FC = () => {
                 path="/contacts" 
                 element={
                   <ProtectedRoute>
-                    <Contacts />
+                    <Layout>
+                      <Contacts />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -198,7 +210,9 @@ const App: React.FC = () => {
                 path="/documents" 
                 element={
                   <ProtectedRoute>
-                    <Documents />
+                    <Layout>
+                      <Documents />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -208,7 +222,9 @@ const App: React.FC = () => {
                 path="/admin/users" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
-                    <Users />
+                    <Layout>
+                      <Users />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
