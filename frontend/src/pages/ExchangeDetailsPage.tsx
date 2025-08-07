@@ -143,30 +143,61 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
 
       console.log('Loading exchange details for ID:', id);
 
-      // Try enterprise endpoints first, fallback to regular endpoints
+      // Load data with better error handling
       let exchangeData, participantsData, tasksData, documentsData, auditData, timelineData, complianceData;
       
       try {
-        // Try enterprise endpoints
-        [exchangeData, participantsData, tasksData, documentsData, auditData, timelineData, complianceData] = await Promise.all([
-          apiService.get(`/enterprise-exchanges/${id}`).catch(() => apiService.get(`/exchanges/${id}`)),
-          apiService.get(`/exchanges/${id}/participants`),
-          apiService.get(`/exchanges/${id}/tasks`),
-          apiService.get(`/documents/exchange/${id}`),
-          apiService.get(`/exchanges/${id}/audit-logs`),
-          apiService.get(`/enterprise-exchanges/${id}/timeline`).catch(() => []),
-          apiService.get(`/enterprise-exchanges/${id}/compliance`).catch(() => null)
-        ]);
+        // Load exchange data first
+        exchangeData = await apiService.get(`/exchanges/${id}`);
+        console.log('Exchange data loaded:', exchangeData);
       } catch (error) {
-        // Fallback to regular endpoints
-        [exchangeData, participantsData, tasksData, documentsData, auditData] = await Promise.all([
-          apiService.get(`/exchanges/${id}`),
-          apiService.get(`/exchanges/${id}/participants`),
-          apiService.get(`/exchanges/${id}/tasks`),
-          apiService.get(`/documents/exchange/${id}`),
-          apiService.get(`/exchanges/${id}/audit-logs`)
-        ]);
+        console.error('Failed to load exchange data:', error);
+        setError('Failed to load exchange details');
+        setLoading(false);
+        return;
+      }
+
+      // Load other data with individual error handling
+      try {
+        participantsData = await apiService.get(`/exchanges/${id}/participants`);
+      } catch (error) {
+        console.warn('Failed to load participants:', error);
+        participantsData = [];
+      }
+
+      try {
+        tasksData = await apiService.get(`/exchanges/${id}/tasks`);
+      } catch (error) {
+        console.warn('Failed to load tasks:', error);
+        tasksData = [];
+      }
+
+      try {
+        documentsData = await apiService.get(`/documents/exchange/${id}`);
+      } catch (error) {
+        console.warn('Failed to load documents:', error);
+        documentsData = [];
+      }
+
+      try {
+        auditData = await apiService.get(`/exchanges/${id}/audit-logs`);
+      } catch (error) {
+        console.warn('Failed to load audit logs:', error);
+        auditData = [];
+      }
+
+      // Try enterprise endpoints for additional data
+      try {
+        timelineData = await apiService.get(`/enterprise-exchanges/${id}/timeline`);
+      } catch (error) {
+        console.warn('Failed to load timeline:', error);
         timelineData = [];
+      }
+
+      try {
+        complianceData = await apiService.get(`/enterprise-exchanges/${id}/compliance`);
+      } catch (error) {
+        console.warn('Failed to load compliance data:', error);
         complianceData = null;
       }
 
