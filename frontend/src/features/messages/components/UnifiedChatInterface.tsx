@@ -61,20 +61,46 @@ const UnifiedChatInterface: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Enhanced message send with better UX
+  // Enhanced message send with better UX and error handling
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || sending) return;
 
+    const originalMessage = newMessage;
+    
     try {
+      console.log('📤 UnifiedChatInterface: Sending message...');
       stopTypingIndicator();
-      await sendMessage(newMessage);
+      
+      // Clear message optimistically for better UX
       setNewMessage('');
       if (messageInputRef.current) {
         messageInputRef.current.style.height = '40px';
       }
-    } catch (err) {
-      console.error('Error sending message:', err);
+      
+      await sendMessage(originalMessage);
+      console.log('✅ UnifiedChatInterface: Message sent successfully');
+      
+    } catch (err: any) {
+      console.error('❌ UnifiedChatInterface: Error sending message:', err);
+      
+      // Restore message if sending failed
+      setNewMessage(originalMessage);
+      if (messageInputRef.current) {
+        messageInputRef.current.focus();
+        messageInputRef.current.style.height = '40px';
+        messageInputRef.current.style.height = Math.min(messageInputRef.current.scrollHeight, 120) + 'px';
+      }
+      
+      // Show user-friendly error message
+      const errorMessage = err.message || 'Failed to send message';
+      if (errorMessage.includes('session has expired')) {
+        alert('Your session has expired. Please refresh the page to continue.');
+      } else if (errorMessage.includes('permission')) {
+        alert('You do not have permission to send messages to this exchange.');
+      } else {
+        alert(`Failed to send message: ${errorMessage}`);
+      }
     }
   };
 
@@ -95,20 +121,44 @@ const UnifiedChatInterface: React.FC = () => {
     }
   };
 
-  // Enhanced file upload with drag & drop and validation
+  // Enhanced file upload with drag & drop, validation, and better error handling
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     const file = files[0];
+    
+    // Validate file size
     if (file.size > 50 * 1024 * 1024) { // 50MB limit
       alert('File size must be less than 50MB');
       return;
     }
+    
+    // Validate file type
+    const allowedTypes = ['image/', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument', 'text/'];
+    const isAllowed = allowedTypes.some(type => file.type.startsWith(type));
+    
+    if (!isAllowed) {
+      alert('File type not supported. Please upload images, PDFs, Word documents, or text files.');
+      return;
+    }
 
     try {
+      console.log('📤 UnifiedChatInterface: Uploading file:', file.name, file.size + ' bytes');
       await sendFile(file);
-    } catch (err) {
-      console.error('Error uploading file:', err);
+      console.log('✅ UnifiedChatInterface: File uploaded successfully');
+    } catch (err: any) {
+      console.error('❌ UnifiedChatInterface: Error uploading file:', err);
+      
+      const errorMessage = err.message || 'Failed to upload file';
+      if (errorMessage.includes('session has expired')) {
+        alert('Your session has expired. Please refresh the page to continue.');
+      } else if (errorMessage.includes('permission')) {
+        alert('You do not have permission to upload files to this exchange.');
+      } else if (errorMessage.includes('size')) {
+        alert('File is too large. Please choose a smaller file.');
+      } else {
+        alert(`Failed to upload file: ${errorMessage}`);
+      }
     } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -233,11 +283,11 @@ const UnifiedChatInterface: React.FC = () => {
     return true;
   });
 
-  // Enhanced loading state
+  // Enhanced loading state with error handling
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
-        <div className="text-center">
+        <div className="text-center max-w-md px-6">
           <div className="relative">
             <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
             <div className="absolute inset-0 flex items-center justify-center">
@@ -246,6 +296,68 @@ const UnifiedChatInterface: React.FC = () => {
           </div>
           <p className="text-gray-700 font-medium">Loading your conversations...</p>
           <p className="text-gray-500 text-sm mt-1">Setting up secure chat</p>
+          
+          {error && (
+            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start">
+                <ExclamationTriangleIcon className="w-5 h-5 text-red-400 mt-0.5 mr-3 flex-shrink-0" />
+                <div className="text-left">
+                  <h3 className="text-sm font-medium text-red-800">Connection Error</h3>
+                  <p className="text-sm text-red-700 mt-1">{error}</p>
+                  <button
+                    onClick={() => {
+                      clearError();
+                      loadExchanges();
+                    }}
+                    className="mt-3 text-sm text-red-600 hover:text-red-500 underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+  
+  // Show empty state if no exchanges and not loading
+  if (!loading && exchanges.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50">
+        <div className="text-center max-w-md px-6">
+          <UserGroupIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Conversations</h3>
+          <p className="text-gray-500 mb-6">You don't have access to any exchanges yet. Contact your administrator to get started.</p>
+          
+          {error && (
+            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start">
+                <ExclamationTriangleIcon className="w-5 h-5 text-red-400 mt-0.5 mr-3 flex-shrink-0" />
+                <div className="text-left">
+                  <h4 className="text-sm font-medium text-red-800">Error Loading Exchanges</h4>
+                  <p className="text-sm text-red-700 mt-1">{error}</p>
+                  <button
+                    onClick={() => {
+                      clearError();
+                      loadExchanges();
+                    }}
+                    className="mt-3 text-sm text-red-600 hover:text-red-500 underline"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <button
+            onClick={() => loadExchanges()}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Refresh
+          </button>
         </div>
       </div>
     );
@@ -263,7 +375,7 @@ const UnifiedChatInterface: React.FC = () => {
               Conversations
             </h2>
             <button
-              onClick={loadExchanges}
+              onClick={() => loadExchanges()}
               className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               title="Refresh"
             >

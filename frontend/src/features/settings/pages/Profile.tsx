@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Layout from '../../../components/Layout';
+
 import { useAuth } from '../../../hooks/useAuth';
 import { apiService } from '../../../services/api';
 import { User } from '../../../types';
@@ -121,16 +121,13 @@ const Profile: React.FC = () => {
 
   if (!user) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      </Layout>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
     );
   }
 
   return (
-    <Layout>
       <div className="max-w-4xl mx-auto">
         <div className="bg-white shadow rounded-lg">
           {/* Header */}
@@ -342,7 +339,6 @@ const Profile: React.FC = () => {
           </form>
         </div>
       </div>
-    </Layout>
   );
 };
 

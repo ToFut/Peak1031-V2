@@ -43,6 +43,7 @@ const AdminGPT: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'query' | 'insights' | 'history'>('query');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [usageStats, setUsageStats] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const queryInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -51,6 +52,7 @@ const AdminGPT: React.FC = () => {
 
   const loadInitialData = async () => {
     try {
+      setError(null);
       // Load usage stats and suggested queries
       const [stats, suggestedQueries] = await Promise.all([
         apiService.getGPTUsageStats(),
@@ -59,8 +61,9 @@ const AdminGPT: React.FC = () => {
       
       setUsageStats(stats);
       setSuggestions(suggestedQueries.suggestions || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load initial data:', error);
+      setError('Failed to connect to AI service. Please ensure the backend is running.');
     }
   };
 
@@ -68,6 +71,7 @@ const AdminGPT: React.FC = () => {
     if (!currentQuery.trim()) return;
 
     setIsLoading(true);
+    setError(null);
     try {
       const result = await apiService.queryWithGPT(currentQuery);
       
@@ -86,9 +90,9 @@ const AdminGPT: React.FC = () => {
       
       // Update usage stats
       loadInitialData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Query execution failed:', error);
-      // Show error to user
+      setError(`Query failed: ${error.message || 'Unknown error occurred'}`);
     } finally {
       setIsLoading(false);
     }
@@ -185,11 +189,16 @@ const AdminGPT: React.FC = () => {
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-              <SparklesIcon className="h-8 w-8 text-purple-600 mr-3" />
-              AdminGPT
-            </h1>
-            <p className="text-gray-600 mt-2">Query your database using natural language</p>
+            <div className="flex items-center mb-2">
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center mr-4">
+                <SparklesIcon className="h-8 w-8 text-purple-600 mr-3" />
+                AdminGPT
+              </h1>
+              <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
+                Local OSS 20B Model
+              </span>
+            </div>
+            <p className="text-gray-600">Query your database using natural language powered by open-source AI</p>
           </div>
           
           {usageStats && (
@@ -205,6 +214,16 @@ const AdminGPT: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mr-2" />
+            <span className="text-red-800">{error}</span>
+          </div>
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="mb-6">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Layout from '../../../components/Layout';
+
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
 
@@ -110,17 +110,14 @@ const Settings: React.FC = () => {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="bg-gray-200 rounded-lg h-96"></div>
-        </div>
-      </Layout>
+      <div className="animate-pulse">
+        <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+        <div className="bg-gray-200 rounded-lg h-96"></div>
+      </div>
     );
   }
 
   return (
-    <Layout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
@@ -426,7 +423,6 @@ const Settings: React.FC = () => {
           </div>
         </div>
       </div>
-    </Layout>
   );
 };
 

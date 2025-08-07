@@ -33,11 +33,7 @@ class AuthService {
         // Standard bcrypt validation
         isValidPassword = await bcrypt.compare(password, user.password_hash);
       } else {
-        // Fallback for development - check if it's the admin user
-        if (user.email === 'admin@peak1031.com' && password === 'admin123') {
-          console.log('✅ Using hardcoded admin credentials');
-          isValidPassword = true;
-        }
+        // No hardcoded passwords allowed
       }
       
       if (!isValidPassword) {

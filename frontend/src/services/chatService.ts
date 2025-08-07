@@ -60,149 +60,285 @@ class ChatService {
 
   async getExchanges(userId: string): Promise<ChatExchange[]> {
     try {
+      console.log('📋 ChatService: Fetching exchanges for user:', userId);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found. Please log in again.');
+      }
+
       // Use backend API to get exchanges
       const response = await fetch(`${this.baseURL}/exchanges`, {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
       });
 
+      console.log('📋 Response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error('Too many requests. Please wait a moment and try again.');
+        let errorMessage = `Failed to fetch exchanges: ${response.status} ${response.statusText}`;
+        
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } catch (parseError) {
+          console.warn('Could not parse error response:', parseError);
         }
-        throw new Error(`Failed to fetch exchanges: ${response.statusText}`);
+        
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          throw new Error('Your session has expired. Please log in again.');
+        } else if (response.status === 429) {
+          throw new Error('Too many requests. Please wait a moment and try again.');
+        } else if (response.status === 500) {
+          throw new Error(`Server error: ${errorMessage}`);
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      console.log('📋 Raw exchanges data:', data);
+      
+      if (!data.success && data.success !== undefined) {
+        throw new Error(data.error || 'Failed to fetch exchanges');
+      }
+      
       const exchanges = data.exchanges || data.data || data || [];
+      console.log('📋 Found', exchanges.length, 'exchanges');
+
+      // Validate exchanges array
+      if (!Array.isArray(exchanges)) {
+        console.warn('⚠️ Exchanges data is not an array:', exchanges);
+        return [];
+      }
 
       // Transform to ChatExchange format with participants
-      const chatExchanges: ChatExchange[] = exchanges.map((exchange: any) => {
-        // Extract participants from exchangeParticipants if available
-        const participants: User[] = [];
-        
-        // Try different field names for participants
-        const participantsList = exchange.exchangeParticipants || 
-                               exchange.exchange_participants || 
-                               exchange.participants || 
-                               [];
-        
-        if (participantsList && participantsList.length > 0) {
-          participantsList.forEach((ep: any) => {
-            if (ep.user) {
-              participants.push({
-                id: ep.user.id,
-                email: ep.user.email,
-                first_name: ep.user.first_name,
-                last_name: ep.user.last_name,
-                role: ep.user.role || 'third_party', // Use actual user role or default to third_party
-                is_active: ep.user.is_active !== false,
-                two_fa_enabled: ep.user.two_fa_enabled || false,
-                created_at: ep.user.created_at || new Date().toISOString(),
-                updated_at: ep.user.updated_at || new Date().toISOString()
-              } as User);
-            }
-            if (ep.contact) {
-              // For contacts, we'll use 'client' role since they're external participants
-              participants.push({
-                id: `contact_${ep.contact.id}`,
-                email: ep.contact.email,
-                first_name: ep.contact.first_name,
-                last_name: ep.contact.last_name,
-                role: 'client', // Contacts are typically clients or third parties
-                is_active: true,
-                two_fa_enabled: false,
-                created_at: ep.contact.created_at || new Date().toISOString(),
-                updated_at: ep.contact.updated_at || new Date().toISOString()
-              } as User);
-            }
-          });
+      const chatExchanges: ChatExchange[] = exchanges.map((exchange: any, index: number) => {
+        try {
+          // Validate required fields
+          if (!exchange.id) {
+            console.warn(`⚠️ Exchange ${index} missing id:`, exchange);
+            return null;
+          }
+
+          // Extract participants from exchangeParticipants if available
+          const participants: User[] = [];
+          
+          // Try different field names for participants
+          const participantsList = exchange.exchangeParticipants || 
+                                 exchange.exchange_participants || 
+                                 exchange.participants || 
+                                 [];
+          
+          if (Array.isArray(participantsList) && participantsList.length > 0) {
+            participantsList.forEach((ep: any) => {
+              try {
+                if (ep.user && ep.user.id && ep.user.email) {
+                  participants.push({
+                    id: ep.user.id,
+                    email: ep.user.email,
+                    first_name: ep.user.first_name || '',
+                    last_name: ep.user.last_name || '',
+                    role: ep.user.role || 'third_party',
+                    is_active: ep.user.is_active !== false,
+                    two_fa_enabled: ep.user.two_fa_enabled || false,
+                    created_at: ep.user.created_at || new Date().toISOString(),
+                    updated_at: ep.user.updated_at || new Date().toISOString()
+                  } as User);
+                }
+                if (ep.contact && ep.contact.id && ep.contact.email) {
+                  participants.push({
+                    id: `contact_${ep.contact.id}`,
+                    email: ep.contact.email,
+                    first_name: ep.contact.first_name || '',
+                    last_name: ep.contact.last_name || '',
+                    role: 'client',
+                    is_active: true,
+                    two_fa_enabled: false,
+                    created_at: ep.contact.created_at || new Date().toISOString(),
+                    updated_at: ep.contact.updated_at || new Date().toISOString()
+                  } as User);
+                }
+              } catch (participantError) {
+                console.warn('Error processing participant:', participantError, ep);
+              }
+            });
+          }
+
+          // Add coordinator if exists
+          if (exchange.coordinator && exchange.coordinator.id && exchange.coordinator.email) {
+            participants.push({
+              id: exchange.coordinator.id,
+              email: exchange.coordinator.email,
+              first_name: exchange.coordinator.first_name || '',
+              last_name: exchange.coordinator.last_name || '',
+              role: 'coordinator',
+              is_active: true,
+              two_fa_enabled: false,
+              created_at: exchange.coordinator.created_at || new Date().toISOString(),
+              updated_at: exchange.coordinator.updated_at || new Date().toISOString()
+            } as User);
+          }
+
+          // Add client if exists
+          if (exchange.client && exchange.client.id && exchange.client.email) {
+            participants.push({
+              id: `contact_${exchange.client.id}`,
+              email: exchange.client.email,
+              first_name: exchange.client.first_name || '',
+              last_name: exchange.client.last_name || '',
+              role: 'client',
+              is_active: true,
+              two_fa_enabled: false,
+              created_at: exchange.client.created_at || new Date().toISOString(),
+              updated_at: exchange.client.updated_at || new Date().toISOString()
+            } as User);
+          }
+
+          return {
+            id: exchange.id,
+            exchange_name: exchange.name || exchange.exchange_name || exchange.title || 'Unnamed Exchange',
+            status: exchange.status || 'PENDING',
+            last_message: undefined,
+            unread_count: 0,
+            participants: participants
+          };
+        } catch (transformError) {
+          console.error('Error transforming exchange:', transformError, exchange);
+          return null;
         }
+      }).filter(ex => ex !== null) as ChatExchange[];
 
-        // Add coordinator if exists
-        if (exchange.coordinator) {
-          participants.push({
-            id: exchange.coordinator.id,
-            email: exchange.coordinator.email,
-            first_name: exchange.coordinator.first_name,
-            last_name: exchange.coordinator.last_name,
-            role: 'coordinator',
-            is_active: true,
-            two_fa_enabled: false,
-            created_at: exchange.coordinator.created_at || new Date().toISOString(),
-            updated_at: exchange.coordinator.updated_at || new Date().toISOString()
-          } as User);
-        }
-
-        // Add client if exists
-        if (exchange.client) {
-          participants.push({
-            id: `contact_${exchange.client.id}`,
-            email: exchange.client.email,
-            first_name: exchange.client.first_name,
-            last_name: exchange.client.last_name,
-            role: 'client',
-            is_active: true,
-            two_fa_enabled: false,
-            created_at: exchange.client.created_at || new Date().toISOString(),
-            updated_at: exchange.client.updated_at || new Date().toISOString()
-          } as User);
-        }
-
-        return {
-          id: exchange.id,
-          exchange_name: exchange.name || exchange.exchange_name || exchange.title || 'Unnamed Exchange',
-          status: exchange.status || 'PENDING',
-          last_message: undefined, // Will be loaded separately if needed
-          unread_count: 0, // Will be calculated separately if needed
-          participants: participants
-        };
-      });
-
+      console.log('✅ Transformed', chatExchanges.length, 'valid exchanges');
       return chatExchanges;
+      
     } catch (error) {
-      console.error('Error fetching exchanges:', error);
-      throw error;
+      console.error('❌ Error fetching exchanges:', error);
+      
+      // Re-throw with more context
+      if (error instanceof Error) {
+        throw new Error(`Failed to load exchanges: ${error.message}`);
+      } else {
+        throw new Error('Failed to load exchanges: Unknown error occurred');
+      }
     }
   }
 
   async getMessages(exchangeId: string): Promise<ChatMessage[]> {
     try {
+      console.log('📥 ChatService: Fetching messages for exchange:', exchangeId);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found. Please log in again.');
+      }
+
       // Use backend API to get messages
       const response = await fetch(`${this.baseURL}/messages/exchange/${exchangeId}`, {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
       });
 
+      console.log('📥 Response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        throw new Error(`Failed to fetch messages: ${response.statusText}`);
+        let errorMessage = `Failed to fetch messages: ${response.status} ${response.statusText}`;
+        
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } catch (parseError) {
+          // If we can't parse the error response, use the status text
+          console.warn('Could not parse error response:', parseError);
+        }
+        
+        if (response.status === 401) {
+          // Token expired or invalid
+          localStorage.removeItem('token');
+          throw new Error('Your session has expired. Please log in again.');
+        } else if (response.status === 403) {
+          throw new Error('You do not have permission to access this exchange.');
+        } else if (response.status === 404) {
+          throw new Error('Exchange not found or has been deleted.');
+        } else if (response.status === 500) {
+          throw new Error(`Server error: ${errorMessage}`);
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
-      const messages = data.data || data || [];
+      console.log('📥 Raw response data:', data);
+      
+      if (!data.success && data.success !== undefined) {
+        throw new Error(data.error || 'Failed to fetch messages');
+      }
+      
+      const messages = data.data || data.messages || data || [];
+      console.log('📥 Found', messages.length, 'messages');
 
-      // Transform to ChatMessage format
-      const chatMessages: ChatMessage[] = messages.map((message: any) => ({
-        id: message.id,
-        content: message.content,
-        exchange_id: message.exchangeId || message.exchange_id,
-        sender_id: message.senderId || message.sender_id,
-        attachment_id: message.attachmentId || message.attachment_id,
-        message_type: message.messageType || message.message_type || 'text',
-        read_by: message.readBy || message.read_by || [],
-        created_at: message.createdAt || message.created_at,
-        sender: message.sender,
-        attachment: message.attachment
-      }));
+      // Validate messages array
+      if (!Array.isArray(messages)) {
+        console.warn('⚠️ Messages data is not an array:', messages);
+        return [];
+      }
 
+      // Transform to ChatMessage format with validation
+      const chatMessages: ChatMessage[] = messages.map((message: any, index: number) => {
+        try {
+          // Validate required fields
+          if (!message.id) {
+            console.warn(`⚠️ Message ${index} missing id:`, message);
+            return null;
+          }
+          
+          return {
+            id: message.id,
+            content: message.content || '',
+            exchange_id: message.exchangeId || message.exchange_id || exchangeId,
+            sender_id: message.senderId || message.sender_id,
+            attachment_id: message.attachmentId || message.attachment_id,
+            message_type: (message.messageType || message.message_type || 'text') as 'text' | 'file' | 'system',
+            read_by: Array.isArray(message.readBy || message.read_by) ? (message.readBy || message.read_by) : [],
+            created_at: message.createdAt || message.created_at || new Date().toISOString(),
+            sender: message.sender || message.users,
+            attachment: message.attachment
+          };
+        } catch (transformError) {
+          console.error('Error transforming message:', transformError, message);
+          return null;
+        }
+      }).filter(msg => msg !== null) as ChatMessage[];
+
+      console.log('✅ Transformed', chatMessages.length, 'valid messages');
       return chatMessages;
+      
     } catch (error) {
-      console.error('Error fetching messages:', error);
-      throw error;
+      console.error('❌ Error fetching messages for exchange', exchangeId, ':', error);
+      
+      // Re-throw with more context
+      if (error instanceof Error) {
+        throw new Error(`Failed to load messages: ${error.message}`);
+      } else {
+        throw new Error('Failed to load messages: Unknown error occurred');
+      }
     }
   }
 

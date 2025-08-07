@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
+const PPTokenManager = require('./ppTokenManager');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 class PracticePartnerService {
@@ -8,8 +9,9 @@ class PracticePartnerService {
     this.baseURL = 'https://app.practicepanther.com/api/v2';
     this.clientId = process.env.PP_CLIENT_ID;
     this.clientSecret = process.env.PP_CLIENT_SECRET;
-    this.accessToken = null;
-    this.tokenExpiry = null;
+    
+    // Use the new token manager for robust OAuth handling
+    this.tokenManager = new PPTokenManager();
     
     // Initialize Supabase only if configuration is available
     if (process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_API_KEY)) {
@@ -42,12 +44,17 @@ class PracticePartnerService {
     // Add request interceptor for authentication
     this.client.interceptors.request.use(
       async (config) => {
-        await this.ensureValidToken();
-        if (this.accessToken) {
-          config.headers.Authorization = `Bearer ${this.accessToken}`;
+        try {
+          // Get valid token from token manager (auto-refreshes if needed)
+          const accessToken = await this.tokenManager.getValidAccessToken();
+          config.headers.Authorization = `Bearer ${accessToken}`;
           console.log(`🔑 PP: Adding auth header for ${config.method?.toUpperCase()} ${config.url}`);
-        } else {
-          console.log('⚠️ PP: No access token available for request');
+          
+          // Update last used timestamp
+          await this.tokenManager.updateLastUsed();
+        } catch (error) {
+          console.log('⚠️ PP: No valid access token available:', error.message);
+          throw new Error(`PracticePanther authentication required: ${error.message}`);
         }
         
         // Rate limiting check
@@ -65,10 +72,10 @@ class PracticePartnerService {
       (response) => response,
       async (error) => {
         if (error.response?.status === 401) {
-          // Token expired, clear it and retry
-          console.log('🔐 PP: Access token expired, clearing token');
-          this.accessToken = null;
-          this.tokenExpiry = null;
+          // Token expired or invalid - token manager will handle refresh on next request
+          console.log('🔐 PP: Received 401 - token expired or invalid');
+          // Don't automatically retry here to avoid infinite loops
+          // The token manager will refresh the token on the next request
         }
         
         // Log rate limit issues
@@ -83,7 +90,28 @@ class PracticePartnerService {
   }
 
   /**
-   * Get stored OAuth token from database
+   * Get current token status for monitoring
+   */
+  async getTokenStatus() {
+    return await this.tokenManager.getTokenStatus();
+  }
+
+  /**
+   * Generate OAuth authorization URL
+   */
+  generateAuthUrl(redirectUri, state = null) {
+    return this.tokenManager.generateAuthUrl(redirectUri, state);
+  }
+
+  /**
+   * Exchange authorization code for initial token
+   */
+  async exchangeCodeForToken(authorizationCode, redirectUri) {
+    return await this.tokenManager.exchangeCodeForToken(authorizationCode, redirectUri);
+  }
+
+  /**
+   * Get stored OAuth token from database (DEPRECATED - use tokenManager directly)
    */
   async getStoredToken() {
     try {
@@ -300,54 +328,18 @@ class PracticePartnerService {
   }
 
   /**
-   * Ensure we have a valid access token
+   * Ensure we have a valid access token (DEPRECATED - now handled by tokenManager)
    */
   async ensureValidToken() {
+    // This method is now deprecated - token management is handled automatically
+    // by the request interceptor using tokenManager.getValidAccessToken()
+    console.log('⚠️ PP: ensureValidToken() is deprecated - token management is now automatic');
+    
     try {
-      // First try to get a stored token
-      const storedToken = await this.getStoredToken();
-      
-      if (!storedToken) {
-        console.error('❌ PP: No stored token found. OAuth authorization required.');
-        console.log('🔗 PP: Use the following URL to authorize the application:');
-        console.log(this.generateAuthUrl());
-        throw new Error('PracticePanther authorization required. Please complete OAuth flow first.');
-      }
-
-      // Check if current token is still valid (with 5 minute buffer)
-      const now = Date.now();
-      const tokenExpiry = storedToken.expires_at ? new Date(storedToken.expires_at).getTime() : 0;
-      
-      if (tokenExpiry > now + 300000) { // 5 minutes buffer
-        // Token is still valid
-        this.accessToken = storedToken.access_token;
-        this.tokenExpiry = tokenExpiry;
-        console.log('🔑 PP: Using stored valid token');
-        return;
-      }
-
-      // Token is expired, try to refresh it
-      if (storedToken.refresh_token) {
-        console.log('🔄 PP: Token expired, attempting to refresh...');
-        const refreshResult = await this.refreshToken(storedToken.refresh_token);
-        
-        if (refreshResult) {
-          console.log('✅ PP: Token refreshed successfully');
-          return;
-        } else {
-          console.log('❌ PP: Token refresh failed');
-        }
-      }
-
-      // If refresh failed or no refresh token, need new OAuth flow
-      console.error('❌ PP: Token refresh failed. OAuth authorization required.');
-      console.log('🔗 PP: Use the following URL to authorize the application:');
-      console.log(this.generateAuthUrl());
-      
-      throw new Error('PracticePanther authorization required. Please complete OAuth flow first.');
-      
+      const token = await this.tokenManager.getValidAccessToken();
+      return !!token;
     } catch (error) {
-      console.error('❌ PP: Error ensuring valid token:', error.message);
+      console.error('❌ PP: Token validation failed:', error.message);
       throw error;
     }
   }
@@ -356,12 +348,20 @@ class PracticePartnerService {
    * Public method to authenticate (for testing)
    */
   async authenticate() {
-    await this.ensureValidToken();
-    return {
-      access_token: this.accessToken,
-      token_type: 'Bearer',
-      expires_in: this.tokenExpiry ? Math.floor((this.tokenExpiry - Date.now()) / 1000) : 0
-    };
+    try {
+      const accessToken = await this.tokenManager.getValidAccessToken();
+      const status = await this.tokenManager.getTokenStatus();
+      
+      return {
+        access_token: accessToken,
+        token_type: 'Bearer',
+        status: status.status,
+        expires_at: status.expires_at,
+        message: status.message
+      };
+    } catch (error) {
+      throw new Error(`PracticePanther authentication failed: ${error.message}`);
+    }
   }
 
   /**
@@ -1572,7 +1572,10 @@ class PracticePartnerService {
   }
 }
 
-// Only create the service instance if Supabase is configured
+// Export both the class and a default instance
+module.exports = PracticePartnerService;
+
+// Also export a default instance for backward compatibility
 let practicePartnerService = null;
 if (process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_API_KEY)) {
   practicePartnerService = new PracticePartnerService();
@@ -1581,4 +1584,4 @@ if (process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_KEY || process.env
   console.log('⚠️ Supabase not configured - PracticePartnerService disabled');
 }
 
-module.exports = practicePartnerService;
+module.exports.instance = practicePartnerService;

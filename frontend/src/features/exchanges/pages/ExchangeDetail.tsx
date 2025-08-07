@@ -306,6 +306,8 @@ const ExchangeDetail: React.FC = () => {
   const [exchange, setExchange] = useState<Exchange | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [ppData, setPpData] = useState<any>(null);
+  const [loadingPpData, setLoadingPpData] = useState(false);
   
   useEffect(() => {
     if (id) {
@@ -318,10 +320,29 @@ const ExchangeDetail: React.FC = () => {
       setLoading(true);
       const data = await getExchange(id!);
       setExchange(data);
+      
+      // Load PP data in background (optional - remove if not using PP integration)
+      // loadPPData();
     } catch (error) {
       console.error('Error loading exchange:', error);
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const loadPPData = async () => {
+    if (!id) return;
+    
+    setLoadingPpData(true);
+    try {
+      const response = await apiService.get(`/pp-data/exchange/${id}`);
+      if (response.success) {
+        setPpData(response.pp_data);
+      }
+    } catch (error) {
+      console.log('Could not load PP data for exchange');
+    } finally {
+      setLoadingPpData(false);
     }
   };
   
@@ -484,6 +505,137 @@ const ExchangeDetail: React.FC = () => {
             {activeTab === 'tasks' && <TasksList tasks={[]} />}
             {activeTab === 'documents' && <DocumentsList documents={[]} onUploadClick={() => {}} onDownload={() => {}} canUpload={true} canDelete={false} />}
             {activeTab === 'messages' && <MessagesTab exchange={exchange} />}
+            
+            {/* PP Data tab removed - data is now integrated into main tabs */}
+            {false && activeTab === 'pp-data' && (
+              <div className="space-y-6">
+                {loadingPpData ? (
+                  <div className="bg-white rounded-xl p-8 text-center">
+                    <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading PracticePanther data...</p>
+                  </div>
+                ) : ppData ? (
+                  <>
+                    {/* PP Tasks */}
+                    {ppData.tasks && ppData.tasks.length > 0 && (
+                      <div className="bg-white rounded-xl shadow-sm border p-6">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center">
+                          <CheckCircle className="w-5 h-5 mr-2 text-blue-600" />
+                          PracticePanther Tasks ({ppData.tasks.length})
+                        </h3>
+                        <div className="space-y-3">
+                          {ppData.tasks.slice(0, 10).map((task: any) => (
+                            <div key={task.pp_id} className="border-l-4 border-blue-500 pl-4 py-2">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h4 className="font-medium text-gray-900">{task.subject}</h4>
+                                  <p className="text-sm text-gray-600 mt-1">{task.notes}</p>
+                                  {task.due_date && (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      Due: {new Date(task.due_date).toLocaleDateString()}
+                                    </p>
+                                  )}
+                                </div>
+                                <span className={`px-2 py-1 text-xs rounded-full ${
+                                  task.priority === 'High' ? 'bg-red-100 text-red-700' :
+                                  task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {task.priority || 'Normal'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* PP Invoices */}
+                    {ppData.invoices && ppData.invoices.length > 0 && (
+                      <div className="bg-white rounded-xl shadow-sm border p-6">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center">
+                          <DollarSign className="w-5 h-5 mr-2 text-green-600" />
+                          PracticePanther Invoices ({ppData.invoices.length})
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead>
+                              <tr>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
+                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Outstanding</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                              {ppData.invoices.slice(0, 10).map((invoice: any) => (
+                                <tr key={invoice.pp_id}>
+                                  <td className="px-4 py-2 text-sm">
+                                    {invoice.issue_date ? new Date(invoice.issue_date).toLocaleDateString() : '-'}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm">{invoice.account_ref_display_name || '-'}</td>
+                                  <td className="px-4 py-2 text-sm text-right font-medium">
+                                    ${(invoice.total / 100).toLocaleString()}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-right">
+                                    {invoice.total_outstanding > 0 && (
+                                      <span className="text-red-600 font-medium">
+                                        ${(invoice.total_outstanding / 100).toLocaleString()}
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* PP Expenses */}
+                    {ppData.expenses && ppData.expenses.length > 0 && (
+                      <div className="bg-white rounded-xl shadow-sm border p-6">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center">
+                          <TrendingUp className="w-5 h-5 mr-2 text-purple-600" />
+                          PracticePanther Expenses ({ppData.expenses.length})
+                        </h3>
+                        <div className="grid gap-3">
+                          {ppData.expenses.slice(0, 10).map((expense: any) => (
+                            <div key={expense.pp_id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                              <div>
+                                <p className="font-medium text-gray-900">{expense.description}</p>
+                                <p className="text-xs text-gray-500">
+                                  {expense.date ? new Date(expense.date).toLocaleDateString() : '-'}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-medium">${(expense.amount / 100).toLocaleString()}</p>
+                                {expense.is_billable && !expense.is_billed && (
+                                  <span className="text-xs text-yellow-600">Unbilled</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {(!ppData.tasks?.length && !ppData.invoices?.length && !ppData.expenses?.length) && (
+                      <div className="bg-gray-50 rounded-xl p-8 text-center">
+                        <Briefcase className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-600">No PracticePanther data found for this exchange</p>
+                        <p className="text-sm text-gray-500 mt-2">Data will appear after syncing from PracticePanther</p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="bg-gray-50 rounded-xl p-8 text-center">
+                    <Briefcase className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">PracticePanther integration not configured</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

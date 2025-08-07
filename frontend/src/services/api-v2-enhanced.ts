@@ -377,12 +377,12 @@ class ApiServiceV2Enhanced {
   }
 
   async getMessages(exchangeId?: string): Promise<Message[]> {
-    const endpoint = exchangeId ? `/exchanges/${exchangeId}/messages` : '/messages';
+    const endpoint = exchangeId ? `/messages/exchange/${exchangeId}` : '/messages';
     return this.get(endpoint);
   }
 
   async sendMessage(exchangeId: string, content: string): Promise<Message> {
-    return this.post(`/exchanges/${exchangeId}/messages`, { content });
+    return this.post('/messages', { exchangeId, content, messageType: 'text' });
   }
 
   async getDocuments(): Promise<Document[]> {

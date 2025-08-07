@@ -1,6 +1,7 @@
 require('dotenv').config({ path: '../.env' });
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 console.log('👤 CREATING CLIENT USER ACCOUNT\n');
 
@@ -12,9 +13,14 @@ const supabase = createClient(
 
 async function createClientUser() {
   try {
-    const email = 'client@peak1031.com';
-    const password = 'client123';
+    const email = process.env.CLIENT_EMAIL || 'client@peak1031.com';
+    const password = process.env.CLIENT_PASSWORD || crypto.randomBytes(16).toString('hex');
     const role = 'client';
+    
+    if (!process.env.CLIENT_PASSWORD) {
+      console.log(`⚠️  Generated temporary password for security`);
+      console.log('   Please set CLIENT_PASSWORD in .env file for production use');
+    }
     
     console.log('🔍 Checking if user already exists...');
     

@@ -35,10 +35,18 @@ const oauthRoutes = require('./routes/oauth');
 const exportRoutes = require('./routes/exports');
 const { router: exchangeParticipantsRoutes } = require('./routes/exchange-participants');
 const templateRoutes = require('./routes/templates');
+const adminGPTRoutes = require('./routes/admin-gpt');
+const reportsRoutes = require('./routes/reports');
+const enhancedQueryRoutes = require('./routes/enhanced-query');
+const ppTokenAdminRoutes = require('./routes/pp-token-admin');
+const ppDataRoutes = require('./routes/pp-data-api');
+const unifiedDataRoutes = require('./routes/unified-data');
 
 // New routes
 const userRoutes = require('./routes/users');
 const dashboardRoutes = require('./routes/dashboard-new');
+const settingsRoutes = require('./routes/settings');
+const userProfileRoutes = require('./routes/user-profile');
 
 // Enterprise routes
 const enterpriseExchangesRoutes = require('./routes/enterprise-exchanges');
@@ -139,7 +147,17 @@ class PeakServer {
 
     // Body parsing middleware
     this.app.use(compression());
-    this.app.use(express.json({ limit: '10mb' }));
+    this.app.use(express.json({ 
+      limit: '10mb',
+      strict: false,
+      reviver: (key, value) => {
+        // Handle escaped characters in strings
+        if (typeof value === 'string') {
+          return value.replace(/\\\\/g, '\\').replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+        }
+        return value;
+      }
+    }));
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
     // Logging middleware
@@ -282,8 +300,16 @@ class PeakServer {
     this.app.use('/api/exports', authenticateToken, exportRoutes);
     this.app.use('/api/sync', authenticateToken, syncRoutes);
     this.app.use('/api/admin', authenticateToken, adminRoutes);
+    this.app.use('/api/admin/gpt', authenticateToken, adminGPTRoutes);
+    this.app.use('/api/admin/pp-token', authenticateToken, ppTokenAdminRoutes);
+    this.app.use('/api/pp-data', authenticateToken, ppDataRoutes);
+    this.app.use('/api/unified', authenticateToken, unifiedDataRoutes);
+    this.app.use('/api/reports', authenticateToken, reportsRoutes);
+    this.app.use('/api/enhanced-query', enhancedQueryRoutes);
     this.app.use('/api/users', authenticateToken, userRoutes);
     this.app.use('/api/dashboard', authenticateToken, dashboardRoutes);
+    this.app.use('/api/settings', authenticateToken, settingsRoutes);
+    this.app.use('/api/user-profile', authenticateToken, userProfileRoutes);
     
     // Additional routes
     this.app.use('/api/exchange-participants', authenticateToken, exchangeParticipantsRoutes);
@@ -511,6 +537,21 @@ class PeakServer {
   }
 
   initializeErrorHandling() {
+    // JSON parsing error handler (must come before global error handler)
+    this.app.use((error, req, res, next) => {
+      if (error instanceof SyntaxError && error.status === 400 && 'body' in error) {
+        console.error('JSON parsing error:', error.message);
+        console.error('Request body:', req.body);
+        
+        return res.status(400).json({
+          error: 'Invalid JSON format',
+          message: 'The request body contains invalid JSON. Please check for unescaped characters.',
+          details: error.message
+        });
+      }
+      next(error);
+    });
+
     // Global error handler
     this.app.use((error, req, res, next) => {
       console.error('Global error handler:', error);

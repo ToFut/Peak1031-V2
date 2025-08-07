@@ -2,6 +2,7 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 async function setupSupabaseTables() {
   try {
@@ -48,7 +49,14 @@ async function setupSupabaseTables() {
     // Create admin user
     console.log('\n👤 Creating admin user...');
     const bcrypt = require('bcryptjs');
-    const passwordHash = await bcrypt.hash('admin123', 10);
+    // Generate a secure random password or require it via environment variable
+    const adminPassword = process.env.ADMIN_PASSWORD || crypto.randomBytes(16).toString('hex');
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
+    
+    if (!process.env.ADMIN_PASSWORD) {
+      console.log(`⚠️  Generated temporary admin password: ${adminPassword}`);
+      console.log('   Please set ADMIN_PASSWORD in .env file and update the password after first login');
+    }
     
     const { data: adminUser, error: adminError } = await supabase
       .from('users')

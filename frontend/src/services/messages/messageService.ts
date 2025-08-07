@@ -20,7 +20,7 @@ export class MessageService {
   }
 
   async sendMessage(exchangeId: string, content: string): Promise<Message> {
-    return httpClient.post<Message>(`/exchanges/${exchangeId}/messages`, { content });
+    return httpClient.post<Message>('/messages', { exchangeId, content, messageType: 'text' });
   }
 
   async markMessageAsRead(messageId: string): Promise<void> {
@@ -32,7 +32,7 @@ export class MessageService {
   }
 
   async getMessagesByExchange(exchangeId: string): Promise<Message[]> {
-    return httpClient.get<Message[]>(`/exchanges/${exchangeId}/messages`);
+    return httpClient.get<Message[]>(`/messages/exchange/${exchangeId}`);
   }
 
   async getUnreadMessagesCount(): Promise<{ count: number }> {
@@ -40,7 +40,9 @@ export class MessageService {
   }
 
   async markAllMessagesAsRead(exchangeId: string): Promise<void> {
-    await httpClient.post<void>(`/exchanges/${exchangeId}/messages/mark-all-read`);
+    // This endpoint doesn't exist in backend yet, commenting out for now
+    // await httpClient.post<void>(`/messages/exchange/${exchangeId}/mark-all-read`);
+    console.warn('markAllMessagesAsRead not implemented in backend');
   }
 }
 

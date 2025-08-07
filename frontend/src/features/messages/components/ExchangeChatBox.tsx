@@ -66,8 +66,8 @@ export const ExchangeChatBox: React.FC<ExchangeChatBoxProps> = ({ exchange, clas
 
       // Load exchange participants and check access
       const [exchangeParticipants, exchangeMessages] = await Promise.all([
-        apiService.get(`/exchanges/${exchange.id}/participants`),
-        apiService.get(`/exchanges/${exchange.id}/messages`)
+        apiService.get(`/exchange-participants?exchange_id=${exchange.id}`),
+        apiService.get(`/messages/exchange/${exchange.id}`)
       ]);
 
       // Check if user has access to this exchange
@@ -308,42 +308,45 @@ export const ExchangeChatBox: React.FC<ExchangeChatBoxProps> = ({ exchange, clas
   }
 
   return (
-    <div className={`flex flex-col bg-white rounded-lg shadow-sm border ${className}`} style={{ height: '600px' }}>
+    <div className={`flex flex-col bg-gray-50 rounded-xl shadow-lg border border-gray-200 ${className}`} style={{ height: '650px' }}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+      <div className="flex items-center justify-between p-4 bg-white border-b border-gray-200 rounded-t-xl">
         <div className="flex items-center space-x-3">
-          <ChatBubbleLeftIcon className="h-5 w-5 text-gray-400" />
+          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+            <ChatBubbleLeftIcon className="h-5 w-5 text-white" />
+          </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Exchange Chat</h3>
-            <p className="text-sm text-gray-500">{exchange.name}</p>
+            <p className="text-sm text-gray-500 truncate max-w-xs">{exchange.name}</p>
           </div>
         </div>
         
         <div className="flex items-center space-x-4">
           {/* Connection Status */}
-          <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
-            <span className="text-sm text-gray-500">
-              {isConnected ? 'Connected' : 'Disconnected'}
+          <div className="hidden md:flex items-center space-x-2">
+            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+            <span className="text-xs text-gray-500">
+              {isConnected ? 'Online' : 'Offline'}
             </span>
-          </div>
-          
-          {/* Security Indicator */}
-          <div className="flex items-center space-x-1 text-sm text-green-600">
-            <ShieldCheckIcon className="h-4 w-4" />
-            <span>Secure Chat</span>
           </div>
           
           {/* Participants Count */}
           <div className="flex items-center space-x-1 text-sm text-gray-500">
             <UserCircleIcon className="h-4 w-4" />
-            <span>{participants.length} members</span>
+            <span className="hidden sm:inline">{participants.length} members</span>
+            <span className="sm:hidden">{participants.length}</span>
+          </div>
+          
+          {/* Security Indicator */}
+          <div className="hidden lg:flex items-center space-x-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+            <ShieldCheckIcon className="h-3 w-3" />
+            <span>Secure</span>
           </div>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-gray-50 to-gray-100">
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
             <div className="flex">
@@ -355,72 +358,91 @@ export const ExchangeChatBox: React.FC<ExchangeChatBoxProps> = ({ exchange, clas
           </div>
         )}
 
-        {messages.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            <ChatBubbleLeftIcon className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-            <p>No messages yet</p>
-            <p className="text-sm">Start the conversation with your exchange team!</p>
+{messages.length === 0 ? (
+          <div className="text-center text-gray-500 py-12">
+            <div className="bg-gray-50 rounded-full p-6 w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+              <ChatBubbleLeftIcon className="h-10 w-10 text-gray-300" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
+            <p className="text-sm text-gray-500">Start the conversation with your exchange team!</p>
           </div>
         ) : (
           messages.map((message, index) => {
             const showDate = index === 0 || 
               formatDate(message.createdAt) !== formatDate(messages[index - 1].createdAt);
+            const isOwn = isOwnMessage(message);
+            const showSender = !isOwn && (index === 0 || messages[index - 1]?.senderId !== message.senderId);
             
             return (
-              <div key={message.id}>
+              <div key={message.id} className="mb-1">
                 {showDate && (
-                  <div className="text-center my-4">
-                    <span className="px-3 py-1 text-xs text-gray-500 bg-gray-100 rounded-full">
+                  <div className="text-center my-6">
+                    <span className="px-3 py-1 text-xs text-gray-500 bg-white shadow-sm border rounded-full">
                       {formatDate(message.createdAt)}
                     </span>
                   </div>
                 )}
                 
-                <div className={`flex ${isOwnMessage(message) ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                      message.messageType === 'system'
-                        ? 'bg-gray-100 text-gray-700 mx-auto text-center text-sm'
-                        : isOwnMessage(message)
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-gray-900'
-                    }`}
-                  >
-                    {message.messageType !== 'system' && !isOwnMessage(message) && (
-                      <p className="text-xs font-medium mb-1 opacity-75">
+                <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-1`}>
+                  <div className={`max-w-xs lg:max-w-md ${isOwn ? 'order-2' : 'order-1'}`}>
+                    {showSender && !isOwn && (
+                      <p className="text-xs font-medium text-gray-600 mb-1 px-3">
                         {getMessageSenderName(message)}
                       </p>
                     )}
                     
-                    <p className={message.messageType === 'system' ? 'text-xs' : 'text-sm'}>
-                      {message.content}
-                    </p>
-                    
-                    {message.attachment && (
-                      <div className="mt-2">
-                        <div className="flex items-center space-x-2 text-xs opacity-75">
-                          <PaperClipIcon className="h-4 w-4" />
-                          <span>{message.attachment.originalFilename}</span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center justify-between mt-1">
-                      <p className={`text-xs ${
-                        message.messageType === 'system' 
-                          ? 'text-gray-500'
-                          : isOwnMessage(message) 
-                          ? 'text-blue-100' 
-                          : 'text-gray-500'
-                      }`}>
-                        {formatTime(message.createdAt)}
+                    <div
+                      className={`px-3 py-2 relative ${
+                        message.messageType === 'system'
+                          ? 'bg-yellow-50 border border-yellow-200 text-yellow-800 mx-auto text-center text-sm rounded-lg'
+                          : isOwn
+                          ? 'bg-blue-500 text-white rounded-l-2xl rounded-tr-2xl rounded-br-md shadow-sm'
+                          : 'bg-white text-gray-900 rounded-r-2xl rounded-tl-2xl rounded-bl-md shadow-sm border border-gray-100'
+                      }`}
+                      style={{
+                        wordWrap: 'break-word',
+                        overflowWrap: 'break-word'
+                      }}
+                    >
+                      <p className="text-sm leading-relaxed">
+                        {message.content}
                       </p>
                       
-                      {isOwnMessage(message) && message.readBy && (
-                        <span className="text-xs text-blue-100">
-                          {message.readBy.length > 0 ? `Read by ${message.readBy.length}` : ''}
-                        </span>
+                      {message.attachment && (
+                        <div className="mt-2 p-2 rounded-lg bg-black/10 border border-white/20">
+                          <div className="flex items-center space-x-2 text-xs">
+                            <PaperClipIcon className="h-4 w-4" />
+                            <span className="truncate">{message.attachment.originalFilename}</span>
+                          </div>
+                        </div>
                       )}
+                      
+                      <div className={`flex items-center justify-end mt-1 space-x-1 ${
+                        isOwn ? 'text-blue-100' : 'text-gray-400'
+                      }`}>
+                        <span className="text-xs">
+                          {formatTime(message.createdAt)}
+                        </span>
+                        
+                        {isOwn && (
+                          <div className="flex items-center space-x-1">
+                            {message.readBy && message.readBy.length > 0 ? (
+                              <div className="flex items-center">
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                                <svg className="w-4 h-4 -ml-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                            ) : (
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -431,11 +453,18 @@ export const ExchangeChatBox: React.FC<ExchangeChatBoxProps> = ({ exchange, clas
         
         {/* Typing Indicators */}
         {isTyping.length > 0 && (
-          <div className="flex justify-start">
-            <div className="bg-gray-100 px-4 py-2 rounded-lg">
-              <p className="text-sm text-gray-600">
-                {isTyping.length === 1 ? 'Someone is typing...' : `${isTyping.length} people are typing...`}
-              </p>
+          <div className="flex justify-start mb-2">
+            <div className="bg-white shadow-sm border border-gray-100 px-4 py-3 rounded-r-2xl rounded-tl-2xl rounded-bl-md max-w-xs">
+              <div className="flex items-center space-x-1">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </div>
+                <span className="text-xs text-gray-500 ml-2">
+                  {isTyping.length === 1 ? 'typing' : `${isTyping.length} typing`}
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -444,46 +473,53 @@ export const ExchangeChatBox: React.FC<ExchangeChatBoxProps> = ({ exchange, clas
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-200 p-4">
+      <div className="border-t border-gray-200 bg-gray-50 p-4">
         {userPermissions.canMessage !== false ? (
-          <form onSubmit={handleSendMessage} className="flex space-x-2">
-            <div className="flex-1 flex space-x-2">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => {
-                  setNewMessage(e.target.value);
-                  handleTyping();
-                }}
-                placeholder="Type your message..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={!isConnected}
-                maxLength={1000}
-              />
-              
+          <form onSubmit={handleSendMessage} className="flex items-end space-x-3">
+            <div className="flex-1 flex items-end space-x-2">
               {userPermissions.canUpload && (
                 <button
                   type="button"
-                  className="p-2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                  className="p-2 text-gray-500 hover:text-gray-700 focus:outline-none transition-colors"
                   disabled={!isConnected}
                 >
                   <PaperClipIcon className="h-5 w-5" />
                 </button>
               )}
+              
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => {
+                    setNewMessage(e.target.value);
+                    handleTyping();
+                  }}
+                  placeholder="Type a message..."
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-3xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 resize-none"
+                  disabled={!isConnected}
+                  maxLength={1000}
+                />
+              </div>
             </div>
             
             <button
               type="submit"
               disabled={!newMessage.trim() || !isConnected}
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+              className={`p-3 rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                newMessage.trim() && isConnected
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
             >
-              <PaperAirplaneIcon className="h-4 w-4" />
-              <span>Send</span>
+              <PaperAirplaneIcon className="h-5 w-5" />
             </button>
           </form>
         ) : (
-          <div className="text-center py-3 text-gray-500 text-sm">
-            You do not have permission to send messages in this exchange.
+          <div className="text-center py-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-yellow-800 text-sm">
+              You do not have permission to send messages in this exchange.
+            </div>
           </div>
         )}
       </div>

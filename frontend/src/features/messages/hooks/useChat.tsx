@@ -16,8 +16,12 @@ export const useChat = () => {
   const loadExchangesTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load exchanges for the current user
-  const loadExchanges = useCallback(async () => {
-    if (!user?.id) return;
+  const loadExchanges = useCallback(async (retries = 0) => {
+    if (!user?.id) {
+      console.warn('⚠️ useChat: Cannot load exchanges - no user ID');
+      setLoading(false);
+      return [];
+    }
 
     // Clear any pending timeout
     if (loadExchangesTimeoutRef.current) {
@@ -25,24 +29,43 @@ export const useChat = () => {
     }
 
     try {
+      console.log('📋 useChat: Loading exchanges for user:', user.id);
       setLoading(true);
       setError(null);
+      
       const chatExchanges = await chatService.getExchanges(user.id);
+      console.log('✅ useChat: Loaded', chatExchanges.length, 'exchanges');
       
       setExchanges(chatExchanges);
       
       // Return exchanges for auto-selection logic
       return chatExchanges;
     } catch (err: any) {
-      console.error('Error loading exchanges:', err);
+      console.error('❌ useChat: Error loading exchanges:', err);
       const errorMessage = err.message || 'Failed to load exchanges';
+      
+      // If it's a server error and we haven't retried, try once more
+      if (retries === 0 && errorMessage.includes('Server error')) {
+        console.log('🔄 useChat: Retrying exchanges load after server error...');
+        setTimeout(() => loadExchanges(1), 2000);
+        return [];
+      }
+      
+      // If it's an auth error, clear the token
+      if (errorMessage.includes('session has expired') || errorMessage.includes('Authentication')) {
+        localStorage.removeItem('token');
+        setError('Your session has expired. Please refresh the page to log in again.');
+        return [];
+      }
+      
       setError(errorMessage);
       
       // If it's a rate limit error, retry after a delay
       if (errorMessage.includes('Too many requests')) {
+        console.log('⏱️ useChat: Rate limited, retrying in 5 seconds...');
         loadExchangesTimeoutRef.current = setTimeout(() => {
-          loadExchanges();
-        }, 5000); // Retry after 5 seconds
+          loadExchanges(retries + 1);
+        }, 5000);
       }
       
       return [];
@@ -52,32 +75,86 @@ export const useChat = () => {
   }, [user?.id]);
 
   // Load messages for a specific exchange
-  const loadMessages = useCallback(async (exchangeId: string) => {
+  const loadMessages = useCallback(async (exchangeId: string, retries = 0) => {
     try {
+      console.log('📥 useChat: Loading messages for exchange:', exchangeId);
       setError(null);
+      
       const chatMessages = await chatService.getMessages(exchangeId);
+      console.log('✅ useChat: Loaded', chatMessages.length, 'messages');
+      
       setMessages(chatMessages);
       
       // Mark messages as read
-      const unreadMessages = chatMessages.filter(
-        msg => msg.sender_id !== user?.id && !msg.read_by?.includes(user?.id || '')
-      );
-      if (unreadMessages.length > 0) {
-        await chatService.markAsRead(
-          unreadMessages.map(msg => msg.id),
-          user?.id || ''
+      if (user?.id) {
+        const unreadMessages = chatMessages.filter(
+          msg => msg.sender_id !== user.id && !msg.read_by?.includes(user.id)
         );
+        
+        if (unreadMessages.length > 0) {
+          console.log('🔍 useChat: Marking', unreadMessages.length, 'messages as read');
+          try {
+            await chatService.markAsRead(
+              unreadMessages.map(msg => msg.id),
+              user.id
+            );
+          } catch (readError) {
+            console.warn('⚠️ useChat: Failed to mark messages as read:', readError);
+            // Don't throw - read receipts are not critical
+          }
+        }
       }
     } catch (err: any) {
-      console.error('Error loading messages:', err);
-      setError(err.message || 'Failed to load messages');
+      console.error('❌ useChat: Error loading messages:', err);
+      
+      const errorMessage = err.message || 'Failed to load messages';
+      
+      // If it's a server error and we haven't retried, try once more
+      if (retries === 0 && errorMessage.includes('Server error')) {
+        console.log('🔄 useChat: Retrying message load after server error...');
+        setTimeout(() => loadMessages(exchangeId, 1), 2000);
+        return;
+      }
+      
+      // If it's an auth error, clear the token
+      if (errorMessage.includes('session has expired') || errorMessage.includes('Authentication')) {
+        localStorage.removeItem('token');
+        setError('Your session has expired. Please refresh the page to log in again.');
+        return;
+      }
+      
+      // Set specific error messages for better UX
+      if (errorMessage.includes('not found')) {
+        setError('This exchange no longer exists or you no longer have access to it.');
+      } else if (errorMessage.includes('permission')) {
+        setError('You do not have permission to view messages in this exchange.');
+      } else {
+        setError(errorMessage);
+      }
+      
+      // Clear messages on error to avoid showing stale data
+      setMessages([]);
     }
   }, [user?.id]);
 
   // Select an exchange and load its messages
   const selectExchange = useCallback(async (exchange: ChatExchange) => {
-    setSelectedExchange(exchange);
-    await loadMessages(exchange.id);
+    try {
+      console.log('🎯 useChat: Selecting exchange:', exchange.id, exchange.exchange_name);
+      
+      // Clear previous state
+      setSelectedExchange(exchange);
+      setMessages([]);
+      setError(null);
+      setTypingUsers(new Set());
+      
+      // Load messages for the selected exchange
+      await loadMessages(exchange.id);
+      
+    } catch (err: any) {
+      console.error('❌ useChat: Error selecting exchange:', err);
+      setError(err.message || 'Failed to select exchange');
+    }
   }, [loadMessages]);
 
   // Send a message
@@ -245,17 +322,27 @@ export const useChat = () => {
   // Load exchanges on mount and when user changes
   useEffect(() => {
     const initializeExchanges = async () => {
-      const exchanges = await loadExchanges();
-      
-      // Auto-select first exchange if none selected
-      if (exchanges && exchanges.length > 0 && !selectedExchange) {
+      try {
+        console.log('🚀 useChat: Initializing exchanges...');
+        const exchanges = await loadExchanges();
         
-        await selectExchange(exchanges[0]);
+        // Auto-select first exchange if none selected and exchanges exist
+        if (exchanges && exchanges.length > 0 && !selectedExchange) {
+          console.log('🎯 useChat: Auto-selecting first exchange:', exchanges[0].exchange_name);
+          await selectExchange(exchanges[0]);
+        } else if (exchanges && exchanges.length === 0) {
+          console.log('📋 useChat: No exchanges found for user');
+          setMessages([]);
+        }
+      } catch (err) {
+        console.error('❌ useChat: Failed to initialize exchanges:', err);
       }
     };
     
-    initializeExchanges();
-  }, [loadExchanges, selectedExchange, selectExchange]);
+    if (user?.id) {
+      initializeExchanges();
+    }
+  }, [user?.id]); // Only depend on user.id to avoid infinite loops
 
   // Cleanup subscriptions on unmount
   useEffect(() => {

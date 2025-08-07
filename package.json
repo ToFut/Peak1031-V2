@@ -12,6 +12,7 @@
     "test": "npm run test:backend && npm run test:frontend",
     "test:backend": "cd backend && npm test",
     "test:frontend": "cd frontend && npm test",
+    "test:enhanced": "node test-enhanced-features.js",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:build": "docker-compose up -d --build",
@@ -44,6 +45,8 @@
     "colors": "^1.4.0",
     "dotenv": "^17.2.1",
     "form-data": "^4.0.4",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "socket.io-client": "^4.7.5",
+    "ws": "^8.18.0"
   }
 }

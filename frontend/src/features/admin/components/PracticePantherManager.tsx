@@ -17,6 +17,7 @@ import {
   PauseIcon
 } from '@heroicons/react/24/outline';
 import { apiService } from '../../../services/api';
+import PPTokenManager from './PPTokenManager';
 
 interface SyncStatus {
   lastSync: string | null;
@@ -215,6 +216,9 @@ const PracticePantherManager: React.FC = () => {
       {/* Overview Tab */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          {/* PP Token Manager - Primary Component */}
+          <PPTokenManager />
+          
           {/* Connection Status Card */}
           <div className="bg-white rounded-lg shadow border p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Connection Status</h3>

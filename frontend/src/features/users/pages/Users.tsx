@@ -33,6 +33,8 @@ const Users: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ppDataCache, setPpDataCache] = useState<Record<string, any>>({});
+  const [loadingPpData, setLoadingPpData] = useState<Set<string>>(new Set());
   const { isAdmin } = usePermissions();
   const navigate = useNavigate();
 
@@ -51,8 +53,7 @@ const Users: React.FC = () => {
   const [showMinChip, setShowMinChip] = useState(false);
   const [showMaxChip, setShowMaxChip] = useState(false);
   const [userActionMenu, setUserActionMenu] = useState<string | null>(null);
-  const [showProfileDrawer, setShowProfileDrawer] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  
 
   // Check if user has admin access
   useEffect(() => {
@@ -65,25 +66,54 @@ const Users: React.FC = () => {
 
   const loadUsers = useCallback(async () => {
     try {
-    setLoading(true);
-    setError(null);
-    
-    
-    const response = await apiService.get('/admin/users');
-    
-    
-    // Handle both direct array and paginated response
-    const usersData = response.users || response.data || response || [];
-    
-    
-    setUsers(usersData);
+      setLoading(true);
+      setError(null);
+      
+      const response = await apiService.get('/admin/users');
+      
+      // Handle both direct array and paginated response
+      const usersData = response.users || response.data || response || [];
+      
+      setUsers(usersData);
+      
+      // Load PP data for first 10 users in background
+      usersData.slice(0, 10).forEach((user: any) => {
+        loadPPDataForUser(user.id);
+      });
     } catch (err: any) {
-    console.error('❌ Error loading users:', err);
-    setError(err.message || 'Failed to load users');
+      console.error('❌ Error loading users:', err);
+      setError(err.message || 'Failed to load users');
     } finally {
-    setLoading(false);
+      setLoading(false);
     }
   }, []);
+  
+  const loadPPDataForUser = async (userId: string) => {
+    // Skip if PP integration is not enabled
+    return;
+    
+    // Uncomment below to enable PP data loading
+    /*
+    if (ppDataCache[userId] || loadingPpData.has(userId)) return;
+    
+    setLoadingPpData(prev => new Set(prev).add(userId));
+    
+    try {
+      const response = await apiService.get(`/pp-data/user/${userId}`);
+      if (response.success) {
+        setPpDataCache(prev => ({ ...prev, [userId]: response.pp_data }));
+      }
+    } catch (err) {
+      console.log('Could not load PP data for user:', userId);
+    } finally {
+      setLoadingPpData(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(userId);
+        return newSet;
+      });
+    }
+    */
+  };
 
   useEffect(() => {
     // Only load users if user is admin
@@ -134,8 +164,25 @@ const Users: React.FC = () => {
   };
 
   const handleViewUserProfile = (user: any) => {
-    setSelectedUser(user);
-    setShowProfileDrawer(true);
+    // Safety check for user ID
+    if (!user || !user.id) {
+      console.error('❌ Cannot navigate to user profile: user or user.id is undefined', user);
+      alert('Error: User information not available');
+      return;
+    }
+    
+    // Additional validation for UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(user.id)) {
+      console.error('❌ Invalid user ID format:', user.id);
+      alert('Error: Invalid user ID format');
+      return;
+    }
+    
+    console.log('✅ Navigating to user profile:', user.email, 'ID:', user.id);
+    
+    // Navigate to the detailed user profile page
+    navigate(`/users/user-profile/${user.id}`);
     setUserActionMenu(null);
   };
 
@@ -242,7 +289,6 @@ const Users: React.FC = () => {
         alert(response.message);
         // Refresh users list
         loadUsers();
-        setShowProfileDrawer(false);
       }
     } catch (error: any) {
       alert(`Error deleting user: ${error.message}`);
@@ -259,10 +305,6 @@ const Users: React.FC = () => {
       alert(response.message);
       // Refresh users list
       loadUsers();
-      // Update selected user if it's the same user
-      if (selectedUser && selectedUser.id === user.id) {
-        setSelectedUser({ ...selectedUser, role: newRole });
-      }
     }
     } catch (error: any) {
     alert(`Error changing user role: ${error.message}`);
@@ -428,8 +470,8 @@ const Users: React.FC = () => {
                     Send Login Link
                   </button>
                   <button className="block w-full text-left px-4 py-2 hover:bg-blue-50" onClick={() => handleViewUserProfile(user)}>
-                    <Eye className="w-4 h-4 inline mr-2" />
-                    View Profile
+                    <BarChart3 className="w-4 h-4 inline mr-2" />
+                    View Analytics
                   </button>
                   <button className="block w-full text-left px-4 py-2 hover:bg-blue-50" onClick={() => handleSeeAudit(user)}>
                     <BarChart3 className="w-4 h-4 inline mr-2" />
@@ -480,9 +522,27 @@ const Users: React.FC = () => {
               Email: {user.email}
             </div>
 
+            {/* PP Data Integration - Commented out until PP sync is complete */}
+            {/* Uncomment this section after running PP data sync
+            {ppDataCache[user.id] && (
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {ppDataCache[user.id].invoices?.total_revenue > 0 && (
+                    <div className="flex items-center gap-1">
+                      <DollarSign className="w-3 h-3 text-green-600" />
+                      <span className="text-gray-600">
+                        ${ppDataCache[user.id].invoices.total_revenue.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            */}
+
             {/* Last Login */}
             {user.last_login && (
-              <div className="text-xs text-gray-500 mb-2">
+              <div className="text-xs text-gray-500 mt-2">
                 Last login: {new Date(user.last_login).toLocaleDateString()}
               </div>
             )}
@@ -513,205 +573,6 @@ const Users: React.FC = () => {
         </div>
       )}
 
-      {/* Slide-in Profile Drawer */}
-      {showProfileDrawer && selectedUser && (
-        <div className="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white shadow-2xl z-50 transition-transform duration-300 animate-slide-in overflow-y-auto">
-          <button 
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-2xl" 
-            onClick={() => setShowProfileDrawer(false)}
-          >
-            ×
-          </button>
-          
-          {/* User Profile Content */}
-          <div className="p-6">
-            {/* Header with Edit Button */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-2xl font-bold text-blue-700 shadow">
-                  {`${selectedUser.first_name || ''} ${selectedUser.last_name || ''}`.split(' ').map(n => n[0]).join('') || selectedUser.email[0].toUpperCase()}
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    {selectedUser.first_name && selectedUser.last_name ? `${selectedUser.first_name} ${selectedUser.last_name}` : selectedUser.email}
-                  </h2>
-                  <p className="text-gray-600">{selectedUser.role}</p>
-                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium mt-2 ${getStatusColor(selectedUser.is_active)}`}>
-                    {selectedUser.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-              </div>
-              <button 
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                onClick={() => handleEditUser(selectedUser)}
-              >
-                <Edit className="w-4 h-4 inline mr-2" />
-                Edit Profile
-              </button>
-            </div>
-
-            {/* Admin Quick Stats */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-blue-700">
-                  {selectedUser.exchanges ? selectedUser.exchanges.length : 0}
-                </div>
-                <div className="text-sm text-blue-600">Active Exchanges</div>
-              </div>
-              <div className="bg-green-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-green-700">
-                  {selectedUser.tasks ? selectedUser.tasks.length : 0}
-                </div>
-                <div className="text-sm text-green-600">Open Tasks</div>
-              </div>
-            </div>
-
-            {/* Contact Information */}
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3 text-gray-900">Contact Information</h3>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-gray-500" />
-                    <span className="text-gray-700">{selectedUser.email}</span>
-                  </div>
-                  <button 
-                    className="text-blue-600 hover:text-blue-800 text-sm" 
-                    onClick={() => handleCopyEmail(selectedUser.email)}
-                  >
-                    <Copy className="w-4 h-4 inline mr-1" />
-                    Copy
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-gray-500" />
-                  <span className="text-gray-700">
-                    Last Login: {selectedUser.last_login ? new Date(selectedUser.last_login).toLocaleString() : 'N/A'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Star className="w-4 h-4 text-gray-500" />
-                  <span className="text-gray-700">Created: {new Date(selectedUser.created_at).toLocaleDateString()}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Admin Actions Section */}
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3 text-gray-900">Admin Actions</h3>
-              <div className="space-y-2">
-                <button 
-                  className="w-full text-left p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                  onClick={() => handleSendLoginLink(selectedUser)}
-                >
-                  <div className="font-medium text-blue-900">Send Login Link</div>
-                  <div className="text-sm text-blue-700">Email login credentials to user</div>
-                </button>
-                <button 
-                  className="w-full text-left p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
-                  onClick={() => handleResetPassword(selectedUser)}
-                >
-                  <div className="font-medium text-green-900">Reset Password</div>
-                  <div className="text-sm text-green-700">Force password reset on next login</div>
-                </button>
-                <button 
-                  className="w-full text-left p-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
-                  onClick={() => handleEnable2FA(selectedUser)}
-                >
-                  <div className="font-medium text-purple-900">
-                    {selectedUser.two_fa_enabled ? 'Disable' : 'Enable'} 2FA
-                  </div>
-                  <div className="text-sm text-purple-700">
-                    {selectedUser.two_fa_enabled ? 'Remove two-factor authentication' : 'Require two-factor authentication'}
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* Role & Status Management */}
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3 text-gray-900">Role & Status</h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                  <div className="relative">
-                    <select 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white cursor-pointer hover:border-gray-400 transition-colors"
-                      value={selectedUser.role}
-                      onChange={(e) => handleChangeRole(selectedUser, e.target.value)}
-                    >
-                      <option value="admin">👑 Admin</option>
-                      <option value="coordinator">👨‍💼 Coordinator</option>
-                      <option value="client">👤 Client</option>
-                      <option value="third_party">🏢 Third Party</option>
-                      <option value="agency">🏢 Agency</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                  <div className="flex gap-2">
-                    <button 
-                      className={`px-4 py-2 rounded-lg border transition-colors ${
-                        selectedUser.is_active 
-                          ? 'bg-green-100 text-green-800 border-green-300' 
-                          : 'bg-gray-100 text-gray-600 border-gray-300'
-                      }`}
-                      onClick={() => handleDeactivate(selectedUser)}
-                    >
-                      {selectedUser.is_active ? 'Active' : 'Inactive'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Security Information */}
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3 text-gray-900">Security</h3>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-gray-500" />
-                    <span className="text-gray-700">Two-Factor Authentication</span>
-                  </div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    selectedUser.two_fa_enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    {selectedUser.two_fa_enabled ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-gray-500" />
-                    <span className="text-gray-700">Last Login</span>
-                  </div>
-                  <span className="text-sm text-gray-600">
-                    {selectedUser.last_login ? new Date(selectedUser.last_login).toLocaleString() : 'Never'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Danger Zone */}
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3 text-red-900">Danger Zone</h3>
-              <div className="space-y-2">
-                <button 
-                  className="w-full text-left p-3 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-200"
-                  onClick={() => handleDeleteUser(selectedUser)}
-                >
-                  <div className="font-medium text-red-900 flex items-center gap-2">
-                    <Trash2 className="w-4 h-4" />
-                    Delete User
-                  </div>
-                  <div className="text-sm text-red-700">Permanently remove this user and all associated data</div>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Error Display */}
       {error && (

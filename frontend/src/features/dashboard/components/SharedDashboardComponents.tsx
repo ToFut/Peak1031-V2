@@ -62,7 +62,7 @@ export const EnhancedStatCard: React.FC<EnhancedStatCardProps> = ({
 
   return (
     <div 
-      className={`bg-white rounded-lg shadow-sm border p-6 ${
+      className={`bg-white rounded-lg shadow-sm border p-4 sm:p-6 ${
         urgent 
           ? 'border-red-200 bg-red-50' 
           : 'border-gray-200'
@@ -78,7 +78,7 @@ export const EnhancedStatCard: React.FC<EnhancedStatCardProps> = ({
           }`}>
             {title}
           </p>
-          <p className={`text-3xl font-bold ${colorClasses[color].split(' ')[0]}`}>
+          <p className={`text-2xl sm:text-3xl font-bold ${colorClasses[color].split(' ')[0]}`}>
             {value}
           </p>
           {subtitle && (
@@ -92,8 +92,8 @@ export const EnhancedStatCard: React.FC<EnhancedStatCardProps> = ({
           )}
         </div>
         <div className="flex-shrink-0">
-          <div className={`w-12 h-12 rounded-lg ${colorClasses[color]} flex items-center justify-center`}>
-            <Icon className="w-6 h-6" />
+          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg ${colorClasses[color]} flex items-center justify-center`}>
+            <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
         </div>
       </div>
@@ -138,17 +138,17 @@ export const QuickAction: React.FC<QuickActionProps> = ({
     <button
       onClick={onClick}
       disabled={disabled || loading}
-      className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-left hover:shadow-md transition-all duration-200 ${colorClasses[color]} disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 text-left hover:shadow-md transition-all duration-200 ${colorClasses[color]} disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     >
-      <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-2 sm:space-x-3">
         {loading ? (
-          <div className="w-8 h-8 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+          <div className="w-6 h-6 sm:w-8 sm:h-8 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
         ) : (
-          <Icon className="w-8 h-8" />
+          <Icon className="w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0" />
         )}
-        <div>
-          <h3 className="text-sm font-medium text-gray-900">{title}</h3>
-          <p className="text-xs text-gray-500">{description}</p>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-xs sm:text-sm font-medium text-gray-900 truncate">{title}</h3>
+          <p className="text-xs text-gray-500 truncate">{description}</p>
         </div>
       </div>
     </button>
@@ -177,16 +177,16 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     <div className={`min-h-screen bg-gray-50 ${className}`}>
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4 sm:py-6 space-y-3 sm:space-y-0">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{title}</h1>
               {subtitle && (
                 <p className="text-sm text-gray-600 mt-1">{subtitle}</p>
               )}
             </div>
             {headerActions && (
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
                 {headerActions}
               </div>
             )}
@@ -195,15 +195,15 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
         {sidebar ? (
-          <div className="flex gap-8">
+          <div className="flex flex-col lg:flex-row gap-4 sm:gap-8">
             {/* Sidebar */}
-            <div className="w-80 flex-shrink-0">
+            <div className="w-full lg:w-80 flex-shrink-0 order-2 lg:order-1">
               {sidebar}
             </div>
             {/* Main content */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 order-1 lg:order-2">
               {children}
             </div>
           </div>
@@ -239,14 +239,14 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
 }) => {
   return (
     <div className={`border-b border-gray-200 ${className}`}>
-      <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+      <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto scrollbar-hide" aria-label="Tabs">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => !tab.disabled && onTabChange(tab.id)}
             disabled={tab.disabled}
             className={`
-              whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 
+              whitespace-nowrap py-2 px-1 border-b-2 font-medium text-xs sm:text-sm flex items-center space-x-1 sm:space-x-2 flex-shrink-0
               ${
                 activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
@@ -285,7 +285,7 @@ export const DashboardSkeleton: React.FC<{ cards?: number }> = ({ cards = 4 }) =
   return (
     <div className="space-y-6">
       {/* Stats Cards Skeleton */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {Array.from({ length: cards }).map((_, i) => (
           <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="animate-pulse">

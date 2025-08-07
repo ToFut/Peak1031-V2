@@ -1,58 +1,124 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
-async function testConnection() {
-  console.log('🔍 TESTING SUPABASE CONNECTION\n');
-  
-  // Check environment variables
-  console.log('Environment Variables:');
-  console.log('- SUPABASE_URL:', process.env.SUPABASE_URL ? '✅ Set' : '❌ Missing');
-  console.log('- SUPABASE_SERVICE_KEY:', process.env.SUPABASE_SERVICE_KEY ? '✅ Set' : '❌ Missing');
-  console.log('- SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing');
-  
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-    console.log('\n❌ Missing required environment variables');
-    return;
-  }
-  
-  console.log('\n🔗 Testing connection...');
-  
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ Missing Supabase credentials');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+async function testSupabaseConnection() {
   try {
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    
-    // Try a simple query to test connection
+    console.log('🔍 Testing Supabase connection...');
+    console.log('📋 Supabase URL:', supabaseUrl ? 'Set' : 'Missing');
+    console.log('🔑 Supabase Key:', supabaseKey ? 'Set' : 'Missing');
+    console.log('✅ Supabase client created');
+
+    // Test basic connection
+    console.log('🔍 Testing database connection...');
     const { data, error } = await supabase
-      .from('_supabase_migrations')
-      .select('*')
-      .limit(1);
-    
+      .from('users')
+      .select('count', { count: 'exact', head: true });
+
     if (error) {
-      console.log('❌ Connection failed:', error.message);
-      
-      if (error.message.includes('Invalid API key')) {
-        console.log('\n🔧 DIAGNOSIS: Invalid API Key');
-        console.log('Possible causes:');
-        console.log('1. Service key is expired or invalid');
-        console.log('2. Key is split across multiple lines in .env file');
-        console.log('3. Project has been deleted or suspended');
-        console.log('4. Wrong key type (using anon key instead of service key)');
-        
-        console.log('\n💡 SOLUTION:');
-        console.log('1. Go to https://supabase.com/dashboard');
-        console.log('2. Select your project');
-        console.log('3. Go to Settings → API');
-        console.log('4. Copy the "service_role" key (not anon key)');
-        console.log('5. Update your .env file');
-      }
-    } else {
-      console.log('✅ Connection successful!');
-      console.log('✅ Supabase project is accessible');
-      console.log('✅ Service key is valid');
+      console.error('❌ Supabase connection failed:', error.message);
+      return;
     }
+
+    console.log('✅ Supabase connection successful!');
+    console.log('📊 Data:', data);
+
+    // Check exchange participants
+    console.log('\n🔍 Checking exchange participants...');
     
+    // First check if the table exists
+    const { data: participants, error: participantsError } = await supabase
+      .from('exchange_participants')
+      .select('*', { count: 'exact', head: true });
+
+    if (participantsError) {
+      console.log('❌ Exchange participants table error:', participantsError.message);
+    } else {
+      console.log(`📊 Total exchange participants: ${participants}`);
+    }
+
+    // Get actual participant records
+    const { data: participantRecords, error: recordsError } = await supabase
+      .from('exchange_participants')
+      .select(`
+        id,
+        exchange_id,
+        user_id,
+        contact_id,
+        role,
+        created_at
+      `)
+      .limit(10);
+
+    if (recordsError) {
+      console.log('❌ Error fetching participant records:', recordsError.message);
+    } else {
+      if (participantRecords && participantRecords.length > 0) {
+        console.log(`\n👥 Found ${participantRecords.length} exchange participants:`);
+        participantRecords.forEach((participant, index) => {
+          console.log(`\n${index + 1}. Participant ID: ${participant.id}`);
+          console.log(`   Exchange ID: ${participant.exchange_id}`);
+          console.log(`   User ID: ${participant.user_id || 'N/A'}`);
+          console.log(`   Contact ID: ${participant.contact_id || 'N/A'}`);
+          console.log(`   Role: ${participant.role}`);
+          console.log(`   Created: ${participant.created_at}`);
+        });
+      } else {
+        console.log('❌ No exchange participants found in database');
+      }
+    }
+
+    // Check exchanges table
+    console.log('\n🏢 Checking exchanges table...');
+    const { data: exchanges, error: exchangesError } = await supabase
+      .from('exchanges')
+      .select('id, name, exchange_name, status, coordinator_id, client_id')
+      .limit(5);
+
+    if (exchangesError) {
+      console.log('❌ Error fetching exchanges:', exchangesError.message);
+    } else {
+      console.log(`📊 Found ${exchanges?.length || 0} exchanges:`);
+      exchanges?.forEach((exchange, index) => {
+        console.log(`\n${index + 1}. Exchange: ${exchange.name || exchange.exchange_name || 'Unnamed'}`);
+        console.log(`   ID: ${exchange.id}`);
+        console.log(`   Status: ${exchange.status || 'N/A'}`);
+        console.log(`   Coordinator ID: ${exchange.coordinator_id || 'N/A'}`);
+        console.log(`   Client ID: ${exchange.client_id || 'N/A'}`);
+      });
+    }
+
+    // Check if there are any users that could be participants
+    console.log('\n👤 Checking users table...');
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('id, first_name, last_name, email, role')
+      .limit(5);
+
+    if (usersError) {
+      console.log('❌ Error fetching users:', usersError.message);
+    } else {
+      console.log(`📊 Found ${users?.length || 0} users:`);
+      users?.forEach((user, index) => {
+        console.log(`\n${index + 1}. User: ${user.first_name} ${user.last_name}`);
+        console.log(`   ID: ${user.id}`);
+        console.log(`   Email: ${user.email}`);
+        console.log(`   Role: ${user.role}`);
+      });
+    }
+
   } catch (error) {
-    console.log('❌ Unexpected error:', error.message);
+    console.error('❌ Error:', error.message);
   }
 }
 
-testConnection(); 
+testSupabaseConnection(); 

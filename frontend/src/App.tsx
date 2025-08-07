@@ -10,7 +10,7 @@ import { ErrorBoundary, RouteErrorBoundary } from './components/ErrorBoundary';
 // Feature imports
 import Messages from './features/messages/pages/Messages';
 import Exchanges from './features/exchanges/pages/Exchanges';
-import ExchangeDetail from './features/exchanges/pages/ExchangeDetail';
+import ExchangeDetailEnhanced from './features/exchanges/pages/ExchangeDetailEnhanced';
 import Tasks from './features/tasks/pages/Tasks';
 import Contacts from './features/contacts/pages/Contacts';
 import Documents from './features/documents/pages/Documents';
@@ -18,6 +18,7 @@ import Users from './features/users/pages/Users';
 import Reports from './features/reports/pages/Reports';
 import Settings from './features/settings/pages/Settings';
 import Profile from './features/settings/pages/Profile';
+import UserProfile from './features/users/pages/UserProfile';
 import Preferences from './features/settings/pages/Preferences';
 import AuthTest from './features/auth/pages/AuthTest';
 import TemplateManager from './features/documents/components/TemplateManager';
@@ -171,9 +172,11 @@ const App: React.FC = () => {
                 path="/exchanges/:id" 
                 element={
                   <ProtectedRoute>
-                    <RouteErrorBoundary routeName="ExchangeDetails">
-                      <ExchangeDetail />
-                    </RouteErrorBoundary>
+                    <Layout>
+                      <RouteErrorBoundary routeName="ExchangeDetails">
+                        <ExchangeDetailEnhanced />
+                      </RouteErrorBoundary>
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -239,7 +242,11 @@ const App: React.FC = () => {
                 path="/templates" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
-                    <TemplateDocumentManager />
+                    <Layout>
+                      <RouteErrorBoundary routeName="TemplateDocumentManager">
+                        <TemplateDocumentManager />
+                      </RouteErrorBoundary>
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -249,7 +256,11 @@ const App: React.FC = () => {
                 path="/admin/templates" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
-                    <TemplateManager />
+                    <Layout>
+                      <RouteErrorBoundary routeName="TemplateManager">
+                        <TemplateManager />
+                      </RouteErrorBoundary>
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -367,7 +378,11 @@ const App: React.FC = () => {
                 path="/reports" 
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
-                    <Reports />
+                    <Layout>
+                      <RouteErrorBoundary routeName="Reports">
+                        <Reports />
+                      </RouteErrorBoundary>
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -377,7 +392,11 @@ const App: React.FC = () => {
                 path="/settings" 
                 element={
                   <ProtectedRoute>
-                    <Settings />
+                    <Layout>
+                      <RouteErrorBoundary routeName="Settings">
+                        <Settings />
+                      </RouteErrorBoundary>
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -387,7 +406,39 @@ const App: React.FC = () => {
                 path="/profile" 
                 element={
                   <ProtectedRoute>
-                    <Profile />
+                    <Layout>
+                      <RouteErrorBoundary routeName="Profile">
+                        <Profile />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* User Profile with Analytics - Available to all authenticated users */}
+              <Route 
+                path="/user-profile" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <RouteErrorBoundary routeName="UserProfile">
+                        <UserProfile />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Specific User Profile - Admin only */}
+              <Route 
+                path="/users/user-profile/:userId" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <RouteErrorBoundary routeName="UserProfile">
+                        <UserProfile />
+                      </RouteErrorBoundary>
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
@@ -397,7 +448,11 @@ const App: React.FC = () => {
                 path="/preferences" 
                 element={
                   <ProtectedRoute>
-                    <Preferences />
+                    <Layout>
+                      <RouteErrorBoundary routeName="Preferences">
+                        <Preferences />
+                      </RouteErrorBoundary>
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />

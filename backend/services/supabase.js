@@ -130,6 +130,27 @@ class SupabaseService {
   }
 
   async getUserById(id) {
+    // Try contacts table first (preferred for user profiles) - use 'id' field, not 'user_id'
+    try {
+      const users = await this.select('contacts', { where: { id } });
+      if (users && users.length > 0) {
+        return users[0];
+      }
+    } catch (contactError) {
+      console.log('⚠️ Could not query contacts table with id, trying people table:', contactError.message);
+    }
+    
+    // Try people table second
+    try {
+      const users = await this.select('people', { where: { id } });
+      if (users && users.length > 0) {
+        return users[0];
+      }
+    } catch (peopleError) {
+      console.log('⚠️ Could not query people table, trying users table:', peopleError.message);
+    }
+    
+    // Fallback to users table
     const users = await this.select('users', { where: { id } });
     return users[0] || null;
   }
@@ -392,13 +413,10 @@ class SupabaseService {
     try {
       const { where = {}, orderBy = { column: 'created_at', ascending: false }, limit } = options;
       
+      // First try simple query without relationships to test basic functionality
       let query = this.client
         .from('messages')
-        .select(`
-          *,
-          users!messages_sender_id_fkey(id, first_name, last_name, email),
-          exchange:exchanges(id, name, status)
-        `);
+        .select('*');
 
       // Apply where conditions with column name conversion
       if (where.exchangeId) {
@@ -435,8 +453,35 @@ class SupabaseService {
         console.error('❌ Supabase select error for messages:', error);
         throw new Error(error.message);
       }
+      
+      // If we have messages, try to enrich with user data
+      const messages = data || [];
+      
+      // For each message, try to fetch sender info separately
+      if (messages.length > 0) {
+        const enrichedMessages = await Promise.all(messages.map(async (message) => {
+          try {
+            // Fetch sender info separately
+            const { data: userData, error: userError } = await this.client
+              .from('users')
+              .select('id, first_name, last_name, email, role')
+              .eq('id', message.sender_id)
+              .single();
+              
+            if (!userError && userData) {
+              message.users = userData;
+            }
+          } catch (userErr) {
+            console.warn('⚠️ Could not fetch user data for message:', message.id, userErr.message);
+          }
+          
+          return message;
+        }));
+        
+        return enrichedMessages;
+      }
 
-      return data || [];
+      return messages;
     } catch (error) {
       console.error('Error in getMessages:', error);
       throw error;

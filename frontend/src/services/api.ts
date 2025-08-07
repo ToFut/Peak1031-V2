@@ -152,20 +152,28 @@ class ApiService {
 
       if (!response.ok) {
       // If we get a 401 and have a refresh token, try to refresh (but only once)
-      if (response.status === 401 && localStorage.getItem('refreshToken') && !isRetry) {
-        try {
-          await this.refreshToken();
-          // Retry the request with the new token
-          return await this.request<T>(endpoint, options, true);
-        } catch (refreshError) {
-          console.error('Token refresh failed:', refreshError);
-          // If refresh fails, clear tokens and throw original error
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
+      if (response.status === 401 && !isRetry) {
+        const hasRefreshToken = localStorage.getItem('refreshToken');
+        
+        if (hasRefreshToken) {
+          // Try to get error details to check if it's token expiry
+          const errorData = await response.clone().json().catch(() => ({}));
+          console.log('🔍 401 Error details:', errorData);
           
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Authentication failed. Please login again.');
+          console.log('🔄 Attempting token refresh due to 401 error...');
+          try {
+            await this.refreshToken();
+            console.log('✅ Token refreshed successfully, retrying request...');
+            // Retry the request with the new token
+            return await this.request<T>(endpoint, options, true);
+          } catch (refreshError) {
+            console.error('❌ Token refresh failed:', refreshError);
+            // If refresh fails, clear tokens and throw original error
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+            throw new Error('Session expired. Please login again.');
+          }
         }
       }
       
@@ -398,9 +406,9 @@ class ApiService {
   }
 
   async sendMessage(exchangeId: string, content: string): Promise<Message> {
-    return await this.request(`/exchanges/${exchangeId}/messages`, {
+    return await this.request(`/messages`, {
       method: 'POST',
-      body: JSON.stringify({ content })
+      body: JSON.stringify({ exchangeId, content, messageType: 'text' })
     });
   }
 
@@ -1075,16 +1083,20 @@ class ApiService {
    * Initiate PracticePanther OAuth flow
    */
   async initiateP3OAuth(): Promise<{ authUrl: string }> {
-    return await this.request('/practicepanther/auth', { method: 'POST' });
+    const response = await this.request<{ auth_url: string }>('/admin/pp-token/auth-url', { method: 'GET' });
+    return { authUrl: response.auth_url };
   }
 
   /**
    * Complete PracticePanther OAuth with callback code
    */
   async completeP3OAuth(code: string, state: string): Promise<{ success: boolean }> {
-    return await this.request('/practicepanther/callback', {
-      method: 'POST',
-      body: JSON.stringify({ code, state })
+    const url = new URL(`${this.baseURL}/admin/pp-token/callback`);
+    url.searchParams.set('code', code);
+    url.searchParams.set('state', state);
+    
+    return await this.request<{ success: boolean }>(url.pathname + url.search, {
+      method: 'GET'
     });
   }
 
@@ -1092,14 +1104,22 @@ class ApiService {
    * Get PracticePanther authorization status
    */
   async getP3AuthStatus(): Promise<{ authorized: boolean; lastSync?: string }> {
-    return await this.request('/practicepanther/status');
+    const response = await this.request<{
+      token_status?: { status: string };
+      last_refresh?: { refreshed_at: string };
+    }>('/admin/pp-token/status');
+    
+    return { 
+      authorized: response.token_status?.status === 'valid',
+      lastSync: response.last_refresh?.refreshed_at 
+    };
   }
 
   /**
    * Disconnect PracticePanther integration
    */
   async disconnectP3Integration(): Promise<{ success: boolean }> {
-    return await this.request('/practicepanther/disconnect', { method: 'POST' });
+    return await this.request('/admin/pp-token/revoke', { method: 'DELETE' });
   }
 
   /**

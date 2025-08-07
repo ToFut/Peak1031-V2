@@ -208,16 +208,16 @@ router.get('/users', authenticateToken, requireRole(['admin']), async (req, res)
           try {
             const contacts = await supabaseService.select('contacts', {
               where: {
-                user_id: { in: users.map(u => u.id) }
+                id: { in: users.map(u => u.id) }
               }
             });
             
-            // Group contacts by user_id
+            // Group contacts by id (not user_id since contacts table uses id field)
             contacts.forEach(contact => {
-              if (!contactsMap[contact.user_id]) {
-                contactsMap[contact.user_id] = [];
+              if (!contactsMap[contact.id]) {
+                contactsMap[contact.id] = [];
               }
-              contactsMap[contact.user_id].push(contact);
+              contactsMap[contact.id].push(contact);
             });
           } catch (contactError) {
             console.log('⚠️ Could not fetch contacts:', contactError.message);

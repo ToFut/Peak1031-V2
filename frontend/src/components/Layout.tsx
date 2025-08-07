@@ -385,23 +385,23 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-80 bg-white shadow-xl transform transition-all duration-300 ease-in-out lg:relative lg:translate-x-0 lg:flex-shrink-0 border-r-2 border-red-500 ${
+      <div className={`fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-white shadow-xl transform transition-all duration-300 ease-in-out lg:relative lg:translate-x-0 lg:flex-shrink-0 border-r border-gray-200 ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       } ${
         isDesktopSidebarCollapsed ? 'lg:w-16' : 'lg:w-64'
       }`}>
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 bg-white">
-          <div className="flex items-center">
+        <div className="flex items-center justify-between h-16 px-3 sm:px-4 border-b border-gray-200 bg-white">
+          <div className="flex items-center min-w-0 flex-1">
             <div className="flex-shrink-0">
-              <div className="h-10 w-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center shadow-sm">
-                <span className="text-white font-bold text-lg">P</span>
+              <div className="h-8 w-8 sm:h-10 sm:w-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center shadow-sm">
+                <span className="text-white font-bold text-sm sm:text-lg">P</span>
               </div>
             </div>
             {!isDesktopSidebarCollapsed && (
-              <div className="ml-3">
-                <h1 className="text-lg font-bold text-gray-900">Peak 1031</h1>
-                <p className="text-xs text-gray-500">Exchange Platform</p>
+              <div className="ml-2 sm:ml-3 min-w-0 flex-1">
+                <h1 className="text-base sm:text-lg font-bold text-gray-900 truncate">Peak 1031</h1>
+                <p className="text-xs text-gray-500 hidden sm:block">Exchange Platform</p>
               </div>
             )}
           </div>
@@ -417,8 +417,8 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6">
-          <div className="space-y-2">
+        <nav className="flex-1 px-2 sm:px-4 py-4 sm:py-6 overflow-y-auto">
+          <div className="space-y-1 sm:space-y-2">
             {getNavigation().map((item) => {
               const Icon = isCurrentPath(item.href) ? item.iconSolid : item.icon;
               const isActive = isCurrentPath(item.href);
@@ -441,7 +441,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
                               navigate(child.href);
                               setSidebarOpen(false); // Close sidebar on mobile after navigation
                             }}
-                            className={`w-full group flex items-center ${isDesktopSidebarCollapsed ? 'justify-center px-2' : 'px-4'} py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
+                            className={`w-full group flex items-center ${isDesktopSidebarCollapsed ? 'justify-center px-2' : 'px-3 sm:px-4'} py-2.5 sm:py-3 text-sm font-medium rounded-lg sm:rounded-xl transition-all duration-200 ${
                               isChildActive
                                 ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
                                 : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -471,7 +471,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
                       navigate(item.href);
                       setSidebarOpen(false); // Close sidebar on mobile after navigation
                     }}
-                    className={`w-full group flex items-center ${isDesktopSidebarCollapsed ? 'justify-center px-2' : 'px-4'} py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
+                    className={`w-full group flex items-center ${isDesktopSidebarCollapsed ? 'justify-center px-2' : 'px-3 sm:px-4'} py-2.5 sm:py-3 text-sm font-medium rounded-lg sm:rounded-xl transition-all duration-200 ${
                       isActive
                         ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
                         : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -555,15 +555,15 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
         isDesktopSidebarCollapsed ? 'lg:ml-16' : 'lg:ml-0'
       }`}>
         {/* Top navigation */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="flex justify-between items-center px-6 py-4 min-h-[64px]">
-            <div className="flex items-center">
+        <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+          <div className="flex justify-between items-center px-3 sm:px-6 py-3 sm:py-4 min-h-[56px] sm:min-h-[64px]">
+            <div className="flex items-center min-w-0 flex-1">
               {/* Mobile menu button */}
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="lg:hidden p-2 -ml-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 mr-2"
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
@@ -577,22 +577,22 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
               </button>
               {/* Page-specific header content */}
               {headerContent && (
-                <div className="lg:flex items-center flex-1 ml-4 hidden">
+                <div className="hidden lg:flex items-center flex-1 ml-4 min-w-0">
                   {headerContent}
                 </div>
               )}
             </div>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               {/* Notifications */}
               <div className="relative">
                 <button
                   onClick={() => setNotificationsOpen(!notificationsOpen)}
                   className="p-2 rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 relative border border-gray-200"
                 >
-                  <BellIcon className="h-6 w-6" />
+                  <BellIcon className="h-5 w-5 sm:h-6 sm:w-6" />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-500 text-white">
+                    <span className="absolute -top-1 -right-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-500 text-white min-w-[18px] h-[18px] justify-center">
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
@@ -600,7 +600,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
 
                 {/* Notifications dropdown */}
                 {notificationsOpen && (
-                  <div className="absolute right-0 mt-2 w-96 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
                     <div className="py-1 max-h-96 overflow-y-auto">
                       <div className="px-4 py-2 border-b border-gray-200">
                         <h3 className="text-sm font-medium text-gray-900">Notifications</h3>
@@ -659,23 +659,23 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200 bg-white shadow-sm transition-colors"
+                  className="flex items-center space-x-2 sm:space-x-3 p-1.5 sm:p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200 bg-white shadow-sm transition-colors"
                   data-testid="user-menu-button"
                 >
-                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                    <span className="text-white font-medium text-sm">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                    <span className="text-white font-medium text-xs sm:text-sm">
                       {user.first_name?.[0]}{user.last_name?.[0]}
                     </span>
                   </div>
-                  <div className="text-left hidden sm:block">
-                    <p className="text-sm font-medium text-gray-900">
+                  <div className="text-left hidden sm:block min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
                       {user.first_name} {user.last_name}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 truncate">
                       {getRoleDisplayName(user.role)}
                     </p>
                   </div>
-                  <ChevronDownIcon className="h-4 w-4 text-gray-400" />
+                  <ChevronDownIcon className="h-4 w-4 text-gray-400 hidden sm:block" />
                 </button>
 
                 {/* User dropdown */}
@@ -722,8 +722,8 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 bg-gray-50">
-          <div className="px-6 py-8">
+        <main className="flex-1 bg-gray-50 min-h-0">
+          <div className="px-3 sm:px-6 py-4 sm:py-8">
             {children || <Outlet />}
           </div>
         </main>

@@ -131,4 +131,5 @@ out/
 coverage/
 
 # Local development
-.local/ 
+.local/ backend/data/ppdata-insert.sql
+backend/data/ppdata-raw.json

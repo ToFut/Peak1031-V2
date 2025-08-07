@@ -29,6 +29,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const initializeAuth = async () => {
       try {
         const token = localStorage.getItem('token');
+        const refreshTokenValue = localStorage.getItem('refreshToken');
+        
         if (token) {
           
           
@@ -44,10 +46,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             return;
           }
           
-          // Verify token with backend and get user data - backend handles expiry
-          const userData = await apiService.getCurrentUser();
-          
-          setUser(userData);
+          try {
+            // Verify token with backend and get user data - backend handles expiry
+            const userData = await apiService.getCurrentUser();
+            
+            setUser(userData);
+          } catch (error: any) {
+            // If token is expired and we have a refresh token, try to refresh
+            if (error.message?.includes('expired') && refreshTokenValue) {
+              console.log('🔄 Token expired during init, attempting refresh...');
+              try {
+                await apiService.refreshToken();
+                // After refresh, try getting user data again
+                const userData = await apiService.getCurrentUser();
+                setUser(userData);
+                console.log('✅ Token refresh successful during init');
+              } catch (refreshError) {
+                console.error('❌ Token refresh failed during init:', refreshError);
+                // Clear tokens if refresh fails
+                localStorage.removeItem('token');
+                localStorage.removeItem('refreshToken');
+                localStorage.removeItem('user');
+                setUser(null);
+              }
+            } else {
+              // For other errors, clear tokens
+              console.error('❌ Auth init error (non-expiry):', error);
+              localStorage.removeItem('token');
+              localStorage.removeItem('refreshToken');
+              localStorage.removeItem('user');
+              setUser(null);
+            }
+          }
         } else {
           
         }
@@ -66,6 +96,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     initializeAuth();
   }, []);
+
+  // Set up periodic token refresh to prevent expiration
+  useEffect(() => {
+    if (!user) return;
+
+    // Check token every 10 minutes and refresh if needed
+    const intervalId = setInterval(async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const refreshTokenValue = localStorage.getItem('refreshToken');
+        
+        if (token && refreshTokenValue) {
+          // Parse token to check expiry (base64 decode)
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const expiryTime = payload.exp * 1000; // Convert to milliseconds
+          const currentTime = Date.now();
+          const timeUntilExpiry = expiryTime - currentTime;
+          
+          // If token expires in less than 5 minutes, refresh it
+          if (timeUntilExpiry < 5 * 60 * 1000) {
+            console.log('🔄 Token expiring soon, refreshing proactively...');
+            await apiService.refreshToken();
+            console.log('✅ Proactive token refresh successful');
+          }
+        }
+      } catch (error) {
+        console.error('❌ Periodic token refresh check failed:', error);
+      }
+    }, 10 * 60 * 1000); // Check every 10 minutes
+
+    return () => clearInterval(intervalId);
+  }, [user]);
 
   const login = async (email: string, password: string): Promise<void> => {
     try {
