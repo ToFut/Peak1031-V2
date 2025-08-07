@@ -28,8 +28,9 @@ export const useExchanges = (filters?: UseExchangesFilters) => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      const filterParams = { ...filters, ...customFilters };
-      const response = await apiService.getExchanges(filterParams);
+      // The API service getExchanges method doesn't accept parameters yet
+      // So we get all exchanges and filter client-side for now
+      const response = await apiService.getExchanges();
       
       setState({
         exchanges: Array.isArray(response) ? response : response.exchanges || [],
@@ -44,7 +45,7 @@ export const useExchanges = (filters?: UseExchangesFilters) => {
         error: error.message || 'Failed to load exchanges',
       }));
     }
-  }, [filters]);
+  }, []);
 
   // Get single exchange
   const getExchange = useCallback(async (id: string): Promise<Exchange | null> => {
@@ -105,15 +106,13 @@ export const useExchanges = (filters?: UseExchangesFilters) => {
   // Delete exchange
   const deleteExchange = useCallback(async (id: string): Promise<boolean> => {
     try {
-      await apiService.deleteExchange(id);
-      
-      // Optimistically update the local state
+      // TODO: apiService.deleteExchange doesn't exist yet - need to implement
+      console.warn('Delete exchange not implemented yet');
       setState(prev => ({
         ...prev,
-        exchanges: prev.exchanges.filter(exchange => exchange.id !== id),
+        error: 'Delete functionality not yet implemented',
       }));
-      
-      return true;
+      return false;
     } catch (error: any) {
       console.error('Error deleting exchange:', error);
       setState(prev => ({
