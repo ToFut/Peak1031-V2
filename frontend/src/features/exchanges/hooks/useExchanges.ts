@@ -26,19 +26,28 @@ export const useExchanges = (filters?: UseExchangesFilters) => {
   // Load exchanges with filters
   const loadExchanges = useCallback(async (customFilters?: UseExchangesFilters) => {
     try {
+      console.log('🔄 useExchanges: Starting to load exchanges...');
       setState(prev => ({ ...prev, loading: true, error: null }));
       
       // The API service getExchanges method doesn't accept parameters yet
       // So we get all exchanges and filter client-side for now
+      console.log('📡 useExchanges: Calling apiService.getExchanges()...');
       const response = await apiService.getExchanges();
+      console.log('📊 useExchanges: Raw API response:', response);
+      console.log('📊 useExchanges: Response type:', typeof response);
+      console.log('📊 useExchanges: Is array?', Array.isArray(response));
+      
+      const exchanges = Array.isArray(response) ? response : response.exchanges || [];
+      console.log('📈 useExchanges: Final exchanges array:', exchanges);
+      console.log('📈 useExchanges: Exchanges count:', exchanges.length);
       
       setState({
-        exchanges: Array.isArray(response) ? response : response.exchanges || [],
+        exchanges,
         loading: false,
         error: null,
       });
     } catch (error: any) {
-      console.error('Error loading exchanges:', error);
+      console.error('❌ useExchanges: Error loading exchanges:', error);
       setState(prev => ({
         ...prev,
         loading: false,

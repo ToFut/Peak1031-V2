@@ -194,10 +194,14 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
     { value: 'year', label: 'This Year' }
   ];
 
-  // Debug user detection
+  // Debug user detection and exchanges
   console.log('🔍 ExchangeList: Current user:', user);
   console.log('🔍 ExchangeList: User role:', user?.role);
   console.log('🔍 ExchangeList: Is admin?', user?.role === 'admin');
+  console.log('📊 ExchangeList: Exchanges from hook:', exchanges);
+  console.log('📈 ExchangeList: Exchanges count:', exchanges?.length || 0);
+  console.log('🔄 ExchangeList: Loading state:', loading);
+  console.log('❌ ExchangeList: Error state:', error);
 
   // Filter exchanges based on current filters - memoized to prevent unnecessary re-computations
   const filteredExchanges = useMemo(() => {
