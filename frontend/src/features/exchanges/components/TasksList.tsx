@@ -1,7 +1,7 @@
 import React from 'react';
 import { CheckSquare, Clock, AlertCircle } from 'lucide-react';
-import { Task } from '../../types';
-import { formatDate, isOverdue } from '../../utils/date.utils';
+import { Task } from '../../../types';
+import { formatDate, isOverdue } from '../../../utils/date.utils';
 
 interface TasksListProps {
   tasks: Task[];

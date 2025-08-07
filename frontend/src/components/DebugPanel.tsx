@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { smartApi } from '../services/smartApi';
 import { apiService } from '../services/api';
 
 const DebugPanel: React.FC = () => {
@@ -34,18 +33,17 @@ const DebugPanel: React.FC = () => {
         };
       }
       
-      // Test 3: Smart API call
+      // Test 3: API with caching
       try {
-        console.log('🔍 Testing smart API call...');
-        const smartContacts = await smartApi.getContacts();
-        results.smartApi = {
+        console.log('🔍 Testing cached API call...');
+        const cachedContacts = await apiService.getContacts();
+        results.cachedApi = {
           status: '✅ Working',
-          contactsCount: smartContacts.contacts?.length || 0,
-          firstContact: smartContacts.contacts?.[0] || null,
-          usingFallback: smartContacts.contacts?.[0]?._isFallback || false
+          contactsCount: cachedContacts.length || 0,
+          firstContact: cachedContacts[0] || null
         };
       } catch (error: any) {
-        results.smartApi = {
+        results.cachedApi = {
           status: '❌ Failed',
           error: error.message
         };
@@ -204,15 +202,13 @@ const DebugPanel: React.FC = () => {
         </div>
         
         <div style={{ marginBottom: 10 }}>
-          <strong>Smart API:</strong>
+          <strong>Cached API:</strong>
           <div style={{ marginLeft: 10 }}>
-            Status: {debugInfo.smartApi?.status}<br/>
-            {debugInfo.smartApi?.contactsCount !== undefined && 
-              `Contacts: ${debugInfo.smartApi.contactsCount}`}<br/>
-            {debugInfo.smartApi?.usingFallback && 
-              <span style={{ color: 'orange' }}>⚠️ Using fallback data</span>}<br/>
-            {debugInfo.smartApi?.error && 
-              <span style={{ color: 'red' }}>Error: {debugInfo.smartApi.error}</span>}
+            Status: {debugInfo.cachedApi?.status}<br/>
+            {debugInfo.cachedApi?.contactsCount !== undefined && 
+              `Contacts: ${debugInfo.cachedApi.contactsCount}`}<br/>
+            {debugInfo.cachedApi?.error && 
+              <span style={{ color: 'red' }}>Error: {debugInfo.cachedApi.error}</span>}
           </div>
         </div>
         

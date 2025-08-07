@@ -37,7 +37,7 @@ export function useCachedData<T = any>({
   const fetchData = useCallback(async (forceRefresh = false) => {
     // Check cache first (unless force refresh)
     if (!forceRefresh && cacheInstance.has(cacheKey)) {
-      const cachedData = cacheInstance.get<T>(cacheKey);
+      const cachedData = cacheInstance.get(cacheKey) as T;
       if (cachedData) {
         setData(transform ? transform(cachedData) : cachedData);
         setError(null);
@@ -57,9 +57,7 @@ export function useCachedData<T = any>({
       setLoading(true);
       setError(null);
 
-      const response = await apiService.get(endpoint, {
-        signal: abortControllerRef.current.signal
-      });
+      const response = await apiService.get(endpoint);
 
       const responseData = response.data || response;
       const transformedData = transform ? transform(responseData) : responseData;

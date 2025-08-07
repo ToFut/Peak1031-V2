@@ -123,7 +123,7 @@ const Users: React.FC = () => {
   // Admin action handlers
   const handleSendLoginLink = async (user: any) => {
     try {
-    const response = await apiService.post(`/admin/users/${user.id}/send-login-link`);
+    const response = await apiService.post(`/admin/users/${user.id}/send-login-link`, {});
     if (response.success) {
       alert(`Login link sent to ${user.email}\n\nLink: ${response.loginLink}`);
     }
@@ -201,7 +201,7 @@ const Users: React.FC = () => {
   const handleResetPassword = async (user: any) => {
     if (window.confirm(`Are you sure you want to reset the password for ${user.email}?`)) {
     try {
-      const response = await apiService.post(`/admin/users/${user.id}/reset-password`);
+      const response = await apiService.post(`/admin/users/${user.id}/reset-password`, {});
       if (response.success) {
         alert(`Password reset successfully!\n\nNew password: ${response.newPassword}\n\nPlease share this password securely with the user.`);
       }

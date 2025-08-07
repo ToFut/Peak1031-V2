@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiService } from '../../services/api';
 import { roleBasedApiService } from '../../services/roleBasedApiService';
-import { smartApi } from '../../services/smartApi';
 
 // Standard dashboard data types
 export interface DashboardStats {
@@ -299,7 +298,7 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
 
     setSyncing(true);
     try {
-      await apiService.post('/sync/all');
+      await apiService.post('/sync/all', {});
       await loadDashboardData(); // Refresh data after sync
     } catch (err: any) {
       console.error('PracticePanther sync failed:', err);

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { apiService } from '../services/api';
-import ModernCard from './ui/ModernCard';
-import StatusBadge from './ui/StatusBadge';
-import ModernDropdown from './ui/ModernDropdown';
-import FilterChips from './ui/FilterChips';
+import { useAuth } from '../../../hooks/useAuth';
+import { apiService } from '../../../services/api';
+import ModernCard from '../../../components/ui/ModernCard';
+import StatusBadge from '../../../components/ui/StatusBadge';
+import ModernDropdown from '../../../components/ui/ModernDropdown';
+import FilterChips from '../../../components/ui/FilterChips';
 
 import {
   ShieldCheckIcon,
@@ -28,7 +28,7 @@ import {
   ChartBarIcon
 } from '@heroicons/react/24/outline';
 
-import { AuditLog, User } from '../types';
+import { AuditLog, User } from '../../../types';
 
 interface AuditLogFilter {
   action: string;

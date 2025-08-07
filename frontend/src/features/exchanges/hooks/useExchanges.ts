@@ -37,7 +37,7 @@ export const useExchanges = (filters?: UseExchangesFilters) => {
       console.log('📊 useExchanges: Response type:', typeof response);
       console.log('📊 useExchanges: Is array?', Array.isArray(response));
       
-      const exchanges = Array.isArray(response) ? response : response.exchanges || [];
+      const exchanges = Array.isArray(response) ? response : (response as any)?.exchanges || [];
       console.log('📈 useExchanges: Final exchanges array:', exchanges);
       console.log('📈 useExchanges: Exchanges count:', exchanges.length);
       

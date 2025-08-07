@@ -5,6 +5,25 @@ import { SocketProvider } from './hooks/useSocket';
 import Layout from './components/Layout';
 import ConnectionStatus from './components/ConnectionStatus';
 import DebugPanel from './components/DebugPanel';
+import { ErrorBoundary, RouteErrorBoundary } from './components/ErrorBoundary';
+
+// Feature imports
+import Messages from './features/messages/pages/Messages';
+import Exchanges from './features/exchanges/pages/Exchanges';
+import ExchangeDetailsPage from './pages/ExchangeDetailsPage';
+import Tasks from './features/tasks/pages/Tasks';
+import Contacts from './features/contacts/pages/Contacts';
+import Documents from './features/documents/pages/Documents';
+import Users from './features/users/pages/Users';
+import Reports from './features/reports/pages/Reports';
+import Settings from './features/settings/pages/Settings';
+import Profile from './features/settings/pages/Profile';
+import Preferences from './features/settings/pages/Preferences';
+import AuthTest from './features/auth/pages/AuthTest';
+import TemplateManager from './features/documents/components/TemplateManager';
+import TemplateDocumentManager from './pages/TemplateDocumentManager';
+import { AdminGPT, PracticePantherManager } from './features/admin/components';
+import { AgencyManagement } from './features/agency/components';
 
 // Lazy load heavy components for better performance
 const Login = lazy(() => import('./features/auth/pages/Login'));
@@ -13,42 +32,6 @@ const ClientDashboard = lazy(() => import('./features/dashboard/components/Stand
 const CoordinatorDashboard = lazy(() => import('./features/dashboard/components/StandardizedCoordinatorDashboard'));
 const ThirdPartyDashboard = lazy(() => import('./features/dashboard/components/StandardizedThirdPartyDashboard'));
 const AgencyDashboard = lazy(() => import('./features/dashboard/components/StandardizedAgencyDashboard'));
-// OLD: import Messages from './pages/Messages';
-// NEW V2-style import (testing Messages migration)
-import Messages from './features/messages/pages/Messages';
-// OLD: import Exchanges from './pages/Exchanges';
-// NEW V2-style import (testing Exchanges migration)
-import Exchanges from './features/exchanges/pages/Exchanges';
-import ExchangeDetailsPage from './pages/ExchangeDetailsPage';
-// OLD: import Tasks from './pages/Tasks';
-// NEW V2-style import (testing Tasks migration)
-import Tasks from './features/tasks/pages/Tasks';
-// OLD: import Contacts from './pages/Contacts';
-// NEW V2-style import (testing Contacts migration)
-import Contacts from './features/contacts/pages/Contacts';
-// OLD: import Documents from './pages/Documents';
-// NEW V2-style import (testing Documents migration)
-import Documents from './features/documents/pages/Documents';
-// OLD: import Users from './pages/Users';
-// NEW V2-style import (testing Users migration)  
-import Users from './features/users/pages/Users';
-// OLD: import Reports from './pages/Reports';
-// NEW V2-style import (testing Reports migration)
-import Reports from './features/reports/pages/Reports';
-// OLD: import Settings from './pages/Settings';
-// NEW V2-style import (testing Settings migration)
-import Settings from './features/settings/pages/Settings';
-// OLD: import Profile from './pages/Profile';
-// OLD: import Preferences from './pages/Preferences';
-
-// NEW V2-style imports (testing migration)
-import Profile from './features/settings/pages/Profile';
-import Preferences from './features/settings/pages/Preferences';
-// OLD: import AuthTest from './pages/AuthTest';
-// NEW V2-style import (testing AuthTest migration)
-import AuthTest from './features/auth/pages/AuthTest';
-import TemplateManager from './components/TemplateManager';
-import TemplateDocumentManager from './pages/TemplateDocumentManager';
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -118,13 +101,17 @@ const DashboardRoute: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <SocketProvider>
-        <Router>
-          <div className="App">
-            <ConnectionStatus />
-            {process.env.NODE_ENV === 'development' && <DebugPanel />}
-            <Suspense fallback={<LoadingFallback />}>
+    <ErrorBoundary onError={(error, errorInfo) => {
+      console.error('Global app error:', error, errorInfo);
+      // In production, send to error monitoring service
+    }}>
+      <AuthProvider>
+        <SocketProvider>
+          <Router>
+            <div className="App">
+              <ConnectionStatus />
+              {process.env.NODE_ENV === 'development' && <DebugPanel />}
+              <Suspense fallback={<LoadingFallback />}>
               <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
@@ -144,7 +131,9 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Layout>
-                      <DashboardRoute />
+                      <RouteErrorBoundary routeName="Dashboard">
+                        <DashboardRoute />
+                      </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
                 } 
@@ -156,7 +145,9 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client', 'agency', 'third_party']}>
                     <Layout>
-                      <Messages />
+                      <RouteErrorBoundary routeName="Messages">
+                        <Messages />
+                      </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
                 } 
@@ -168,7 +159,9 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Layout>
-                      <Exchanges />
+                      <RouteErrorBoundary routeName="Exchanges">
+                        <Exchanges />
+                      </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
                 } 
@@ -179,7 +172,9 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Layout>
-                      <ExchangeDetailsPage />
+                      <RouteErrorBoundary routeName="ExchangeDetails">
+                        <ExchangeDetailsPage />
+                      </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
                 } 
@@ -191,7 +186,9 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client']}>
                     <Layout>
-                      <Tasks />
+                      <RouteErrorBoundary routeName="Tasks">
+                        <Tasks />
+                      </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
                 } 
@@ -203,7 +200,9 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Layout>
-                      <Contacts />
+                      <RouteErrorBoundary routeName="Contacts">
+                        <Contacts />
+                      </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
                 } 
@@ -215,7 +214,9 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Layout>
-                      <Documents />
+                      <RouteErrorBoundary routeName="Documents">
+                        <Documents />
+                      </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
                 } 
@@ -227,7 +228,9 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
-                      <Users />
+                      <RouteErrorBoundary routeName="Users">
+                        <Users />
+                      </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
                 } 
@@ -262,6 +265,45 @@ const App: React.FC = () => {
                         <h1 className="text-2xl font-bold mb-4">Audit Logs</h1>
                         <p className="text-gray-600">Audit logs management coming soon...</p>
                       </div>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/admin/gpt" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <RouteErrorBoundary routeName="AdminGPT">
+                        <AdminGPT />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/admin/practice-panther" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <RouteErrorBoundary routeName="PracticePantherManager">
+                        <PracticePantherManager />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/admin/agencies" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <RouteErrorBoundary routeName="AgencyManagement">
+                        <AgencyManagement />
+                      </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
                 } 
@@ -370,6 +412,7 @@ const App: React.FC = () => {
         </Router>
       </SocketProvider>
     </AuthProvider>
+    </ErrorBoundary>
   );
 };
 

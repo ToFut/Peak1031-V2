@@ -45,7 +45,7 @@ export const useSettings = () => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      const settings = await apiService.getUserSettings();
+      const settings = await apiService.getSettings();
       
       setState({
         settings,
@@ -68,7 +68,7 @@ export const useSettings = () => {
     try {
       setState(prev => ({ ...prev, saving: true, error: null }));
       
-      const updatedSettings = await apiService.updateUserSettings(updates);
+      const updatedSettings = await apiService.updateSettings(updates);
       
       setState(prev => ({
         ...prev,
@@ -124,7 +124,7 @@ export const useSettings = () => {
     try {
       setState(prev => ({ ...prev, saving: true, error: null }));
       
-      await apiService.changePassword({ currentPassword, newPassword });
+      await apiService.post('/auth/change-password', { currentPassword, newPassword });
       
       setState(prev => ({
         ...prev,
@@ -147,7 +147,7 @@ export const useSettings = () => {
   // Export user data
   const exportData = useCallback(async (): Promise<boolean> => {
     try {
-      await apiService.exportUserData();
+      await apiService.post('/users/export-data', {});
       return true;
     } catch (error: any) {
       console.error('Error exporting data:', error);
@@ -162,7 +162,7 @@ export const useSettings = () => {
   // Get activity logs
   const getActivityLogs = useCallback(async () => {
     try {
-      return await apiService.getActivityLogs();
+      return await apiService.get('/audit-logs');
     } catch (error: any) {
       console.error('Error getting activity logs:', error);
       setState(prev => ({

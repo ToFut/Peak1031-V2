@@ -66,7 +66,7 @@ export function useContacts() {
   const updateContact = useCallback(async (contactId: string, contactData: UpdateContactData) => {
     try {
       setUpdating(true);
-      const response = await apiService.put(`/contacts/${contactId}`, contactData);
+      const response = await apiService.post(`/contacts/${contactId}`, contactData);
       await refetch(); // Refresh the cache
       return response;
     } catch (error) {
@@ -99,46 +99,46 @@ export function useContacts() {
 
   // Filter contacts by exchange
   const getContactsByExchange = useCallback((exchangeId: string) => {
-    return contacts.filter(contact => contact.exchange_id === exchangeId);
+    return contacts?.filter(contact => contact.exchange_id === exchangeId) || [];
   }, [contacts]);
 
   // Get active contacts
   const getActiveContacts = useCallback(() => {
-    return contacts.filter(contact => contact.is_active);
+    return contacts?.filter(contact => contact.is_active) || [];
   }, [contacts]);
 
   // Get inactive contacts
   const getInactiveContacts = useCallback(() => {
-    return contacts.filter(contact => !contact.is_active);
+    return contacts?.filter(contact => !contact.is_active) || [];
   }, [contacts]);
 
   // Search contacts
   const searchContacts = useCallback((searchTerm: string) => {
     const term = searchTerm.toLowerCase();
-    return contacts.filter(contact => 
+    return contacts?.filter(contact => 
       contact.email.toLowerCase().includes(term) ||
       contact.first_name.toLowerCase().includes(term) ||
       contact.last_name.toLowerCase().includes(term) ||
       contact.company?.toLowerCase().includes(term) ||
       contact.role?.toLowerCase().includes(term)
-    );
+    ) || [];
   }, [contacts]);
 
   // Get contacts by company
   const getContactsByCompany = useCallback((company: string) => {
-    return contacts.filter(contact => contact.company === company);
+    return contacts?.filter(contact => contact.company === company) || [];
   }, [contacts]);
 
   // Get contacts by role
   const getContactsByRole = useCallback((role: string) => {
-    return contacts.filter(contact => contact.role === role);
+    return contacts?.filter(contact => contact.role === role) || [];
   }, [contacts]);
 
   // Bulk operations
   const bulkUpdateContacts = useCallback(async (contactIds: string[], updateData: UpdateContactData) => {
     try {
       setUpdating(true);
-      const response = await apiService.put('/contacts/bulk', {
+      const response = await apiService.post('/contacts/bulk', {
         contactIds,
         updateData
       });
@@ -154,9 +154,7 @@ export function useContacts() {
   const bulkDeleteContacts = useCallback(async (contactIds: string[]) => {
     try {
       setDeleting(true);
-      const response = await apiService.delete('/contacts/bulk', {
-        data: { contactIds }
-      });
+      const response = await apiService.delete('/contacts/bulk');
       await refetch(); // Refresh the cache
       return response;
     } catch (error) {
@@ -186,8 +184,6 @@ export function useContacts() {
       const response = await apiService.post('/contacts/export', {
         format,
         filters
-      }, {
-        responseType: 'blob'
       });
       
       // Create download link

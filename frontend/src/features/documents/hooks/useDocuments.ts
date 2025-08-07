@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Document } from '../../../types';
 import { apiService } from '../../../services/api';
+import { useAuth } from '../../../hooks/useAuth';
 
 interface UseDocumentsState {
   documents: Document[];
@@ -18,6 +19,7 @@ interface UseDocumentsFilters {
 }
 
 export const useDocuments = (filters?: UseDocumentsFilters) => {
+  const { user } = useAuth();
   const [state, setState] = useState<UseDocumentsState>({
     documents: [],
     loading: true,
@@ -31,7 +33,11 @@ export const useDocuments = (filters?: UseDocumentsFilters) => {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
       const filterParams = { ...filters, ...customFilters };
-      const response = await apiService.getDocuments(filterParams);
+      const stringParams = Object.fromEntries(
+        Object.entries(filterParams).map(([key, value]) => [key, String(value)])
+      );
+      const queryString = new URLSearchParams(stringParams).toString();
+      const response = await apiService.get(`/documents?${queryString}`);
       
       setState(prev => ({
         ...prev,
@@ -73,17 +79,7 @@ export const useDocuments = (filters?: UseDocumentsFilters) => {
       formData.append('metadata', JSON.stringify(metadata));
 
       // Upload with progress tracking
-      const document = await apiService.uploadDocument(formData, {
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            setState(prev => ({
-              ...prev,
-              uploadProgress: { ...prev.uploadProgress, [uploadId]: progress },
-            }));
-          }
-        },
-      });
+      const document = await apiService.post('/documents/upload', formData);
 
       // Add to documents list
       setState(prev => ({
@@ -170,10 +166,11 @@ export const useDocuments = (filters?: UseDocumentsFilters) => {
     exchangeId?: string
   ): Promise<Document | null> => {
     try {
-      const document = await apiService.generateDocumentFromTemplate({
-        templateId,
-        data,
-        exchangeId,
+      const document = await apiService.post('/documents/generate', {
+        template_id: templateId,
+        exchange_id: exchangeId,
+        generation_data: data,
+        generated_by: user?.id || 'unknown'
       });
       
       // Add to documents list

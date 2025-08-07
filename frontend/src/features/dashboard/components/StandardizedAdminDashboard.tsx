@@ -371,14 +371,8 @@ const StandardizedAdminDashboard: React.FC = () => {
   return (
     <StandardDashboard
       role="admin"
-      customTabs={customTabs}
-      onTabChange={handleTabChange}
-      customContent={activeTab === 'overview' ? customOverviewContent : undefined}
-    >
-      {activeTab !== 'overview' && (
-        <AdminTabContent activeTab={activeTab} role="admin" />
-      )}
-    </StandardDashboard>
+      customContent={customOverviewContent}
+    />
   );
 };
 

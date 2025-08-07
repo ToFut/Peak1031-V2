@@ -8,50 +8,53 @@ export interface ExchangeStageInfo {
   progress: number;
 }
 
-export function getExchangeStage(exchange: EnterpriseExchange | null): ExchangeStageInfo | null {
-  if (!exchange) return null;
+export const formatExchangeValue = (value: number | undefined): string => {
+  if (!value) return '$0';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(value);
+};
 
-  const today = new Date();
-  const startDate = new Date(exchange.startDate || exchange.createdAt || '');
-  const deadline45 = new Date(exchange.identificationDeadline || '');
-  const deadline180 = new Date(exchange.exchangeDeadline || '');
-  
-  if (today < startDate) {
-    return {
-      stage: 'Before Initial',
-      color: 'bg-gray-100 text-gray-800',
-      borderColor: 'border-gray-300',
-      progress: 0
-    };
-  } else if (today >= startDate && today <= deadline45) {
-    const totalDays = (deadline45.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-    const daysElapsed = (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-    const progress = Math.min((daysElapsed / totalDays) * 100, 100);
-    return {
-      stage: '45 Days',
-      color: 'bg-yellow-100 text-yellow-800',
-      borderColor: 'border-yellow-300',
-      progress: Math.round(progress)
-    };
-  } else if (today > deadline45 && today <= deadline180) {
-    const totalDays = (deadline180.getTime() - deadline45.getTime()) / (1000 * 60 * 60 * 24);
-    const daysElapsed = (today.getTime() - deadline45.getTime()) / (1000 * 60 * 60 * 24);
-    const progress = Math.min((daysElapsed / totalDays) * 100, 100);
-    return {
-      stage: '180 Days',
-      color: 'bg-orange-100 text-orange-800',
-      borderColor: 'border-orange-300',
-      progress: Math.round(progress)
-    };
-  } else {
-    return {
-      stage: 'Closeup',
-      color: 'bg-green-100 text-green-800',
-      borderColor: 'border-green-300',
-      progress: 100
-    };
+export const getExchangeStage = (exchange: any): string => {
+  return exchange?.lifecycle_stage || exchange?.stage || 'Unknown';
+};
+
+
+
+export const getStageColorClass = (stage: string | undefined): string => {
+  switch (stage?.toLowerCase()) {
+    case 'initiation':
+      return 'text-blue-600 bg-blue-100';
+    case 'identification':
+      return 'text-purple-600 bg-purple-100';
+    case 'exchange':
+      return 'text-green-600 bg-green-100';
+    case 'completion':
+      return 'text-gray-600 bg-gray-100';
+    default:
+      return 'text-gray-600 bg-gray-100';
   }
-}
+};
+
+export const getDaysUntilDeadline = (deadline: string | undefined): number => {
+  if (!deadline) return 0;
+  const deadlineDate = new Date(deadline);
+  const now = new Date();
+  const diffTime = deadlineDate.getTime() - now.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
+
+export const isDeadlineApproaching = (deadline: string | undefined, daysThreshold: number = 30): boolean => {
+  const daysUntil = getDaysUntilDeadline(deadline);
+  return daysUntil > 0 && daysUntil <= daysThreshold;
+};
+
+export const isDeadlineOverdue = (deadline: string | undefined): boolean => {
+  return getDaysUntilDeadline(deadline) < 0;
+};
 
 export function getLifecycleStageInfo(stage?: string) {
   if (!stage || !LIFECYCLE_STAGES[stage as keyof typeof LIFECYCLE_STAGES]) {
@@ -60,24 +63,32 @@ export function getLifecycleStageInfo(stage?: string) {
   return LIFECYCLE_STAGES[stage as keyof typeof LIFECYCLE_STAGES];
 }
 
-export function getRiskColorClass(riskLevel?: string): string {
-  if (!riskLevel || !RISK_COLORS[riskLevel as keyof typeof RISK_COLORS]) {
-    return RISK_COLORS.LOW;
+export const getRiskColorClass = (riskLevel?: string): string => {
+  switch (riskLevel?.toLowerCase()) {
+    case 'low':
+      return 'text-green-600 bg-green-100';
+    case 'medium':
+      return 'text-yellow-600 bg-yellow-100';
+    case 'high':
+      return 'text-red-600 bg-red-100';
+    default:
+      return 'text-gray-600 bg-gray-100';
   }
-  return RISK_COLORS[riskLevel as keyof typeof RISK_COLORS];
-}
+};
 
-export function getComplianceColorClass(status?: string): string {
-  if (!status || !COMPLIANCE_COLORS[status as keyof typeof COMPLIANCE_COLORS]) {
-    return COMPLIANCE_COLORS.PENDING;
+export const getComplianceColorClass = (complianceStatus?: string): string => {
+  switch (complianceStatus?.toLowerCase()) {
+    case 'compliant':
+      return 'text-green-600 bg-green-100';
+    case 'pending':
+      return 'text-yellow-600 bg-yellow-100';
+    case 'non-compliant':
+      return 'text-red-600 bg-red-100';
+    default:
+      return 'text-gray-600 bg-gray-100';
   }
-  return COMPLIANCE_COLORS[status as keyof typeof COMPLIANCE_COLORS];
-}
+};
 
-export function formatExchangeValue(value?: number): string {
-  if (!value) return '$0';
-  return `$${value.toLocaleString()}`;
-}
 
 export function getExchangeProgress(exchange: EnterpriseExchange): number {
   // If enterprise exchange has stage_progress, use it
@@ -85,7 +96,6 @@ export function getExchangeProgress(exchange: EnterpriseExchange): number {
     return exchange.stage_progress;
   }
   
-  // Otherwise calculate based on dates
-  const stageInfo = getExchangeStage(exchange);
-  return stageInfo?.progress || 0;
+  // Otherwise return 0 as fallback
+  return 0;
 }

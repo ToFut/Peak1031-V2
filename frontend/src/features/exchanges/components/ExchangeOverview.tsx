@@ -1,16 +1,20 @@
 import React from 'react';
 import { Users, CheckSquare, FileText, TrendingUp, Calendar, DollarSign, Target, Shield } from 'lucide-react';
-import { EnterpriseExchange, ExchangeParticipant } from '../../types/exchange-details.types';
-import { Task, Document } from '../../types';
-import { formatDate, formatDateTime, getDaysUntil } from '../../utils/date.utils';
-import { formatExchangeValue, getExchangeStage, getRiskColorClass, getComplianceColorClass } from '../../utils/exchange.utils';
+import { EnterpriseExchange, ExchangeParticipant } from '../types';
+import { Task, Document } from '../../../types';
+import { formatDate, formatDateTime, getDaysUntil } from '../../../utils/date.utils';
+import { formatExchangeValue, getExchangeStage, getRiskColorClass, getComplianceColorClass } from '../../../utils/exchange.utils';
 
 interface ExchangeOverviewProps {
   exchange: EnterpriseExchange;
   participants: ExchangeParticipant[];
   tasks: Task[];
   documents: Document[];
-  exchangeStage: ReturnType<typeof getExchangeStage>;
+  exchangeStage?: {
+    stage: string;
+    color: string;
+    progress: number;
+  };
 }
 
 export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
@@ -20,10 +24,16 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
   documents,
   exchangeStage
 }) => {
+  const defaultExchangeStage = {
+    stage: getExchangeStage(exchange),
+    color: getRiskColorClass(exchange.risk_level),
+    progress: exchange.progress || 0
+  };
+  const stage = exchangeStage || defaultExchangeStage;
   const activeTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === 'PENDING').length : 0;
   const completedTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === 'COMPLETED').length : 0;
-  const daysUntil45 = getDaysUntil(exchange.identificationDeadline);
-  const daysUntil180 = getDaysUntil(exchange.exchangeDeadline);
+  const daysUntil45 = getDaysUntil(exchange.identificationDeadline || '');
+  const daysUntil180 = getDaysUntil(exchange.exchangeDeadline || '');
 
   return (
     <div className="space-y-6">
@@ -90,7 +100,7 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
           </div>
           <div>
             <h4 className="text-sm font-medium text-gray-500">Start Date</h4>
-            <p className="mt-1 text-sm text-gray-900">{formatDate(exchange.startDate)}</p>
+            <p className="mt-1 text-sm text-gray-900">{formatDate(exchange.startDate || '')}</p>
           </div>
           <div>
             <h4 className="text-sm font-medium text-gray-500">Exchange Value</h4>
@@ -99,7 +109,7 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
           <div>
             <h4 className="text-sm font-medium text-gray-500">45-Day Deadline</h4>
             <p className="mt-1 text-sm text-gray-900">
-              {formatDate(exchange.identificationDeadline)}
+              {formatDate(exchange.identificationDeadline || '')}
               <span className={`ml-2 text-xs ${daysUntil45 < 0 ? 'text-red-600' : 'text-gray-500'}`}>
                 ({daysUntil45 < 0 ? `${Math.abs(daysUntil45)} days overdue` : `${daysUntil45} days remaining`})
               </span>
@@ -108,7 +118,7 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
           <div>
             <h4 className="text-sm font-medium text-gray-500">180-Day Deadline</h4>
             <p className="mt-1 text-sm text-gray-900">
-              {formatDate(exchange.exchangeDeadline)}
+              {formatDate(exchange.exchangeDeadline || '')}
               <span className={`ml-2 text-xs ${daysUntil180 < 0 ? 'text-red-600' : 'text-gray-500'}`}>
                 ({daysUntil180 < 0 ? `${Math.abs(daysUntil180)} days overdue` : `${daysUntil180} days remaining`})
               </span>
@@ -122,10 +132,10 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
         <div className="bg-white rounded-lg border p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Exchange Stage</h3>
           <div className="flex items-center justify-between mb-4">
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${exchangeStage.color}`}>
-              {exchangeStage.stage}
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${stage.color}`}>
+              {stage.stage}
             </span>
-            <span className="text-sm text-gray-500">{exchangeStage.progress}% Complete</span>
+            <span className="text-sm text-gray-500">{stage.progress}% Complete</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div

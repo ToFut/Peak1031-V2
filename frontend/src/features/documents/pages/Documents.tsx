@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import EnterpriseDocumentManager from '../components/EnterpriseDocumentManager';
 import EnterpriseDocumentTemplateManager from '../components/EnterpriseDocumentTemplateManager';
+import { EnhancedDocumentManager } from '../components';
 import { useAuth } from '../../../hooks/useAuth';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { useDocuments, useExchanges } from '../../../hooks/useCachedData';
@@ -23,13 +24,16 @@ import {
   Cog6ToothIcon,
   PlusIcon,
   ExclamationTriangleIcon,
-  ClipboardDocumentListIcon
+  ClipboardDocumentListIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 
 const Documents: React.FC = () => {
   const [filter, setFilter] = useState('all');
   const [showEnterpriseManager, setShowEnterpriseManager] = useState(false);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [showEnhancedManager, setShowEnhancedManager] = useState(false);
+  const [useEnhancedManager, setUseEnhancedManager] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
@@ -38,23 +42,26 @@ const Documents: React.FC = () => {
   const canManage = isAdmin() || isCoordinator();
 
   // Use cached data hooks
-  const { data: documents = [], loading, error, refetch } = useDocuments(filter);
+  const { data: documents, loading, error, refetch } = useDocuments(filter);
   const { data: exchanges = [] } = useExchanges();
 
   // Professional document stats - memoized for performance
-  const documentStats = useMemo(() => ({
-    total: documents.length,
-    byCategory: documents.reduce((acc: any, doc) => {
-      acc[doc.category || 'general'] = (acc[doc.category || 'general'] || 0) + 1;
-      return acc;
-    }, {}),
-    totalSize: documents.reduce((acc, doc) => acc + (doc.fileSize || doc.file_size || 0), 0),
-    recentUploads: documents.filter(doc => {
-      const uploadDate = new Date(doc.createdAt || doc.created_at);
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      return uploadDate > sevenDaysAgo;
-    }).length
-  }), [documents]);
+  const documentStats = useMemo(() => {
+    const docs = documents || [];
+    return {
+      total: docs.length,
+      byCategory: docs.reduce((acc: Record<string, number>, doc: any) => {
+        acc[doc.category || 'general'] = (acc[doc.category || 'general'] || 0) + 1;
+        return acc;
+      }, {}),
+      totalSize: docs.reduce((acc: number, doc: any) => acc + (doc.fileSize || doc.file_size || 0), 0),
+      recentUploads: docs.filter((doc: any) => {
+        const uploadDate = new Date(doc.createdAt || doc.created_at);
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        return uploadDate > sevenDaysAgo;
+      }).length
+    };
+  }, [documents]);
 
   const getDocumentIcon = (filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase();
@@ -107,16 +114,18 @@ const Documents: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const filteredDocuments = useMemo(() => 
-    documents.filter(doc => {
-      const matchesSearch = searchTerm === '' || 
-        (doc.fileName || doc.filename || doc.original_filename || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (doc.category || '').toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesFilter = filter === 'all' || doc.category === filter;
-      
-      return matchesSearch && matchesFilter;
-    }), [documents, searchTerm, filter]);
+    const filteredDocuments = useMemo(() => {
+      const docs = documents || [];
+      return docs.filter((doc: any) => {
+        const matchesSearch = searchTerm === '' || 
+          (doc.fileName || doc.filename || doc.original_filename || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (doc.category || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesFilter = filter === 'all' || doc.category === filter;
+
+        return matchesSearch && matchesFilter;
+      });
+    }, [documents, searchTerm, filter]);
 
 
   if (loading) {
@@ -304,6 +313,17 @@ const Documents: React.FC = () => {
                   <CloudArrowUpIcon className="w-5 h-5" />
                   <span>Upload & Manage</span>
                 </button>
+                <button
+                  onClick={() => setUseEnhancedManager(!useEnhancedManager)}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                    useEnhancedManager 
+                      ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                      : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                  }`}
+                >
+                  <Cog6ToothIcon className="w-5 h-5" />
+                  <span>{useEnhancedManager ? 'Enhanced Mode' : 'Switch to Enhanced'}</span>
+                </button>
               </>
             )}
             <button className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
@@ -321,7 +341,7 @@ const Documents: React.FC = () => {
             <p className="ml-3 text-sm text-red-700 font-medium">{error}</p>
           </div>
           <button
-            onClick={loadDocuments}
+            onClick={refetch}
             className="mt-3 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
           >
             Try Again
@@ -329,10 +349,15 @@ const Documents: React.FC = () => {
         </div>
       )}
 
+      {/* Document Display - Toggle between Enhanced and Classic */}
+      {useEnhancedManager ? (
+        <EnhancedDocumentManager />
+      ) : (
+        <>
       {/* Professional Document Display */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredDocuments.map((document) => (
+          {filteredDocuments.map((document: any) => (
             <div key={document.id} className="bg-white rounded-xl shadow-sm border hover:shadow-md transition-all group">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -410,8 +435,8 @@ const Documents: React.FC = () => {
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredDocuments.map((document) => (
+                              <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredDocuments.map((document: any) => (
                   <tr key={document.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -461,8 +486,10 @@ const Documents: React.FC = () => {
           </div>
         </div>
       )}
+        </>
+      )}
 
-      {filteredDocuments.length === 0 && !loading && (
+      {!useEnhancedManager && filteredDocuments.length === 0 && !loading && (
         <div className="text-center py-16 bg-white rounded-xl border">
           <FolderIcon className="mx-auto h-16 w-16 text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No documents found</h3>
@@ -482,26 +509,49 @@ const Documents: React.FC = () => {
           )}
         </div>
       )}
+
+      {!useEnhancedManager && (
+        <>
+      {/* Enterprise Document Manager */}
+      <EnterpriseDocumentManager
+        isOpen={showEnterpriseManager}
+        onClose={() => setShowEnterpriseManager(false)}
+        onDocumentChange={() => {
+          refetch();
+        }}
+      />
+
+      {/* Enterprise Document Template Manager */}
+      <EnterpriseDocumentTemplateManager
+        isOpen={showTemplateManager}
+        onClose={() => setShowTemplateManager(false)}
+        onTemplateChange={() => {
+          refetch();
+        }}
+      />
+
+      {/* Enhanced Document Manager Modal */}
+      {showEnhancedManager && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative min-h-screen">
+            <div className="bg-white">
+              <div className="flex items-center justify-between p-6 border-b">
+                <h2 className="text-xl font-semibold text-gray-900">Enhanced Document Manager</h2>
+                <button
+                  onClick={() => setShowEnhancedManager(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+              <EnhancedDocumentManager />
+            </div>
+          </div>
+        </div>
+      )}
+        </>
+      )}
     </div>
-
-    {/* Enterprise Document Manager */}
-    <EnterpriseDocumentManager
-      isOpen={showEnterpriseManager}
-      onClose={() => setShowEnterpriseManager(false)}
-      onDocumentChange={() => {
-        refetch();
-      }}
-    />
-
-    {/* Enterprise Document Template Manager */}
-    <EnterpriseDocumentTemplateManager
-      isOpen={showTemplateManager}
-      onClose={() => setShowTemplateManager(false)}
-      onTemplateChange={() => {
-        refetch();
-      }}
-    />
-      </div>
   );
 };
 

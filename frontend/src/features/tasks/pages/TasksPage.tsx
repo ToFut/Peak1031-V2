@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Task } from '../../../types';
 import { TaskBoard } from '../components/TaskBoard';
+import { EnhancedTaskManager } from '../components';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
+import { Cog6ToothIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 const TasksPage: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showEnhancedManager, setShowEnhancedManager] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -85,8 +88,17 @@ const TasksPage: React.FC = () => {
     <div className="p-6 h-full">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Task Management</h1>
-        <div className="text-sm text-gray-500">
-          {tasks.length} total tasks
+        <div className="flex items-center space-x-4">
+          <div className="text-sm text-gray-500">
+            {tasks.length} total tasks
+          </div>
+          <button
+            onClick={() => setShowEnhancedManager(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            <Cog6ToothIcon className="w-5 h-5" />
+            <span>Enhanced Manager</span>
+          </button>
         </div>
       </div>
 
@@ -95,6 +107,26 @@ const TasksPage: React.FC = () => {
         onTaskUpdate={handleTaskUpdate}
         onTaskSelect={handleTaskSelect}
       />
+
+      {/* Enhanced Task Manager Modal */}
+      {showEnhancedManager && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative min-h-screen">
+            <div className="bg-white">
+              <div className="flex items-center justify-between p-6 border-b">
+                <h2 className="text-xl font-semibold text-gray-900">Enhanced Task Manager</h2>
+                <button
+                  onClick={() => setShowEnhancedManager(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+              <EnhancedTaskManager />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

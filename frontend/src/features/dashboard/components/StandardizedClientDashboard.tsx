@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import StandardDashboard from './StandardDashboard';
 import { EnhancedStatCard } from './SharedDashboardComponents';
-import UnifiedChatInterface from '../../../components/UnifiedChatInterface';
+import UnifiedChatInterface from '../../messages/components/UnifiedChatInterface';
 import { ExchangeList } from '../../exchanges/components/ExchangeList';
-import { TaskBoard } from '../../../components/TaskBoard';
+import { TaskBoard } from '../../tasks/components/TaskBoard';
 import {
   ChartBarIcon,
   DocumentTextIcon,
@@ -141,39 +141,6 @@ const ClientTabContent: React.FC<ClientTabContentProps> = ({ activeTab, role }) 
 };
 
 const StandardizedClientDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('overview');
-
-  const customTabs = [
-    {
-      id: 'overview',
-      name: 'Overview',
-      icon: ChartBarIcon
-    },
-    {
-      id: 'my_exchanges',
-      name: 'My Exchanges',
-      icon: DocumentTextIcon
-    },
-    {
-      id: 'my_tasks',
-      name: 'My Tasks',
-      icon: CheckCircleIcon
-    },
-    {
-      id: 'documents',
-      name: 'Documents',
-      icon: FolderIcon
-    },
-    {
-      id: 'messages',
-      name: 'Messages',
-      icon: ChatBubbleLeftRightIcon
-    }
-  ];
-
-  const handleTabChange = (tabId: string) => {
-    setActiveTab(tabId);
-  };
 
   const customOverviewContent = (
     <div className="space-y-6">
@@ -238,14 +205,8 @@ const StandardizedClientDashboard: React.FC = () => {
   return (
     <StandardDashboard
       role="client"
-      customTabs={customTabs}
-      onTabChange={handleTabChange}
-      customContent={activeTab === 'overview' ? customOverviewContent : undefined}
-    >
-      {activeTab !== 'overview' && (
-        <ClientTabContent activeTab={activeTab} role="client" />
-      )}
-    </StandardDashboard>
+      customContent={customOverviewContent}
+    />
   );
 };
 

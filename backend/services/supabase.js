@@ -396,7 +396,7 @@ class SupabaseService {
         .from('messages')
         .select(`
           *,
-          sender:users(id, first_name, last_name, email),
+          users!messages_sender_id_fkey(id, first_name, last_name, email),
           exchange:exchanges(id, name, status)
         `);
 
@@ -531,8 +531,7 @@ class SupabaseService {
         .from('documents')
         .select(`
           *,
-          exchange:exchanges(id, name, status),
-          uploaded_by_user:users(id, first_name, last_name, email)
+          exchange:exchanges(id, name, status)
         `);
 
       // Apply where conditions
@@ -666,7 +665,7 @@ class SupabaseService {
         .select(`
           *,
           contact:contacts(*),
-          user:users(id, first_name, last_name, email, role)
+          users!exchange_participants_user_id_fkey(id, first_name, last_name, email, role)
         `);
 
       // Apply where conditions

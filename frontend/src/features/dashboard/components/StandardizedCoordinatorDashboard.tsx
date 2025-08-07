@@ -237,39 +237,6 @@ const CoordinatorTabContent: React.FC<CoordinatorTabContentProps> = ({ activeTab
 };
 
 const StandardizedCoordinatorDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('overview');
-
-  const customTabs = [
-    {
-      id: 'overview',
-      name: 'Overview',
-      icon: ChartBarIcon
-    },
-    {
-      id: 'exchanges',
-      name: 'Exchanges',
-      icon: DocumentTextIcon
-    },
-    {
-      id: 'tasks',
-      name: 'Tasks',
-      icon: CheckCircleIcon
-    },
-    {
-      id: 'team',
-      name: 'Team',
-      icon: UsersIcon
-    },
-    {
-      id: 'documents',
-      name: 'Documents',
-      icon: DocumentTextIcon
-    }
-  ];
-
-  const handleTabChange = (tabId: string) => {
-    setActiveTab(tabId);
-  };
 
   const customOverviewContent = (
     <div className="space-y-6">
@@ -321,14 +288,8 @@ const StandardizedCoordinatorDashboard: React.FC = () => {
   return (
     <StandardDashboard
       role="coordinator"
-      customTabs={customTabs}
-      onTabChange={handleTabChange}
-      customContent={activeTab === 'overview' ? customOverviewContent : undefined}
-    >
-      {activeTab !== 'overview' && (
-        <CoordinatorTabContent activeTab={activeTab} role="coordinator" />
-      )}
-    </StandardDashboard>
+      customContent={customOverviewContent}
+    />
   );
 };
 

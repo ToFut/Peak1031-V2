@@ -134,6 +134,7 @@ router.get('/:id/tasks', [
  * Get exchanges with filtering, searching, and pagination
  */
 router.get('/', [
+  authenticateToken,
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 5000 }).withMessage('Limit must be between 1 and 5000'),
   query('status').optional().isIn(['PENDING', '45D', '180D', 'COMPLETED', 'TERMINATED', 'ON_HOLD']),
@@ -177,6 +178,10 @@ router.get('/', [
       client_id,
       include_inactive: include_inactive === 'true'
     });
+    
+    console.log('🔍 DEBUG: whereClause =', JSON.stringify(whereClause, null, 2));
+    console.log('🔍 DEBUG: user role =', req.user?.role);
+    console.log('🔍 DEBUG: include_inactive =', include_inactive);
     
     // Log for debugging
     if (req.user && req.user.role === 'admin') {

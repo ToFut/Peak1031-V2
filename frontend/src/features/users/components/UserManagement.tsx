@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { apiService } from '../services/api';
-import ModernCard from './ui/ModernCard';
-import StatusBadge from './ui/StatusBadge';
-import ModernDropdown from './ui/ModernDropdown';
+import { useAuth } from '../../../hooks/useAuth';
+import { apiService } from '../../../services/api';
+import ModernCard from '../../../components/ui/ModernCard';
+import StatusBadge from '../../../components/ui/StatusBadge';
+import ModernDropdown from '../../../components/ui/ModernDropdown';
 
 import {
   UserIcon,
@@ -115,7 +115,7 @@ const UserManagement: React.FC = () => {
           );
         }
         
-        setUsers(filteredUsers);
+        setUsers(filteredUsers as any);
         setTotalPages(1); // Single page for client-side filtering
       } else if (Array.isArray(response)) {
         setUsers(response);
@@ -230,8 +230,8 @@ const UserManagement: React.FC = () => {
       email: user.email,
       firstName: user.first_name,
       lastName: user.last_name,
-      role: user.role,
-      phone: user.phone || '',
+      role: user.role as any,
+      phone: (user as any).phone || '',
       isActive: user.is_active
     });
     setShowEditModal(true);
@@ -259,7 +259,7 @@ const UserManagement: React.FC = () => {
         user.first_name,
         user.last_name,
         user.role,
-        user.phone || '',
+        (user as any).phone || '',
         user.is_active ? 'Active' : 'Inactive',
         new Date(user.created_at).toLocaleDateString(),
         user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'
@@ -423,10 +423,10 @@ const UserManagement: React.FC = () => {
                           <EnvelopeIcon className="h-4 w-4" />
                           {user.email}
                         </div>
-                        {user.phone && (
+                        {(user as any).phone && (
                           <div className="text-sm text-gray-500 flex items-center gap-2">
                             <PhoneIcon className="h-4 w-4" />
-                            {user.phone}
+                            {(user as any).phone}
                           </div>
                         )}
                       </div>
@@ -544,10 +544,10 @@ const UserManagement: React.FC = () => {
                         />
                       </div>
                       
-                      {user.phone && (
+                      {(user as any).phone && (
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-gray-600">Phone:</span>
-                          <span className="text-sm text-gray-900">{user.phone}</span>
+                          <span className="text-sm text-gray-900">{(user as any).phone}</span>
                         </div>
                       )}
                       

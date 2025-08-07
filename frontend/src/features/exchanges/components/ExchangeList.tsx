@@ -686,3 +686,5 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
     </div>
   );
 };
+
+export default ExchangeList;

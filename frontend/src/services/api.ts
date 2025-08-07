@@ -10,9 +10,96 @@ import {
   LoginCredentials,
   LoginResponse
 } from '../types';
+import { generalCache as cacheService } from './cache';
+
+interface ApiOptions {
+  useCache?: boolean;
+  cacheDuration?: number;
+  useFallback?: boolean;
+  forceRefresh?: boolean;
+}
 
 class ApiService {
   private baseURL: string = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+  private isOnline: boolean = true;
+  private healthCheckInterval: NodeJS.Timeout | null = null;
+  private lastHealthCheck: number = 0;
+  private connectionListeners: ((online: boolean) => void)[] = [];
+
+  constructor() {
+    // Monitor connection status
+    window.addEventListener('online', () => this.checkBackendHealth());
+    window.addEventListener('offline', () => this.setConnectionStatus(false));
+    
+    // Start periodic health checks
+    this.startHealthCheck();
+    
+    // Initial health check
+    this.checkBackendHealth();
+  }
+
+  private setConnectionStatus(online: boolean) {
+    if (this.isOnline !== online) {
+      this.isOnline = online;
+      console.log(`🔗 Connection status changed: ${online ? 'ONLINE' : 'OFFLINE'}`);
+      this.connectionListeners.forEach(listener => listener(online));
+    }
+  }
+
+  onConnectionChange(listener: (online: boolean) => void) {
+    this.connectionListeners.push(listener);
+    return () => {
+      this.connectionListeners = this.connectionListeners.filter(l => l !== listener);
+    };
+  }
+
+  private startHealthCheck() {
+    // Check every 30 seconds
+    this.healthCheckInterval = setInterval(() => {
+      this.checkBackendHealth();
+    }, 30000);
+  }
+
+  private async checkBackendHealth(): Promise<boolean> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      const response = await fetch(`${this.baseURL}/health`, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      const isHealthy = response.ok;
+      
+      this.setConnectionStatus(isHealthy);
+      this.lastHealthCheck = Date.now();
+      
+      return isHealthy;
+    } catch (error: any) {
+      console.warn('⚠️ Backend health check failed:', error.name === 'AbortError' ? 'Timeout' : error.message);
+      this.setConnectionStatus(false);
+      return false;
+    }
+  }
+
+  getConnectionStatus(): { online: boolean; lastCheck: number } {
+    return {
+      online: this.isOnline,
+      lastCheck: this.lastHealthCheck
+    };
+  }
+
+  destroy() {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+  }
 
   // Helper method to get auth headers
   private getAuthHeaders(isFormData: boolean = false): HeadersInit {
@@ -23,20 +110,47 @@ class ApiService {
     };
   }
 
-  // Helper method for HTTP requests
-  private async request<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<T> {
+  // Helper method for HTTP requests with caching support and fallbacks
+  private async request<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false, apiOptions?: ApiOptions): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
-    console.log(`🔗 API Request: ${options.method || 'GET'} ${url}`);
+    const method = options.method || 'GET';
     
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...this.getAuthHeaders(),
-        ...options.headers
-      }
-    });
+    // Handle caching for GET requests only
+    if (method === 'GET' && apiOptions) {
+      const {
+        useCache = true,
+        cacheDuration = 5 * 60 * 1000, // 5 minutes
+        useFallback = true,
+        forceRefresh = false
+      } = apiOptions;
 
-    if (!response.ok) {
+      const cacheKey = `api:${endpoint}`;
+
+      // Check cache first
+      if (useCache && !forceRefresh) {
+        const cached = cacheService.get<T>(cacheKey);
+        if (cached) {
+          console.log(`📦 Using cached data for ${endpoint}`);
+          return cached;
+        }
+      }
+    }
+    
+    console.log(`🔗 API Request: ${method} ${url}`);
+    
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...this.getAuthHeaders(),
+          ...options.headers
+        }
+      });
+
+      // Update connection status on successful request
+      this.setConnectionStatus(true);
+
+      if (!response.ok) {
       // If we get a 401 and have a refresh token, try to refresh (but only once)
       if (response.status === 401 && localStorage.getItem('refreshToken') && !isRetry) {
         try {
@@ -68,8 +182,34 @@ class ApiService {
     const data = await response.json();
     console.log(`✅ API Response from ${endpoint}:`, data);
     
-    // Return data.data if it exists (backend format), otherwise return the whole response
-    return data.data || data;
+    // Cache GET responses if caching is enabled
+    if (method === 'GET' && apiOptions?.useCache !== false) {
+      const cacheKey = `api:${endpoint}`;
+      const cacheDuration = apiOptions?.cacheDuration || 5 * 60 * 1000; // 5 minutes default
+      cacheService.set(cacheKey, data.data || data, cacheDuration);
+      console.log(`💾 Cached response for ${endpoint}`);
+      }
+    
+      // Return data.data if it exists (backend format), otherwise return the whole response
+      return data.data || data;
+    
+    } catch (networkError: any) {
+      console.error('❌ Network error:', networkError.message);
+      this.setConnectionStatus(false);
+      
+      // For GET requests, try to use cached data as fallback
+      if (method === 'GET' && apiOptions?.useFallback !== false) {
+        const cacheKey = `api:${endpoint}`;
+        const cached = cacheService.get<T>(cacheKey);
+        if (cached) {
+          console.log(`🔄 Using fallback cached data for ${endpoint} due to network error`);
+          return cached;
+        }
+      }
+      
+      // If no cached data available, throw the original error
+      throw new Error(`Network error: ${networkError.message || 'Failed to connect to backend'}`);
+    }
   }
 
   // Authentication methods
@@ -149,32 +289,11 @@ class ApiService {
     }
   }
 
-  // Generic HTTP methods
-  async get(endpoint: string): Promise<any> {
-    return this.request(endpoint, { method: 'GET' });
-  }
 
-  async post(endpoint: string, data?: any): Promise<any> {
-    return this.request(endpoint, {
-      method: 'POST',
-      body: data ? JSON.stringify(data) : undefined
-    });
-  }
-
-  async patch(endpoint: string, data?: any): Promise<any> {
-    return this.request(endpoint, {
-      method: 'PATCH',
-      body: data ? JSON.stringify(data) : undefined
-    });
-  }
-
-  async delete(endpoint: string): Promise<any> {
-    return this.request(endpoint, { method: 'DELETE' });
-  }
 
   // Data methods - now using backend API
   async getUsers(): Promise<User[]> {
-    return await this.request('/admin/users');
+    return await this.request('/users');
   }
 
   async getContacts(): Promise<Contact[]> {
@@ -207,7 +326,7 @@ class ApiService {
     return [];
   }
 
-  async getExchanges(): Promise<Exchange[]> {
+  async getExchanges(options?: ApiOptions): Promise<Exchange[]> {
     // Check if user is admin to request all exchanges
     const userStr = localStorage.getItem('user');
     let limit = '20';
@@ -233,7 +352,7 @@ class ApiService {
     const endpoint = `/exchanges?limit=${limit}`;
     console.log('Making request to:', endpoint);
     
-    const response = await this.request<any>(endpoint);
+    const response = await this.request<any>(endpoint, {}, false, options);
     // Handle both array response and paginated response
     if (Array.isArray(response)) {
       console.log(`✅ ${isAdmin ? 'ADMIN' : 'USER'} received ${response.length} exchanges`);
@@ -276,7 +395,7 @@ class ApiService {
   }
 
   async getAuditLogs(): Promise<AuditLog[]> {
-    return await this.request('/admin/audit-logs');
+    return await this.request('/admin/audit-logs'); // This endpoint exists in backend
   }
 
   async getSyncLogs(): Promise<SyncLog[]> {
@@ -284,7 +403,7 @@ class ApiService {
   }
 
   async getDashboardStats(): Promise<any> {
-    return await this.request('/admin/stats');
+    return await this.request('/dashboard/overview');
   }
 
   // User Management
@@ -296,14 +415,14 @@ class ApiService {
   }
 
   async updateUser(id: string, userData: Partial<User>): Promise<User> {
-    return await this.request(`/admin/users/${id}`, {
+    return await this.request(`/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(userData)
     });
   }
 
   async deleteUser(id: string): Promise<void> {
-    await this.request(`/admin/users/${id}`, {
+    await this.request(`/users/${id}`, {
       method: 'DELETE'
     });
   }
@@ -348,6 +467,12 @@ class ApiService {
     return await this.request(`/tasks/${id}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status })
+    });
+  }
+
+  async deleteTask(id: string): Promise<void> {
+    return await this.request(`/tasks/${id}`, {
+      method: 'DELETE'
     });
   }
 
@@ -462,13 +587,13 @@ class ApiService {
 
   // User Management - Additional methods
   async activateUser(userId: string): Promise<User> {
-    return await this.request(`/admin/users/${userId}/activate`, {
+    return await this.request(`/users/${userId}/activate`, {
       method: 'POST'
     });
   }
 
   async deactivateUser(userId: string): Promise<User> {
-    return await this.request(`/admin/users/${userId}/deactivate`, {
+    return await this.request(`/users/${userId}/deactivate`, {
       method: 'POST'
     });
   }
@@ -875,6 +1000,526 @@ class ApiService {
     if (!userStr) return null;
     const user = JSON.parse(userStr);
     return user.id;
+  }
+
+  // Generic HTTP methods with caching support
+  async get<T = any>(endpoint: string, options?: ApiOptions): Promise<T> {
+    return await this.request(endpoint, {}, false, options);
+  }
+
+  async post<T = any>(endpoint: string, data: any): Promise<T> {
+    return await this.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async put<T = any>(endpoint: string, data: any): Promise<T> {
+    return await this.request(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async patch<T = any>(endpoint: string, data: any): Promise<T> {
+    return await this.request(endpoint, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async delete<T = any>(endpoint: string, data?: any): Promise<T> {
+    const options: RequestInit = {
+      method: 'DELETE'
+    };
+    
+    if (data) {
+      options.body = JSON.stringify(data);
+    }
+    
+    return await this.request(endpoint, options);
+  }
+
+  // ===========================================
+  // PRACTICEPANTHER INTEGRATION API METHODS
+  // ===========================================
+
+  /**
+   * Initiate PracticePanther OAuth flow
+   */
+  async initiateP3OAuth(): Promise<{ authUrl: string }> {
+    return await this.request('/practicepanther/auth', { method: 'POST' });
+  }
+
+  /**
+   * Complete PracticePanther OAuth with callback code
+   */
+  async completeP3OAuth(code: string, state: string): Promise<{ success: boolean }> {
+    return await this.request('/practicepanther/callback', {
+      method: 'POST',
+      body: JSON.stringify({ code, state })
+    });
+  }
+
+  /**
+   * Get PracticePanther authorization status
+   */
+  async getP3AuthStatus(): Promise<{ authorized: boolean; lastSync?: string }> {
+    return await this.request('/practicepanther/status');
+  }
+
+  /**
+   * Disconnect PracticePanther integration
+   */
+  async disconnectP3Integration(): Promise<{ success: boolean }> {
+    return await this.request('/practicepanther/disconnect', { method: 'POST' });
+  }
+
+  /**
+   * Sync data from PracticePanther
+   */
+  async syncFromPracticePanther(): Promise<{ success: boolean; synced: any }> {
+    return await this.request('/practice-panther/sync/exchanges', { method: 'POST' });
+  }
+
+  /**
+   * Get sync status with PracticePanther
+   */
+  async getP3SyncStatus(): Promise<{ 
+    lastSync: string | null; 
+    isRunning: boolean; 
+    error?: string;
+    stats: {
+      total: number;
+      success: number;
+      failed: number;
+    }
+  }> {
+    return await this.request('/practice-panther/sync/status');
+  }
+
+  /**
+   * Get sync logs for PracticePanther
+   */
+  async getP3SyncLogs(limit: number = 50): Promise<{
+    logs: Array<{
+      id: string;
+      timestamp: string;
+      action: string;
+      status: 'success' | 'error';
+      details: string;
+      entityType?: string;
+      entityId?: string;
+    }>;
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+    };
+  }> {
+    return await this.request(`/practice-panther/sync/logs?limit=${limit}`);
+  }
+
+  // ===========================================
+  // AGENCY MANAGEMENT API METHODS  
+  // ===========================================
+
+  /**
+   * Get all agencies
+   */
+  async getAgencies(): Promise<{
+    agencies: Array<{
+      id: string;
+      name: string;
+      contactInfo: any;
+      status: 'active' | 'inactive';
+      createdAt: string;
+      thirdParties: number;
+    }>;
+  }> {
+    return await this.request('/agency/agencies');
+  }
+
+  /**
+   * Create a new agency
+   */
+  async createAgency(agencyData: {
+    name: string;
+    contactInfo: any;
+    description?: string;
+  }): Promise<{ agency: any }> {
+    return await this.request('/agency/agencies', {
+      method: 'POST',
+      body: JSON.stringify(agencyData)
+    });
+  }
+
+  /**
+   * Update an agency
+   */
+  async updateAgency(agencyId: string, agencyData: any): Promise<{ agency: any }> {
+    return await this.request(`/agency/agencies/${agencyId}`, {
+      method: 'PUT',
+      body: JSON.stringify(agencyData)
+    });
+  }
+
+  /**
+   * Delete an agency
+   */
+  async deleteAgency(agencyId: string): Promise<{ success: boolean }> {
+    return await this.request(`/agency/agencies/${agencyId}`, { method: 'DELETE' });
+  }
+
+  /**
+   * Get third parties for an agency
+   */
+  async getAgencyThirdParties(agencyId: string): Promise<{
+    thirdParties: Array<{
+      id: string;
+      userId: string;
+      agencyId: string;
+      role: string;
+      permissions: string[];
+      status: 'active' | 'inactive';
+      user: {
+        firstName: string;
+        lastName: string;
+        email: string;
+      };
+    }>;
+  }> {
+    return await this.request(`/agency/agencies/${agencyId}/third-parties`);
+  }
+
+  /**
+   * Add third party to agency
+   */
+  async addThirdPartyToAgency(agencyId: string, thirdPartyData: {
+    userId: string;
+    role: string;
+    permissions: string[];
+  }): Promise<{ thirdParty: any }> {
+    return await this.request(`/agency/agencies/${agencyId}/third-parties`, {
+      method: 'POST',
+      body: JSON.stringify(thirdPartyData)
+    });
+  }
+
+  /**
+   * Remove third party from agency
+   */
+  async removeThirdPartyFromAgency(agencyId: string, thirdPartyId: string): Promise<{ success: boolean }> {
+    return await this.request(`/agency/agencies/${agencyId}/third-parties/${thirdPartyId}`, { 
+      method: 'DELETE' 
+    });
+  }
+
+  /**
+   * Get all third parties across all agencies
+   */
+  async getAllThirdParties(): Promise<{
+    thirdParties: Array<{
+      id: string;
+      userId: string;
+      agencyId: string;
+      agencyName: string;
+      role: string;
+      permissions: string[];
+      status: 'active' | 'inactive';
+      user: {
+        firstName: string;
+        lastName: string;
+        email: string;
+      };
+    }>;
+  }> {
+    return await this.request('/agency/third-parties');
+  }
+
+  // ===========================================
+  // ADMIN GPT API METHODS
+  // ===========================================
+
+  /**
+   * Query database using GPT-powered natural language
+   */
+  async queryWithGPT(query: string, context?: string): Promise<{
+    query: string;
+    results: any[];
+    explanation: string;
+    suggestedActions?: string[];
+  }> {
+    return await this.request('/admin/gpt/query', {
+      method: 'POST',
+      body: JSON.stringify({ query, context })
+    });
+  }
+
+  /**
+   * Get insights about exchanges using GPT analysis
+   */
+  async getExchangeInsights(exchangeId?: string): Promise<{
+    insights: Array<{
+      category: string;
+      insight: string;
+      severity: 'low' | 'medium' | 'high';
+      actionable: boolean;
+      suggestedAction?: string;
+    }>;
+    summary: string;
+  }> {
+    const endpoint = exchangeId ? `/admin/gpt/insights/${exchangeId}` : '/admin/gpt/insights';
+    return await this.request(endpoint);
+  }
+
+  /**
+   * Generate reports using GPT
+   */
+  async generateGPTReport(reportType: string, parameters?: any): Promise<{
+    report: {
+      title: string;
+      content: string;
+      data: any[];
+      charts?: any[];
+    };
+    metadata: {
+      generatedAt: string;
+      parameters: any;
+      executionTime: number;
+    };
+  }> {
+    return await this.request('/admin/gpt/reports', {
+      method: 'POST',
+      body: JSON.stringify({ reportType, parameters })
+    });
+  }
+
+  /**
+   * Get GPT usage statistics
+   */
+  async getGPTUsageStats(): Promise<{
+    usage: {
+      totalQueries: number;
+      thisMonth: number;
+      avgResponseTime: number;
+      successRate: number;
+    };
+    topQueries: Array<{
+      query: string;
+      count: number;
+      avgResponseTime: number;
+    }>;
+  }> {
+    return await this.request('/admin/gpt/usage');
+  }
+
+  // ===========================================  
+  // ENHANCED MESSAGE SYSTEM API METHODS
+  // ===========================================
+
+  /**
+   * Send message with file attachments
+   */
+  async sendMessageWithFiles(exchangeId: string, content: string, files: File[]): Promise<{ message: any }> {
+    const formData = new FormData();
+    formData.append('content', content);
+    files.forEach(file => formData.append('files', file));
+
+    return await this.request(`/messages/exchange/${exchangeId}`, {
+      method: 'POST',
+      body: formData,
+      headers: this.getAuthHeaders(true) // isFormData = true
+    });
+  }
+
+  /**
+   * Search messages in an exchange
+   */
+  async searchMessages(exchangeId: string, searchTerm: string, options?: {
+    limit?: number;
+    offset?: number;
+    dateFrom?: string;
+    dateTo?: string;
+  }): Promise<{
+    messages: any[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+    };
+  }> {
+    const params = new URLSearchParams({
+      q: searchTerm,
+      ...(options?.limit && { limit: options.limit.toString() }),
+      ...(options?.offset && { offset: options.offset.toString() }),
+      ...(options?.dateFrom && { dateFrom: options.dateFrom }),
+      ...(options?.dateTo && { dateTo: options.dateTo })
+    });
+    
+    return await this.request(`/messages/exchange/${exchangeId}/search?${params}`);
+  }
+
+  /**
+   * Set typing indicator
+   */
+  async setTypingIndicator(exchangeId: string, isTyping: boolean): Promise<{ success: boolean }> {
+    return await this.request(`/messages/exchange/${exchangeId}/typing`, {
+      method: 'POST',
+      body: JSON.stringify({ isTyping })
+    });
+  }
+
+  /**
+   * Get typing indicators for an exchange
+   */
+  async getTypingIndicators(exchangeId: string): Promise<{
+    typingUsers: Array<{
+      userId: string;
+      userName: string;
+      timestamp: string;
+    }>;
+  }> {
+    return await this.request(`/messages/exchange/${exchangeId}/typing`);
+  }
+
+  // ===========================================
+  // ENHANCED DOCUMENT MANAGEMENT API METHODS  
+  // ===========================================
+
+  /**
+   * Get document versions
+   */
+  async getDocumentVersions(documentId: string): Promise<{
+    versions: Array<{
+      id: string;
+      version: number;
+      fileName: string;
+      uploadedBy: string;
+      uploadedAt: string;
+      size: number;
+      changes?: string;
+    }>;
+  }> {
+    return await this.request(`/documents/${documentId}/versions`);
+  }
+
+  /**
+   * Share document with external parties
+   */
+  async shareDocument(documentId: string, shareData: {
+    email?: string;
+    permissions: 'view' | 'download' | 'edit';
+    expiresAt?: string;
+    password?: string;
+  }): Promise<{
+    shareLink: string;
+    shareId: string;
+    expiresAt?: string;
+  }> {
+    return await this.request(`/documents/${documentId}/share`, {
+      method: 'POST',
+      body: JSON.stringify(shareData)
+    });
+  }
+
+  /**
+   * Search documents across all exchanges
+   */
+  async searchDocuments(searchTerm: string, filters?: {
+    exchangeId?: string;
+    type?: string;
+    uploadedBy?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    limit?: number;
+  }): Promise<{
+    documents: any[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+    };
+  }> {
+    const params = new URLSearchParams({
+      q: searchTerm,
+      ...(filters?.exchangeId && { exchangeId: filters.exchangeId }),
+      ...(filters?.type && { type: filters.type }),
+      ...(filters?.uploadedBy && { uploadedBy: filters.uploadedBy }),
+      ...(filters?.dateFrom && { dateFrom: filters.dateFrom }),
+      ...(filters?.dateTo && { dateTo: filters.dateTo }),
+      ...(filters?.limit && { limit: filters.limit.toString() })
+    });
+
+    return await this.request(`/documents/search?${params}`);
+  }
+
+  /**
+   * Perform bulk operations on documents
+   */
+  async bulkDocumentOperation(operation: 'delete' | 'move' | 'tag', data: {
+    documentIds: string[];
+    targetExchangeId?: string;
+    tags?: string[];
+  }): Promise<{
+    success: number;
+    failed: number;
+    errors: Array<{ documentId: string; error: string }>;
+  }> {
+    return await this.request('/documents/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ operation, ...data })
+    });
+  }
+
+  // ===========================================
+  // ENHANCED TASK MANAGEMENT API METHODS
+  // ===========================================
+
+  /**
+   * Bulk update tasks
+   */
+  async bulkUpdateTasks(updates: {
+    taskIds: string[];
+    status?: string;
+    priority?: string;
+    assignedTo?: string;
+    dueDate?: string;
+  }): Promise<{
+    updated: number;
+    failed: number;
+    errors: Array<{ taskId: string; error: string }>;
+  }> {
+    return await this.request('/tasks/bulk-update', {
+      method: 'POST',
+      body: JSON.stringify(updates)
+    });
+  }
+
+  /**
+   * Get tasks filtered by exchange
+   */
+  async getTasksByExchange(exchangeId: string, options?: {
+    status?: string;
+    priority?: string;
+    assignedTo?: string;
+    limit?: number;
+  }): Promise<{
+    tasks: any[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+    };
+  }> {
+    const params = new URLSearchParams({
+      ...(options?.status && { status: options.status }),
+      ...(options?.priority && { priority: options.priority }),
+      ...(options?.assignedTo && { assignedTo: options.assignedTo }),
+      ...(options?.limit && { limit: options.limit.toString() })
+    });
+
+    return await this.request(`/tasks/exchange/${exchangeId}?${params}`);
   }
 }
 

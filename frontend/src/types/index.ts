@@ -104,6 +104,11 @@ export interface AuditLog {
   ip?: string;
   exchangeId?: string;
   documentId?: string;
+  // Properties expected by AuditLogSystem component
+  user_id?: string;
+  resource_type?: string;
+  resource_id?: string;
+  ip_address?: string;
 }
 
 export interface SyncLog {

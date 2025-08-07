@@ -1,5 +1,4 @@
 import { apiService } from './api';
-import { smartApi } from './smartApi';
 import { UserRole } from '../types/roles';
 
 interface RoleBasedApiOptions {
@@ -26,8 +25,8 @@ class RoleBasedApiService {
     
     try {
       // Get all exchanges from the API
-      const response = await smartApi.getExchanges({ forceRefresh: options.forceRefresh });
-      const exchanges = response.exchanges || response || [];
+      const response = await apiService.getExchanges({ forceRefresh: options.forceRefresh });
+      const exchanges = Array.isArray(response) ? response : [];
       
       if (!userContext) {
         return { exchanges };
@@ -55,8 +54,8 @@ class RoleBasedApiService {
     const { userContext } = options;
     
     try {
-      const response = await smartApi.getTasks({ forceRefresh: options.forceRefresh });
-      const tasks = response.tasks || response || [];
+      const response = await apiService.getTasks();
+      const tasks = Array.isArray(response) ? response : [];
       
       if (!userContext) {
         return { tasks };
@@ -83,8 +82,8 @@ class RoleBasedApiService {
     const { userContext } = options;
     
     try {
-      const response = await smartApi.getContacts({ forceRefresh: options.forceRefresh });
-      const contacts = response.contacts || response || [];
+      const response = await apiService.getContacts();
+      const contacts = Array.isArray(response) ? response : [];
       
       if (!userContext) {
         return { contacts };
@@ -111,8 +110,8 @@ class RoleBasedApiService {
     const { userContext } = options;
     
     try {
-      const response = await smartApi.getDocuments({ forceRefresh: options.forceRefresh });
-      const documents = response.documents || response || [];
+      const response = await apiService.getDocuments();
+      const documents = Array.isArray(response) ? response : [];
       
       if (!userContext) {
         return { documents };

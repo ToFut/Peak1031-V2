@@ -256,6 +256,16 @@ class PeakServer {
       }
     });
 
+    // Health check endpoint (no authentication required)
+    this.app.get('/api/health', (req, res) => {
+      res.status(200).json({ 
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        version: '2.0.0',
+        database: config.useSupabase ? 'supabase' : 'sqlite'
+      });
+    });
+
     // API routes - Use working auth for now
     this.app.use('/api/auth', workingAuthRoutes);
     this.app.use('/api/auth/supabase', supabaseAuthRoutes); // Keep Supabase auth available
@@ -316,7 +326,7 @@ class PeakServer {
         console.log('🔍 Token received, verifying...');
         // Use same JWT verification as API routes
         const jwt = require('jsonwebtoken');
-        const { User } = require('./models');
+        const databaseService = require('./services/database');
         
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         console.log('✅ Token verified, user ID:', decoded.userId);
@@ -327,19 +337,18 @@ class PeakServer {
           return next(new Error('Token expired'));
         }
 
-        // Find user and verify account status
+        // Find user and verify account status using database service
         console.log('🔍 Looking for user with ID:', decoded.userId);
-        const user = await User.findByPk(decoded.userId, {
-          attributes: { exclude: ['password_hash', 'two_fa_secret'] }
-        });
+        const user = await databaseService.getUserById(decoded.userId);
         
         if (!user) {
           console.log('❌ User not found');
           return next(new Error('User not found'));
         }
 
-        console.log('✅ User found:', user.email, 'isActive:', user.isActive);
-        if (!user.isActive) {
+        console.log('✅ User found:', user.email, 'isActive:', user.is_active || user.isActive);
+        const isActive = user.is_active !== undefined ? user.is_active : user.isActive;
+        if (!isActive) {
           console.log('❌ Account disabled');
           return next(new Error('Account disabled'));
         }

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useChat } from '../hooks/useChat';
 import { useAuth } from '../../../hooks/useAuth';
 import { ChatMessage } from '../../../services/chatService';
-import ExchangeParticipantsManager from '../../../components/ExchangeParticipantsManager';
+// import ExchangeParticipantsManager from '../../../components/ExchangeParticipantsManager'; // Component not found
 import StatusBadge from '../../../components/ui/StatusBadge';
 import DebugChatInfo from './DebugChatInfo';
 import { 
@@ -649,17 +649,20 @@ const UnifiedChatInterface: React.FC = () => {
         </div>
       )}
 
-      {/* Participants Manager Modal */}
-      {selectedExchange && (
-        <ExchangeParticipantsManager
-          exchangeId={selectedExchange.id}
-          isOpen={showParticipantsManager}
-          onClose={() => setShowParticipantsManager(false)}
-          onParticipantsChange={() => {
-            // Refresh exchange data to update participant count
-            loadExchanges();
-          }}
-        />
+      {/* Participants Manager Modal - Component not found, temporarily disabled */}
+      {selectedExchange && showParticipantsManager && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-medium mb-4">Exchange Participants</h3>
+            <p className="text-gray-600 mb-4">Participants management coming soon...</p>
+            <button
+              onClick={() => setShowParticipantsManager(false)}
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
       
       {/* Debug Info in Development */}

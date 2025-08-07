@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FileText, Download, Upload, Search, Filter, Trash2 } from 'lucide-react';
-import { Document } from '../../types';
-import { formatDate } from '../../utils/date.utils';
+import { Document } from '../../../types';
+import { formatDate } from '../../../utils/date.utils';
 
 interface DocumentsListProps {
   documents: Document[];

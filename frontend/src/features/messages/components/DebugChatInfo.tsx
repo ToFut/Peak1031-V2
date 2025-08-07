@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../../../hooks/useAuth';
-import { useChat } from '../../../hooks/useChat';
+import { useChat } from '../hooks/useChat';
 
 const DebugChatInfo: React.FC = () => {
   const { user } = useAuth();

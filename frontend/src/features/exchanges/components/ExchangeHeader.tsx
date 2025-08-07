@@ -1,9 +1,9 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Eye, ChevronRight, UserCheck, UserPlus } from 'lucide-react';
-import { EnterpriseExchange } from '../../types/exchange-details.types';
-import { User } from '../../types';
-import { canManageExchange, canAdvanceStage } from '../../utils/permission.utils';
+import { EnterpriseExchange } from '../types';
+import { User } from '../../../types';
+import { canManageExchange, canAdvanceStage } from '../../../utils/permission.utils';
 
 interface ExchangeHeaderProps {
   exchange: EnterpriseExchange;

@@ -105,8 +105,6 @@ export function useReports() {
         reportType,
         format,
         filters
-      }, {
-        responseType: 'blob'
       });
       
       // Create download link

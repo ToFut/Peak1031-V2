@@ -1,12 +1,8 @@
 import React from 'react';
-import TasksPage from './TasksPage';
+import { EnhancedTaskManager } from '../components';
 
 const Tasks: React.FC = () => {
-  return (
-    
-    <TasksPage />
-    
-  );
+  return <EnhancedTaskManager />;
 };
 
 export default Tasks;

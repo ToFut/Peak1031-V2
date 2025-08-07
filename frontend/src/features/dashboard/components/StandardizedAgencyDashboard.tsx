@@ -192,34 +192,6 @@ const AgencyTabContent: React.FC<AgencyTabContentProps> = ({ activeTab, role }) 
 };
 
 const StandardizedAgencyDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('overview');
-
-  const customTabs = [
-    {
-      id: 'overview',
-      name: 'Overview',
-      icon: ChartBarIcon
-    },
-    {
-      id: 'exchanges',
-      name: 'Exchanges',
-      icon: DocumentTextIcon
-    },
-    {
-      id: 'clients',
-      name: 'Clients',
-      icon: UsersIcon
-    },
-    {
-      id: 'performance',
-      name: 'Performance',
-      icon: ArrowTrendingUpIcon
-    }
-  ];
-
-  const handleTabChange = (tabId: string) => {
-    setActiveTab(tabId);
-  };
 
   const customOverviewContent = (
     <div className="space-y-6">
@@ -271,14 +243,8 @@ const StandardizedAgencyDashboard: React.FC = () => {
   return (
     <StandardDashboard
       role="agency"
-      customTabs={customTabs}
-      onTabChange={handleTabChange}
-      customContent={activeTab === 'overview' ? customOverviewContent : undefined}
-    >
-      {activeTab !== 'overview' && (
-        <AgencyTabContent activeTab={activeTab} role="agency" />
-      )}
-    </StandardDashboard>
+      customContent={customOverviewContent}
+    />
   );
 };
 

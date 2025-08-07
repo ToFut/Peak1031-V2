@@ -96,8 +96,7 @@ export function useTasks() {
 
   const completeTask = useCallback(async (taskId: string) => {
     return updateTask(taskId, { 
-      status: 'completed',
-      completed_at: new Date().toISOString()
+      status: 'completed'
     });
   }, [updateTask]);
 
@@ -111,45 +110,45 @@ export function useTasks() {
 
   // Filter tasks by status
   const getTasksByStatus = useCallback((status: Task['status']) => {
-    return tasks.filter(task => task.status === status);
+    return tasks?.filter(task => task.status === status) || [];
   }, [tasks]);
 
   // Filter tasks by priority
   const getTasksByPriority = useCallback((priority: Task['priority']) => {
-    return tasks.filter(task => task.priority === priority);
+    return tasks?.filter(task => task.priority === priority) || [];
   }, [tasks]);
 
   // Filter tasks by assignee
   const getTasksByAssignee = useCallback((assigneeId: string) => {
-    return tasks.filter(task => task.assignee_id === assigneeId);
+    return tasks?.filter(task => task.assignee_id === assigneeId) || [];
   }, [tasks]);
 
   // Filter tasks by exchange
   const getTasksByExchange = useCallback((exchangeId: string) => {
-    return tasks.filter(task => task.exchange_id === exchangeId);
+    return tasks?.filter(task => task.exchange_id === exchangeId) || [];
   }, [tasks]);
 
   // Get overdue tasks
   const getOverdueTasks = useCallback(() => {
     const now = new Date();
-    return tasks.filter(task => 
+    return tasks?.filter(task => 
       task.due_date && 
       new Date(task.due_date) < now && 
       task.status !== 'completed' && 
       task.status !== 'cancelled'
-    );
+    ) || [];
   }, [tasks]);
 
   // Get tasks due today
   const getTasksDueToday = useCallback(() => {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
-    return tasks.filter(task => 
+    return tasks?.filter(task => 
       task.due_date && 
       task.due_date.startsWith(todayStr) &&
       task.status !== 'completed' && 
       task.status !== 'cancelled'
-    );
+    ) || [];
   }, [tasks]);
 
   // Get tasks due this week
@@ -158,7 +157,7 @@ export function useTasks() {
     const endOfWeek = new Date(now);
     endOfWeek.setDate(now.getDate() + 7);
     
-    return tasks.filter(task => 
+    return (tasks || []).filter(task => 
       task.due_date && 
       new Date(task.due_date) <= endOfWeek &&
       new Date(task.due_date) >= now &&
@@ -170,12 +169,12 @@ export function useTasks() {
   // Search tasks
   const searchTasks = useCallback((searchTerm: string) => {
     const term = searchTerm.toLowerCase();
-    return tasks.filter(task => 
+    return tasks?.filter(task => 
       task.title.toLowerCase().includes(term) ||
       task.description?.toLowerCase().includes(term) ||
       task.assignee_name?.toLowerCase().includes(term) ||
       task.exchange_name?.toLowerCase().includes(term)
-    );
+    ) || [];
   }, [tasks]);
 
   // Bulk operations
@@ -212,11 +211,11 @@ export function useTasks() {
 
   // Task statistics
   const getTaskStats = useCallback(() => {
-    const total = tasks.length;
-    const completed = tasks.filter(task => task.status === 'completed').length;
-    const pending = tasks.filter(task => task.status === 'pending').length;
-    const inProgress = tasks.filter(task => task.status === 'in_progress').length;
-    const cancelled = tasks.filter(task => task.status === 'cancelled').length;
+    const total = tasks?.length || 0;
+    const completed = tasks?.filter(task => task.status === 'completed').length || 0;
+    const pending = tasks?.filter(task => task.status === 'pending').length || 0;
+    const inProgress = tasks?.filter(task => task.status === 'in_progress').length || 0;
+    const cancelled = tasks?.filter(task => task.status === 'cancelled').length || 0;
     const overdue = getOverdueTasks().length;
     const dueToday = getTasksDueToday().length;
 

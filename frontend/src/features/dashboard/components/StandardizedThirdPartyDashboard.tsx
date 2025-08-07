@@ -105,29 +105,6 @@ const ThirdPartyTabContent: React.FC<ThirdPartyTabContentProps> = ({ activeTab, 
 };
 
 const StandardizedThirdPartyDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('overview');
-
-  const customTabs = [
-    {
-      id: 'overview',
-      name: 'Overview',
-      icon: ChartBarIcon
-    },
-    {
-      id: 'exchanges',
-      name: 'Exchanges',
-      icon: DocumentTextIcon
-    },
-    {
-      id: 'documents',
-      name: 'Documents',
-      icon: DocumentTextIcon
-    }
-  ];
-
-  const handleTabChange = (tabId: string) => {
-    setActiveTab(tabId);
-  };
 
   const customOverviewContent = (
     <div className="space-y-6">
@@ -236,14 +213,8 @@ const StandardizedThirdPartyDashboard: React.FC = () => {
   return (
     <StandardDashboard
       role="third_party"
-      customTabs={customTabs}
-      onTabChange={handleTabChange}
-      customContent={activeTab === 'overview' ? customOverviewContent : undefined}
-    >
-      {activeTab !== 'overview' && (
-        <ThirdPartyTabContent activeTab={activeTab} role="third_party" />
-      )}
-    </StandardDashboard>
+      customContent={customOverviewContent}
+    />
   );
 };
 

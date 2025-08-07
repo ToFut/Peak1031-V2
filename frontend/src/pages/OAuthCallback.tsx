@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { practicePartnerOAuth } from '../services/practicePartnerOAuth';
+import { oauthService } from '../services/oauthService';
 
 const OAuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -55,7 +55,7 @@ const OAuthCallback: React.FC = () => {
         // OAuth Step 2 - Exchange code for tokens
         console.log('🔄 Starting token exchange (OAuth Step 2)...');
         
-        const tokenData = await practicePartnerOAuth.exchangeCodeForToken(code, state);
+        const tokenData = await oauthService.exchangeCodeForTokens(code, state);
         
         console.log('✅ OAuth flow completed successfully!');
         console.log('🔑 Access token obtained and stored securely');

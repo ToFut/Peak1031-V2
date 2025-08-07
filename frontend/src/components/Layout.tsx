@@ -20,7 +20,8 @@ import {
   ExclamationTriangleIcon,
   InformationCircleIcon,
   ShieldCheckIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import {
   HomeIcon as HomeIconSolid,
@@ -31,6 +32,7 @@ import {
   CheckCircleIcon as CheckCircleIconSolid,
   CogIcon as CogIconSolid,
   ChartBarIcon as ChartBarIconSolid,
+  ArrowPathIcon as ArrowPathIconSolid,
 } from '@heroicons/react/24/solid';
 
 interface NavigationItem {
@@ -73,6 +75,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
 
   const [sidebarOpen, setSidebarOpen] = useState(true); // Start open by default
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -165,6 +168,27 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
         href: '/reports',
         icon: ChartBarIcon,
         iconSolid: ChartBarIconSolid,
+        roles: [user.role]
+      },
+      templates: {
+        name: 'Templates',
+        href: '/admin/templates',
+        icon: DocumentDuplicateIcon,
+        iconSolid: DocumentDuplicateIconSolid,
+        roles: [user.role]
+      },
+      audit: {
+        name: 'Audit Logs',
+        href: '/admin/audit',
+        icon: DocumentTextIcon,
+        iconSolid: DocumentTextIconSolid,
+        roles: [user.role]
+      },
+      sync: {
+        name: 'System Sync',
+        href: '/admin/system/sync',
+        icon: ArrowPathIcon,
+        iconSolid: ArrowPathIconSolid,
         roles: [user.role]
       },
       settings: {
@@ -360,10 +384,6 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
 
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6">
-          {/* Debug: Show navigation items count */}
-          <div className="text-xs text-red-500 mb-4 p-2 bg-red-50 border border-red-200 rounded">
-            Debug: {getNavigation().length} navigation items loaded
-          </div>
           <div className="space-y-2">
             {getNavigation().map((item) => {
               const Icon = isCurrentPath(item.href) ? item.iconSolid : item.icon;
@@ -486,14 +506,6 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* Debug: Show user info */}
-              <div className="text-xs text-gray-500 mr-4">
-                User: {user?.first_name} {user?.last_name} ({user?.role})
-              </div>
-              {/* Debug: Force show user menu */}
-              <div className="text-xs text-red-500 mr-4 bg-red-100 p-1 rounded">
-                MENU SHOULD BE HERE →
-              </div>
               {/* Notifications */}
               <div className="relative">
                 <button
@@ -569,22 +581,20 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200 bg-yellow-100"
+                  className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200 bg-white shadow-sm transition-colors"
+                  data-testid="user-menu-button"
                 >
                   <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
                     <span className="text-white font-medium text-sm">
                       {user.first_name?.[0]}{user.last_name?.[0]}
                     </span>
                   </div>
-                  <div className="text-left">
+                  <div className="text-left hidden sm:block">
                     <p className="text-sm font-medium text-gray-900">
                       {user.first_name} {user.last_name}
                     </p>
                     <p className="text-xs text-gray-500">
                       {getRoleDisplayName(user.role)}
-                    </p>
-                    <p className="text-xs text-red-600 font-bold">
-                      CLICK ME!
                     </p>
                   </div>
                   <ChevronDownIcon className="h-4 w-4 text-gray-400" />
@@ -592,7 +602,10 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
 
                 {/* User dropdown */}
                 {userMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                  <div 
+                    className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50"
+                    data-testid="user-menu-dropdown"
+                  >
                     <div className="py-1">
                       <button
                         onClick={() => {

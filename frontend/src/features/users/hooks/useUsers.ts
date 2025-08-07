@@ -95,7 +95,7 @@ export function useUsers() {
 
   const resetPassword = useCallback(async (userId: string) => {
     try {
-      const response = await apiService.post(`/users/${userId}/reset-password`);
+      const response = await apiService.post(`/users/${userId}/reset-password`, {});
       return response;
     } catch (error) {
       throw error;
@@ -112,28 +112,28 @@ export function useUsers() {
 
   // Filter users by role
   const getUsersByRole = useCallback((role: string) => {
-    return users.filter(user => user.role === role);
+    return users?.filter(user => user.role === role) || [];
   }, [users]);
 
   // Get active users
   const getActiveUsers = useCallback(() => {
-    return users.filter(user => user.is_active);
+    return users?.filter(user => user.is_active) || [];
   }, [users]);
 
   // Get inactive users
   const getInactiveUsers = useCallback(() => {
-    return users.filter(user => !user.is_active);
+    return users?.filter(user => !user.is_active) || [];
   }, [users]);
 
   // Search users
   const searchUsers = useCallback((searchTerm: string) => {
     const term = searchTerm.toLowerCase();
-    return users.filter(user => 
+    return users?.filter(user => 
       user.email.toLowerCase().includes(term) ||
       user.first_name.toLowerCase().includes(term) ||
       user.last_name.toLowerCase().includes(term) ||
       user.role.toLowerCase().includes(term)
-    );
+    ) || [];
   }, [users]);
 
   return {

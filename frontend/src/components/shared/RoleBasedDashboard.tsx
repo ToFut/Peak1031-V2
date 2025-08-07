@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
 import { useRoleBasedData } from '../../hooks/useRoleBasedData';
-import { smartApi } from '../../services/smartApi';
+import { apiService } from '../../services/api';
 import {
   ArrowPathIcon,
   ExclamationTriangleIcon
@@ -52,14 +52,15 @@ export const RoleBasedDashboard: React.FC<RoleBasedDashboardProps> = ({ children
 
     try {
       const [exchangesRes, tasksRes, contactsRes] = await Promise.all([
-        smartApi.getExchanges().catch(err => ({ exchanges: [] })),
-        smartApi.getTasks().catch(err => ({ tasks: [] })),
-        smartApi.getContacts().catch(err => ({ contacts: [] }))
+        apiService.getExchanges().catch(err => { console.error('Exchanges error:', err); return []; }),
+        apiService.getTasks().catch(err => { console.error('Tasks error:', err); return []; }),
+        apiService.getContacts().catch(err => { console.error('Contacts error:', err); return []; })
       ]);
 
-      const allExchanges = exchangesRes.exchanges || exchangesRes || [];
-      const allTasks = tasksRes.tasks || tasksRes || [];
-      const allContacts = contactsRes.contacts || contactsRes || [];
+      // Handle different response formats from apiService
+      const allExchanges = Array.isArray(exchangesRes) ? exchangesRes : [];
+      const allTasks = Array.isArray(tasksRes) ? tasksRes : [];
+      const allContacts = Array.isArray(contactsRes) ? contactsRes : [];
 
       setData({
         exchanges: filterExchanges(allExchanges),

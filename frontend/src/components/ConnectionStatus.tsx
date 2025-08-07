@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { smartApi } from '../services/smartApi';
+import { apiService } from '../services/api';
 
 const ConnectionStatus: React.FC = () => {
   const [isOnline, setIsOnline] = useState(true);
@@ -7,7 +7,7 @@ const ConnectionStatus: React.FC = () => {
 
   useEffect(() => {
     // Monitor connection changes
-    const unsubscribe = smartApi.onConnectionChange((online) => {
+    const unsubscribe = apiService.onConnectionChange((online) => {
       setIsOnline(online);
       setShowStatus(true);
       
@@ -17,8 +17,9 @@ const ConnectionStatus: React.FC = () => {
       }
     });
 
-    // Check initial status
-    setIsOnline(smartApi.isConnected());
+    // Check initial backend connection status
+    const { online } = apiService.getConnectionStatus();
+    setIsOnline(online);
 
     return unsubscribe;
   }, []);

@@ -1,15 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useRolePermissions } from '../../../hooks/useRolePermissions';
-import { useDashboardData } from '../../../hooks/useDashboardData';
+import { useDashboardData } from '../../../shared/hooks/useDashboardData';
 import {
-  DashboardLayout,
   EnhancedStatCard,
   QuickAction,
-  TabNavigation,
   DashboardSkeleton,
-  ErrorState,
-  type TabItem
+  ErrorState
 } from './SharedDashboardComponents';
 import {
   ChartBarIcon,
@@ -158,23 +155,16 @@ const ROLE_CONFIGS: Record<string, RoleConfig> = {
 interface StandardDashboardProps {
   role: string;
   customContent?: React.ReactNode;
-  customTabs?: TabItem[];
-  onTabChange?: (tabId: string, role: string) => void;
-  children?: React.ReactNode;
 }
 
 const StandardDashboard: React.FC<StandardDashboardProps> = ({
   role,
-  customContent,
-  customTabs,
-  onTabChange,
-  children
+  customContent
 }) => {
   const { user } = useAuth();
   const { canView } = useRolePermissions();
   const config = ROLE_CONFIGS[role] || ROLE_CONFIGS.client;
   
-  const [activeTab, setActiveTab] = useState<string>('overview');
   
   const {
     stats,
@@ -194,68 +184,6 @@ const StandardDashboard: React.FC<StandardDashboardProps> = ({
     refreshInterval: 300000 // 5 minutes
   });
 
-  // Build tabs based on role and permissions
-  const buildTabs = (): TabItem[] => {
-    if (customTabs) return customTabs;
-
-    const baseTabs = [
-      {
-        id: 'overview',
-        name: 'Overview',
-        icon: ChartBarIcon
-      },
-      {
-        id: 'exchanges',
-        name: role === 'client' ? 'My Exchanges' : 'Exchanges',
-        count: stats?.exchanges.total,
-        icon: DocumentTextIcon
-      },
-      {
-        id: 'tasks',
-        name: role === 'client' ? 'My Tasks' : 'Tasks',
-        count: stats?.tasks.pending,
-        icon: CheckCircleIcon
-      },
-      {
-        id: 'documents',
-        name: 'Documents',
-        count: stats?.documents?.total,
-        icon: DocumentTextIcon
-      },
-      {
-        id: 'messages',
-        name: 'Messages',
-        count: stats?.messages?.unread,
-        icon: ChatBubbleLeftRightIcon
-      },
-      {
-        id: 'users',
-        name: 'Users',
-        count: stats?.users?.total,
-        icon: UsersIcon
-      },
-      {
-        id: 'system',
-        name: 'System',
-        icon: CogIcon
-      }
-    ];
-
-    return baseTabs.filter(tab => {
-      if (!config.availableTabs.includes(tab.id)) return false;
-      if (tab.id === 'users' && role !== 'admin') return false;
-      if (tab.id === 'system' && role !== 'admin') return false;
-      if (tab.id === 'messages' && role === 'third_party') return false;
-      return canView(tab.id);
-    });
-  };
-
-  const handleTabChange = (tabId: string) => {
-    setActiveTab(tabId);
-    if (onTabChange) {
-      onTabChange(tabId, role);
-    }
-  };
 
   const handleQuickAction = async (actionId: string, action: string) => {
     try {
@@ -264,24 +192,26 @@ const StandardDashboard: React.FC<StandardDashboardProps> = ({
           await syncPracticePanther();
           break;
         case 'create-user':
-          setActiveTab('users');
+          window.location.href = '/admin/users';
           break;
         case 'audit':
+          window.location.href = '/admin/audit';
+          break;
         case 'settings':
-          setActiveTab('system');
+          window.location.href = '/admin/system';
           break;
         case 'exchanges':
         case 'my_exchanges':
-          setActiveTab('exchanges');
+          window.location.href = '/exchanges';
           break;
         case 'tasks':
-          setActiveTab('tasks');
+          window.location.href = '/tasks';
           break;
         case 'upload':
-          setActiveTab('documents');
+          window.location.href = '/documents';
           break;
         case 'clients':
-          setActiveTab('clients');
+          window.location.href = '/contacts';
           break;
         default:
           console.log(`Quick action not implemented: ${action}`);
@@ -327,7 +257,7 @@ const StandardDashboard: React.FC<StandardDashboardProps> = ({
             color={config.primaryColor}
             trend={stats.exchanges.total > 0 ? 'up' : 'neutral'}
             trendValue={`${stats.exchanges.completed} completed`}
-            onClick={() => handleTabChange('exchanges')}
+            onClick={() => window.location.href = '/exchanges'}
           />
 
           <EnhancedStatCard
@@ -339,7 +269,7 @@ const StandardDashboard: React.FC<StandardDashboardProps> = ({
             urgent={stats.tasks.overdue > 0}
             trend={stats.tasks.overdue > 0 ? 'down' : 'up'}
             trendValue={stats.tasks.overdue > 0 ? `${stats.tasks.overdue} overdue` : `${stats.tasks.completed} completed`}
-            onClick={() => handleTabChange('tasks')}
+            onClick={() => window.location.href = '/tasks'}
           />
 
           {stats.documents && (
@@ -351,7 +281,7 @@ const StandardDashboard: React.FC<StandardDashboardProps> = ({
               color="purple"
               trend="neutral"
               trendValue={`${stats.documents.recent} recent`}
-              onClick={() => handleTabChange('documents')}
+              onClick={() => window.location.href = '/documents'}
             />
           )}
 
@@ -363,7 +293,7 @@ const StandardDashboard: React.FC<StandardDashboardProps> = ({
               icon={ChatBubbleLeftRightIcon}
               color={stats.messages.unread > 0 ? 'yellow' : 'gray'}
               urgent={stats.messages.unread > 5}
-              onClick={() => handleTabChange('messages')}
+              onClick={() => window.location.href = '/messages'}
             />
           )}
 
@@ -377,7 +307,7 @@ const StandardDashboard: React.FC<StandardDashboardProps> = ({
                 color="indigo"
                 trend="up"
                 trendValue={`${stats.users.admins} admins`}
-                onClick={() => handleTabChange('users')}
+                onClick={() => window.location.href = '/admin/users'}
               />
 
               {stats.system && (
@@ -387,7 +317,7 @@ const StandardDashboard: React.FC<StandardDashboardProps> = ({
                   subtitle={stats.system.lastSync ? `Last sync: ${new Date(stats.system.lastSync).toLocaleDateString()}` : 'No recent sync'}
                   icon={CogIcon}
                   color={stats.system.systemHealth === 'healthy' ? 'green' : stats.system.systemHealth === 'warning' ? 'yellow' : 'red'}
-                  onClick={() => handleTabChange('system')}
+                  onClick={() => window.location.href = '/admin/system'}
                 />
               )}
             </>
@@ -423,29 +353,6 @@ const StandardDashboard: React.FC<StandardDashboardProps> = ({
     );
   };
 
-  const renderTabContent = () => {
-    if (activeTab === 'overview') {
-      return renderOverviewContent();
-    }
-
-    // For other tabs, render children or placeholder
-    if (children) {
-      return children;
-    }
-
-    return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
-          {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Content
-        </h3>
-        <p className="text-gray-600">
-          This tab content is being migrated. Please check back soon.
-        </p>
-      </div>
-    );
-  };
-
-  const tabs = buildTabs();
 
   return (
     <div className="space-y-6">
@@ -471,15 +378,8 @@ const StandardDashboard: React.FC<StandardDashboardProps> = ({
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <TabNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-      />
-
-      {/* Tab Content */}
-      {renderTabContent()}
+      {/* Dashboard Overview Only - No Tabs */}
+      {renderOverviewContent()}
     </div>
   );
 };
