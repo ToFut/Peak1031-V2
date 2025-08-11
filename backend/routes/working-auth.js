@@ -6,6 +6,7 @@ const AuthService = require('../services/auth');
 const databaseService = require('../services/database');
 const { transformToCamelCase } = require('../utils/caseTransform');
 const bcrypt = require('bcryptjs');
+const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -248,6 +249,31 @@ router.get('/me', async (req, res) => {
       error: 'Internal server error',
       message: 'Failed to get user information'
     });
+  }
+});
+
+// Get user profile
+router.get('/profile', authenticateToken, async (req, res) => {
+  try {
+    const profile = await AuthService.getUserProfile(req.user.id);
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+    res.json(profile);
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update user profile
+router.put('/profile', authenticateToken, async (req, res) => {
+  try {
+    const updatedProfile = await AuthService.updateUserProfile(req.user.id, req.body);
+    res.json(updatedProfile);
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
+import Layout from '../../../components/Layout';
 import { useAuth } from '../../../hooks/useAuth';
 import { apiService } from '../../../services/api';
 import { User } from '../../../types';
@@ -27,6 +27,7 @@ const Profile: React.FC = () => {
     email: user?.email || '',
     phone: user?.phone || '',
     company: user?.company || '',
+    default_document_pin: (user as any)?.default_document_pin || '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
@@ -40,6 +41,7 @@ const Profile: React.FC = () => {
         email: user.email || '',
         phone: (user as any).phone || '',
         company: user.company || '',
+        default_document_pin: (user as any)?.default_document_pin || '',
         currentPassword: '',
         newPassword: '',
         confirmPassword: ''
@@ -61,6 +63,13 @@ const Profile: React.FC = () => {
     setMessage(null);
 
     try {
+      // Validate PIN if provided
+      if (formData.default_document_pin) {
+        if (!/^\d{4,10}$/.test(formData.default_document_pin)) {
+          throw new Error('Document PIN must be 4-10 digits only');
+        }
+      }
+
       // Validate password change if attempting to change password
       if (formData.newPassword) {
         if (!formData.currentPassword) {
@@ -81,6 +90,9 @@ const Profile: React.FC = () => {
         phone: formData.phone,
         company: formData.company
       };
+
+      // Add PIN field
+      (updateData as any).default_document_pin = formData.default_document_pin;
 
       // Add password change if provided
       if (formData.newPassword) {
@@ -121,13 +133,16 @@ const Profile: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </Layout>
     );
   }
 
   return (
+    <Layout>
       <div className="max-w-4xl mx-auto">
         <div className="bg-white shadow rounded-lg">
           {/* Header */}
@@ -257,6 +272,35 @@ const Profile: React.FC = () => {
               </div>
             </div>
 
+            {/* Document PIN Settings */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Document Security</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Default Document PIN
+                  </label>
+                  <div className="flex items-center">
+                    <KeyIcon className="w-5 h-5 text-gray-400 mr-2" />
+                    <input
+                      type="text"
+                      name="default_document_pin"
+                      value={formData.default_document_pin}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      maxLength={10}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                      placeholder="Enter default PIN for secure documents (4-10 digits)"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    This PIN will be used by default when uploading documents with security protection enabled. 
+                    You can still set custom PINs for individual documents.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Security Settings */}
             {isEditing && (
               <div>
@@ -339,6 +383,7 @@ const Profile: React.FC = () => {
           </form>
         </div>
       </div>
+    </Layout>
   );
 };
 

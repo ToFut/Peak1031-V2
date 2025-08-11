@@ -99,9 +99,9 @@ const UserManagement: React.FC = () => {
         if (searchTerm) {
           const search = searchTerm.toLowerCase();
           filteredUsers = filteredUsers.filter(user =>
-            user.email.toLowerCase().includes(search) ||
-            user.first_name?.toLowerCase().includes(search) ||
-            user.last_name?.toLowerCase().includes(search)
+            (user.email || '').toLowerCase().includes(search) ||
+            (user.first_name || '').toLowerCase().includes(search) ||
+            (user.last_name || '').toLowerCase().includes(search)
           );
         }
         

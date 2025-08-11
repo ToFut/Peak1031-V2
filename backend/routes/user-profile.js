@@ -2,6 +2,329 @@ const express = require('express');
 const router = express.Router();
 const databaseService = require('../services/database');
 const AuditService = require('../services/audit');
+const { authenticateToken } = require('../middleware/auth');
+
+/**
+ * GET /api/user-profile/exchanges-summary
+ * Get detailed exchanges summary for current user
+ */
+router.get('/exchanges-summary', authenticateToken, async (req, res) => {
+  try {
+    console.log('📈 Getting detailed exchanges summary for:', req.user.email);
+    
+    const userId = req.user.id;
+    const userContactId = req.user.contact_id;
+    
+    // Get user's exchanges based on role (optimized for summary)
+    let exchanges = [];
+    
+    // For summary, we only need basic fields to avoid timeout
+    const basicFields = 'id,name,status,exchange_type,created_at,updated_at,completion_date';
+    
+    if (req.user.role === 'admin' || req.user.role === 'staff') {
+      exchanges = await databaseService.getExchanges({ 
+        select: basicFields,
+        limit: 1000, // Reduced limit
+        orderBy: { column: 'updated_at', ascending: false }
+      });
+    } else if (req.user.role === 'client') {
+      exchanges = await databaseService.getExchanges({
+        select: basicFields,
+        where: { client_id: userContactId },
+        limit: 500
+      });
+    } else if (req.user.role === 'coordinator') {
+      exchanges = await databaseService.getExchanges({
+        select: basicFields,
+        where: { coordinator_id: userId },
+        limit: 500
+      });
+    } else {
+      try {
+        const exchangeParticipations = await databaseService.getExchangeParticipants({
+          where: { contact_id: userContactId },
+          limit: 100
+        });
+        const exchangeIds = exchangeParticipations.map(p => p.exchange_id);
+        if (exchangeIds.length > 0) {
+          exchanges = await databaseService.getExchanges({
+            select: basicFields,
+            where: { id: { in: exchangeIds.slice(0, 50) } }, // Limit to first 50
+            limit: 50
+          });
+        }
+      } catch (err) {
+        console.error('Error getting participations:', err.message);
+      }
+    }
+    
+    // Detailed exchange analysis
+    const summary = {
+      totalCount: exchanges.length,
+      byStatus: {},
+      byType: {},
+      byCreationMonth: {},
+      averageTimeframes: {},
+      recentActivity: []
+    };
+    
+    // Group by status
+    exchanges.forEach(ex => {
+      const status = ex.status || 'unknown';
+      if (!summary.byStatus[status]) {
+        summary.byStatus[status] = [];
+      }
+      summary.byStatus[status].push({
+        id: ex.id,
+        name: ex.name,
+        createdAt: ex.created_at
+      });
+    });
+    
+    // Group by type
+    exchanges.forEach(ex => {
+      const type = ex.exchange_type || 'standard';
+      if (!summary.byType[type]) {
+        summary.byType[type] = [];
+      }
+      summary.byType[type].push({
+        id: ex.id,
+        name: ex.name,
+        status: ex.status,
+        createdAt: ex.created_at
+      });
+    });
+    
+    // Recent activity (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    summary.recentActivity = exchanges
+      .filter(ex => new Date(ex.updated_at || ex.created_at) > thirtyDaysAgo)
+      .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
+      .slice(0, 20)
+      .map(ex => ({
+        id: ex.id,
+        name: ex.name,
+        status: ex.status,
+        lastActivity: ex.updated_at || ex.created_at
+      }));
+    
+    // Calculate average timeframes
+    const completedExchanges = exchanges.filter(ex => ex.status === 'completed');
+    if (completedExchanges.length > 0) {
+      const timeframes = completedExchanges.map(ex => {
+        const start = new Date(ex.created_at);
+        const end = new Date(ex.completion_date || ex.updated_at);
+        return Math.ceil((end - start) / (1000 * 60 * 60 * 24)); // Days
+      });
+      
+      summary.averageTimeframes = {
+        averageDays: Math.round(timeframes.reduce((a, b) => a + b, 0) / timeframes.length),
+        minDays: Math.min(...timeframes),
+        maxDays: Math.max(...timeframes)
+      };
+    }
+    
+    // Group by creation month
+    exchanges.forEach(ex => {
+      const date = new Date(ex.created_at);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!summary.byCreationMonth[monthKey]) {
+        summary.byCreationMonth[monthKey] = [];
+      }
+      summary.byCreationMonth[monthKey].push({
+        id: ex.id,
+        name: ex.name,
+        status: ex.status,
+        createdAt: ex.created_at
+      });
+    });
+    
+    console.log('✅ Exchanges summary generated:', {
+      totalCount: summary.totalCount,
+      statusCounts: Object.keys(summary.byStatus).length,
+      typeCounts: Object.keys(summary.byType).length,
+      recentActivity: summary.recentActivity.length
+    });
+    
+    res.json({
+      success: true,
+      data: summary
+    });
+    
+  } catch (error) {
+    console.error('❌ Error getting exchanges summary:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get exchanges summary',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/user-profile/:userId/exchanges-summary
+ * Get detailed exchanges summary for specific user (admin only)
+ */
+router.get('/:userId/exchanges-summary', authenticateToken, async (req, res) => {
+  try {
+    const requestedUserId = req.params.userId;
+    
+    // Only admins can view other user's exchange summaries
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied',
+        message: 'Only administrators can view other user exchange summaries'
+      });
+    }
+    
+    // Get the target user's information
+    const targetUser = await databaseService.getUserById(requestedUserId);
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+        message: 'The requested user does not exist'
+      });
+    }
+    
+    // Use the same logic as the main exchanges-summary route but for the target user
+    const userId = targetUser.id;
+    const userContactId = targetUser.contact_id;
+    
+    let exchanges = [];
+    
+    if (targetUser.role === 'admin' || targetUser.role === 'staff') {
+      exchanges = await databaseService.getExchanges({ limit: 5000 });
+    } else if (targetUser.role === 'client') {
+      exchanges = await databaseService.getExchanges({
+        where: { client_id: userContactId },
+        limit: 5000
+      });
+    } else if (targetUser.role === 'coordinator') {
+      exchanges = await databaseService.getExchanges({
+        where: { coordinator_id: userId },
+        limit: 5000
+      });
+    } else {
+      const exchangeParticipations = await databaseService.getExchangeParticipants({
+        where: { contact_id: userContactId }
+      });
+      const exchangeIds = exchangeParticipations.map(p => p.exchange_id);
+      if (exchangeIds.length > 0) {
+        exchanges = await databaseService.getExchanges({
+          where: { id: { in: exchangeIds } },
+          limit: 5000
+        });
+      }
+    }
+    
+    // Generate summary (same logic as above)
+    const summary = {
+      totalCount: exchanges.length,
+      byStatus: {},
+      byType: {},
+      byCreationMonth: {},
+      averageTimeframes: {},
+      recentActivity: []
+    };
+    
+    // Group by status
+    exchanges.forEach(ex => {
+      const status = ex.status || 'unknown';
+      if (!summary.byStatus[status]) {
+        summary.byStatus[status] = [];
+      }
+      summary.byStatus[status].push({
+        id: ex.id,
+        name: ex.name,
+        createdAt: ex.created_at
+      });
+    });
+    
+    // Group by type
+    exchanges.forEach(ex => {
+      const type = ex.exchange_type || 'standard';
+      if (!summary.byType[type]) {
+        summary.byType[type] = [];
+      }
+      summary.byType[type].push({
+        id: ex.id,
+        name: ex.name,
+        status: ex.status,
+        createdAt: ex.created_at
+      });
+    });
+    
+    // Recent activity (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    summary.recentActivity = exchanges
+      .filter(ex => new Date(ex.updated_at || ex.created_at) > thirtyDaysAgo)
+      .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
+      .slice(0, 20)
+      .map(ex => ({
+        id: ex.id,
+        name: ex.name,
+        status: ex.status,
+        lastActivity: ex.updated_at || ex.created_at
+      }));
+    
+    // Calculate average timeframes
+    const completedExchanges = exchanges.filter(ex => ex.status === 'completed');
+    if (completedExchanges.length > 0) {
+      const timeframes = completedExchanges.map(ex => {
+        const start = new Date(ex.created_at);
+        const end = new Date(ex.completion_date || ex.updated_at);
+        return Math.ceil((end - start) / (1000 * 60 * 60 * 24)); // Days
+      });
+      
+      summary.averageTimeframes = {
+        averageDays: Math.round(timeframes.reduce((a, b) => a + b, 0) / timeframes.length),
+        minDays: Math.min(...timeframes),
+        maxDays: Math.max(...timeframes)
+      };
+    }
+    
+    // Group by creation month
+    exchanges.forEach(ex => {
+      const date = new Date(ex.created_at);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!summary.byCreationMonth[monthKey]) {
+        summary.byCreationMonth[monthKey] = [];
+      }
+      summary.byCreationMonth[monthKey].push({
+        id: ex.id,
+        name: ex.name,
+        status: ex.status,
+        createdAt: ex.created_at
+      });
+    });
+    
+    res.json({
+      success: true,
+      data: summary,
+      user: {
+        id: targetUser.id,
+        email: targetUser.email,
+        firstName: targetUser.first_name || targetUser.firstName,
+        lastName: targetUser.last_name || targetUser.lastName,
+        role: targetUser.role
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error getting user exchanges summary:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get user exchanges summary',
+      message: error.message
+    });
+  }
+});
 
 /**
  * GET /api/user-profile/:userId?
@@ -9,7 +332,7 @@ const AuditService = require('../services/audit');
  * If userId is provided, get that user's profile (admin only)
  * If no userId, get current user's profile
  */
-router.get('/:userId?', async (req, res) => {
+router.get('/:userId?', authenticateToken, async (req, res) => {
   try {
     console.log('🔍 USER PROFILE REQUEST START');
     console.log('🔍 Requested userId:', req.params.userId);
@@ -97,7 +420,7 @@ router.get('/:userId?', async (req, res) => {
       if (targetUser.role === 'admin' || targetUser.role === 'staff') {
         console.log('🔍 Admin/staff role - getting all exchanges');
         // Admin user sees all exchanges
-        exchanges = await databaseService.getExchanges({ limit: 1000 });
+        exchanges = await databaseService.getExchanges({ limit: 5000 });
         console.log('✅ Admin exchanges fetched:', exchanges.length);
       } else if (targetUser.role === 'client') {
         console.log('🔍 Client role - getting exchanges for contact_id:', userContactId);
@@ -108,7 +431,7 @@ router.get('/:userId?', async (req, res) => {
           // Client sees only their exchanges
           exchanges = await databaseService.getExchanges({
             where: { client_id: userContactId },
-            limit: 1000
+            limit: 5000
           });
         }
         console.log('✅ Client exchanges fetched:', exchanges.length);
@@ -117,7 +440,7 @@ router.get('/:userId?', async (req, res) => {
         // Coordinator sees assigned exchanges
         exchanges = await databaseService.getExchanges({
           where: { coordinator_id: userId },
-          limit: 1000
+          limit: 5000
         });
         console.log('✅ Coordinator exchanges fetched:', exchanges.length);
       } else {
@@ -132,7 +455,7 @@ router.get('/:userId?', async (req, res) => {
           if (exchangeIds.length > 0) {
             exchanges = await databaseService.getExchanges({
               where: { id: { in: exchangeIds } },
-              limit: 1000
+              limit: 5000
             });
             console.log('✅ Exchanges from participations fetched:', exchanges.length);
           }
@@ -298,277 +621,6 @@ router.get('/:userId?', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to load user profile',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-/**
- * GET /api/user-profile/exchanges-summary
- * Get detailed exchanges summary for current user
- */
-router.get('/exchanges-summary', async (req, res) => {
-  try {
-    console.log('📈 Getting detailed exchanges summary for:', req.user.email);
-    
-    const userId = req.user.id;
-    const userContactId = req.user.contact_id;
-    
-    // Get user's exchanges based on role (same logic as main profile endpoint)
-    let exchanges = [];
-    
-    if (req.user.role === 'admin' || req.user.role === 'staff') {
-      exchanges = await databaseService.getExchanges({ limit: 1000 });
-    } else if (req.user.role === 'client') {
-      exchanges = await databaseService.getExchanges({
-        where: { client_id: userContactId },
-        limit: 1000
-      });
-    } else if (req.user.role === 'coordinator') {
-      exchanges = await databaseService.getExchanges({
-        where: { coordinator_id: userId },
-        limit: 1000
-      });
-    } else {
-      try {
-        const exchangeParticipations = await databaseService.getExchangeParticipants({
-          where: { contact_id: userContactId }
-        });
-        const exchangeIds = exchangeParticipations.map(p => p.exchange_id);
-        if (exchangeIds.length > 0) {
-          exchanges = await databaseService.getExchanges({
-            where: { id: { in: exchangeIds } },
-            limit: 1000
-          });
-        }
-      } catch (err) {
-        console.error('Error getting participations:', err.message);
-      }
-    }
-    
-    // Detailed exchange analysis
-    const summary = {
-      totalCount: exchanges.length,
-      byStatus: {},
-      byType: {},
-      byCreationMonth: {},
-      averageTimeframes: {},
-      recentActivity: []
-    };
-    
-    // Group by status
-    exchanges.forEach(ex => {
-      const status = ex.status || 'unknown';
-      if (!summary.byStatus[status]) {
-        summary.byStatus[status] = [];
-      }
-      summary.byStatus[status].push({
-        id: ex.id,
-        name: ex.name,
-        createdAt: ex.created_at,
-        propertyAddress: ex.property_address
-      });
-    });
-    
-    // Group by type
-    exchanges.forEach(ex => {
-      const type = ex.exchange_type || ex.type || 'standard';
-      if (!summary.byType[type]) {
-        summary.byType[type] = [];
-      }
-      summary.byType[type].push({
-        id: ex.id,
-        name: ex.name,
-        status: ex.status,
-        createdAt: ex.created_at
-      });
-    });
-    
-    // Recent activity (last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    summary.recentActivity = exchanges
-      .filter(ex => new Date(ex.updated_at || ex.created_at) > thirtyDaysAgo)
-      .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
-      .slice(0, 20)
-      .map(ex => ({
-        id: ex.id,
-        name: ex.name,
-        status: ex.status,
-        lastActivity: ex.updated_at || ex.created_at,
-        propertyAddress: ex.property_address
-      }));
-    
-    res.json({
-      success: true,
-      data: summary
-    });
-    
-  } catch (error) {
-    console.error('❌ Error getting exchanges summary:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to load exchanges summary',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-/**
- * GET /api/user-profile/:userId/exchanges-summary
- * Get detailed exchanges summary for specific user (admin only)
- */
-router.get('/:userId/exchanges-summary', async (req, res) => {
-  try {
-    const requestedUserId = req.params.userId;
-    let targetUser = req.user; // Default to current user
-    
-    // If requesting another user's summary
-    if (requestedUserId && requestedUserId !== req.user.id) {
-      // Only admins can view other user's profiles
-      if (req.user.role !== 'admin') {
-        return res.status(403).json({
-          success: false,
-          error: 'Access denied',
-          message: 'Only administrators can view other user profiles'
-        });
-      }
-      
-      // Get the target user's information
-      try {
-        targetUser = await databaseService.getUserById(requestedUserId);
-        if (!targetUser) {
-          return res.status(404).json({
-            success: false,
-            error: 'User not found',
-            message: 'The requested user does not exist'
-          });
-        }
-        console.log('📈 Admin getting exchanges summary for:', targetUser.email || 'Unknown');
-      } catch (err) {
-        console.error('Error fetching target user:', err);
-        return res.status(500).json({
-          success: false,
-          error: 'Failed to fetch user',
-          message: 'Could not retrieve target user information'
-        });
-      }
-    } else {
-      console.log('📈 Getting detailed exchanges summary for:', req.user.email);
-    }
-    
-    const userId = targetUser.id;
-    const userContactId = targetUser.contact_id;
-    
-    // Get target user's exchanges based on their role (same logic as main profile endpoint)
-    let exchanges = [];
-    
-    if (targetUser.role === 'admin' || targetUser.role === 'staff') {
-      exchanges = await databaseService.getExchanges({ limit: 1000 });
-    } else if (targetUser.role === 'client') {
-      console.log('🔍 Querying exchanges for client with client_id:', userContactId);
-      if (!userContactId || userContactId === 'undefined') {
-        console.log('❌ Invalid userContactId for client exchanges query:', userContactId);
-        exchanges = []; // Return empty array for invalid contact ID
-      } else {
-        exchanges = await databaseService.getExchanges({
-          where: { client_id: userContactId },
-          limit: 1000
-        });
-      }
-    } else if (targetUser.role === 'coordinator') {
-      exchanges = await databaseService.getExchanges({
-        where: { coordinator_id: userId },
-        limit: 1000
-      });
-    } else {
-      try {
-        const exchangeParticipations = await databaseService.getExchangeParticipants({
-          where: { contact_id: userContactId }
-        });
-        const exchangeIds = exchangeParticipations.map(p => p.exchange_id);
-        if (exchangeIds.length > 0) {
-          exchanges = await databaseService.getExchanges({
-            where: { id: { in: exchangeIds } },
-            limit: 1000
-          });
-        }
-      } catch (err) {
-        console.error('Error getting participations:', err.message);
-      }
-    }
-    
-    // Detailed exchange analysis
-    const summary = {
-      totalCount: exchanges.length,
-      byStatus: {},
-      byType: {},
-      byCreationMonth: {},
-      averageTimeframes: {},
-      recentActivity: []
-    };
-    
-    // Group by status
-    exchanges.forEach(ex => {
-      const status = ex.status || 'unknown';
-      if (!summary.byStatus[status]) {
-        summary.byStatus[status] = [];
-      }
-      summary.byStatus[status].push({
-        id: ex.id,
-        name: ex.name,
-        createdAt: ex.created_at,
-        propertyAddress: ex.property_address
-      });
-    });
-    
-    // Group by type
-    exchanges.forEach(ex => {
-      const type = ex.exchange_type || ex.type || 'standard';
-      if (!summary.byType[type]) {
-        summary.byType[type] = [];
-      }
-      summary.byType[type].push({
-        id: ex.id,
-        name: ex.name,
-        status: ex.status,
-        createdAt: ex.created_at
-      });
-    });
-    
-    // Recent activity (last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    summary.recentActivity = exchanges
-      .filter(ex => new Date(ex.updated_at || ex.created_at) > thirtyDaysAgo)
-      .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
-      .slice(0, 20)
-      .map(ex => ({
-        id: ex.id,
-        name: ex.name,
-        status: ex.status,
-        lastActivity: ex.updated_at || ex.created_at,
-        propertyAddress: ex.property_address
-      }));
-    
-    res.json({
-      success: true,
-      data: summary
-    });
-    
-  } catch (error) {
-    console.error('❌ Error getting exchanges summary for user:', req.params.userId);
-    console.error('❌ Full error details:', {
-      message: error.message,
-      stack: error.stack,
-      requestedUserId: req.params.userId,
-      userRole: req.user?.role
-    });
-    res.status(500).json({
-      success: false,
-      error: 'Failed to load exchanges summary',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

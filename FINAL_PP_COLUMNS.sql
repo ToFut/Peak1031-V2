@@ -1,0 +1,90 @@
+-- ================================================================
+-- FINAL PP COLUMNS - Add ALL PP integration columns
+-- Run this in Supabase SQL Editor to add every PP column the sync needs
+-- ================================================================
+
+-- USERS TABLE - Add all PP columns
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pp_created_at VARCHAR(50);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pp_updated_at VARCHAR(50);
+
+-- CONTACTS TABLE - Add all PP columns  
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS pp_account_ref JSONB DEFAULT '{}';
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS pp_is_primary_contact BOOLEAN;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS pp_display_name VARCHAR(255);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS pp_first_name VARCHAR(255);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS pp_middle_name VARCHAR(255);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS pp_last_name VARCHAR(255);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS pp_phone_mobile VARCHAR(50);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS pp_phone_home VARCHAR(50);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS pp_phone_fax VARCHAR(50);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS pp_phone_work VARCHAR(50);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS pp_email VARCHAR(255);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS pp_notes TEXT;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS pp_custom_field_values JSONB DEFAULT '[]';
+
+-- EXCHANGES TABLE - Add all PP columns
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_account_ref JSONB DEFAULT '{}';
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_number INTEGER;
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_display_name TEXT;
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_name TEXT;
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_notes TEXT;
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_rate VARCHAR(50);
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_open_date VARCHAR(50);
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_close_date VARCHAR(50);
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_statute_of_limitation_date VARCHAR(50);
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_tags JSONB DEFAULT '[]';
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_status VARCHAR(50);
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_assigned_to_users JSONB DEFAULT '[]';
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_custom_field_values JSONB DEFAULT '[]';
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_created_at VARCHAR(50);
+ALTER TABLE exchanges ADD COLUMN IF NOT EXISTS pp_updated_at VARCHAR(50);
+
+-- TASKS TABLE - Add all PP columns
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pp_account_ref JSONB DEFAULT '{}';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pp_matter_ref JSONB DEFAULT '{}';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pp_subject VARCHAR(255);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pp_notes TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pp_priority VARCHAR(50);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pp_status VARCHAR(50);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pp_due_date VARCHAR(50);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pp_assigned_to_users JSONB DEFAULT '[]';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pp_assigned_to_contacts JSONB DEFAULT '[]';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pp_tags JSONB DEFAULT '[]';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pp_created_at VARCHAR(50);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pp_updated_at VARCHAR(50);
+
+-- INVOICES TABLE - Add all PP columns
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_account_ref JSONB DEFAULT '{}';
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_matter_ref JSONB DEFAULT '{}';
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_issue_date VARCHAR(50);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_due_date VARCHAR(50);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_items_time_entries JSONB DEFAULT '[]';
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_items_expenses JSONB DEFAULT '[]';
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_items_flat_fees JSONB DEFAULT '[]';
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_subtotal INTEGER;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_tax INTEGER;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_discount INTEGER;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_total INTEGER;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_total_paid INTEGER;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_total_outstanding INTEGER;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_invoice_type VARCHAR(50);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_created_at VARCHAR(50);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pp_updated_at VARCHAR(50);
+
+-- EXPENSES TABLE - Add all PP columns
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pp_account_ref JSONB DEFAULT '{}';
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pp_matter_ref JSONB DEFAULT '{}';
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pp_billed_by_user_ref JSONB DEFAULT '{}';
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pp_expense_category_ref JSONB DEFAULT '{}';
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pp_is_billable BOOLEAN;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pp_is_billed BOOLEAN;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pp_date VARCHAR(50);
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pp_qty INTEGER;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pp_price INTEGER;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pp_amount INTEGER;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pp_description TEXT;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pp_private_notes TEXT;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pp_created_at VARCHAR(50);
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pp_updated_at VARCHAR(50);
+
+SELECT 'SUCCESS: All PP integration columns added to all tables!' as result;

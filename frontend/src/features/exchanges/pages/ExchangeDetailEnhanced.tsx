@@ -4,7 +4,9 @@ import { useExchanges } from '../hooks/useExchanges';
 import { Exchange } from '../../../types';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
-
+import { usePermissions } from '../../../hooks/usePermissions';
+import Layout from '../../../components/Layout';
+import UnifiedChatInterface from '../../messages/components/UnifiedChatInterface';
 import {
   ArrowLeft,
   Calendar,
@@ -37,6 +39,8 @@ import {
 import { ExchangeOverview } from '../components/ExchangeOverview';
 import { TasksList } from '../components/TasksList';
 import { DocumentsList } from '../components/DocumentsList';
+import InvitationManager from '../components/InvitationManager';
+import { DocumentUploader } from '../../../components/shared';
 
 interface TabProps {
   exchange: Exchange;
@@ -357,94 +361,13 @@ const ContactCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
 };
 
 const MessagesTab: React.FC<TabProps> = ({ exchange }) => {
-  const [messages, setMessages] = useState<any[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
-  
-  useEffect(() => {
-    loadMessages();
-  }, [exchange.id]);
-  
-  const loadMessages = async () => {
-    try {
-      const msgs = await apiService.getMessages(exchange.id);
-      setMessages(msgs);
-    } catch (error) {
-      console.error('Error loading messages:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const sendMessage = async () => {
-    if (!newMessage.trim()) return;
-    
-    try {
-      await apiService.sendMessage(exchange.id, newMessage);
-      setNewMessage('');
-      loadMessages();
-    } catch (error) {
-      console.error('Error sending message:', error);
-    }
-  };
-  
-  if (loading) {
-    return <div className="animate-pulse h-96 bg-gray-100 rounded-xl"></div>;
-  }
-  
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="h-[600px] flex flex-col">
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.length === 0 ? (
-            <div className="text-center py-12">
-              <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No messages yet. Start the conversation!</p>
-            </div>
-          ) : (
-            messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-lg px-4 py-3 rounded-2xl ${
-                    message.senderId === user?.id
-                      ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
-                      : 'bg-gray-100 text-gray-900'
-                  }`}
-                >
-                  <p className="text-sm">{message.content}</p>
-                  <p className={`text-xs mt-1 ${
-                    message.senderId === user?.id ? 'text-blue-100' : 'text-gray-500'
-                  }`}>
-                    {new Date(message.createdAt).toLocaleTimeString()}
-                  </p>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-        
-        <div className="border-t border-gray-200 p-4 bg-gray-50">
-          <div className="flex items-center space-x-3">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-              placeholder="Type your message..."
-              className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <button
-              onClick={sendMessage}
-              className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full hover:shadow-lg transition-all"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+      <div className="h-[600px]">
+        <UnifiedChatInterface 
+          exchangeId={exchange.id} 
+          hideExchangeList={true}
+        />
       </div>
     </div>
   );
@@ -454,10 +377,15 @@ const ExchangeDetailEnhanced: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { getExchange } = useExchanges();
+  const { isAdmin, isCoordinator } = usePermissions();
   
   const [exchange, setExchange] = useState<Exchange | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   
   useEffect(() => {
     if (id) {
@@ -470,43 +398,113 @@ const ExchangeDetailEnhanced: React.FC = () => {
       setLoading(true);
       const data = await getExchange(id!);
       setExchange(data);
+      // Load associated documents and tasks
+      await Promise.all([
+        loadDocuments(),
+        loadTasks()
+      ]);
     } catch (error) {
       console.error('Error loading exchange:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  const loadDocuments = async () => {
+    if (!id) return;
+    try {
+      setLoadingDocuments(true);
+      const docs = await apiService.get(`/documents/exchange/${id}`);
+      // Handle different response formats
+      const documentsList = Array.isArray(docs) ? docs : (docs.documents || docs.data || []);
+      setDocuments(documentsList);
+    } catch (error) {
+      console.error('Error loading documents:', error);
+      setDocuments([]);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  const loadTasks = async () => {
+    if (!id) return;
+    try {
+      const tasks = await apiService.get(`/tasks/exchange/${id}`);
+      const tasksList = Array.isArray(tasks) ? tasks : (tasks.tasks || tasks.data || []);
+      setTasks(tasksList);
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+      setTasks([]);
+    }
+  };
+
+  const handleDocumentUploadSuccess = async () => {
+    await loadDocuments();
+    setShowUploadModal(false);
+  };
+
+  const handleDocumentDownload = async (doc: any) => {
+    try {
+      const blob = await apiService.downloadDocument(doc.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = doc.original_filename || doc.originalFilename || doc.filename || 'document';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      alert('Failed to download document');
+    }
+  };
+
+  const handleDocumentDelete = async (documentId: string) => {
+    if (!window.confirm('Are you sure you want to delete this document?')) return;
+    try {
+      await apiService.delete(`/documents/${documentId}`);
+      await loadDocuments();
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      alert('Failed to delete document');
+    }
+  };
   
   if (loading) {
     return (
-      <div className="animate-pulse space-y-6">
-        <div className="h-32 bg-gray-200 rounded-2xl"></div>
-        <div className="grid grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-32 bg-gray-200 rounded-2xl"></div>
-          ))}
+      <Layout>
+        <div className="animate-pulse space-y-6">
+          <div className="h-32 bg-gray-200 rounded-2xl"></div>
+          <div className="grid grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-200 rounded-2xl"></div>
+            ))}
+          </div>
+          <div className="h-96 bg-gray-200 rounded-2xl"></div>
         </div>
-        <div className="h-96 bg-gray-200 rounded-2xl"></div>
-      </div>
+      </Layout>
     );
   }
   
   if (!exchange) {
     return (
-      <div className="text-center py-12">
-        <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">Exchange Not Found</h3>
-        <p className="text-gray-600 mb-6">The exchange you're looking for doesn't exist or you don't have access to it.</p>
-        <button
-          onClick={() => navigate('/exchanges')}
-          className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition-all"
-        >
-          Back to Exchanges
-        </button>
-      </div>
+      <Layout>
+        <div className="text-center py-12">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">Exchange Not Found</h3>
+          <p className="text-gray-600 mb-6">The exchange you're looking for doesn't exist or you don't have access to it.</p>
+          <button
+            onClick={() => navigate('/exchanges')}
+            className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition-all"
+          >
+            Back to Exchanges
+          </button>
+        </div>
+      </Layout>
     );
   }
-  
+
   const getDaysUntilClosing = () => {
     if (!exchange.completionDeadline && !exchange.expectedClosingDate) return null;
     const closingDate = exchange.completionDeadline || exchange.expectedClosingDate;
@@ -518,16 +516,19 @@ const ExchangeDetailEnhanced: React.FC = () => {
   };
 
   const daysUntilClosing = getDaysUntilClosing();
+  const canManageInvitations = isAdmin() || isCoordinator();
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Building2 },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'tasks', label: 'Tasks', icon: CheckCircle },
-    { id: 'documents', label: 'Documents', icon: FileText }
+    { id: 'documents', label: 'Documents', icon: FileText },
+    ...(canManageInvitations ? [{ id: 'invitations', label: 'Invitations', icon: Users }] : [])
   ];
 
   return (
-    <div className="space-y-6">
+    <Layout>
+      <div className="space-y-6">
         {/* Enhanced Header */}
         <div className="bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-800 rounded-3xl shadow-2xl p-8 text-white relative overflow-hidden">
           {/* Background Pattern */}
@@ -629,13 +630,55 @@ const ExchangeDetailEnhanced: React.FC = () => {
           </div>
           
           <div className="p-8">
-            {activeTab === 'overview' && <ExchangeOverview exchange={exchange as any} participants={[]} tasks={[]} documents={[]} />}
-            {activeTab === 'tasks' && <TasksList tasks={[]} />}
-            {activeTab === 'documents' && <DocumentsList documents={[]} onUploadClick={() => {}} onDownload={() => {}} canUpload={true} canDelete={false} />}
+            {activeTab === 'overview' && <ExchangeOverview exchange={exchange as any} participants={[]} tasks={tasks} documents={documents} />}
+            {activeTab === 'tasks' && <TasksList tasks={tasks} />}
+            {activeTab === 'documents' && (
+              <div className="space-y-6">
+                <DocumentsList 
+                  documents={documents} 
+                  onUploadClick={() => setShowUploadModal(true)} 
+                  onDownload={handleDocumentDownload} 
+                  onDelete={handleDocumentDelete}
+                  canUpload={true} 
+                  canDelete={isAdmin() || isCoordinator()} 
+                />
+                {showUploadModal && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-lg max-w-2xl w-full p-6">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-medium">Upload Document</h3>
+                        <button 
+                          onClick={() => setShowUploadModal(false)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <DocumentUploader 
+                        exchangeId={exchange.id}
+                        onUploadSuccess={handleDocumentUploadSuccess}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {activeTab === 'messages' && <MessagesTab exchange={exchange} />}
+            {activeTab === 'invitations' && canManageInvitations && (
+              <InvitationManager
+                exchangeId={exchange.id}
+                exchangeName={exchange.name || exchange.exchangeNumber}
+                existingParticipants={[]}
+                onParticipantAdded={() => {
+                  // Refresh exchange data when new participants are added
+                  loadExchange();
+                }}
+              />
+            )}
           </div>
         </div>
       </div>
+    </Layout>
   );
 };
 

@@ -83,3 +83,11 @@ async function checkAuditLogsSchema() {
 }
 
 checkAuditLogsSchema();
+
+
+
+
+
+
+
+

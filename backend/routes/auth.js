@@ -146,8 +146,11 @@ router.get('/me', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(transformToCamelCase(user.toJSON()));
+    // Transform user object to camelCase
+    const transformedUser = transformToCamelCase(user);
+    res.json(transformedUser);
   } catch (error) {
+    console.error('Error in /me route:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -169,6 +172,42 @@ router.put('/change-password', authenticateToken, [
     res.json({ message: 'Password changed successfully' });
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+// Get user profile
+router.get('/profile', authenticateToken, async (req, res) => {
+  try {
+    const profile = await AuthService.getUserProfile(req.user.id);
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+    res.json(profile);
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update user profile
+router.put('/profile', authenticateToken, [
+  body('firstName').optional().trim().isLength({ min: 1 }),
+  body('lastName').optional().trim().isLength({ min: 1 }),
+  body('phone').optional().isMobilePhone(),
+  body('company').optional().trim(),
+  body('timezone').optional().trim()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const updatedProfile = await AuthService.updateUserProfile(req.user.id, req.body);
+    res.json(updatedProfile);
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -205,4 +244,4 @@ router.post('/verify-2fa', authenticateToken, [
   }
 });
 
-module.exports = router; 
+module.exports = router;

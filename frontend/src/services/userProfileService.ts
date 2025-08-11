@@ -63,20 +63,37 @@ export interface ExchangesSummary {
 }
 
 export class UserProfileService {
+  private static etagCache: Map<string, string> = new Map();
+
   /**
-   * Get comprehensive user profile with exchange analytics
+   * Get comprehensive user profile with exchange analytics and real-time data
    * @param userId - Optional user ID. If provided, gets that user's profile (admin only)
    */
   static async getUserProfile(userId?: string): Promise<UserProfile> {
     try {
       const endpoint = userId ? `/user-profile/${userId}` : '/user-profile';
-      const response = await apiService.get(endpoint);
+      const etag = this.etagCache.get(endpoint);
       
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to load user profile');
+      const response = await apiService.get(endpoint, { 
+        useCache: false, // Don't use cache for real-time data
+        cacheDuration: 1 * 60 * 1000, // 1 minute for offline fallback only
+        useFallback: true,
+        forceRefresh: true, // Always fetch fresh data
+        lazyLoad: false,
+        etag
+      });
+      
+      // The API service already unwraps the response, so we get the data directly
+      if (!response) {
+        throw new Error('Failed to load user profile');
       }
       
-      return response.data;
+      // Store ETag for future requests
+      if (response.etag) {
+        this.etagCache.set(endpoint, response.etag);
+      }
+      
+      return response;
     } catch (error) {
       console.error('Error fetching user profile:', error);
       throw error;
@@ -84,19 +101,32 @@ export class UserProfileService {
   }
 
   /**
-   * Get detailed exchanges summary for user
-   * @param userId - Optional user ID. If provided, gets that user's summary (admin only)
+   * Get detailed exchanges summary with real-time data
    */
-  static async getExchangesSummary(userId?: string): Promise<ExchangesSummary> {
+  static async getExchangesSummary(): Promise<ExchangesSummary> {
     try {
-      const endpoint = userId ? `/user-profile/${userId}/exchanges-summary` : '/user-profile/exchanges-summary';
-      const response = await apiService.get(endpoint);
+      const endpoint = '/user-profile/exchanges-summary';
+      const etag = this.etagCache.get(endpoint);
       
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to load exchanges summary');
+      const response = await apiService.get(endpoint, { 
+        useCache: false, // Don't use cache for real-time data
+        cacheDuration: 1 * 60 * 1000, // 1 minute for offline fallback only
+        useFallback: true,
+        forceRefresh: true, // Always fetch fresh data
+        lazyLoad: false,
+        etag
+      });
+      
+      if (!response) {
+        throw new Error('Failed to load exchanges summary');
       }
       
-      return response.data;
+      // Store ETag for future requests
+      if (response.etag) {
+        this.etagCache.set(endpoint, response.etag);
+      }
+      
+      return response;
     } catch (error) {
       console.error('Error fetching exchanges summary:', error);
       throw error;
@@ -123,6 +153,7 @@ export class UserProfileService {
    * Format role display name
    */
   static formatRole(role: string): string {
+    if (!role || typeof role !== 'string') return 'User';
     switch (role.toLowerCase()) {
       case 'admin':
         return 'Administrator';

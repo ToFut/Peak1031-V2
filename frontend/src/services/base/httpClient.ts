@@ -29,15 +29,21 @@ export class HttpClient {
     if (!response.ok) {
       // Handle 401 with refresh token retry
       if (response.status === 401 && localStorage.getItem('refreshToken') && !isRetry) {
+        console.warn('🔄 Got 401, attempting token refresh for:', endpoint);
         try {
           await this.refreshToken();
+          console.log('✅ Token refresh successful, retrying request');
           return await this.request<T>(endpoint, options, true);
         } catch (refreshError) {
-          console.error('Token refresh failed:', refreshError);
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
+          console.error('❌ Token refresh failed:', refreshError);
+          console.error('Endpoint that caused logout:', endpoint);
+          // Only logout if this is a critical endpoint, not for optional requests
+          if (!endpoint.includes('analytics') && !endpoint.includes('stats')) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+          }
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.message || 'Authentication failed. Please login again.');
         }

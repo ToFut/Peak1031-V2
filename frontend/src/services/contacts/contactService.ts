@@ -8,28 +8,39 @@ import { httpClient } from '../base/httpClient';
 import { safeJsonParse } from '../../utils/validation';
 
 export class ContactService {
-  async getContacts(): Promise<Contact[]> {
-    // Check if user is admin to request all contacts
+  async getContacts(options?: { page?: number; limit?: number; search?: string }): Promise<Contact[]> {
+    // Use pagination to prevent performance issues
+    const { page = 1, limit = 50, search } = options || {};
+    
+    // Check if user is admin to request more contacts per page
     const userStr = localStorage.getItem('user');
-    let endpoint = '/contacts';
+    let userLimit = limit;
     
     if (userStr) {
       const user = safeJsonParse<{ role: string }>(userStr);
       if (user && user.role === 'admin') {
-        endpoint = '/contacts?limit=2000'; // Admin gets ALL contacts
+        userLimit = Math.min(limit, 100); // Admin gets more but still paginated
       }
     }
+    
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: userLimit.toString()
+    });
+    
+    if (search) {
+      params.append('search', search);
+    }
+    
+    const endpoint = `/contacts?${params.toString()}`;
     
     const response = await httpClient.get<any>(endpoint);
     
     if (Array.isArray(response)) {
-      
       return response;
     } else if (response && response.contacts) {
-      
       return response.contacts;
     } else if (response && response.data) {
-      
       return response.data;
     }
     return [];

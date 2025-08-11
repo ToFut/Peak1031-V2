@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const practicePartnerService = require('./practicePartnerService');
+const ppTokenManager = require('./ppTokenManager');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
@@ -203,7 +204,7 @@ class ScheduledSyncService {
       
       // Use axios directly with updated_since parameter
       const axios = require('axios');
-      const token = await practicePartnerService.getStoredToken();
+      const token = await ppTokenManager.getStoredToken();
 
       const response = await axios.get('https://app.practicepanther.com/api/v2/matters', {
         headers: {
@@ -239,7 +240,7 @@ class ScheduledSyncService {
 
       const axios = require('axios');
       const practicePartnerService = require('./practicePartnerService');
-      const token = await practicePartnerService.getStoredToken();
+      const token = await ppTokenManager.getStoredToken();
 
       const response = await axios.get('https://app.practicepanther.com/api/v2/accounts', {
         headers: {
@@ -275,7 +276,7 @@ class ScheduledSyncService {
 
       const axios = require('axios');
       const practicePartnerService = require('./practicePartnerService');
-      const token = await practicePartnerService.getStoredToken();
+      const token = await ppTokenManager.getStoredToken();
 
       // Get only NEW tasks that are NOT completed
       const response = await axios.get('https://app.practicepanther.com/api/v2/tasks', {
@@ -313,7 +314,7 @@ class ScheduledSyncService {
 
       const axios = require('axios');
       const practicePartnerService = require('./practicePartnerService');
-      const token = await practicePartnerService.getStoredToken();
+      const token = await ppTokenManager.getStoredToken();
 
       const response = await axios.get('https://app.practicepanther.com/api/v2/notes', {
         headers: {

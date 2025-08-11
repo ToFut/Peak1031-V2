@@ -20,6 +20,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Backend tests**: `npm run test:backend` (Jest)
 - **Frontend tests**: `npm run test:frontend` (React Testing Library)
 - **API testing**: `cd backend && npm run test:api`
+- **Working endpoints test**: `cd backend && npm run test:working`
+- **Comprehensive fix test**: `cd backend && npm run test:fix`
+- **Enhanced features test**: `npm run test:enhanced`
 
 ### Docker Commands
 - **Start services**: `npm run docker:up`
@@ -29,6 +32,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Build Commands
 - **Production build**: `npm run build`
+
+### Database Management
+- **Migrate up**: `cd backend && npm run migrate` (or `sequelize-cli db:migrate`)
+- **Migrate down**: `cd backend && npm run migrate:undo`
+- **Seed database**: `cd backend && npm run seed` (or `sequelize-cli db:seed:all`) 
+- **Undo seeds**: `cd backend && npm run seed:undo`
 
 ## Architecture Overview
 
@@ -135,6 +144,8 @@ Five distinct user roles with different permissions:
 - **Unit tests**: Jest for backend, React Testing Library for frontend
 - **Integration tests**: Full authentication and database flows
 - **Manual testing**: UI flows for all user roles
+- **Test data**: Sample data available in `/database/seeds/` and various test scripts
+- **Endpoint testing**: Multiple test files including `test-all-endpoints.js`, `test-working-endpoints.js`
 
 ## Common Development Tasks
 
@@ -161,6 +172,21 @@ Five distinct user roles with different permissions:
 - **Required variables**: Database URL, JWT secret, PracticePanther OAuth, SendGrid, AWS S3
 - **Frontend environment**: Uses REACT_APP_ prefixed variables
 - **Docker environment**: Configured in docker-compose.yml
+
+## Important File Locations
+
+### Key Configuration Files
+- **Main package.json**: Root level coordination of backend/frontend services
+- **Backend package.json**: Express server with Sequelize, Socket.IO, JWT auth
+- **Frontend package.json**: React 18 + TypeScript with Tailwind CSS
+- **Docker compose**: `docker-compose.yml` for development environment
+- **Database migrations**: `/database/migrations/` for schema management
+- **Environment templates**: `env.example` and `/backend/.env.example`
+
+### Migration Management
+- **Latest comprehensive schema**: `/database/migrations/200_comprehensive_optimized_schema_fixed.sql`
+- **Missing columns fix**: `/database/migrations/201_add_missing_columns.sql`
+- **Migration scripts**: Various migration and data sync scripts in `/backend/scripts/`
 
 ## Important Implementation Notes
 
@@ -189,3 +215,18 @@ Five distinct user roles with different permissions:
 - **User feedback**: Clear error messages displayed in UI
 
 This architecture supports a scalable, secure, and maintainable 1031 exchange management platform with comprehensive PracticePanther integration and role-based access control.
+
+## Development Notes
+
+### Project State
+- **Current branch**: Working on `main` (main development branch is `feature/project-updates`)
+- **Recent focus**: TypeScript compilation fixes, layout improvements, OAuth integration
+- **Database**: Uses Supabase PostgreSQL with comprehensive schema in latest migrations
+- **Active development**: Frontend uses feature-based organization with role-specific components
+
+### Common Issues and Solutions
+- **Build issues**: Run `npm run install:all` to ensure all dependencies are installed
+- **Database sync**: Use migration scripts in `/database/migrations/` for schema updates
+- **Frontend compilation**: TypeScript strict mode enabled - check type definitions in `/frontend/src/types/`
+- **Backend testing**: Multiple test suites available for different components and integration levels
+- **PracticePanther integration**: OAuth flow and data sync handled by services in `/backend/services/`

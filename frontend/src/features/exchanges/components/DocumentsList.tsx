@@ -24,7 +24,8 @@ export const DocumentsList: React.FC<DocumentsListProps> = ({
   const [categoryFilter, setCategoryFilter] = useState('all');
 
   const filteredDocuments = documents.filter(doc => {
-    const matchesSearch = doc.filename.toLowerCase().includes(searchTerm.toLowerCase());
+    const docName = doc.original_filename || doc.originalFilename || doc.filename || '';
+    const matchesSearch = docName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || doc.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
@@ -86,9 +87,14 @@ export const DocumentsList: React.FC<DocumentsListProps> = ({
                 <div className="flex items-center space-x-3">
                   <FileText className="w-8 h-8 text-gray-400" />
                   <div>
-                    <h4 className="font-medium text-gray-900">{doc.filename}</h4>
+                    <h4 className="font-medium text-gray-900">
+                      {doc.original_filename || doc.originalFilename || doc.filename || 'Untitled Document'}
+                    </h4>
                     <p className="text-sm text-gray-500">
-                      {doc.category || 'General'} • Uploaded {formatDate(doc.createdAt)}
+                      {doc.category || 'General'} • 
+                      Uploaded {formatDate(doc.created_at || doc.createdAt)} 
+                      {doc.uploaded_by_name && ` by ${doc.uploaded_by_name}`}
+                      {doc.file_size && ` • ${(doc.file_size / 1024 / 1024).toFixed(2)} MB`}
                     </p>
                   </div>
                 </div>

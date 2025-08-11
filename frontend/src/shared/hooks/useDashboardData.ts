@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiService } from '../../services/api';
 import { roleBasedApiService } from '../../services/roleBasedApiService';
 
@@ -63,6 +63,15 @@ export interface UseDashboardDataReturn {
   syncing: boolean;
 }
 
+// Cache for dashboard data to prevent unnecessary API calls
+const dashboardCache = new Map<string, {
+  data: any;
+  timestamp: number;
+  expiry: number;
+}>();
+
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache
+
 export const useDashboardData = (options: UseDashboardDataOptions): UseDashboardDataReturn => {
   const { role, autoRefresh = false, refreshInterval = 300000 } = options; // 5 minutes default
   
@@ -76,19 +85,157 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
-  // V2 API with V1 fallback pattern (from EnhancedAdminDashboard)
-  const loadDashboardData = async () => {
+  // Refs to prevent unnecessary re-renders
+  const loadingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Generate cache key based on role and options
+  const getCacheKey = useCallback(() => {
+    return `dashboard_${role}_${autoRefresh}_${refreshInterval}`;
+  }, [role, autoRefresh, refreshInterval]);
+
+  // Check if cache is valid
+  const isCacheValid = useCallback((cacheKey: string) => {
+    const cached = dashboardCache.get(cacheKey);
+    if (!cached) return false;
+    return Date.now() < cached.expiry;
+  }, []);
+
+  // Get data from cache
+  const getFromCache = useCallback((cacheKey: string) => {
+    if (!isCacheValid(cacheKey)) {
+      dashboardCache.delete(cacheKey);
+      return null;
+    }
+    return dashboardCache.get(cacheKey)?.data || null;
+  }, [isCacheValid]);
+
+  // Set cache data
+  const setCache = useCallback((cacheKey: string, data: any) => {
+    dashboardCache.set(cacheKey, {
+      data,
+      timestamp: Date.now(),
+      expiry: Date.now() + CACHE_DURATION
+    });
+  }, []);
+
+  // Optimized data loading with caching
+  const loadDashboardData = useCallback(async () => {
+    // Prevent concurrent requests
+    if (loadingRef.current) {
+      console.log('🔄 Dashboard data loading already in progress, skipping...');
+      return;
+    }
+
+    const cacheKey = getCacheKey();
+    
+    // Check cache first
+    const cachedData = getFromCache(cacheKey);
+    if (cachedData) {
+      console.log('📋 Using cached dashboard data');
+      setStats(cachedData.stats);
+      setExchanges(cachedData.exchanges || []);
+      setTasks(cachedData.tasks || []);
+      setDocuments(cachedData.documents || []);
+      setMessages(cachedData.messages || []);
+      setUsers(cachedData.users || []);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    loadingRef.current = true;
     setLoading(true);
     setError(null);
 
     try {
-      // Try V2 dashboard overview endpoint first
+      console.log('🚀 Loading fresh dashboard data...');
+
+      // Try enhanced analytics endpoint first for better data
       try {
+        const enhancedData = await apiService.getEnhancedDashboardStats();
         
+        if (enhancedData && typeof enhancedData === 'object') {
+          console.log('✅ Enhanced analytics data received');
+          
+          // Map enhanced response to standard format with richer data
+          const mappedStats: DashboardStats = {
+            exchanges: {
+              total: enhancedData.exchanges?.total || 0,
+              pending: enhancedData.exchanges?.pending || 0,
+              active: enhancedData.exchanges?.active || 0,
+              completed: enhancedData.exchanges?.completed || 0,
+              ppSynced: 0,
+            },
+            tasks: {
+              total: enhancedData.timeline?.total || 0,
+              pending: enhancedData.timeline?.approaching45Day + enhancedData.timeline?.approaching180Day || 0,
+              overdue: enhancedData.timeline?.overdue || 0,
+              completed: enhancedData.exchanges?.completed || 0,
+              urgent: enhancedData.risk?.high || 0,
+              thisWeek: enhancedData.timeline?.approaching45Day || 0,
+            },
+            documents: {
+              total: 0,
+              requireSignature: 0,
+              recent: 0,
+            },
+            messages: {
+              unread: 0,
+              recent: 0,
+            },
+            users: {
+              total: 0,
+              active: 0,
+              admins: 0,
+              clients: 0,
+              coordinators: 0,
+            },
+            system: {
+              lastSync: enhancedData.lastUpdated || null,
+              syncStatus: 'success' as const,
+              totalDocuments: 0,
+              systemHealth: 'healthy' as const,
+            },
+          };
+
+          const resultData = {
+            stats: mappedStats,
+            exchanges: enhancedData.recentExchanges || [],
+            tasks: [],
+            documents: [],
+            messages: [],
+            users: []
+          };
+
+          // Cache the result
+          setCache(cacheKey, resultData);
+
+          setStats(mappedStats);
+          setExchanges(enhancedData.recentExchanges || []);
+          setTasks([]);
+          setDocuments([]);
+          setMessages([]);
+          setUsers([]);
+          
+          return; // Success with enhanced data
+        }
+      } catch (enhancedError) {
+        console.log('⚠️ Enhanced analytics failed, falling back to standard:', enhancedError);
+      }
+
+      // Fallback to V2 dashboard overview endpoint
+      try {
         const overviewData = await apiService.getDashboardOverview();
         
         if (overviewData && typeof overviewData === 'object') {
-          
+          console.log('✅ Standard dashboard overview data received');
           
           // Map V2 response to our standard format
           const mappedStats: DashboardStats = {
@@ -131,47 +278,51 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
             } : undefined,
           };
 
+          const resultData = {
+            stats: mappedStats,
+            exchanges: (overviewData as any).exchangesList || [],
+            tasks: (overviewData as any).tasksList || [],
+            documents: (overviewData as any).documentsList || [],
+            messages: (overviewData as any).messagesList || [],
+            users: (overviewData as any).usersList || []
+          };
+
+          // Cache the result
+          setCache(cacheKey, resultData);
+
           setStats(mappedStats);
-          
-          // Set individual data arrays if provided
-          if ((overviewData as any).exchangesList) setExchanges((overviewData as any).exchangesList);
-          if ((overviewData as any).tasksList) setTasks((overviewData as any).tasksList);
-          if ((overviewData as any).documentsList) setDocuments((overviewData as any).documentsList);
-          if ((overviewData as any).messagesList) setMessages((overviewData as any).messagesList);
-          if ((overviewData as any).usersList) setUsers((overviewData as any).usersList);
+          setExchanges((overviewData as any).exchangesList || []);
+          setTasks((overviewData as any).tasksList || []);
+          setDocuments((overviewData as any).documentsList || []);
+          setMessages((overviewData as any).messagesList || []);
+          setUsers((overviewData as any).usersList || []);
           
           return; // Success, no need for fallback
         }
       } catch (v2Error) {
-        
+        console.log('⚠️ V2 dashboard overview failed, falling back to V1:', v2Error);
       }
 
-      // Fallback to V1 individual calls (Enhanced pattern)
-      
+      // Fallback to V1 individual calls (only if needed)
+      console.log('📊 Falling back to V1 individual API calls...');
       
       const apiToUse = role === 'admin' ? apiService : roleBasedApiService;
       
-      // Load all data in parallel for better performance
-      const [exchangesRes, tasksRes, docsRes, messagesRes, usersRes] = await Promise.allSettled([
+      // Load only essential data in parallel for better performance
+      const [exchangesRes, tasksRes] = await Promise.allSettled([
         apiToUse.getExchanges().catch(err => {
-          
+          console.log('⚠️ Exchanges API failed:', err);
           return [];
         }),
         apiToUse.getTasks().catch(err => {
-          
+          console.log('⚠️ Tasks API failed:', err);
           return [];
-        }),
-        Promise.resolve([]), // Documents placeholder
-        Promise.resolve([]), // Messages placeholder  
-        Promise.resolve([])  // Users placeholder
+        })
       ]);
 
       // Extract data from settled promises
       const exchangesResult = exchangesRes.status === 'fulfilled' ? exchangesRes.value : { exchanges: [] };
       const tasksResult = tasksRes.status === 'fulfilled' ? tasksRes.value : [];
-      const documentsData = docsRes.status === 'fulfilled' ? docsRes.value : [];
-      const messagesData = messagesRes.status === 'fulfilled' ? messagesRes.value : [];
-      const usersData = usersRes.status === 'fulfilled' ? usersRes.value : [];
 
       // Extract exchanges array from the result object
       const exchangesData = Array.isArray(exchangesResult) ? exchangesResult : (exchangesResult as any).exchanges || [];
@@ -181,13 +332,7 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
       const filteredExchanges = filterExchangesByRole(exchangesData, role);
       const filteredTasks = filterTasksByRole(tasksData, role);
 
-      setExchanges(filteredExchanges);
-      setTasks(filteredTasks);
-      setDocuments(documentsData);
-      setMessages(messagesData);
-      setUsers(usersData);
-
-      // Calculate stats from individual data
+      // Optimize stats calculation
       const now = new Date();
       const calculatedStats: DashboardStats = {
         exchanges: {
@@ -216,61 +361,36 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
         },
       };
 
-      // Add role-specific stats
-      if (documentsData.length > 0) {
-        calculatedStats.documents = {
-          total: documentsData.length,
-          requireSignature: documentsData.filter((d: any) => d.requiresSignature).length,
-          recent: documentsData.filter((d: any) => {
-            const docDate = new Date(d.createdAt || d.uploadDate);
-            const weekAgo = new Date();
-            weekAgo.setDate(now.getDate() - 7);
-            return docDate >= weekAgo;
-          }).length,
-        };
-      }
+      const resultData = {
+        stats: calculatedStats,
+        exchanges: filteredExchanges,
+        tasks: filteredTasks,
+        documents: [],
+        messages: [],
+        users: []
+      };
 
-      if (messagesData.length > 0) {
-        calculatedStats.messages = {
-          unread: messagesData.filter((m: any) => !m.isRead).length,
-          recent: messagesData.filter((m: any) => {
-            const msgDate = new Date(m.createdAt);
-            const dayAgo = new Date();
-            dayAgo.setDate(now.getDate() - 1);
-            return msgDate >= dayAgo;
-          }).length,
-        };
-      }
-
-      if (role === 'admin' && usersData.length > 0) {
-        calculatedStats.users = {
-          total: usersData.length,
-          active: usersData.filter((u: any) => u.isActive).length,
-          admins: usersData.filter((u: any) => u.role === 'admin').length,
-          clients: usersData.filter((u: any) => u.role === 'client').length,
-          coordinators: usersData.filter((u: any) => u.role === 'coordinator').length,
-        };
-
-        calculatedStats.system = {
-          lastSync: (exchangesResult as any).lastSyncTime || null,
-          syncStatus: 'success',
-          totalDocuments: documentsData.length,
-          systemHealth: 'healthy',
-        };
-      }
+      // Cache the result
+      setCache(cacheKey, resultData);
 
       setStats(calculatedStats);
+      setExchanges(filteredExchanges);
+      setTasks(filteredTasks);
+      setDocuments([]);
+      setMessages([]);
+      setUsers([]);
 
     } catch (err: any) {
       console.error('❌ Dashboard data loading failed:', err);
       setError(err.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
-  };
+  }, [role, getCacheKey, getFromCache, setCache]);
 
-  // Role-based data filtering
-  const filterExchangesByRole = (exchanges: any[], userRole: string): any[] => {
+  // Role-based data filtering - memoized
+  const filterExchangesByRole = useCallback((exchanges: any[], userRole: string): any[] => {
     if (userRole === 'admin' || userRole === 'coordinator') {
       return exchanges; // Admin and coordinator see all
     }
@@ -279,19 +399,19 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
     return exchanges.filter((exchange: any) => {
       return exchange.participants?.some((p: any) => p.userId === 'current_user_id'); // TODO: Use actual user ID
     });
-  };
+  }, []);
 
-  const filterTasksByRole = (tasks: any[], userRole: string): any[] => {
+  const filterTasksByRole = useCallback((tasks: any[], userRole: string): any[] => {
     if (userRole === 'admin' || userRole === 'coordinator') {
       return tasks; // Admin and coordinator see all
     }
     
     // Others see only assigned tasks
     return tasks.filter((task: any) => task.assignedTo === 'current_user_id'); // TODO: Use actual user ID
-  };
+  }, []);
 
-  // PracticePanther sync function (from EnhancedAdminDashboard)
-  const syncPracticePanther = async () => {
+  // PracticePanther sync function - optimized
+  const syncPracticePanther = useCallback(async () => {
     if (role !== 'admin') {
       throw new Error('Only admins can sync PracticePanther data');
     }
@@ -299,6 +419,8 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
     setSyncing(true);
     try {
       await apiService.post('/sync/all', {});
+      // Clear cache to force fresh data load
+      dashboardCache.clear();
       await loadDashboardData(); // Refresh data after sync
     } catch (err: any) {
       console.error('PracticePanther sync failed:', err);
@@ -306,25 +428,39 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
     } finally {
       setSyncing(false);
     }
-  };
+  }, [role, loadDashboardData]);
 
-  // Auto-refresh functionality
+  // Optimized auto-refresh functionality
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     
     if (autoRefresh && refreshInterval > 0) {
-      interval = setInterval(loadDashboardData, refreshInterval);
+      interval = setInterval(() => {
+        // Only refresh if not currently loading
+        if (!loadingRef.current) {
+          loadDashboardData();
+        }
+      }, refreshInterval);
     }
     
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [autoRefresh, refreshInterval]);
+  }, [autoRefresh, refreshInterval, loadDashboardData]);
 
-  // Initial load
+  // Initial load - only once
   useEffect(() => {
     loadDashboardData();
-  }, [role]);
+  }, [loadDashboardData]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   return {
     stats,

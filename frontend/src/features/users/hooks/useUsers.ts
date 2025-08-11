@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useCachedData } from '../../../hooks/useCachedData';
 import { apiService } from '../../../services/api';
-import { userCache } from '../../../services/cache';
+import { generalCache } from '../../../services/cache';
 
 interface User {
   id: string;
@@ -38,7 +38,7 @@ export function useUsers() {
   const { data: users = [], loading, error, refetch } = useCachedData<User[]>({
     cacheKey: 'users',
     endpoint: '/users',
-    cacheInstance: userCache,
+    cacheInstance: generalCache,
     ttl: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -129,10 +129,10 @@ export function useUsers() {
   const searchUsers = useCallback((searchTerm: string) => {
     const term = searchTerm.toLowerCase();
     return users?.filter(user => 
-      user.email.toLowerCase().includes(term) ||
-      user.first_name.toLowerCase().includes(term) ||
-      user.last_name.toLowerCase().includes(term) ||
-      user.role.toLowerCase().includes(term)
+      (user.email || '').toLowerCase().includes(term) ||
+      (user.first_name || '').toLowerCase().includes(term) ||
+      (user.last_name || '').toLowerCase().includes(term) ||
+      (user.role || '').toLowerCase().includes(term)
     ) || [];
   }, [users]);
 

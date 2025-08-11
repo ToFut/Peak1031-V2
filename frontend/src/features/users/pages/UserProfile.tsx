@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { 
   UserIcon, 
   ChartBarIcon, 
@@ -8,48 +8,15 @@ import {
   CalendarIcon,
   ArrowTrendingUpIcon,
   ExclamationCircleIcon,
-  ArrowPathIcon,
-  ArrowLeftIcon
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import { useUserProfile } from '../../../hooks/useUserProfile';
-import { useAuth } from '../../../hooks/useAuth';
 import { UserProfileService } from '../../../services/userProfileService';
 import { EnhancedStatCard } from '../../dashboard/components/SharedDashboardComponents';
 
 const UserProfile: React.FC = () => {
-  // All hooks must be called at the top level, before any conditional returns
   const { userId } = useParams<{ userId: string }>();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  
-  // Call useUserProfile with a guaranteed string value to satisfy Rules of Hooks
-  const { profile, summary, loading, error, refreshAll } = useUserProfile(userId ?? '');
-  
-  // Safety check for userId
-  if (!userId || userId === 'undefined' || userId === 'null') {
-    return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <div className="flex items-center">
-            <ExclamationCircleIcon className="h-6 w-6 text-red-500 mr-3" />
-            <div>
-              <h3 className="text-lg font-medium text-red-800">Invalid User ID</h3>
-              <p className="text-red-700 mt-1">No valid user ID provided in the URL.</p>
-              <button
-                onClick={() => navigate('/users')}
-                className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              >
-                <ArrowLeftIcon className="h-4 w-4 mr-2" />
-                Back to Users
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
-  console.log('✅ UserProfile loading for userId:', userId);
+  const { profile, summary, loading, error, refreshAll } = useUserProfile(userId);
 
   if (loading) {
     return (
@@ -70,33 +37,6 @@ const UserProfile: React.FC = () => {
     );
   }
 
-  // Check if user has permission to view this profile
-  const isViewingOtherUser = userId && userId !== user?.id;
-  const canViewOtherProfiles = user?.role === 'admin';
-
-  if (isViewingOtherUser && !canViewOtherProfiles) {
-    return (
-      <div className="p-6">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-          <div className="flex items-center">
-            <ExclamationCircleIcon className="h-6 w-6 text-yellow-500 mr-3" />
-            <div>
-              <h3 className="text-lg font-medium text-yellow-800">Access Restricted</h3>
-              <p className="text-yellow-700 mt-1">You don't have permission to view other user profiles.</p>
-              <button
-                onClick={() => navigate('/users')}
-                className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
-              >
-                <ArrowLeftIcon className="h-4 w-4 mr-2" />
-                Back to Users
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="p-6">
@@ -106,24 +46,13 @@ const UserProfile: React.FC = () => {
             <div>
               <h3 className="text-lg font-medium text-red-800">Error Loading Profile</h3>
               <p className="text-red-700 mt-1">{error}</p>
-              <div className="mt-3 space-x-3">
-                <button
-                  onClick={refreshAll}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                >
-                  <ArrowPathIcon className="h-4 w-4 mr-2" />
-                  Try Again
-                </button>
-                {isViewingOtherUser && (
-                  <button
-                    onClick={() => navigate('/users')}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                  >
-                    <ArrowLeftIcon className="h-4 w-4 mr-2" />
-                    Back to Users
-                  </button>
-                )}
-              </div>
+              <button
+                onClick={refreshAll}
+                className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                <ArrowPathIcon className="h-4 w-4 mr-2" />
+                Try Again
+              </button>
             </div>
           </div>
         </div>
@@ -146,38 +75,13 @@ const UserProfile: React.FC = () => {
     <div className="p-6 space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          {isViewingOtherUser && (
-            <button
-              onClick={() => navigate('/users')}
-              className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <ArrowLeftIcon className="h-5 w-5 mr-1" />
-              Back to Users
-            </button>
-          )}
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              {UserProfileService.formatUserName(profile.user)}
-              {isViewingOtherUser && (
-                <span className="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  Admin View
-                </span>
-              )}
-            </h1>
-            <p className="text-gray-600 mt-1">
-              {UserProfileService.formatRole(profile.user.role)} • {profile.user.email}
-              {profile.user.isActive ? (
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                  Active
-                </span>
-              ) : (
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                  Inactive
-                </span>
-              )}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {UserProfileService.formatUserName(profile.user)}
+          </h1>
+          <p className="text-gray-600 mt-1">
+            {UserProfileService.formatRole(profile.user.role)} • {profile.user.email}
+          </p>
         </div>
         <button
           onClick={refreshAll}

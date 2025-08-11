@@ -24,6 +24,7 @@ import AuthTest from './features/auth/pages/AuthTest';
 import TemplateManager from './features/documents/components/TemplateManager';
 import TemplateDocumentManager from './pages/TemplateDocumentManager';
 import { AdminGPT, PracticePantherManager } from './features/admin/components';
+import AuditLogSystem from './features/admin/components/AuditLogSystem';
 import { AgencyManagement } from './features/agency/components';
 
 // Lazy load heavy components for better performance
@@ -33,6 +34,8 @@ const ClientDashboard = lazy(() => import('./features/dashboard/components/Stand
 const CoordinatorDashboard = lazy(() => import('./features/dashboard/components/StandardizedCoordinatorDashboard'));
 const ThirdPartyDashboard = lazy(() => import('./features/dashboard/components/StandardizedThirdPartyDashboard'));
 const AgencyDashboard = lazy(() => import('./features/dashboard/components/StandardizedAgencyDashboard'));
+const InvitationSignup = lazy(() => import('./pages/InvitationSignup'));
+const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -100,6 +103,12 @@ const DashboardRoute: React.FC = () => {
   }
 };
 
+// Debug Panel wrapper that checks authentication
+const AuthenticatedDebugPanel: React.FC = () => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <DebugPanel /> : null;
+};
+
 const App: React.FC = () => {
   return (
     <ErrorBoundary onError={(error, errorInfo) => {
@@ -111,11 +120,13 @@ const App: React.FC = () => {
           <Router>
             <div className="App">
               <ConnectionStatus />
-              {process.env.NODE_ENV === 'development' && <DebugPanel />}
+              {process.env.NODE_ENV === 'development' && <AuthenticatedDebugPanel />}
               <Suspense fallback={<LoadingFallback />}>
               <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
+              <Route path="/invite/:token" element={<InvitationSignup />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               
               {/* Protected Routes */}
               <Route 
@@ -172,11 +183,9 @@ const App: React.FC = () => {
                 path="/exchanges/:id" 
                 element={
                   <ProtectedRoute>
-                    <Layout>
-                      <RouteErrorBoundary routeName="ExchangeDetails">
-                        <ExchangeDetailEnhanced />
-                      </RouteErrorBoundary>
-                    </Layout>
+                    <RouteErrorBoundary routeName="ExchangeDetails">
+                      <ExchangeDetailEnhanced />
+                    </RouteErrorBoundary>
                   </ProtectedRoute>
                 } 
               />
@@ -270,10 +279,9 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
-                      <div className="p-8">
-                        <h1 className="text-2xl font-bold mb-4">Audit Logs</h1>
-                        <p className="text-gray-600">Audit logs management coming soon...</p>
-                      </div>
+                      <RouteErrorBoundary routeName="AuditLogSystem">
+                        <AuditLogSystem />
+                      </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
                 } 
@@ -378,11 +386,7 @@ const App: React.FC = () => {
                 path="/reports" 
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
-                    <Layout>
-                      <RouteErrorBoundary routeName="Reports">
-                        <Reports />
-                      </RouteErrorBoundary>
-                    </Layout>
+                    <Reports />
                   </ProtectedRoute>
                 } 
               />
@@ -392,11 +396,7 @@ const App: React.FC = () => {
                 path="/settings" 
                 element={
                   <ProtectedRoute>
-                    <Layout>
-                      <RouteErrorBoundary routeName="Settings">
-                        <Settings />
-                      </RouteErrorBoundary>
-                    </Layout>
+                    <Settings />
                   </ProtectedRoute>
                 } 
               />
@@ -406,11 +406,7 @@ const App: React.FC = () => {
                 path="/profile" 
                 element={
                   <ProtectedRoute>
-                    <Layout>
-                      <RouteErrorBoundary routeName="Profile">
-                        <Profile />
-                      </RouteErrorBoundary>
-                    </Layout>
+                    <Profile />
                   </ProtectedRoute>
                 } 
               />
@@ -448,11 +444,7 @@ const App: React.FC = () => {
                 path="/preferences" 
                 element={
                   <ProtectedRoute>
-                    <Layout>
-                      <RouteErrorBoundary routeName="Preferences">
-                        <Preferences />
-                      </RouteErrorBoundary>
-                    </Layout>
+                    <Preferences />
                   </ProtectedRoute>
                 } 
               />

@@ -166,8 +166,8 @@ const TemplateDocumentManager: React.FC = () => {
 
   const filteredTemplates = templates.filter(template => {
     const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory;
-    const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         template.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (template.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (template.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 

@@ -426,56 +426,93 @@ class ChatService {
 
   async markAsRead(messageIds: string[], userId: string): Promise<void> {
     try {
-      // Mark each message as read individually using the correct endpoint
-      const promises = messageIds.map(messageId => 
-        fetch(`${this.baseURL}/messages/${messageId}/read`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
-        })
-      );
-
-      const responses = await Promise.allSettled(promises);
+      console.log(`🔍 useChat: Marking ${messageIds.length} messages as read`);
       
-      // Check if any requests failed
-      const failedRequests = responses.filter(response => 
-        response.status === 'rejected' || 
-        (response.status === 'fulfilled' && !response.value.ok)
-      );
+      // Mark each message as read individually using the correct endpoint
+      const promises = messageIds.map(async (messageId) => {
+        try {
+          const response = await fetch(`${this.baseURL}/messages/${messageId}/read`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json'
+            }
+          });
 
-      if (failedRequests.length > 0) {
-        console.warn(`Failed to mark ${failedRequests.length} messages as read`);
-        // Don't throw error for read receipts, just log warning
+          if (!response.ok) {
+            const errorData = await response.text();
+            if (response.status === 404) {
+              console.warn(`⚠️ Message ${messageId} not found (may have been deleted)`);
+              return { success: true, messageId, status: 'not_found' };
+            } else if (response.status === 500) {
+              console.error(`❌ Server error marking message ${messageId} as read:`, errorData);
+              return { success: false, messageId, error: errorData, status: response.status };
+            } else {
+              console.error(`❌ Error marking message ${messageId} as read:`, response.status, errorData);
+              return { success: false, messageId, error: errorData, status: response.status };
+            }
+          }
+
+          return { success: true, messageId, status: 'marked' };
+        } catch (error: any) {
+          console.error(`❌ Network error marking message ${messageId} as read:`, error);
+          return { success: false, messageId, error: error.message || 'Network error' };
+        }
+      });
+
+      const results = await Promise.all(promises);
+      
+      // Log results summary
+      const successful = results.filter(r => r.success).length;
+      const notFound = results.filter(r => r.status === 'not_found').length;
+      const failed = results.filter(r => !r.success).length;
+      
+      if (failed > 0 || notFound > 0) {
+        console.warn(`📊 Mark as read summary: ${successful} successful, ${notFound} not found, ${failed} failed`);
+        
+        // Log specific failures (excluding not_found)
+        results.filter(r => !r.success && r.status !== 'not_found').forEach(result => {
+          console.error(`❌ Failed to mark message ${result.messageId}:`, result.error);
+        });
+      } else {
+        console.log(`✅ Successfully marked ${successful} messages as read`);
       }
     } catch (error) {
-      console.error('Error marking messages as read:', error);
+      console.error('❌ Error in markAsRead:', error);
       // Don't throw error for read receipts to avoid blocking UI
     }
   }
 
-  async uploadFile(file: File): Promise<string> {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
+  async uploadFile(file: File, exchangeId?: string, category: string = 'general', pinRequired: boolean = false, pin?: string): Promise<string> {
+    // Import here to avoid circular dependency
+    const { documentUploadService } = await import('./documentUploadService');
+    
+    if (!exchangeId) {
+      throw new Error('Exchange ID is required for file upload');
+    }
 
-      const response = await fetch(`${this.baseURL}/documents`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formData
+    try {
+      console.log('📤 ChatService: Delegating upload to unified service', {
+        fileName: file.name,
+        exchangeId,
+        category,
+        pinRequired
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to upload file: ${response.statusText}`);
-      }
+      const documentId = await documentUploadService.uploadForChat(
+        file,
+        exchangeId,
+        pinRequired,
+        pin
+      );
 
-      const data = await response.json();
-      return data.id || data.documentId || data.attachmentId;
-    } catch (error) {
-      console.error('Error uploading file:', error);
+      console.log('✅ ChatService: Upload successful via unified service', {
+        documentId
+      });
+
+      return documentId;
+    } catch (error: any) {
+      console.error('❌ ChatService: Upload failed', error);
       throw error;
     }
   }

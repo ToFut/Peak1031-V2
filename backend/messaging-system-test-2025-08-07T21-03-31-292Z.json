@@ -1,0 +1,26 @@
+{
+  "summary": {
+    "feature": "Messaging System",
+    "total": 2,
+    "passed": 0,
+    "failed": 2,
+    "successRate": "0.00%",
+    "timestamp": "2025-08-07T21:03:31.292Z"
+  },
+  "tests": [
+    {
+      "test": "Admin Authentication",
+      "success": false,
+      "details": {},
+      "error": "Failed to authenticate admin",
+      "timestamp": "2025-08-07T21:03:31.292Z"
+    },
+    {
+      "test": "Test Suite Execution",
+      "success": false,
+      "details": {},
+      "error": "Authentication setup failed - cannot proceed",
+      "timestamp": "2025-08-07T21:03:31.292Z"
+    }
+  ]
+}

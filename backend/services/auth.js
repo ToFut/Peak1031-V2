@@ -42,8 +42,8 @@ class AuthService {
       }
 
       console.log('✅ AUTH SERVICE: Password valid, updating last login...');
-      // Update last login
-      await databaseService.updateUser(user.id, { lastLogin: new Date() });
+      // Update last login - use snake_case for database compatibility
+      await databaseService.updateUser(user.id, { last_login: new Date().toISOString() });
       console.log('✅ AUTH SERVICE: Last login updated, returning user');
 
       return user;
@@ -76,7 +76,7 @@ class AuthService {
       }
 
       console.log('✅ AUTH SERVICE: Password valid, updating last login...');
-      await user.update({ lastLogin: new Date() });
+      await user.update({ last_login: new Date() });
       console.log('✅ AUTH SERVICE: Last login updated, returning user');
 
       return user;
@@ -149,7 +149,27 @@ class AuthService {
   }
 
   static async getUserById(userId) {
-    return await User.findByPk(userId);
+    try {
+      const user = await databaseService.getUserById(userId);
+      
+      if (!user) {
+        return null;
+      }
+      
+      // Return user with expected properties
+      return {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name || user.firstName,
+        lastName: user.last_name || user.lastName,
+        role: user.role,
+        isActive: user.is_active !== false,
+        passwordHash: user.password_hash
+      };
+    } catch (error) {
+      console.error('Error getting user by ID:', error);
+      return null;
+    }
   }
 
   static async updateUser(userId, updateData) {
@@ -481,6 +501,79 @@ class AuthService {
       });
     } catch (error) {
       console.error('Failed to log security event:', error);
+    }
+  }
+  static async getUserProfile(userId) {
+    try {
+      // Get user from database service
+      const users = await databaseService.getUsers({
+        where: { id: userId },
+        limit: 1
+      });
+
+      if (!users || users.length === 0) {
+        return null;
+      }
+
+      const user = users[0];
+      
+      // Return profile data
+      return {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name || user.firstName,
+        lastName: user.last_name || user.lastName,
+        role: user.role,
+        phone: user.phone,
+        company: user.company,
+        timezone: user.timezone || 'America/New_York',
+        isActive: user.is_active !== false,
+        emailVerified: true, // Default since column doesn't exist
+        twoFaEnabled: user.two_fa_enabled || false,
+        lastLogin: user.last_login || user.lastLogin,
+        createdAt: user.created_at || user.createdAt,
+        updatedAt: user.updated_at || user.updatedAt
+      };
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      throw error;
+    }
+  }
+
+  static async updateUserProfile(userId, profileData) {
+    try {
+      const updateData = {};
+      
+      // Map profile fields to database columns
+      if (profileData.firstName) updateData.first_name = profileData.firstName;
+      if (profileData.lastName) updateData.last_name = profileData.lastName;
+      if (profileData.phone) updateData.phone = profileData.phone;
+      if (profileData.company) updateData.company = profileData.company;
+      if (profileData.timezone) updateData.timezone = profileData.timezone;
+      if (profileData.default_document_pin !== undefined) updateData.default_document_pin = profileData.default_document_pin;
+      
+      // Update user in database
+      const updatedUser = await databaseService.updateUser(userId, updateData);
+      
+      // Return updated profile
+      return {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.first_name || updatedUser.firstName,
+        lastName: updatedUser.last_name || updatedUser.lastName,
+        role: updatedUser.role,
+        phone: updatedUser.phone,
+        company: updatedUser.company,
+        timezone: updatedUser.timezone || 'America/New_York',
+        default_document_pin: updatedUser.default_document_pin,
+        isActive: updatedUser.is_active !== false,
+        emailVerified: true,
+        twoFaEnabled: updatedUser.two_fa_enabled || false,
+        updatedAt: new Date()
+      };
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      throw error;
     }
   }
 }

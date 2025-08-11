@@ -16,16 +16,22 @@ export const useUserProfile = (userId?: string): UseUserProfileReturn => {
   const [summary, setSummary] = useState<ExchangesSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isStale, setIsStale] = useState(true);
 
   const refreshProfile = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const profileData = await UserProfileService.getUserProfile(userId);
-      setProfile(profileData);
+      
+      // Force refresh to get real-time data
+      const freshProfile = await UserProfileService.getUserProfile(userId);
+      setProfile(freshProfile);
+      setLastUpdated(new Date());
+      setIsStale(false);
     } catch (err: any) {
-      console.error('Error loading user profile:', err);
-      setError(err.message || 'Failed to load user profile');
+      console.error('Error refreshing profile:', err);
+      setError(err.message || 'Failed to refresh profile');
     } finally {
       setLoading(false);
     }
@@ -33,49 +39,40 @@ export const useUserProfile = (userId?: string): UseUserProfileReturn => {
 
   const refreshSummary = useCallback(async () => {
     try {
-      // Don't set error to null here to preserve any profile errors
-      const summaryData = await UserProfileService.getExchangesSummary(userId);
-      setSummary(summaryData);
+      setLoading(true);
+      setError(null);
+      
+      // Force refresh to get real-time data
+      const freshSummary = await UserProfileService.getExchangesSummary();
+      setSummary(freshSummary);
+      setLastUpdated(new Date());
+      setIsStale(false);
     } catch (err: any) {
-      console.warn('Warning: Could not load exchanges summary:', err);
-      // Don't set error for summary failure - it's optional data
+      console.error('Error refreshing summary:', err);
+      setError(err.message || 'Failed to refresh summary');
+    } finally {
+      setLoading(false);
     }
-  }, [userId]);
+  }, []);
 
   const refreshAll = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Use Promise.allSettled to handle partial failures
-      const [profileResult, summaryResult] = await Promise.allSettled([
+      // Force refresh both profile and summary
+      const [freshProfile, freshSummary] = await Promise.all([
         UserProfileService.getUserProfile(userId),
-        UserProfileService.getExchangesSummary(userId)
+        UserProfileService.getExchangesSummary()
       ]);
       
-      // Handle profile result
-      if (profileResult.status === 'fulfilled') {
-        setProfile(profileResult.value);
-      } else {
-        console.error('Error loading user profile:', profileResult.reason);
-        setError(profileResult.reason?.message || 'Failed to load user profile');
-      }
-      
-      // Handle summary result (optional - don't fail if this fails)
-      if (summaryResult.status === 'fulfilled') {
-        setSummary(summaryResult.value);
-      } else {
-        console.warn('Warning: Could not load exchanges summary:', summaryResult.reason);
-        // Don't set error for summary failure - it's optional
-      }
-      
-      // Only show error if the main profile failed
-      if (profileResult.status === 'rejected') {
-        throw new Error(profileResult.reason?.message || 'Failed to load user profile');
-      }
+      setProfile(freshProfile);
+      setSummary(freshSummary);
+      setLastUpdated(new Date());
+      setIsStale(false);
     } catch (err: any) {
-      console.error('Error loading user profile data:', err);
-      setError(err.message || 'Failed to load user profile data');
+      console.error('Error refreshing all data:', err);
+      setError(err.message || 'Failed to refresh data');
     } finally {
       setLoading(false);
     }

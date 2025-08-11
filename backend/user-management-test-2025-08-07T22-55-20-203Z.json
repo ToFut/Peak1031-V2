@@ -1,0 +1,136 @@
+{
+  "summary": {
+    "feature": "User Management",
+    "total": 15,
+    "passed": 5,
+    "failed": 10,
+    "successRate": "33.33%",
+    "timestamp": "2025-08-07T22:55:20.203Z"
+  },
+  "tests": [
+    {
+      "test": "Admin JWT Login",
+      "success": true,
+      "details": {
+        "token": "generated",
+        "user": "admin@peak1031.com",
+        "role": "admin"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T22:55:15.325Z"
+    },
+    {
+      "test": "Invalid Login Rejection",
+      "success": true,
+      "details": {
+        "status": 401
+      },
+      "error": null,
+      "timestamp": "2025-08-07T22:55:15.622Z"
+    },
+    {
+      "test": "JWT Token Refresh",
+      "success": false,
+      "details": {
+        "newToken": "failed"
+      },
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T22:55:15.626Z"
+    },
+    {
+      "test": "Create client User",
+      "success": false,
+      "details": {},
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T22:55:16.532Z"
+    },
+    {
+      "test": "Create coordinator User",
+      "success": false,
+      "details": {},
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T22:55:17.092Z"
+    },
+    {
+      "test": "Create third_party User",
+      "success": false,
+      "details": {},
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T22:55:17.738Z"
+    },
+    {
+      "test": "Create agency User",
+      "success": false,
+      "details": {},
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T22:55:18.297Z"
+    },
+    {
+      "test": "User Status Management",
+      "success": false,
+      "details": {},
+      "error": "No test users available",
+      "timestamp": "2025-08-07T22:55:18.298Z"
+    },
+    {
+      "test": "Get User Profile",
+      "success": true,
+      "details": {
+        "hasProfile": true,
+        "email": "admin@peak1031.com"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T22:55:18.668Z"
+    },
+    {
+      "test": "Update User Profile",
+      "success": true,
+      "details": {
+        "updated": true
+      },
+      "error": null,
+      "timestamp": "2025-08-07T22:55:18.983Z"
+    },
+    {
+      "test": "Exchange Participant Assignment",
+      "success": false,
+      "details": {},
+      "error": "No exchanges available for assignment testing",
+      "timestamp": "2025-08-07T22:55:19.710Z"
+    },
+    {
+      "test": "Admin access to all users",
+      "success": true,
+      "details": {
+        "role": "admin",
+        "endpoint": "/api/users",
+        "expectedAccess": true,
+        "actualAccess": true,
+        "status": 200
+      },
+      "error": null,
+      "timestamp": "2025-08-07T22:55:20.203Z"
+    },
+    {
+      "test": "Client blocked from user management",
+      "success": false,
+      "details": {},
+      "error": "No token for client",
+      "timestamp": "2025-08-07T22:55:20.203Z"
+    },
+    {
+      "test": "Coordinator access to exchanges",
+      "success": false,
+      "details": {},
+      "error": "No token for coordinator",
+      "timestamp": "2025-08-07T22:55:20.203Z"
+    },
+    {
+      "test": "Third party blocked from audit logs",
+      "success": false,
+      "details": {},
+      "error": "No token for third_party",
+      "timestamp": "2025-08-07T22:55:20.203Z"
+    }
+  ]
+}

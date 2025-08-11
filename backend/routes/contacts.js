@@ -6,27 +6,36 @@ const { Op } = require('sequelize');
 
 const router = express.Router();
 
-// Get all contacts (from Supabase)
+// Get all contacts (from Supabase) with pagination
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    console.log('📥 Getting contacts from database service...');
+    const { page = 1, limit = 50, search } = req.query; // Default 50 per page
+    const offset = (parseInt(page) - 1) * parseInt(limit);
     
-    const contacts = await databaseService.getContacts();
+    console.log(`📥 Getting contacts from database service (page ${page}, limit ${limit})...`);
     
-    console.log(`✅ Found ${contacts.length} contacts in database`);
+    // Get contacts with pagination
+    const contactsResult = await databaseService.getContacts({
+      page: parseInt(page),
+      limit: parseInt(limit),
+      offset,
+      search
+    });
+    
+    console.log(`✅ Found ${contactsResult.data?.length || 0} contacts in database (total: ${contactsResult.total || 0})`);
     
     // Transform snake_case to camelCase for frontend
-    const transformedContacts = transformToCamelCase(contacts);
+    const transformedContacts = transformToCamelCase(contactsResult.data || []);
     
     // Return in the format frontend expects
     res.json({
       contacts: transformedContacts,
       data: transformedContacts,
       pagination: {
-        page: 1,
-        limit: transformedContacts.length,
-        total: transformedContacts.length,
-        totalPages: 1
+        page: contactsResult.page || parseInt(page),
+        limit: contactsResult.limit || parseInt(limit),
+        total: contactsResult.total || 0,
+        totalPages: contactsResult.totalPages || 1
       }
     });
   } catch (error) {

@@ -33,8 +33,6 @@ const Users: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [ppDataCache, setPpDataCache] = useState<Record<string, any>>({});
-  const [loadingPpData, setLoadingPpData] = useState<Set<string>>(new Set());
   const { isAdmin } = usePermissions();
   const navigate = useNavigate();
 
@@ -53,7 +51,7 @@ const Users: React.FC = () => {
   const [showMinChip, setShowMinChip] = useState(false);
   const [showMaxChip, setShowMaxChip] = useState(false);
   const [userActionMenu, setUserActionMenu] = useState<string | null>(null);
-  
+  const [showProfileDrawer, setShowProfileDrawer] = useState(false);
 
   // Check if user has admin access
   useEffect(() => {
@@ -69,17 +67,19 @@ const Users: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const response = await apiService.get('/admin/users');
+      // Use real-time data fetching with minimal caching for offline fallback only
+      const response = await apiService.get('/admin/users', {
+        useCache: false, // Don't use cache for real-time data
+        cacheDuration: 1 * 60 * 1000, // 1 minute for offline fallback only
+        useFallback: true,
+        forceRefresh: true, // Always fetch fresh data
+        lazyLoad: false
+      });
       
       // Handle both direct array and paginated response
       const usersData = response.users || response.data || response || [];
       
       setUsers(usersData);
-      
-      // Load PP data for first 10 users in background
-      usersData.slice(0, 10).forEach((user: any) => {
-        loadPPDataForUser(user.id);
-      });
     } catch (err: any) {
       console.error('❌ Error loading users:', err);
       setError(err.message || 'Failed to load users');
@@ -87,33 +87,6 @@ const Users: React.FC = () => {
       setLoading(false);
     }
   }, []);
-  
-  const loadPPDataForUser = async (userId: string) => {
-    // Skip if PP integration is not enabled
-    return;
-    
-    // Uncomment below to enable PP data loading
-    /*
-    if (ppDataCache[userId] || loadingPpData.has(userId)) return;
-    
-    setLoadingPpData(prev => new Set(prev).add(userId));
-    
-    try {
-      const response = await apiService.get(`/pp-data/user/${userId}`);
-      if (response.success) {
-        setPpDataCache(prev => ({ ...prev, [userId]: response.pp_data }));
-      }
-    } catch (err) {
-      console.log('Could not load PP data for user:', userId);
-    } finally {
-      setLoadingPpData(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(userId);
-        return newSet;
-      });
-    }
-    */
-  };
 
   useEffect(() => {
     // Only load users if user is admin
@@ -164,23 +137,6 @@ const Users: React.FC = () => {
   };
 
   const handleViewUserProfile = (user: any) => {
-    // Safety check for user ID
-    if (!user || !user.id) {
-      console.error('❌ Cannot navigate to user profile: user or user.id is undefined', user);
-      alert('Error: User information not available');
-      return;
-    }
-    
-    // Additional validation for UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(user.id)) {
-      console.error('❌ Invalid user ID format:', user.id);
-      alert('Error: Invalid user ID format');
-      return;
-    }
-    
-    console.log('✅ Navigating to user profile:', user.email, 'ID:', user.id);
-    
     // Navigate to the detailed user profile page
     navigate(`/users/user-profile/${user.id}`);
     setUserActionMenu(null);
@@ -289,6 +245,7 @@ const Users: React.FC = () => {
         alert(response.message);
         // Refresh users list
         loadUsers();
+        setShowProfileDrawer(false);
       }
     } catch (error: any) {
       alert(`Error deleting user: ${error.message}`);
@@ -522,27 +479,9 @@ const Users: React.FC = () => {
               Email: {user.email}
             </div>
 
-            {/* PP Data Integration - Commented out until PP sync is complete */}
-            {/* Uncomment this section after running PP data sync
-            {ppDataCache[user.id] && (
-              <div className="mt-2 pt-2 border-t border-gray-100">
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {ppDataCache[user.id].invoices?.total_revenue > 0 && (
-                    <div className="flex items-center gap-1">
-                      <DollarSign className="w-3 h-3 text-green-600" />
-                      <span className="text-gray-600">
-                        ${ppDataCache[user.id].invoices.total_revenue.toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            */}
-
             {/* Last Login */}
             {user.last_login && (
-              <div className="text-xs text-gray-500 mt-2">
+              <div className="text-xs text-gray-500 mb-2">
                 Last login: {new Date(user.last_login).toLocaleDateString()}
               </div>
             )}

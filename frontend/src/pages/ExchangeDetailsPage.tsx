@@ -4,8 +4,9 @@ import { Exchange, Task, Document, AuditLog } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { usePermissions } from '../hooks/usePermissions';
 import { apiService } from '../services/api';
-import { ExchangeChatBox } from '../features/messages/components/ExchangeChatBox';
+import UnifiedChatInterface from '../features/messages/components/UnifiedChatInterface';
 import EnterpriseParticipantsManager from '../components/EnterpriseParticipantsManager';
+import { EnhancedDocumentManager } from '../features/documents/components';
 import {
   ArrowLeft,
   Eye,
@@ -108,7 +109,6 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
   const [advancingStage, setAdvancingStage] = useState(false);
   const [participants, setParticipants] = useState<ExchangeParticipant[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [documents, setDocuments] = useState<Document[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -123,11 +123,6 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState('general');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load exchange data
   const loadExchangeData = useCallback(async () => {
@@ -148,22 +143,20 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
       
       try {
         // Try enterprise endpoints
-        [exchangeData, participantsData, tasksData, documentsData, auditData, timelineData, complianceData] = await Promise.all([
+        [exchangeData, participantsData, tasksData, auditData, timelineData, complianceData] = await Promise.all([
           apiService.get(`/enterprise-exchanges/${id}`).catch(() => apiService.get(`/exchanges/${id}`)),
           apiService.get(`/exchanges/${id}/participants`),
           apiService.get(`/exchanges/${id}/tasks`),
-          apiService.get(`/documents/exchange/${id}`),
           apiService.get(`/exchanges/${id}/audit-logs`),
           apiService.get(`/enterprise-exchanges/${id}/timeline`).catch(() => []),
           apiService.get(`/enterprise-exchanges/${id}/compliance`).catch(() => null)
         ]);
       } catch (error) {
         // Fallback to regular endpoints
-        [exchangeData, participantsData, tasksData, documentsData, auditData] = await Promise.all([
+        [exchangeData, participantsData, tasksData, auditData] = await Promise.all([
           apiService.get(`/exchanges/${id}`),
           apiService.get(`/exchanges/${id}/participants`),
           apiService.get(`/exchanges/${id}/tasks`),
-          apiService.get(`/documents/exchange/${id}`),
           apiService.get(`/exchanges/${id}/audit-logs`)
         ]);
         timelineData = [];
@@ -175,7 +168,6 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
       setExchange(exchangeData);
       setParticipants(participantsData?.participants || participantsData || []);
       setTasks(tasksData?.tasks || tasksData || []);
-      setDocuments(documentsData?.documents || documentsData || []);
       setAuditLogs(auditData?.auditLogs || auditData || []);
       setTimeline(timelineData || []);
       setCompliance(complianceData);
@@ -279,39 +271,13 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
   };
 
   // Role-based action handlers
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !exchange) return;
-
-    try {
-      setUploading(true);
-      setUploadError(null);
-
-      const response = await apiService.uploadDocument(file, exchange.id, selectedCategory);
-      
-      if (response) {
-        await loadExchangeData(); // Reload exchange data after successful upload
-        setShowUploadModal(false);
-        setSelectedCategory('general');
-      }
-    } catch (err: any) {
-      console.error('Error uploading document:', err);
-      setUploadError(err.message || 'Failed to upload document');
-    } finally {
-      setUploading(false);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
 
   const handleViewExchangeDetails = (role: string) => {
     if (!exchange) return;
 
     const details = {
       'admin': `Admin: View Full Exchange Details for ${exchange.name}\n- Exchange ID: ${exchange.id}\n- Status: ${exchange.status}\n- Progress: ${exchange.progress || 0}%\n- Value: $${exchange.exchangeValue?.toLocaleString()}\n- Active Tasks: ${Array.isArray(tasks) ? tasks.filter(t => t.status === 'PENDING').length : 0}`,
-      'client': `Client: View My Exchange Details for ${exchange.name}\n- Your Exchange Progress: ${exchange.progress || 0}%\n- Next Deadline: ${exchange.identificationDeadline}\n- Documents Pending: ${Array.isArray(documents) ? documents.filter(d => d.category === 'pending').length : 0}\n- Payments Status: Up to date`,
+      'client': `Client: View My Exchange Details for ${exchange.name}\n- Your Exchange Progress: ${exchange.progress || 0}%\n- Next Deadline: ${exchange.identificationDeadline}\n- Payments Status: Up to date`,
       'coordinator': `Coordinator: Manage Exchange for ${exchange.name}\n- Exchange Status: ${exchange.status}\n- Progress: ${exchange.progress || 0}%\n- Team Members: ${Array.isArray(participants) ? participants.length : 0}\n- Active Tasks: ${Array.isArray(tasks) ? tasks.filter(t => t.status === 'PENDING').length : 0}`,
       'third_party': `Third Party: View Assigned Exchange for ${exchange.name}\n- Service Status: Active\n- Billing Information: Current\n- Service Level: Premium\n- Next Review: ${exchange.identificationDeadline}`
     };
@@ -726,7 +692,7 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-purple-600">Documents</p>
-                        <p className="text-2xl font-bold text-purple-900">{Array.isArray(documents) ? documents.length : 0}</p>
+                        <p className="text-2xl font-bold text-purple-900">--</p>
                       </div>
                       <FileText className="w-8 h-8 text-purple-600" />
                     </div>
@@ -849,10 +815,15 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {participants
-                    .filter(p => 
-                      (searchTerm === '' || p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
-                      (statusFilter === 'all' || p.status === statusFilter)
-                    )
+                    .filter(p => {
+                      const name = p.name || '';
+                      const email = p.email || '';
+                      const matchesSearch = searchTerm === '' || 
+                        name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        email.toLowerCase().includes(searchTerm.toLowerCase());
+                      const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
+                      return matchesSearch && matchesStatus;
+                    })
                     .map((participant) => (
                       <div key={participant.id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
                         <div className="flex items-start justify-between mb-4">
@@ -998,98 +969,8 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
 
             {activeTab === 'documents' && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Exchange Documents</h3>
-                  <button 
-                    onClick={() => setShowUploadModal(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Upload className="w-4 h-4 inline mr-2" />
-                    Upload Document
-                  </button>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {Array.isArray(documents) && documents.map((document) => (
-                    <div key={document.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center space-x-3">
-                            <FileText className={`w-8 h-8 ${document.document_type === 'generated' ? 'text-green-600' : 'text-blue-600'}`} />
-                            <div>
-                              <h4 className="font-semibold text-gray-900">
-                                {document.originalFilename || document.name}
-                                {document.document_type === 'generated' && (
-                                  <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    Generated
-                                  </span>
-                                )}
-                              </h4>
-                              <p className="text-sm text-gray-600">
-                                {document.mimeType || document.category}
-                                {document.template_name && (
-                                  <span className="ml-2 text-gray-500">• Template: {document.template_name}</span>
-                                )}
-                              </p>
-                            </div>
-                          </div>
-                          <button className="p-1 text-gray-400 hover:text-gray-600 rounded">
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                        </div>
-                        
-                        <div className="space-y-2 text-sm text-gray-600">
-                          <div className="flex justify-between">
-                            <span>Size:</span>
-                            <span>{document.fileSize ? `${Math.round(document.fileSize / 1024)} KB` : 'Unknown'}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Uploaded:</span>
-                            <span>{document.createdAt ? new Date(document.createdAt).toLocaleDateString() : 'Unknown'}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Category:</span>
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              document.category === 'approved' ? 'bg-green-100 text-green-800' :
-                              document.category === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {document.category || 'Uncategorized'}
-                            </span>
-                          </div>
-                        </div>
-                      
-                      <div className="flex items-center space-x-2 mt-4 pt-4 border-t border-gray-100">
-                        <button 
-                          onClick={() => {
-                            if (document.document_type === 'generated' && document.file_url) {
-                              // For generated documents, download directly from URL
-                              window.open(document.file_url, '_blank');
-                            } else {
-                              // For regular documents, use the download API
-                              // apiService.downloadDocument(document.id);
-                              console.log('Download regular document:', document.id);
-                            }
-                          }}
-                          className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                        >
-                          <Download className="w-4 h-4" />
-                          <span>Download</span>
-                        </button>
-                        <button className="flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {(!Array.isArray(documents) || documents.length === 0) && (
-                    <div className="text-center py-12 col-span-full">
-                      <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Documents</h3>
-                      <p className="text-gray-500">No documents have been uploaded for this exchange yet.</p>
-                    </div>
-                  )}
-                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Exchange Documents</h3>
+                <EnhancedDocumentManager exchangeId={exchange.id} />
               </div>
             )}
 
@@ -1245,7 +1126,10 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
 
             {activeTab === 'chat' && exchange && (
               <div className="h-96">
-                <ExchangeChatBox exchange={exchange} />
+                <UnifiedChatInterface 
+                  exchangeId={exchange.id} 
+                  hideExchangeList={true}
+                />
               </div>
             )}
 
@@ -1367,79 +1251,6 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
           </div>
         )}
 
-        {/* Upload Document Modal */}
-        {showUploadModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Document to {exchange?.name}</h3>
-              
-              <div className="space-y-4">
-                {/* Category Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="general">General</option>
-                    <option value="contract">Contract</option>
-                    <option value="financial">Financial</option>
-                    <option value="legal">Legal</option>
-                    <option value="identification">Identification</option>
-                    <option value="deed">Deed</option>
-                    <option value="appraisal">Appraisal</option>
-                    <option value="inspection">Inspection</option>
-                    <option value="title">Title</option>
-                    <option value="insurance">Insurance</option>
-                  </select>
-                </div>
-
-                {/* File Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">File</label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    onChange={handleFileUpload}
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.txt,.csv,.zip"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Supported formats: PDF, Word, Excel, Images, Text, CSV, ZIP (max 50MB)
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowUploadModal(false);
-                    setSelectedCategory('general');
-                    setUploadError(null);
-                  }}
-                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition-colors"
-                >
-                  {uploading ? 'Uploading...' : 'Select File & Upload'}
-                </button>
-              </div>
-
-              {uploadError && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-red-600 text-sm">{uploadError}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* Enterprise Participants Manager Modal */}
         {exchange && (

@@ -6,14 +6,20 @@ import App from './App';
 // import './utils/testAuth'; // Removed - not needed
 
 // Prevent duplicate custom element registration errors during hot reloading
-const originalDefine = window.customElements.define;
-window.customElements.define = function(name, constructor, options) {
-  if (!window.customElements.get(name)) {
-    originalDefine.call(this, name, constructor, options);
-  } else {
-    console.warn(`Custom element "${name}" already defined, skipping registration`);
-  }
-};
+if (typeof window !== 'undefined' && window.customElements) {
+  const originalDefine = window.customElements.define;
+  window.customElements.define = function(name, constructor, options) {
+    if (!window.customElements.get(name)) {
+      try {
+        originalDefine.call(this, name, constructor, options);
+      } catch (e) {
+        console.warn(`Failed to define custom element "${name}":`, e instanceof Error ? e.message : String(e));
+      }
+    } else {
+      console.warn(`Custom element "${name}" already defined, skipping registration`);
+    }
+  };
+}
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement

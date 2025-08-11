@@ -110,8 +110,8 @@ const EnhancedTaskManager: React.FC<{ exchangeId?: string }> = ({ exchangeId }) 
 
     if (filters.search) {
       filtered = filtered.filter(task =>
-        task.title.toLowerCase().includes(filters.search!.toLowerCase()) ||
-        task.description.toLowerCase().includes(filters.search!.toLowerCase())
+        (task.title || '').toLowerCase().includes(filters.search!.toLowerCase()) ||
+        (task.description || '').toLowerCase().includes(filters.search!.toLowerCase())
       );
     }
 

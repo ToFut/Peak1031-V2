@@ -1,0 +1,35 @@
+{
+  "summary": {
+    "feature": "Document Management",
+    "total": 3,
+    "passed": 1,
+    "failed": 2,
+    "successRate": "33.33%",
+    "timestamp": "2025-08-07T19:57:06.187Z"
+  },
+  "tests": [
+    {
+      "test": "Admin Authentication",
+      "success": true,
+      "details": {
+        "token": "obtained"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T19:57:04.635Z"
+    },
+    {
+      "test": "Test Exchange Available",
+      "success": false,
+      "details": {},
+      "error": "No exchanges available for testing",
+      "timestamp": "2025-08-07T19:57:06.187Z"
+    },
+    {
+      "test": "Test Suite Execution",
+      "success": false,
+      "details": {},
+      "error": "Authentication setup failed - cannot proceed",
+      "timestamp": "2025-08-07T19:57:06.187Z"
+    }
+  ]
+}

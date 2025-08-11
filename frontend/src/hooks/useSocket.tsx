@@ -57,7 +57,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   // Disconnect socket function
   const disconnectSocket = useCallback(() => {
     if (socket) {
-      
+      console.log('🔌 Disconnecting socket...');
+      socket.off(); // Remove all listeners
       socket.disconnect();
       setSocket(null);
     }
@@ -66,6 +67,12 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   }, [socket]);
 
   const initializeSocket = useCallback(() => {
+    // Don't reinitialize if already connected or connecting
+    if (socket?.connected || connectionStatus === 'connecting' || connectionStatus === 'connected') {
+      console.log('🔌 Socket already connected or connecting, skipping initialization');
+      return;
+    }
+
     if (socket) {
       socket.disconnect();
     }
@@ -76,10 +83,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       return;
     }
 
-    
+    console.log('🔌 Initializing socket connection...');
     setConnectionStatus('connecting');
 
-         const socketUrl = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5001';
+    const socketUrl = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5001';
     
     const newSocket = io(socketUrl, {
       auth: {
@@ -140,7 +147,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     setupMessageHandlers(newSocket);
 
     setSocket(newSocket);
-  }, [user?.id]); // Remove setupMessageHandlers dependency to prevent circular dependency
+  }, [user?.id, connectionStatus, socket]); // Add connectionStatus and socket to prevent re-initialization
 
   const setupMessageHandlers = useCallback((socket: Socket) => {
     // New message received
@@ -305,7 +312,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     return () => {
       disconnectSocket();
     };
-  }, [isAuthenticated, user?.id]); // Remove function dependencies to prevent infinite loops
+  }, [isAuthenticated]); // Only depend on authentication status, not user.id which can change
 
   const joinExchange = useCallback((exchangeId: string) => {
     if (socket && connectionStatus === 'connected') {

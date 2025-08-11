@@ -17,16 +17,22 @@ interface ApiOptions {
   cacheDuration?: number;
   useFallback?: boolean;
   forceRefresh?: boolean;
+  lazyLoad?: boolean;
+  etag?: string;
 }
 
 class ApiService {
-  private baseURL: string = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+  private baseURL: string;
   private isOnline: boolean = true;
   private healthCheckInterval: NodeJS.Timeout | null = null;
   private lastHealthCheck: number = 0;
   private connectionListeners: ((online: boolean) => void)[] = [];
 
   constructor() {
+    // Resolve base URL from env or current origin, trim trailing slashes
+    const resolvedBaseUrl = (process.env.REACT_APP_API_URL || `${window.location.origin}/api`).replace(/\/+$/, '');
+    this.baseURL = resolvedBaseUrl;
+    console.log('🔗 API base URL:', this.baseURL);
     // Monitor connection status
     window.addEventListener('online', () => this.checkBackendHealth());
     window.addEventListener('offline', () => this.setConnectionStatus(false));
@@ -110,130 +116,131 @@ class ApiService {
     };
   }
 
-  // Helper method for HTTP requests with caching support and fallbacks
+
+  // Helper method for HTTP requests with real-time data fetching
   private async request<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false, apiOptions?: ApiOptions): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     const method = options.method || 'GET';
     
-    // Handle caching for GET requests only
+    // Handle caching for GET requests only (as fallback for offline scenarios)
     if (method === 'GET' && apiOptions) {
       const {
-        useCache = true,
-        cacheDuration = 5 * 60 * 1000, // 5 minutes
+        useCache = false, // Default to false for real-time data
+        cacheDuration = 1 * 60 * 1000, // 1 minute for offline fallback
         useFallback = true,
-        forceRefresh = false
+        forceRefresh = true, // Default to true for real-time data
+        lazyLoad = false,
+        etag
       } = apiOptions;
 
       const cacheKey = `api:${endpoint}`;
 
-      // Check cache first
+      // Only check cache if explicitly requested and not forcing refresh
       if (useCache && !forceRefresh) {
         const cached = cacheService.get<T>(cacheKey);
         if (cached) {
-          
+          console.log('📦 Returning cached data for:', endpoint);
           return cached;
         }
       }
+
+      // Add ETag header if provided for conditional requests
+      if (etag) {
+        options.headers = {
+          ...options.headers,
+          'If-None-Match': etag
+        };
+      }
     }
-    
-    
-    
+
+    // Add cache control headers for real-time data
+    if (method === 'GET') {
+      options.headers = {
+        ...options.headers,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      };
+    }
+
     try {
       const response = await fetch(url, {
         ...options,
         headers: {
+          'Content-Type': 'application/json',
           ...this.getAuthHeaders(),
           ...options.headers
         }
       });
 
-      // Update connection status on successful request
-      this.setConnectionStatus(true);
+      // Handle 304 Not Modified responses (only if we have cached data)
+      if (response.status === 304) {
+        console.log('📦 Data not modified, using cached version for:', endpoint);
+        const cacheKey = `api:${endpoint}`;
+        const cached = cacheService.get<T>(cacheKey);
+        if (cached) {
+          return cached;
+        }
+      }
 
       if (!response.ok) {
-      // If we get a 401 and have a refresh token, try to refresh (but only once)
-      if (response.status === 401 && !isRetry) {
-        const hasRefreshToken = localStorage.getItem('refreshToken');
-        
-        if (hasRefreshToken) {
-          // Try to get error details to check if it's token expiry
-          const errorData = await response.clone().json().catch(() => ({}));
-          console.log('🔍 401 Error details:', errorData);
-          
-          console.log('🔄 Attempting token refresh due to 401 error...');
+        // Handle 401 with refresh token retry
+        if (response.status === 401 && !isRetry && localStorage.getItem('refreshToken')) {
+          console.warn('🔄 Got 401, attempting token refresh for:', endpoint);
           try {
             await this.refreshToken();
-            console.log('✅ Token refreshed successfully, retrying request...');
-            // Retry the request with the new token
-            return await this.request<T>(endpoint, options, true);
+            console.log('✅ Token refresh successful, retrying request');
+            return await this.request<T>(endpoint, options, true, apiOptions);
           } catch (refreshError) {
             console.error('❌ Token refresh failed:', refreshError);
-            // If refresh fails, clear tokens and throw original error
+            console.error('🔍 Request was to:', endpoint);
+            console.error('🔍 Refresh error details:', refreshError.message);
+            
+            // Clear tokens and redirect to login
             localStorage.removeItem('token');
             localStorage.removeItem('refreshToken');
             localStorage.removeItem('user');
-            throw new Error('Session expired. Please login again.');
+            
+            // Log before redirect to help debug
+            console.error('🚨 About to redirect to login due to authentication failure');
+            console.error('🚨 This was triggered by request to:', endpoint);
+            
+            window.location.href = '/login';
+            throw new Error('Authentication expired');
           }
         }
-      }
-      
-      // Handle rate limiting
-      if (response.status === 429) {
+        
         const errorData = await response.json().catch(() => ({}));
-        throw new Error('Too many requests. Please wait a moment and try again.');
+        console.error(`❌ API Error ${response.status} for ${endpoint}:`, errorData);
+        throw new Error(errorData.message || errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
-      
-      // Handle missing endpoints (404) gracefully
-      if (response.status === 404) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.message || `API endpoint not found: ${endpoint}`;
-        console.warn('⚠️', errorMessage);
-        throw new Error(errorMessage);
-      }
-      
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-    }
 
-    const data = await response.json();
-    
-    
-    // Cache GET responses if caching is enabled
-    if (method === 'GET' && apiOptions?.useCache !== false) {
-      const cacheKey = `api:${endpoint}`;
-      const cacheDuration = apiOptions?.cacheDuration || 5 * 60 * 1000; // 5 minutes default
-      cacheService.set(cacheKey, data.data || data, cacheDuration);
+      const data = await response.json();
       
+      // Cache GET responses only for offline fallback scenarios
+      if (method === 'GET' && apiOptions?.useCache && !apiOptions?.forceRefresh) {
+        const cacheKey = `api:${endpoint}`;
+        const cacheDuration = apiOptions?.cacheDuration || 1 * 60 * 1000; // 1 minute default
+        cacheService.set(cacheKey, data.data || data, cacheDuration);
+        console.log('💾 Cached data for offline fallback:', endpoint);
       }
-    
+      
       // Return data.data if it exists (backend format), otherwise return the whole response
       return data.data || data;
-    
-    } catch (networkError: any) {
-      console.error('❌ Network error:', networkError.message);
-      this.setConnectionStatus(false);
+    } catch (error) {
+      console.error(`❌ API request failed for ${endpoint}:`, error);
       
-      // For GET requests, try to use cached data as fallback
+      // For GET requests, try to use cached data as fallback if available
       if (method === 'GET' && apiOptions?.useFallback !== false) {
         const cacheKey = `api:${endpoint}`;
         const cached = cacheService.get<T>(cacheKey);
         if (cached) {
-          
+          console.log('📦 Using cached data as fallback for:', endpoint);
           return cached;
         }
       }
       
-      // For missing API endpoints (404), provide a more helpful error
-      if (networkError.message?.includes('404')) {
-        console.warn(`⚠️ API endpoint not found: ${endpoint}. This feature may not be implemented yet.`);
-        // Return empty data for GET requests to prevent crashes
-        if (method === 'GET') {
-          return [] as T;
-        }
-      }
-      
-      // If no cached data available, throw the original error
-      throw new Error(`Network error: ${networkError.message || 'Failed to connect to backend'}`);
+      throw error;
     }
   }
 
@@ -319,32 +326,42 @@ class ApiService {
     return await this.request('/users');
   }
 
-  async getContacts(): Promise<Contact[]> {
-    // Check if user is admin to request all contacts
+  async getContacts(options?: { page?: number; limit?: number; search?: string }): Promise<Contact[]> {
+    // Use pagination to prevent performance issues
+    const { page = 1, limit = 50, search } = options || {};
+    
+    // Check if user is admin to request more contacts per page
     const userStr = localStorage.getItem('user');
-    let endpoint = '/contacts';
+    let userLimit = limit;
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
         if (user?.role === 'admin') {
-          endpoint = '/contacts?limit=2000'; // Admin gets ALL contacts
-          
+          userLimit = Math.min(limit, 100); // Admin gets more but still paginated
         }
       } catch (e) {
         console.error('Error parsing user data for contacts:', e);
-        // Continue with default endpoint
+        // Continue with default limit
       }
     }
     
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: userLimit.toString()
+    });
+    
+    if (search) {
+      params.append('search', search);
+    }
+    
+    const endpoint = `/contacts?${params.toString()}`;
+    
     const response = await this.request<any>(endpoint);
     if (Array.isArray(response)) {
-      
       return response;
     } else if (response && response.contacts) {
-      
       return response.contacts;
     } else if (response && response.data) {
-      
       return response.data;
     }
     return [];
@@ -361,7 +378,7 @@ class ApiService {
         const user = JSON.parse(userStr);
         
         if (user?.role === 'admin') {
-          limit = '2000'; // Admin gets ALL exchanges (increased to ensure we get all)
+          limit = '50'; // Admin gets more exchanges but not ALL at once (reduced from 100 to prevent timeouts)
           isAdmin = true;
           
         }
@@ -413,11 +430,130 @@ class ApiService {
   }
 
   async getDocuments(): Promise<Document[]> {
-    return await this.request('/documents');
+    const response = await this.request<Document[]>('/documents');
+    return response;
+  }
+
+  // Folder operations
+  async getFolders(exchangeId?: string, parentId?: string): Promise<any[]> {
+    let endpoint = '/folders';
+    if (exchangeId) {
+      endpoint = `/folders/exchange/${exchangeId}`;
+      if (parentId) {
+        endpoint += `?parentId=${parentId}`;
+      }
+    }
+    const response = await this.request<any>(endpoint);
+    return response.data || response || [];
+  }
+
+  async getFolderById(id: string): Promise<any> {
+    const response = await this.request<any>(`/folders/${id}`);
+    return response.data || response;
+  }
+
+  async createFolder(folderData: {
+    name: string;
+    parentId?: string;
+    exchangeId: string;
+  }): Promise<any> {
+    const response = await this.request<any>('/folders', {
+      method: 'POST',
+      body: JSON.stringify(folderData)
+    });
+    return response.data || response;
+  }
+
+  async updateFolder(id: string, folderData: {
+    name?: string;
+    parentId?: string;
+  }): Promise<any> {
+    const response = await this.request<any>(`/folders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(folderData)
+    });
+    return response.data || response;
+  }
+
+  async deleteFolder(id: string): Promise<void> {
+    await this.request(`/folders/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async moveDocumentsToFolder(documentIds: string[], folderId: string): Promise<any[]> {
+    const response = await this.request<any>(`/folders/${folderId}/move-documents`, {
+      method: 'POST',
+      body: JSON.stringify({ documentIds })
+    });
+    return response.data || response || [];
   }
 
   async getAuditLogs(): Promise<AuditLog[]> {
     return await this.request('/admin/audit-logs'); // This endpoint exists in backend
+  }
+
+  // Audit Social Features
+  async getAuditLogInteractions(auditLogId: string): Promise<any> {
+    return await this.request(`/audit-social/${auditLogId}/interactions`);
+  }
+
+  async likeAuditLog(auditLogId: string, reactionType: string = 'like'): Promise<any> {
+    return await this.request(`/audit-social/${auditLogId}/like`, {
+      method: 'POST',
+      body: JSON.stringify({ reactionType })
+    });
+  }
+
+  async commentOnAuditLog(auditLogId: string, content: string, mentions: string[] = []): Promise<any> {
+    return await this.request(`/audit-social/${auditLogId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ content, mentions })
+    });
+  }
+
+  async assignAuditLog(auditLogId: string, assignmentData: {
+    assignedTo: string;
+    assignmentType: string;
+    priority: string;
+    notes?: string;
+  }): Promise<any> {
+    return await this.request(`/audit-social/${auditLogId}/assign`, {
+      method: 'POST',
+      body: JSON.stringify(assignmentData)
+    });
+  }
+
+  async escalateAuditLog(auditLogId: string, escalationData: {
+    escalatedTo: string;
+    reason: string;
+    priority: string;
+    escalationLevel: number;
+  }): Promise<any> {
+    return await this.request(`/audit-social/${auditLogId}/escalate`, {
+      method: 'POST',
+      body: JSON.stringify(escalationData)
+    });
+  }
+
+  async updateAssignment(assignmentId: string, updateData: {
+    status: string;
+    notes?: string;
+  }): Promise<any> {
+    return await this.request(`/audit-social/assignments/${assignmentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData)
+    });
+  }
+
+  async updateEscalation(escalationId: string, updateData: {
+    status: string;
+    resolutionNotes?: string;
+  }): Promise<any> {
+    return await this.request(`/audit-social/escalations/${escalationId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData)
+    });
   }
 
   async getSyncLogs(): Promise<SyncLog[]> {
@@ -498,12 +634,21 @@ class ApiService {
     });
   }
 
-  async uploadDocument(file: File, exchangeId: string, category: string): Promise<Document> {
+  async uploadDocument(
+    file: File,
+    exchangeId: string,
+    category: string,
+    options?: { description?: string; pinRequired?: boolean; pin?: string; folderId?: string }
+  ): Promise<Document> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('exchangeId', exchangeId);
     formData.append('category', category);
-    
+    if (options?.description) formData.append('description', options.description);
+    if (typeof options?.pinRequired === 'boolean') formData.append('pinRequired', String(options.pinRequired));
+    if (options?.pin) formData.append('pin', options.pin);
+    if (options?.folderId) formData.append('folderId', options.folderId);
+
     const token = localStorage.getItem('token');
     const response = await fetch(`${this.baseURL}/documents`, {
       method: 'POST',
@@ -512,13 +657,15 @@ class ApiService {
       },
       body: formData
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || 'Upload failed');
     }
-    
-    return response.json();
+
+    const result = await response.json();
+    // Backend returns { data: document, message: string }
+    return result.data || result;
   }
 
   async downloadDocument(id: string, pinCode?: string): Promise<Blob> {
@@ -646,6 +793,12 @@ class ApiService {
   // Document Template Management
   async getDocumentTemplates(): Promise<any[]> {
     return this.request<any[]>('/documents/templates');
+  }
+
+  async createDocumentTemplate(templateData: any): Promise<any> {
+    return this.request<any>('/documents/templates', {
+      method: 'POST'
+    }, templateData);
   }
 
   async uploadDocumentTemplate(formData: FormData): Promise<any> {
@@ -874,6 +1027,82 @@ class ApiService {
     return this.get('/dashboard/exchange-metrics');
   }
 
+  // ===========================================
+  // ENHANCED ANALYTICS ENDPOINTS
+  // ===========================================
+
+  /**
+   * Get paginated exchanges with smart filtering
+   */
+  async getSmartExchanges(options: {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    status?: string;
+    minValue?: number;
+    maxValue?: number;
+    exchangeType?: string;
+    searchTerm?: string;
+    startDate?: string;
+    endDate?: string;
+  } = {}): Promise<any> {
+    const params = new URLSearchParams();
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.set(key, String(value));
+      }
+    });
+    
+    return this.get(`/analytics/exchanges?${params.toString()}`);
+  }
+
+  /**
+   * Get comprehensive financial overview
+   */
+  async getFinancialOverview(): Promise<any> {
+    return this.get('/analytics/financial-overview');
+  }
+
+  /**
+   * Get enhanced dashboard statistics
+   */
+  async getEnhancedDashboardStats(): Promise<any> {
+    return this.get('/analytics/dashboard-stats');
+  }
+
+  /**
+   * Get available classic queries
+   */
+  async getClassicQueries(): Promise<any> {
+    return this.get('/analytics/classic-queries');
+  }
+
+  /**
+   * Execute a classic pre-built query
+   */
+  async executeClassicQuery(queryKey: string, params?: any): Promise<any> {
+    return this.post('/analytics/classic-query', { queryKey, params });
+  }
+
+  /**
+   * Execute AI-powered natural language query
+   */
+  async executeAIQuery(query: string): Promise<any> {
+    return this.post('/analytics/ai-query', { query });
+  }
+
+  /**
+   * Get query suggestions based on context
+   */
+  async getQuerySuggestions(context?: any): Promise<string[]> {
+    const params = new URLSearchParams();
+    if (context?.page) params.set('page', context.page);
+    if (context?.recent) params.set('recent', JSON.stringify(context.recent));
+    
+    return this.get(`/analytics/query-suggestions?${params.toString()}`);
+  }
+
   /**
    * Get upcoming 1031 exchange deadlines (CRITICAL for compliance)
    */
@@ -1091,12 +1320,8 @@ class ApiService {
    * Complete PracticePanther OAuth with callback code
    */
   async completeP3OAuth(code: string, state: string): Promise<{ success: boolean }> {
-    const url = new URL(`${this.baseURL}/admin/pp-token/callback`);
-    url.searchParams.set('code', code);
-    url.searchParams.set('state', state);
-    
-    return await this.request<{ success: boolean }>(url.pathname + url.search, {
-      method: 'GET'
+    return await this.request(`/admin/pp-token/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`, {
+      method: 'GET',
     });
   }
 
@@ -1108,7 +1333,6 @@ class ApiService {
       token_status?: { status: string };
       last_refresh?: { refreshed_at: string };
     }>('/admin/pp-token/status');
-    
     return { 
       authorized: response.token_status?.status === 'valid',
       lastSync: response.last_refresh?.refreshed_at 

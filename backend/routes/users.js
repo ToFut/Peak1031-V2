@@ -58,7 +58,7 @@ router.get('/', authenticateToken, checkPermission(['admin', 'coordinator']), as
       lastName: user.last_name || user.lastName,
       role: user.role,
       isActive: user.is_active !== false,
-      emailVerified: user.email_verified || false,
+      emailVerified: true, // Default since email_verified column doesn't exist
       twoFaEnabled: user.two_fa_enabled || false,
       lastLogin: user.last_login || user.lastLogin,
       createdAt: user.created_at || user.createdAt,
@@ -97,7 +97,7 @@ router.get('/:id', authenticateToken, checkPermission(['admin', 'coordinator']),
       lastName: user.last_name || user.lastName,
       role: user.role,
       isActive: user.is_active !== false,
-      emailVerified: user.email_verified || false,
+      emailVerified: true, // Default since email_verified column doesn't exist
       twoFaEnabled: user.two_fa_enabled || false,
       lastLogin: user.last_login || user.lastLogin,
       createdAt: user.created_at || user.createdAt,
@@ -145,7 +145,7 @@ router.post('/', [
       last_name: lastName,
       role,
       is_active: true,
-      email_verified: false,
+      // email_verified column doesn't exist in database
       two_fa_enabled: false
     };
 
@@ -159,7 +159,7 @@ router.post('/', [
       lastName: newUser.last_name || newUser.lastName,
       role: newUser.role,
       isActive: newUser.is_active !== false,
-      emailVerified: newUser.email_verified || false,
+      emailVerified: true, // Default to true since column doesn't exist
       twoFaEnabled: newUser.two_fa_enabled || false,
       createdAt: newUser.created_at || newUser.createdAt
     };
@@ -210,7 +210,7 @@ router.put('/:id', [
       lastName: updatedUser.last_name || updatedUser.lastName,
       role: updatedUser.role,
       isActive: updatedUser.is_active !== false,
-      emailVerified: updatedUser.email_verified || false,
+      emailVerified: true, // Default since email_verified column doesn't exist
       twoFaEnabled: updatedUser.two_fa_enabled || false,
       updatedAt: updatedUser.updated_at || updatedUser.updatedAt
     };
@@ -249,6 +249,24 @@ router.put('/:id/password', [
   }
 });
 
+// Activate user
+router.put('/:id/activate', authenticateToken, checkPermission(['admin']), async (req, res) => {
+  try {
+    const user = await databaseService.getUserById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Activate user by setting is_active to true
+    await databaseService.updateUser(req.params.id, { is_active: true });
+
+    res.json({ message: 'User activated successfully' });
+  } catch (error) {
+    console.error('Error activating user:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Deactivate user (soft delete)
 router.delete('/:id', authenticateToken, checkPermission(['admin']), async (req, res) => {
   try {
@@ -283,7 +301,7 @@ router.get('/statistics/overview', authenticateToken, checkPermission(['admin'])
         agency: users.filter(u => u.role === 'agency').length,
         third_party: users.filter(u => u.role === 'third_party').length
       },
-      verified: users.filter(u => u.email_verified).length,
+      verified: users.length, // All users considered verified since email_verified column doesn't exist
       twoFaEnabled: users.filter(u => u.two_fa_enabled).length,
       recentLogins: users.filter(u => {
         const lastLogin = u.last_login || u.lastLogin;

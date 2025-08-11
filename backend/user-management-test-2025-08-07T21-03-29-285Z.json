@@ -1,0 +1,225 @@
+{
+  "summary": {
+    "feature": "User Management",
+    "total": 21,
+    "passed": 10,
+    "failed": 11,
+    "successRate": "47.62%",
+    "timestamp": "2025-08-07T21:03:29.285Z"
+  },
+  "tests": [
+    {
+      "test": "Admin JWT Login",
+      "success": true,
+      "details": {
+        "token": "generated",
+        "user": "admin@peak1031.com",
+        "role": "admin"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T21:03:16.746Z"
+    },
+    {
+      "test": "Invalid Login Rejection",
+      "success": true,
+      "details": {
+        "status": 401
+      },
+      "error": null,
+      "timestamp": "2025-08-07T21:03:16.914Z"
+    },
+    {
+      "test": "JWT Token Refresh",
+      "success": false,
+      "details": {
+        "newToken": "failed"
+      },
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T21:03:16.918Z"
+    },
+    {
+      "test": "Create client User",
+      "success": true,
+      "details": {
+        "email": "test-client@peak1031.com",
+        "role": "client"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T21:03:18.553Z"
+    },
+    {
+      "test": "Create coordinator User",
+      "success": true,
+      "details": {
+        "email": "test-coordinator@peak1031.com",
+        "role": "coordinator"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T21:03:19.836Z"
+    },
+    {
+      "test": "Create third_party User",
+      "success": true,
+      "details": {
+        "email": "test-thirdparty@peak1031.com",
+        "role": "third_party"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T21:03:20.900Z"
+    },
+    {
+      "test": "Create agency User",
+      "success": true,
+      "details": {
+        "email": "test-agency@peak1031.com",
+        "role": "agency"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T21:03:22.038Z"
+    },
+    {
+      "test": "client Dashboard Access",
+      "success": false,
+      "details": {
+        "role": "client",
+        "hasAccess": false
+      },
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T21:03:22.903Z"
+    },
+    {
+      "test": "coordinator Dashboard Access",
+      "success": false,
+      "details": {
+        "role": "coordinator",
+        "hasAccess": false
+      },
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T21:03:23.744Z"
+    },
+    {
+      "test": "third_party Dashboard Access",
+      "success": false,
+      "details": {
+        "role": "third_party",
+        "hasAccess": false
+      },
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T21:03:24.615Z"
+    },
+    {
+      "test": "agency Dashboard Access",
+      "success": false,
+      "details": {
+        "role": "agency",
+        "hasAccess": false
+      },
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T21:03:25.428Z"
+    },
+    {
+      "test": "Deactivate User",
+      "success": false,
+      "details": {
+        "action": "deactivate"
+      },
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T21:03:25.666Z"
+    },
+    {
+      "test": "Inactive User Login Blocked",
+      "success": false,
+      "details": {
+        "blocked": false
+      },
+      "error": "Inactive user should not be able to login",
+      "timestamp": "2025-08-07T21:03:26.352Z"
+    },
+    {
+      "test": "Reactivate User",
+      "success": false,
+      "details": {
+        "action": "reactivate"
+      },
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T21:03:26.578Z"
+    },
+    {
+      "test": "Get User Profile",
+      "success": false,
+      "details": {
+        "hasProfile": false
+      },
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T21:03:26.579Z"
+    },
+    {
+      "test": "Update User Profile",
+      "success": false,
+      "details": {
+        "updated": false
+      },
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T21:03:26.581Z"
+    },
+    {
+      "test": "Exchange Participant Assignment",
+      "success": false,
+      "details": {},
+      "error": "No exchanges available for assignment testing",
+      "timestamp": "2025-08-07T21:03:26.958Z"
+    },
+    {
+      "test": "Admin access to all users",
+      "success": true,
+      "details": {
+        "role": "admin",
+        "endpoint": "/api/users",
+        "expectedAccess": true,
+        "actualAccess": true,
+        "status": 200
+      },
+      "error": null,
+      "timestamp": "2025-08-07T21:03:27.631Z"
+    },
+    {
+      "test": "Client blocked from user management",
+      "success": true,
+      "details": {
+        "role": "client",
+        "endpoint": "/api/users",
+        "expectedAccess": false,
+        "actualAccess": false,
+        "status": 403
+      },
+      "error": null,
+      "timestamp": "2025-08-07T21:03:28.139Z"
+    },
+    {
+      "test": "Coordinator access to exchanges",
+      "success": true,
+      "details": {
+        "role": "coordinator",
+        "endpoint": "/api/exchanges",
+        "expectedAccess": true,
+        "actualAccess": true,
+        "status": 200
+      },
+      "error": null,
+      "timestamp": "2025-08-07T21:03:28.437Z"
+    },
+    {
+      "test": "Third party blocked from audit logs",
+      "success": true,
+      "details": {
+        "role": "third_party",
+        "endpoint": "/api/admin/audit-logs",
+        "expectedAccess": false,
+        "actualAccess": false,
+        "status": 403
+      },
+      "error": null,
+      "timestamp": "2025-08-07T21:03:29.285Z"
+    }
+  ]
+}

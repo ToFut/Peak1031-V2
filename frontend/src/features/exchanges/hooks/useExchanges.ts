@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Exchange } from '../../../types';
 import { apiService } from '../../../services/api';
 
@@ -22,6 +22,7 @@ export const useExchanges = (filters?: UseExchangesFilters) => {
     loading: true,
     error: null,
   });
+  const hasFetchedRef = useRef(false);
 
   // Load exchanges with filters
   const loadExchanges = useCallback(async (customFilters?: UseExchangesFilters) => {
@@ -142,10 +143,13 @@ export const useExchanges = (filters?: UseExchangesFilters) => {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
-  // Load exchanges on mount and when filters change
+  // Load exchanges on mount
   useEffect(() => {
-    loadExchanges();
-  }, [loadExchanges]);
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      loadExchanges();
+    }
+  }, []); // Empty dependency array - only run on mount
 
   return {
     exchanges: state.exchanges,

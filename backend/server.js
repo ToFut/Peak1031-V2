@@ -17,6 +17,7 @@ const { authenticateToken } = require('./middleware/auth');
 const { authenticateSupabaseToken } = require('./middleware/supabase-auth');
 const { authenticateHybridToken } = require('./middleware/hybrid-auth');
 const auditMiddleware = require('./middleware/audit');
+const { performanceMiddleware } = require('./middleware/performance');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -26,6 +27,7 @@ const contactRoutes = require('./routes/contacts');
 const exchangeRoutes = require('./routes/supabase-exchanges');
 const taskRoutes = require('./routes/tasks');
 const documentRoutes = require('./routes/documents');
+const folderRoutes = require('./routes/folders');
 const messageRoutes = require('./routes/messages');
 const testMessageRoutes = require('./routes/test-message');
 const syncRoutes = require('./routes/sync');
@@ -41,16 +43,22 @@ const enhancedQueryRoutes = require('./routes/enhanced-query');
 const ppTokenAdminRoutes = require('./routes/pp-token-admin');
 const ppDataRoutes = require('./routes/pp-data-api');
 const unifiedDataRoutes = require('./routes/unified-data');
+const invitationRoutes = require('./routes/invitations');
 
 // New routes
 const userRoutes = require('./routes/users');
 const dashboardRoutes = require('./routes/dashboard-new');
+const analyticsRoutes = require('./routes/analytics');
 const settingsRoutes = require('./routes/settings');
 const userProfileRoutes = require('./routes/user-profile');
+const performanceRoutes = require('./routes/performance');
 
 // Enterprise routes
 const enterpriseExchangesRoutes = require('./routes/enterprise-exchanges');
 const accountManagementRoutes = require('./routes/account-management');
+
+// Audit social features routes
+const auditSocialRoutes = require('./routes/audit-social');
 
 // Import services
 const MessageService = require('./services/messages');
@@ -115,8 +123,9 @@ class PeakServer {
         }
       },
       credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization']
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'cache-control', 'Pragma', 'pragma', 'Expires', 'expires', 'X-Requested-With', 'Accept', 'Origin'],
+      exposedHeaders: ['Content-Length', 'Content-Type', 'X-Total-Count']
     }));
 
     // Rate limiting
@@ -165,16 +174,19 @@ class PeakServer {
       this.app.use(morgan('combined'));
     }
 
-    // NO audit middleware here - will apply per route later
-    // Health check endpoint (before auth)
+    // Performance monitoring middleware (only in development or when explicitly enabled)
+    if (process.env.NODE_ENV === 'development' || process.env.ENABLE_PERFORMANCE_MONITORING === 'true') {
+      console.log('🔍 Performance monitoring enabled');
+      this.app.use(performanceMiddleware());
+    }
+
+    // Health check endpoint
     this.app.get('/health', (req, res) => {
-      console.log('🏥 Simple health check');
-      res.status(200).json({ 
-        status: 'healthy', 
+      res.json({
+        status: 'healthy',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        version: process.env.npm_package_version || '1.0.0'
+        environment: process.env.NODE_ENV || 'development'
       });
     });
     
@@ -284,39 +296,44 @@ class PeakServer {
       });
     });
 
-    // API routes - Use working auth for now
-    this.app.use('/api/auth', workingAuthRoutes);
-    this.app.use('/api/auth/supabase', supabaseAuthRoutes); // Keep Supabase auth available
-    this.app.use('/api/auth/legacy', authRoutes); // Keep old auth for reference
+    // API routes
+    this.app.use('/api/auth', authRoutes);
+    this.app.use('/api/supabase-auth', supabaseAuthRoutes);
+    this.app.use('/api/working-auth', workingAuthRoutes);
+    this.app.use('/api/contacts', contactRoutes);
+    this.app.use('/api/exchanges', exchangeRoutes);
+    this.app.use('/api/tasks', taskRoutes);
+    this.app.use('/api/documents', documentRoutes);
+    this.app.use('/api/folders', folderRoutes);
+    this.app.use('/api/messages', messageRoutes);
+    this.app.use('/api/test-messages', testMessageRoutes);
+    this.app.use('/api/sync', syncRoutes);
+    this.app.use('/api/admin', adminRoutes);
+    this.app.use('/api/notifications', notificationRoutes);
     this.app.use('/api/oauth', oauthRoutes);
-    this.app.use('/api/contacts', authenticateToken, contactRoutes);
-    this.app.use('/api/exchanges', authenticateToken, exchangeRoutes);
-    this.app.use('/api/tasks', authenticateToken, taskRoutes);
-    this.app.use('/api/documents/templates', authenticateToken, templateRoutes);
-    this.app.use('/api/documents', authenticateToken, documentRoutes);
-    this.app.use('/api/messages', authenticateToken, messageRoutes);
-    this.app.use('/api/test-messages', authenticateToken, testMessageRoutes);
-    this.app.use('/api/notifications', authenticateToken, notificationRoutes);
-    this.app.use('/api/exports', authenticateToken, exportRoutes);
-    this.app.use('/api/sync', authenticateToken, syncRoutes);
-    this.app.use('/api/admin', authenticateToken, adminRoutes);
-    this.app.use('/api/admin/gpt', authenticateToken, adminGPTRoutes);
-    this.app.use('/api/admin/pp-token', authenticateToken, ppTokenAdminRoutes);
-    this.app.use('/api/pp-data', authenticateToken, ppDataRoutes);
-    this.app.use('/api/unified', authenticateToken, unifiedDataRoutes);
-    this.app.use('/api/reports', authenticateToken, reportsRoutes);
+    this.app.use('/api/exports', exportRoutes);
+    this.app.use('/api/exchange-participants', exchangeParticipantsRoutes);
+    this.app.use('/api/templates', templateRoutes);
+    this.app.use('/api/admin-gpt', adminGPTRoutes);
+    this.app.use('/api/reports', reportsRoutes);
     this.app.use('/api/enhanced-query', enhancedQueryRoutes);
-    this.app.use('/api/users', authenticateToken, userRoutes);
-    this.app.use('/api/dashboard', authenticateToken, dashboardRoutes);
-    this.app.use('/api/settings', authenticateToken, settingsRoutes);
-    this.app.use('/api/user-profile', authenticateToken, userProfileRoutes);
+    this.app.use('/api/pp-token-admin', ppTokenAdminRoutes);
+    this.app.use('/api/pp-data', ppDataRoutes);
+    this.app.use('/api/unified-data', unifiedDataRoutes);
+    this.app.use('/api/invitations', invitationRoutes);
+    this.app.use('/api/users', userRoutes);
+    this.app.use('/api/dashboard', dashboardRoutes);
+    this.app.use('/api/analytics', analyticsRoutes);
+    this.app.use('/api/settings', settingsRoutes);
+    this.app.use('/api/user-profile', userProfileRoutes);
+    this.app.use('/api/enterprise-exchanges', enterpriseExchangesRoutes);
+    this.app.use('/api/account-management', accountManagementRoutes);
     
-    // Additional routes
-    this.app.use('/api/exchange-participants', authenticateToken, exchangeParticipantsRoutes);
+    // Audit social features routes
+    this.app.use('/api/audit-social', auditSocialRoutes);
     
-    // Enterprise routes
-    this.app.use('/api/enterprise-exchanges', authenticateToken, enterpriseExchangesRoutes);
-    this.app.use('/api/account', authenticateToken, accountManagementRoutes);
+    // Performance monitoring routes (admin only)
+    this.app.use('/api/performance', performanceRoutes);
 
     // Serve uploaded files with authentication
     this.app.use('/api/files', authenticateToken, express.static(

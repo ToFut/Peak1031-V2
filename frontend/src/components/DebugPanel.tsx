@@ -72,7 +72,14 @@ const DebugPanel: React.FC = () => {
   };
 
   useEffect(() => {
-    runTests();
+    // Only run tests on mount, not in StrictMode double-render
+    let mounted = true;
+    if (mounted) {
+      runTests();
+    }
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Collapsed state - just the button

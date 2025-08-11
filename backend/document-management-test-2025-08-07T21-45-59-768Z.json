@@ -1,0 +1,28 @@
+{
+  "summary": {
+    "feature": "Document Management",
+    "total": 2,
+    "passed": 1,
+    "failed": 1,
+    "successRate": "50.00%",
+    "timestamp": "2025-08-07T21:45:59.768Z"
+  },
+  "tests": [
+    {
+      "test": "Admin Authentication",
+      "success": true,
+      "details": {
+        "token": "obtained"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T21:45:57.575Z"
+    },
+    {
+      "test": "Test Suite Execution",
+      "success": false,
+      "details": {},
+      "error": "Cannot read properties of undefined (reading 'id')",
+      "timestamp": "2025-08-07T21:45:59.768Z"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
+import Layout from '../../../components/Layout';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
 
@@ -110,14 +110,17 @@ const Settings: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="animate-pulse">
-        <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-        <div className="bg-gray-200 rounded-lg h-96"></div>
-      </div>
+      <Layout>
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+          <div className="bg-gray-200 rounded-lg h-96"></div>
+        </div>
+      </Layout>
     );
   }
 
   return (
+    <Layout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
@@ -329,6 +332,51 @@ const Settings: React.FC = () => {
                         <option value="America/Los_Angeles">Pacific Time</option>
                       </select>
                     </div>
+                    
+                    {/* Menu Experience Settings */}
+                    <div className="border-t border-gray-200 pt-6">
+                      <h4 className="text-md font-medium text-gray-900 mb-4">Menu Experience</h4>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Delayed Tooltip</label>
+                          <div className="mt-1 flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={settings.menuExperience?.delayedTooltipEnabled !== false}
+                              onChange={(e) => handleInputChange('menuExperience', {
+                                ...settings.menuExperience,
+                                delayedTooltipEnabled: e.target.checked
+                              })}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                            <label className="ml-2 text-sm text-gray-700">
+                              Enable delayed tooltips on sidebar items
+                            </label>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Tooltip Delay (seconds)</label>
+                          <select
+                            value={settings.menuExperience?.tooltipDelay || 4}
+                            onChange={(e) => handleInputChange('menuExperience', {
+                              ...settings.menuExperience,
+                              tooltipDelay: parseInt(e.target.value)
+                            })}
+                            className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value={1}>1 second</option>
+                            <option value={2}>2 seconds</option>
+                            <option value={3}>3 seconds</option>
+                            <option value={4}>4 seconds</option>
+                            <option value={5}>5 seconds</option>
+                            <option value={6}>6 seconds</option>
+                          </select>
+                          <p className="mt-1 text-sm text-gray-500">
+                            How long to wait before showing tooltips on hover
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -423,6 +471,7 @@ const Settings: React.FC = () => {
           </div>
         </div>
       </div>
+    </Layout>
   );
 };
 

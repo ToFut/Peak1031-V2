@@ -1,0 +1,42 @@
+{
+  "name": "peak1031-database-setup",
+  "version": "1.0.0",
+  "description": "Complete database setup package for Peak 1031 Exchange Platform",
+  "main": "setup.js",
+  "bin": {
+    "peak1031-setup": "./setup.js"
+  },
+  "scripts": {
+    "setup": "node setup.js",
+    "setup:verbose": "node setup.js --verbose",
+    "setup:skip-sync": "node setup.js --skip-sync",
+    "sync-pp": "node 03-pp-sync/01-sync-all-data.js",
+    "populate-participants": "node 03-pp-sync/03-populate-participants.js",
+    "help": "node setup.js --help"
+  },
+  "keywords": [
+    "1031-exchange",
+    "database-setup",
+    "supabase",
+    "practice-panther",
+    "peak1031"
+  ],
+  "author": "Peak 1031 Development Team",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/peak1031/database-setup.git"
+  },
+  "bugs": {
+    "url": "https://github.com/peak1031/database-setup/issues"
+  },
+  "homepage": "https://github.com/peak1031/database-setup#readme"
+}

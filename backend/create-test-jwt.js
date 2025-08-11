@@ -9,7 +9,7 @@ async function createTestJWT() {
     
     // Create a test user payload with the actual admin user ID from Supabase
     const payload = {
-      userId: 'd3af6a77-6766-435f-8313-a3be252f269f', // Actual admin user ID from Supabase
+      userId: '278304de-568f-4138-b35b-6fdcfbd2f1ce', // Actual admin user ID from database
       email: 'admin@peak1031.com',
       role: 'admin',
       iat: Math.floor(Date.now() / 1000),

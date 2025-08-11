@@ -1,0 +1,415 @@
+{
+  "startTime": "2025-08-07T21:03:16.175Z",
+  "endTime": "2025-08-07T21:03:46.172Z",
+  "totalFeatures": 7,
+  "passedFeatures": 0,
+  "failedFeatures": 7,
+  "totalTests": 39,
+  "passedTests": 14,
+  "failedTests": 25,
+  "features": {
+    "User Management": {
+      "feature": "User Management",
+      "passed": 10,
+      "failed": 11,
+      "total": 21,
+      "successRate": "0%",
+      "duration": "12.78s",
+      "details": [
+        {
+          "test": "Admin JWT Login",
+          "success": true,
+          "details": {
+            "token": "generated",
+            "user": "admin@peak1031.com",
+            "role": "admin"
+          },
+          "error": null,
+          "timestamp": "2025-08-07T21:03:16.746Z"
+        },
+        {
+          "test": "Invalid Login Rejection",
+          "success": true,
+          "details": {
+            "status": 401
+          },
+          "error": null,
+          "timestamp": "2025-08-07T21:03:16.914Z"
+        },
+        {
+          "test": "JWT Token Refresh",
+          "success": false,
+          "details": {
+            "newToken": "failed"
+          },
+          "error": "[object Object]",
+          "timestamp": "2025-08-07T21:03:16.918Z"
+        },
+        {
+          "test": "Create client User",
+          "success": true,
+          "details": {
+            "email": "test-client@peak1031.com",
+            "role": "client"
+          },
+          "error": null,
+          "timestamp": "2025-08-07T21:03:18.553Z"
+        },
+        {
+          "test": "Create coordinator User",
+          "success": true,
+          "details": {
+            "email": "test-coordinator@peak1031.com",
+            "role": "coordinator"
+          },
+          "error": null,
+          "timestamp": "2025-08-07T21:03:19.836Z"
+        },
+        {
+          "test": "Create third_party User",
+          "success": true,
+          "details": {
+            "email": "test-thirdparty@peak1031.com",
+            "role": "third_party"
+          },
+          "error": null,
+          "timestamp": "2025-08-07T21:03:20.900Z"
+        },
+        {
+          "test": "Create agency User",
+          "success": true,
+          "details": {
+            "email": "test-agency@peak1031.com",
+            "role": "agency"
+          },
+          "error": null,
+          "timestamp": "2025-08-07T21:03:22.038Z"
+        },
+        {
+          "test": "client Dashboard Access",
+          "success": false,
+          "details": {
+            "role": "client",
+            "hasAccess": false
+          },
+          "error": "[object Object]",
+          "timestamp": "2025-08-07T21:03:22.903Z"
+        },
+        {
+          "test": "coordinator Dashboard Access",
+          "success": false,
+          "details": {
+            "role": "coordinator",
+            "hasAccess": false
+          },
+          "error": "[object Object]",
+          "timestamp": "2025-08-07T21:03:23.744Z"
+        },
+        {
+          "test": "third_party Dashboard Access",
+          "success": false,
+          "details": {
+            "role": "third_party",
+            "hasAccess": false
+          },
+          "error": "[object Object]",
+          "timestamp": "2025-08-07T21:03:24.615Z"
+        },
+        {
+          "test": "agency Dashboard Access",
+          "success": false,
+          "details": {
+            "role": "agency",
+            "hasAccess": false
+          },
+          "error": "[object Object]",
+          "timestamp": "2025-08-07T21:03:25.428Z"
+        },
+        {
+          "test": "Deactivate User",
+          "success": false,
+          "details": {
+            "action": "deactivate"
+          },
+          "error": "[object Object]",
+          "timestamp": "2025-08-07T21:03:25.666Z"
+        },
+        {
+          "test": "Inactive User Login Blocked",
+          "success": false,
+          "details": {
+            "blocked": false
+          },
+          "error": "Inactive user should not be able to login",
+          "timestamp": "2025-08-07T21:03:26.352Z"
+        },
+        {
+          "test": "Reactivate User",
+          "success": false,
+          "details": {
+            "action": "reactivate"
+          },
+          "error": "[object Object]",
+          "timestamp": "2025-08-07T21:03:26.578Z"
+        },
+        {
+          "test": "Get User Profile",
+          "success": false,
+          "details": {
+            "hasProfile": false
+          },
+          "error": "[object Object]",
+          "timestamp": "2025-08-07T21:03:26.579Z"
+        },
+        {
+          "test": "Update User Profile",
+          "success": false,
+          "details": {
+            "updated": false
+          },
+          "error": "[object Object]",
+          "timestamp": "2025-08-07T21:03:26.581Z"
+        },
+        {
+          "test": "Exchange Participant Assignment",
+          "success": false,
+          "details": {},
+          "error": "No exchanges available for assignment testing",
+          "timestamp": "2025-08-07T21:03:26.958Z"
+        },
+        {
+          "test": "Admin access to all users",
+          "success": true,
+          "details": {
+            "role": "admin",
+            "endpoint": "/api/users",
+            "expectedAccess": true,
+            "actualAccess": true,
+            "status": 200
+          },
+          "error": null,
+          "timestamp": "2025-08-07T21:03:27.631Z"
+        },
+        {
+          "test": "Client blocked from user management",
+          "success": true,
+          "details": {
+            "role": "client",
+            "endpoint": "/api/users",
+            "expectedAccess": false,
+            "actualAccess": false,
+            "status": 403
+          },
+          "error": null,
+          "timestamp": "2025-08-07T21:03:28.139Z"
+        },
+        {
+          "test": "Coordinator access to exchanges",
+          "success": true,
+          "details": {
+            "role": "coordinator",
+            "endpoint": "/api/exchanges",
+            "expectedAccess": true,
+            "actualAccess": true,
+            "status": 200
+          },
+          "error": null,
+          "timestamp": "2025-08-07T21:03:28.437Z"
+        },
+        {
+          "test": "Third party blocked from audit logs",
+          "success": true,
+          "details": {
+            "role": "third_party",
+            "endpoint": "/api/admin/audit-logs",
+            "expectedAccess": false,
+            "actualAccess": false,
+            "status": 403
+          },
+          "error": null,
+          "timestamp": "2025-08-07T21:03:29.285Z"
+        }
+      ],
+      "timestamp": "2025-08-07T21:03:29.286Z"
+    },
+    "Exchange Management": {
+      "feature": "Exchange Management",
+      "passed": 0,
+      "failed": 2,
+      "total": 2,
+      "successRate": "0%",
+      "duration": "0.00s",
+      "details": [
+        {
+          "test": "Admin Authentication",
+          "success": false,
+          "details": {},
+          "error": "Failed to authenticate",
+          "timestamp": "2025-08-07T21:03:30.289Z"
+        },
+        {
+          "test": "Test Suite Execution",
+          "success": false,
+          "details": {},
+          "error": "Authentication setup failed - cannot proceed",
+          "timestamp": "2025-08-07T21:03:30.289Z"
+        }
+      ],
+      "timestamp": "2025-08-07T21:03:30.289Z"
+    },
+    "Messaging System": {
+      "feature": "Messaging System",
+      "passed": 0,
+      "failed": 2,
+      "total": 2,
+      "successRate": "0%",
+      "duration": "0.00s",
+      "details": [
+        {
+          "test": "Admin Authentication",
+          "success": false,
+          "details": {},
+          "error": "Failed to authenticate admin",
+          "timestamp": "2025-08-07T21:03:31.292Z"
+        },
+        {
+          "test": "Test Suite Execution",
+          "success": false,
+          "details": {},
+          "error": "Authentication setup failed - cannot proceed",
+          "timestamp": "2025-08-07T21:03:31.292Z"
+        }
+      ],
+      "timestamp": "2025-08-07T21:03:31.292Z"
+    },
+    "Document Management": {
+      "feature": "Document Management",
+      "passed": 1,
+      "failed": 1,
+      "total": 2,
+      "successRate": "0%",
+      "duration": "1.69s",
+      "details": [
+        {
+          "test": "Admin Authentication",
+          "success": true,
+          "details": {
+            "token": "obtained"
+          },
+          "error": null,
+          "timestamp": "2025-08-07T21:03:32.607Z"
+        },
+        {
+          "test": "Test Suite Execution",
+          "success": false,
+          "details": {},
+          "error": "Cannot read properties of undefined (reading 'id')",
+          "timestamp": "2025-08-07T21:03:33.977Z"
+        }
+      ],
+      "timestamp": "2025-08-07T21:03:33.978Z"
+    },
+    "Task Management": {
+      "feature": "Task Management (Quick)",
+      "passed": 2,
+      "failed": 1,
+      "total": 3,
+      "successRate": "66.67%",
+      "duration": "2.69s",
+      "details": [
+        {
+          "test": "Get All Tasks",
+          "success": true,
+          "status": 200
+        },
+        {
+          "test": "Get Tasks with Filters",
+          "success": true,
+          "status": 200
+        },
+        {
+          "test": "Get Task Statistics",
+          "success": false,
+          "error": "Request failed with status code 500"
+        }
+      ],
+      "timestamp": "2025-08-07T21:03:37.672Z"
+    },
+    "PracticePanther Integration": {
+      "feature": "PracticePanther Integration (Quick)",
+      "passed": 1,
+      "failed": 3,
+      "total": 4,
+      "successRate": "25.00%",
+      "duration": "1.39s",
+      "details": [
+        {
+          "test": "Get Sync Status",
+          "success": false,
+          "error": "Request failed with status code 500"
+        },
+        {
+          "test": "Get Sync Logs",
+          "success": true,
+          "status": 200
+        },
+        {
+          "test": "Get PP Configuration",
+          "success": false,
+          "error": "Request failed with status code 404"
+        },
+        {
+          "test": "Test PP Connection",
+          "success": false,
+          "error": "Request failed with status code 404"
+        }
+      ],
+      "timestamp": "2025-08-07T21:03:40.067Z"
+    },
+    "Audit Logging": {
+      "feature": "Audit Logging (Quick)",
+      "passed": 0,
+      "failed": 5,
+      "total": 5,
+      "successRate": "0.00%",
+      "duration": "4.10s",
+      "details": [
+        {
+          "test": "Get Audit Logs",
+          "success": false,
+          "error": "Request failed with status code 500"
+        },
+        {
+          "test": "Get User Activity",
+          "success": false,
+          "error": "Request failed with status code 500"
+        },
+        {
+          "test": "Get System Health",
+          "success": false,
+          "error": "Request failed with status code 404"
+        },
+        {
+          "test": "Get Admin Statistics",
+          "success": false,
+          "error": "Request failed with status code 404"
+        },
+        {
+          "test": "Audit Log Creation",
+          "success": false,
+          "error": "Request failed with status code 500"
+        }
+      ],
+      "timestamp": "2025-08-07T21:03:45.169Z"
+    }
+  },
+  "environment": {
+    "baseUrl": "http://localhost:5001",
+    "adminEmail": "admin@peak1031.com",
+    "testMode": "full",
+    "nodeVersion": "v20.19.3",
+    "platform": "darwin"
+  },
+  "totalDuration": "30.00s",
+  "overallSuccessRate": "35.90%"
+}

@@ -10,16 +10,30 @@ class AuditService {
         return;
       }
 
+      // Validate and clean entity_id - only accept valid UUIDs
+      let entityId = data.resourceId || data.entityId;
+      if (entityId && typeof entityId === 'string') {
+        // Check if it's a valid UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(entityId)) {
+          console.log('⚠️ Invalid UUID format for entity_id:', entityId, '- setting to null');
+          entityId = null;
+        }
+      } else if (entityId && typeof entityId !== 'string') {
+        entityId = null;
+      }
+
       const auditData = {
         person_id: null, // Set to null to avoid foreign key constraint issues
         action: data.action,
         entity_type: data.resourceType || data.entityType || 'SYSTEM', // Provide default to satisfy not-null constraint
-        entity_id: data.resourceId || data.entityId,
+        entity_id: entityId, // Use cleaned entityId
         ip_address: data.ipAddress,
         user_agent: data.userAgent,
         details: {
           ...data.details,
-          userId: data.userId // Store userId in details instead
+          userId: data.userId, // Store userId in details instead
+          originalEntityId: data.resourceId || data.entityId // Store original value in details for reference
         },
         created_at: new Date().toISOString()
       };

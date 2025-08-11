@@ -170,10 +170,10 @@ export function useTasks() {
   const searchTasks = useCallback((searchTerm: string) => {
     const term = searchTerm.toLowerCase();
     return tasks?.filter(task => 
-      task.title.toLowerCase().includes(term) ||
-      task.description?.toLowerCase().includes(term) ||
-      task.assignee_name?.toLowerCase().includes(term) ||
-      task.exchange_name?.toLowerCase().includes(term)
+      (task.title || '').toLowerCase().includes(term) ||
+      (task.description || '').toLowerCase().includes(term) ||
+      (task.assignee_name || '').toLowerCase().includes(term) ||
+      (task.exchange_name || '').toLowerCase().includes(term)
     ) || [];
   }, [tasks]);
 

@@ -370,52 +370,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
     console.log('🔗 Public URL generated:', publicUrl);
 
-    // Get the corresponding people table ID for the user
-    let createdById = null;
-    if (req.user?.id) {
-      console.log('🔍 Looking for user with email:', req.user.email);
-      const { data: peopleUser, error: peopleError } = await supabase
-        .from('people')
-        .select('id')
-        .eq('email', req.user.email)
-        .single();
-      
-      if (peopleError) {
-        console.log('⚠️ Could not find user in people table, trying users table:', peopleError.message);
-        
-        // Try to find in users table and verify it exists in people table with same ID
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', req.user.email)
-          .single();
-          
-        if (!userError && userData) {
-          // Check if this user ID exists in people table
-          const { data: peopleByUserId, error: peopleByUserIdError } = await supabase
-            .from('people')
-            .select('id')
-            .eq('id', userData.id)
-            .single();
-            
-          if (!peopleByUserIdError && peopleByUserId) {
-            createdById = peopleByUserId.id;
-            console.log('✅ Found matching user in people table by user ID:', createdById);
-          } else {
-            console.log('⚠️ User not found in people table, using null for created_by');
-            createdById = null; // Allow null if constraint allows it
-          }
-        } else {
-          console.log('⚠️ User not found in users table either, using null for created_by');
-          createdById = null;
-        }
-      } else {
-        createdById = peopleUser.id;
-        console.log('✅ Using people table ID for created_by:', createdById);
-      }
-    } else {
-      console.log('⚠️ No user context available, using null for created_by');
-    }
+    // Use the authenticated user's ID for created_by field
+    const createdById = req.user?.id || null;
 
     // Save template metadata to database
     const { data: template, error: dbError } = await supabase
@@ -919,31 +875,8 @@ router.post('/generate', async (req, res) => {
       .from('documents')
       .getPublicUrl(generatedFileName);
 
-    // Get the generated_by user ID (ensure it exists in people table)
-    let validGeneratedBy = null;
-    if (generated_by) {
-      // Check if this user exists in the people table
-      const { data: personData } = await supabase
-        .from('people')
-        .select('id')
-        .eq('id', generated_by)
-        .single();
-      
-      if (personData) {
-        validGeneratedBy = generated_by;
-      } else {
-        // Try to find by email if generated_by might be an email
-        const { data: userByEmail } = await supabase
-          .from('people')
-          .select('id')
-          .eq('email', generated_by)
-          .single();
-        
-        if (userByEmail) {
-          validGeneratedBy = userByEmail.id;
-        }
-      }
-    }
+    // Use the generated_by user ID directly
+    const validGeneratedBy = generated_by || null;
 
     // Save generated document record
     const { data: generatedDoc, error: saveError } = await supabase
@@ -1188,19 +1121,8 @@ router.post('/check-auto-generation', async (req, res) => {
           .from('documents')
           .getPublicUrl(generatedFileName);
 
-        // Validate triggered_by user exists in people table
-        let validTriggeredBy = null;
-        if (triggered_by) {
-          const { data: personData } = await supabase
-            .from('people')
-            .select('id')
-            .eq('id', triggered_by)
-            .single();
-          
-          if (personData) {
-            validTriggeredBy = triggered_by;
-          }
-        }
+        // Use the triggered_by user ID directly
+        const validTriggeredBy = triggered_by || null;
 
         // Save generated document record
         const { data: generatedDoc, error: saveError } = await supabase

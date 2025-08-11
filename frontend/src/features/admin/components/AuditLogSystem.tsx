@@ -25,7 +25,18 @@ import {
   PencilIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  HeartIcon,
+  ChatBubbleLeftRightIcon,
+  UserPlusIcon,
+  ExclamationCircleIcon,
+  AtSymbolIcon,
+  PaperAirplaneIcon,
+  EllipsisHorizontalIcon,
+  FlagIcon,
+  CheckIcon,
+  ClockIcon as ClockIconSolid,
+  HeartIcon as HeartIconSolid
 } from '@heroicons/react/24/outline';
 
 import { AuditLog, User } from '../../../types';
@@ -47,6 +58,52 @@ interface AuditStats {
   actions: number;
 }
 
+interface AuditComment {
+  id: string;
+  content: string;
+  userId: string;
+  userName: string;
+  createdAt: string;
+  mentions: string[];
+  isEdited: boolean;
+  editedAt?: string;
+}
+
+interface AuditLike {
+  id: string;
+  userId: string;
+  userName: string;
+  reactionType: string;
+  createdAt: string;
+}
+
+interface AuditAssignment {
+  id: string;
+  assignedBy: string;
+  assignedTo: string;
+  assignedByUser: string;
+  assignedToUser: string;
+  assignmentType: string;
+  priority: string;
+  status: string;
+  dueDate?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+interface AuditEscalation {
+  id: string;
+  escalatedBy: string;
+  escalatedTo: string;
+  escalatedByUser: string;
+  escalatedToUser: string;
+  escalationLevel: number;
+  reason: string;
+  priority: string;
+  status: string;
+  createdAt: string;
+}
+
 const AuditLogSystem: React.FC = () => {
   const { user } = useAuth();
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -54,6 +111,21 @@ const AuditLogSystem: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showSocialModal, setShowSocialModal] = useState(false);
+
+  // Social features state
+  const [comments, setComments] = useState<AuditComment[]>([]);
+  const [likes, setLikes] = useState<AuditLike[]>([]);
+  const [assignments, setAssignments] = useState<AuditAssignment[]>([]);
+  const [escalations, setEscalations] = useState<AuditEscalation[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [showEscalationModal, setShowEscalationModal] = useState(false);
+  const [selectedUserForAssignment, setSelectedUserForAssignment] = useState('');
+  const [selectedUserForEscalation, setSelectedUserForEscalation] = useState('');
+  const [assignmentNotes, setAssignmentNotes] = useState('');
+  const [escalationReason, setEscalationReason] = useState('');
 
   // Filter state
   const [filters, setFilters] = useState<AuditLogFilter>({
@@ -102,157 +174,103 @@ const AuditLogSystem: React.FC = () => {
   };
 
   const calculateStats = (logs: AuditLog[]) => {
-    const today = new Date().toDateString();
-    const filteredLogs = getFilteredAuditLogs(logs);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     setStats({
-      total: filteredLogs.length,
-      today: filteredLogs.filter(log => log.timestamp && new Date(log.timestamp).toDateString() === today).length,
-      warnings: filteredLogs.filter(log => log.severity === 'warning').length,
-      errors: filteredLogs.filter(log => log.severity === 'error').length,
-      users: Array.from(new Set(filteredLogs.map(log => log.userName).filter(Boolean))).length,
-      actions: Array.from(new Set(filteredLogs.map(log => log.action))).length
+      total: logs.length,
+      today: logs.filter(log => new Date(log.createdAt || log.timestamp || '') >= today).length,
+      warnings: logs.filter(log => log.severity === 'warning').length,
+      errors: logs.filter(log => log.severity === 'error').length,
+      users: new Set(logs.map(log => log.userId)).size,
+      actions: new Set(logs.map(log => log.action)).size
     });
   };
 
-  // Role-based filtering logic from reference
   const getFilteredAuditLogs = (logs: AuditLog[]) => {
-    let filteredLogs = logs;
-    
-    // Role-based filtering
-    switch (user?.role) {
-      case 'admin':
-        // Admin sees everything
-        break;
-      case 'coordinator':
-        // Coordinators see system activities and their network
-        filteredLogs = logs.filter(log => 
-          log.action === 'security_alert' ||
-          log.userName === user.first_name + ' ' + user.last_name ||
-          (typeof log.details === 'object' && log.details && JSON.stringify(log.details).includes('Coordinator')) ||
-          (typeof log.details === 'object' && log.details && JSON.stringify(log.details).includes('Exchange'))
-        );
-        break;
-      case 'agency':
-        // Agency Managers see their network activities and security alerts
-        filteredLogs = logs.filter(log => 
-          log.action === 'security_alert' ||
-          log.userName === user.first_name + ' ' + user.last_name ||
-          (typeof log.details === 'object' && log.details && JSON.stringify(log.details).includes('Agency')) ||
-          (typeof log.details === 'object' && log.details && JSON.stringify(log.details).includes('Third Party'))
-        );
-        break;
-      case 'third_party':
-        // Third Parties see their own activities and their clients' activities
-        filteredLogs = logs.filter(log => 
-          log.userName === user.first_name + ' ' + user.last_name ||
-          (typeof log.details === 'object' && log.details && JSON.stringify(log.details).includes('Third Party'))
-        );
-        break;
-      case 'client':
-        // Clients see only their own activities and their exchange activities
-        filteredLogs = logs.filter(log => 
-          log.userName === user.first_name + ' ' + user.last_name ||
-          (log.exchangeId && typeof log.details === 'object' && log.details && JSON.stringify(log.details).includes('exchange'))
-        );
-        break;
-      default:
-        // Default: show only own activities
-        filteredLogs = logs.filter(log => log.userName === user?.first_name + ' ' + user?.last_name);
-    }
-    
-    return filteredLogs;
+    return logs.filter(log => {
+      // Action filter
+      if (filters.action !== 'all' && log.action !== filters.action) return false;
+
+      // User filter
+      if (filters.user && !log.userName?.toLowerCase().includes(filters.user.toLowerCase())) return false;
+
+      // Date range filter
+      if (filters.dateRange !== 'all') {
+        const logDate = new Date(log.createdAt || log.timestamp || '');
+        const now = new Date();
+        
+        switch (filters.dateRange) {
+          case 'today':
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            if (logDate < today) return false;
+            break;
+          case 'week':
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            if (logDate < weekAgo) return false;
+            break;
+          case 'month':
+            const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+            if (logDate < monthAgo) return false;
+            break;
+        }
+      }
+
+      // Severity filter
+      if (filters.severity !== 'all' && log.severity !== filters.severity) return false;
+
+      // Search filter
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        const searchableText = [
+          log.action,
+          log.userName,
+          log.details ? JSON.stringify(log.details) : '',
+          log.ip,
+          log.userAgent
+        ].join(' ').toLowerCase();
+        
+        if (!searchableText.includes(searchLower)) return false;
+      }
+
+      return true;
+    });
   };
 
   const applyFilters = () => {
-    let filtered = getFilteredAuditLogs(auditLogs);
-
-    // Apply additional filters
-    if (filters.action !== 'all') {
-      filtered = filtered.filter(log => log.action === filters.action);
-    }
-
-    if (filters.user) {
-      filtered = filtered.filter(log => 
-        log.userName?.toLowerCase().includes(filters.user.toLowerCase())
-      );
-    }
-
-    if (filters.severity !== 'all') {
-      filtered = filtered.filter(log => log.severity === filters.severity);
-    }
-
-    if (filters.search) {
-      filtered = filtered.filter(log => 
-        (typeof log.details === 'object' && log.details && JSON.stringify(log.details).toLowerCase().includes(filters.search.toLowerCase())) ||
-        log.userName?.toLowerCase().includes(filters.search.toLowerCase())
-      );
-    }
-
-    // Date range filtering
-    if (filters.dateRange !== 'all') {
-      const now = new Date();
-      let cutoffDate: Date;
-
-      switch (filters.dateRange) {
-        case 'today':
-          cutoffDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          break;
-        case 'week':
-          cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case 'month':
-          cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          break;
-        default:
-          cutoffDate = new Date(0);
-      }
-
-      filtered = filtered.filter(log => log.timestamp && new Date(log.timestamp) >= cutoffDate);
-    }
-
-    calculateStats(filtered);
+    // This will be called when filters change
+    // The filtering is done in getFilteredAuditLogs
   };
 
   const getActionIcon = (action: string) => {
-    switch (action) {
-      case 'login':
-        return <ArrowRightOnRectangleIcon className="w-4 h-4 text-green-600" />;
-      case 'logout':
-        return <ArrowLeftOnRectangleIcon className="w-4 h-4 text-gray-600" />;
-      case 'document_upload':
-      case 'document_viewed':
-      case 'document_downloaded':
-        return <DocumentTextIcon className="w-4 h-4 text-blue-600" />;
-      case 'message_sent':
-      case 'message_received':
-        return <ChatBubbleLeftIcon className="w-4 h-4 text-purple-600" />;
-      case 'user_created':
-      case 'user_deactivated':
-        return <UserIcon className="w-4 h-4 text-indigo-600" />;
-      case 'security_alert':
-        return <ExclamationTriangleIcon className="w-4 h-4 text-red-600" />;
-      case 'task_completed':
-        return <CheckCircleIcon className="w-4 h-4 text-green-600" />;
-      case 'exchange_created':
-        return <DocumentTextIcon className="w-4 h-4 text-blue-600" />;
-      case 'backup_created':
-        return <ShieldCheckIcon className="w-4 h-4 text-green-600" />;
-      default:
-        return <InformationCircleIcon className="w-4 h-4 text-gray-600" />;
-    }
+    const iconMap: Record<string, React.ReactNode> = {
+      login: <ArrowRightOnRectangleIcon className="w-4 h-4 text-green-600" />,
+      logout: <ArrowLeftOnRectangleIcon className="w-4 h-4 text-gray-600" />,
+      document_upload: <DocumentTextIcon className="w-4 h-4 text-blue-600" />,
+      document_viewed: <EyeIcon className="w-4 h-4 text-blue-600" />,
+      document_downloaded: <DocumentTextIcon className="w-4 h-4 text-green-600" />,
+      message_sent: <ChatBubbleLeftIcon className="w-4 h-4 text-purple-600" />,
+      user_created: <UserPlusIcon className="w-4 h-4 text-green-600" />,
+      user_deactivated: <UserIcon className="w-4 h-4 text-red-600" />,
+      security_alert: <ExclamationTriangleIcon className="w-4 h-4 text-red-600" />,
+      PERFORMANCE_ISSUE: <ExclamationCircleIcon className="w-4 h-4 text-yellow-600" />,
+      task_completed: <CheckCircleIcon className="w-4 h-4 text-green-600" />,
+      exchange_created: <ComputerDesktopIcon className="w-4 h-4 text-blue-600" />,
+      backup_created: <ShieldCheckIcon className="w-4 h-4 text-green-600" />
+    };
+
+    return iconMap[action] || <InformationCircleIcon className="w-4 h-4 text-gray-600" />;
   };
 
   const getSeverityColor = (severity: string | undefined) => {
-    switch (severity) {
-      case 'error':
-        return 'text-red-600 bg-red-50 border-red-200';
-      case 'warning':
-        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'info':
-      default:
-        return 'text-blue-600 bg-blue-50 border-blue-200';
-    }
+    const colorMap: Record<string, string> = {
+      info: 'bg-blue-100 text-blue-800 border-blue-200',
+      warning: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      error: 'bg-red-100 text-red-800 border-red-200',
+      critical: 'bg-red-100 text-red-800 border-red-200'
+    };
+
+    return colorMap[severity || 'info'] || colorMap.info;
   };
 
   const formatTimestamp = (timestamp: string | undefined) => {
@@ -261,20 +279,17 @@ const AuditLogSystem: React.FC = () => {
   };
 
   const getActiveFilters = () => {
-    const activeFilters = [];
-    if (filters.action !== 'all') activeFilters.push({ key: 'action', label: 'Action', value: filters.action });
-    if (filters.user) activeFilters.push({ key: 'user', label: 'User', value: filters.user });
-    if (filters.dateRange !== 'all') activeFilters.push({ key: 'dateRange', label: 'Date Range', value: filters.dateRange });
-    if (filters.severity !== 'all') activeFilters.push({ key: 'severity', label: 'Severity', value: filters.severity });
-    if (filters.search) activeFilters.push({ key: 'search', label: 'Search', value: filters.search });
-    return activeFilters;
+    const active: Array<{ key: string; label: string; value: string }> = [];
+    if (filters.action !== 'all') active.push({ key: 'action', label: 'Action', value: filters.action });
+    if (filters.user) active.push({ key: 'user', label: 'User', value: filters.user });
+    if (filters.dateRange !== 'all') active.push({ key: 'dateRange', label: 'Date Range', value: filters.dateRange });
+    if (filters.severity !== 'all') active.push({ key: 'severity', label: 'Severity', value: filters.severity });
+    if (filters.search) active.push({ key: 'search', label: 'Search', value: filters.search });
+    return active;
   };
 
   const removeFilter = (key: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: key === 'user' || key === 'search' ? '' : 'all'
-    }));
+    setFilters(prev => ({ ...prev, [key]: key === 'action' || key === 'dateRange' || key === 'severity' ? 'all' : '' }));
   };
 
   const clearAllFilters = () => {
@@ -285,6 +300,106 @@ const AuditLogSystem: React.FC = () => {
       severity: 'all',
       search: ''
     });
+  };
+
+  // Social features functions
+  const loadSocialData = async (auditLogId: string) => {
+    try {
+      const response = await apiService.getAuditLogInteractions(auditLogId);
+      const { interactions } = response;
+      
+      setComments(interactions?.comments || []);
+      setLikes(interactions?.likes || []);
+      setAssignments(interactions?.assignments || []);
+      setEscalations(interactions?.escalations || []);
+    } catch (error) {
+      console.error('Failed to load social data:', error);
+    }
+  };
+
+  const handleLike = async (auditLogId: string) => {
+    try {
+      await apiService.likeAuditLog(auditLogId, 'like');
+      
+      // Refresh social data
+      await loadSocialData(auditLogId);
+    } catch (error) {
+      console.error('Failed to like audit log:', error);
+    }
+  };
+
+  const handleComment = async (auditLogId: string) => {
+    if (!newComment.trim()) return;
+
+    try {
+      await apiService.commentOnAuditLog(auditLogId, newComment, extractMentions(newComment));
+      
+      setNewComment('');
+      await loadSocialData(auditLogId);
+    } catch (error) {
+      console.error('Failed to add comment:', error);
+    }
+  };
+
+  const extractMentions = (text: string): string[] => {
+    const mentions = text.match(/@(\w+)/g);
+    if (!mentions) return [];
+    
+    return mentions.map(mention => {
+      const username = mention.substring(1);
+      const user = users.find(u => 
+        u.firstName?.toLowerCase() === username.toLowerCase() ||
+        u.lastName?.toLowerCase() === username.toLowerCase() ||
+        u.email?.toLowerCase().includes(username.toLowerCase())
+      );
+      return user?.id;
+    }).filter(Boolean) as string[];
+  };
+
+  const handleAssign = async (auditLogId: string) => {
+    if (!selectedUserForAssignment) return;
+
+    try {
+      await apiService.assignAuditLog(auditLogId, {
+        assignedTo: selectedUserForAssignment,
+        assignmentType: 'review',
+        priority: 'normal',
+        notes: assignmentNotes
+      });
+      
+      setShowAssignmentModal(false);
+      setSelectedUserForAssignment('');
+      setAssignmentNotes('');
+      await loadSocialData(auditLogId);
+    } catch (error) {
+      console.error('Failed to assign audit log:', error);
+    }
+  };
+
+  const handleEscalate = async (auditLogId: string) => {
+    if (!selectedUserForEscalation || !escalationReason) return;
+
+    try {
+      await apiService.escalateAuditLog(auditLogId, {
+        escalatedTo: selectedUserForEscalation,
+        reason: escalationReason,
+        priority: 'high',
+        escalationLevel: 1
+      });
+      
+      setShowEscalationModal(false);
+      setSelectedUserForEscalation('');
+      setEscalationReason('');
+      await loadSocialData(auditLogId);
+    } catch (error) {
+      console.error('Failed to escalate audit log:', error);
+    }
+  };
+
+  const openSocialModal = async (log: AuditLog) => {
+    setSelectedLog(log);
+    setShowSocialModal(true);
+    await loadSocialData(log.id);
   };
 
   const actionOptions = [
@@ -298,6 +413,7 @@ const AuditLogSystem: React.FC = () => {
     { value: 'user_created', label: 'User Created' },
     { value: 'user_deactivated', label: 'User Deactivated' },
     { value: 'security_alert', label: 'Security Alert' },
+    { value: 'PERFORMANCE_ISSUE', label: 'Performance Issue' },
     { value: 'task_completed', label: 'Task Completed' },
     { value: 'exchange_created', label: 'Exchange Created' },
     { value: 'backup_created', label: 'Backup Created' }
@@ -333,7 +449,7 @@ const AuditLogSystem: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-900">Audit Logs</h2>
           <p className="text-gray-600 mt-1">
             {user?.role === 'admin' 
-              ? 'Complete system activity monitoring and security logs'
+              ? 'Complete system activity monitoring and security logs with social features'
               : 'Your activity logs and relevant system events'
             }
           </p>
@@ -504,15 +620,25 @@ const AuditLogSystem: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => {
-                        setSelectedLog(log);
-                        setShowDetailsModal(true);
-                      }}
-                      className="text-blue-600 hover:text-blue-900"
-                    >
-                      <EyeIcon className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedLog(log);
+                          setShowDetailsModal(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="View Details"
+                      >
+                        <EyeIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => openSocialModal(log)}
+                        className="text-green-600 hover:text-green-900"
+                        title="Social Features"
+                      >
+                        <ChatBubbleLeftRightIcon className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -619,6 +745,285 @@ const AuditLogSystem: React.FC = () => {
                 className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Social Features Modal */}
+      {showSocialModal && selectedLog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-gray-900">Social Features - {selectedLog.action}</h3>
+              <button
+                onClick={() => setShowSocialModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Action Bar */}
+            <div className="flex items-center gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+              <button
+                onClick={() => handleLike(selectedLog.id)}
+                className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+              >
+                <HeartIcon className="w-5 h-5" />
+                <span>Like ({likes.length})</span>
+              </button>
+
+              <button
+                onClick={() => setReplyTo('main')}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
+              >
+                <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                <span>Comment ({comments.length})</span>
+              </button>
+
+              {(user?.role === 'admin' || user?.role === 'coordinator') && (
+                <>
+                  <button
+                    onClick={() => setShowAssignmentModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
+                  >
+                    <UserPlusIcon className="w-5 h-5" />
+                    <span>Assign ({assignments.length})</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowEscalationModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200"
+                  >
+                    <ExclamationCircleIcon className="w-5 h-5" />
+                    <span>Escalate ({escalations.length})</span>
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Comments Section */}
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold mb-4">Comments</h4>
+              
+              {/* Add Comment */}
+              {replyTo && (
+                <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                  <textarea
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Write a comment... Use @username to mention someone"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows={3}
+                  />
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      onClick={() => handleComment(selectedLog.id)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      <PaperAirplaneIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setReplyTo(null);
+                        setNewComment('');
+                      }}
+                      className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Comments List */}
+              <div className="space-y-4">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2 mb-2">
+                        <UserIcon className="w-5 h-5 text-gray-500" />
+                        <span className="font-medium">{comment.userName}</span>
+                        <span className="text-sm text-gray-500">
+                          {formatTimestamp(comment.createdAt)}
+                        </span>
+                        {comment.isEdited && (
+                          <span className="text-xs text-gray-400">(edited)</span>
+                        )}
+                      </div>
+                      <button className="text-gray-400 hover:text-gray-600">
+                        <EllipsisHorizontalIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p className="text-gray-800">{comment.content}</p>
+                    {comment.mentions.length > 0 && (
+                      <div className="mt-2 flex items-center gap-1">
+                        <AtSymbolIcon className="w-4 h-4 text-blue-500" />
+                        <span className="text-sm text-blue-600">
+                          Mentioned: {comment.mentions.join(', ')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Assignments Section */}
+            {assignments.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-lg font-semibold mb-4">Assignments</h4>
+                <div className="space-y-2">
+                  {assignments.map((assignment) => (
+                    <div key={assignment.id} className="p-3 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-medium">{assignment.assignedToUser}</span>
+                          <span className="text-sm text-gray-600"> assigned by {assignment.assignedByUser}</span>
+                        </div>
+                        <StatusBadge status={assignment.status} />
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        Type: {assignment.assignmentType} | Priority: {assignment.priority}
+                      </div>
+                      {assignment.notes && (
+                        <div className="text-sm text-gray-700 mt-1">{assignment.notes}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Escalations Section */}
+            {escalations.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-lg font-semibold mb-4">Escalations</h4>
+                <div className="space-y-2">
+                  {escalations.map((escalation) => (
+                    <div key={escalation.id} className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-medium">{escalation.escalatedToUser}</span>
+                          <span className="text-sm text-gray-600"> escalated by {escalation.escalatedByUser}</span>
+                        </div>
+                        <StatusBadge status={escalation.status} />
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        Level: {escalation.escalationLevel} | Priority: {escalation.priority}
+                      </div>
+                      <div className="text-sm text-gray-700 mt-1">{escalation.reason}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Assignment Modal */}
+      {showAssignmentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-xl font-bold mb-4">Assign Audit Log</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Assign to</label>
+                <select
+                  value={selectedUserForAssignment}
+                  onChange={(e) => setSelectedUserForAssignment(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select a user...</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.firstName} {user.lastName} ({user.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                <textarea
+                  value={assignmentNotes}
+                  onChange={(e) => setAssignmentNotes(e.target.value)}
+                  placeholder="Add notes about this assignment..."
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowAssignmentModal(false)}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => selectedLog && handleAssign(selectedLog.id)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Assign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Escalation Modal */}
+      {showEscalationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-xl font-bold mb-4">Escalate Audit Log</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Escalate to</label>
+                <select
+                  value={selectedUserForEscalation}
+                  onChange={(e) => setSelectedUserForEscalation(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select a user...</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.firstName} {user.lastName} ({user.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Reason</label>
+                <textarea
+                  value={escalationReason}
+                  onChange={(e) => setEscalationReason(e.target.value)}
+                  placeholder="Why is this being escalated?"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowEscalationModal(false)}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => selectedLog && handleEscalate(selectedLog.id)}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+              >
+                Escalate
               </button>
             </div>
           </div>

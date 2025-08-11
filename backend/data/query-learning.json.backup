@@ -1,0 +1,523 @@
+{
+  "successful_queries": [
+    {
+      "id": "1754546389944",
+      "original_query": "how many documents were uploaded last month by clients vs coordinators vs third parties?",
+      "generated_sql": "SELECT id, name, category, file_size, exchange_id, created_at FROM documents ORDER BY created_at DESC LIMIT 20",
+      "result_count": 0,
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:49.944Z",
+      "success": true
+    }
+  ],
+  "failed_queries": [
+    {
+      "id": "1754545987253",
+      "original_query": "how many exchanges are in the system?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.253Z",
+      "success": false
+    },
+    {
+      "id": "1754545987254",
+      "original_query": "how many active exchanges do we have?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.254Z",
+      "success": false
+    },
+    {
+      "id": "1754545987255",
+      "original_query": "show me all active exchanges",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.255Z",
+      "success": false
+    },
+    {
+      "id": "1754545987257",
+      "original_query": "list completed exchanges",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.257Z",
+      "success": false
+    },
+    {
+      "id": "1754545987259",
+      "original_query": "show me recent exchanges",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.259Z",
+      "success": false
+    },
+    {
+      "id": "1754545987268",
+      "original_query": "what exchanges were created this month?",
+      "error_message": "Could not generate SQL for query: \"What exchanges were created this month?\". Try asking about exchanges, users, tasks, documents, or messages.",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.268Z",
+      "success": false
+    },
+    {
+      "id": "1754545987268",
+      "original_query": "show my assigned exchanges",
+      "error_message": "Could not generate SQL for query: \"Show my assigned exchanges\". Try asking about exchanges, users, tasks, documents, or messages.",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.268Z",
+      "success": false
+    },
+    {
+      "id": "1754545987269",
+      "original_query": "what tasks are assigned to me?",
+      "error_message": "Could not generate SQL for query: \"What tasks are assigned to me?\". Try asking about exchanges, users, tasks, documents, or messages.",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.269Z",
+      "success": false
+    },
+    {
+      "id": "1754545987269",
+      "original_query": "which exchanges have approaching 45-day deadlines?",
+      "error_message": "Could not generate SQL for query: \"Which exchanges have approaching 45-day deadlines?\". Try asking about exchanges, users, tasks, documents, or messages.",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.269Z",
+      "success": false
+    },
+    {
+      "id": "1754545987269",
+      "original_query": "show exchanges past their 180-day deadline",
+      "error_message": "Could not generate SQL for query: \"Show exchanges past their 180-day deadline\". Try asking about exchanges, users, tasks, documents, or messages.",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.269Z",
+      "success": false
+    },
+    {
+      "id": "1754545987269",
+      "original_query": "show exchanges with their coordinators",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.269Z",
+      "success": false
+    },
+    {
+      "id": "1754545987270",
+      "original_query": "list exchanges and their clients",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.270Z",
+      "success": false
+    },
+    {
+      "id": "1754545987270",
+      "original_query": "what's the total value of all exchange proceeds?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.270Z",
+      "success": false
+    },
+    {
+      "id": "1754545987270",
+      "original_query": "show me system statistics",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.270Z",
+      "success": false
+    },
+    {
+      "id": "1754545987270",
+      "original_query": "how many exchanges by state?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:53:07.270Z",
+      "success": false
+    },
+    {
+      "id": "1754546194263",
+      "original_query": "how many exchanges names are with - katzovitz, yechiel?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:56:34.263Z",
+      "success": false
+    },
+    {
+      "id": "1754546194264",
+      "original_query": "find exchanges with client named john smith",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:56:34.264Z",
+      "success": false
+    },
+    {
+      "id": "1754546194264",
+      "original_query": "show exchanges for johnson",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:56:34.264Z",
+      "success": false
+    },
+    {
+      "id": "1754546194280",
+      "original_query": "how many contacts named david cohen?",
+      "error_message": "SQLITE_ERROR: no such table: contacts",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:56:34.280Z",
+      "success": false
+    },
+    {
+      "id": "1754546194281",
+      "original_query": "show properties in california",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:56:34.281Z",
+      "success": false
+    },
+    {
+      "id": "1754546388647",
+      "original_query": "how many exchanges names are with - katzovitz, yechiel?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:48.647Z",
+      "success": false
+    },
+    {
+      "id": "1754546388751",
+      "original_query": "show me all exchanges where the client's last name contains 'smith' but the exchange was created before january 2024",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:48.751Z",
+      "success": false
+    },
+    {
+      "id": "1754546388854",
+      "original_query": "find properties in nyc, la, or chicago with proceeds over $2.5 million",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:48.854Z",
+      "success": false
+    },
+    {
+      "id": "1754546388956",
+      "original_query": "what's the average exchange value for properties sold this quarter in california?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:48.956Z",
+      "success": false
+    },
+    {
+      "id": "1754546389059",
+      "original_query": "show exchanges approaching their 45-day deadline in the next 2 weeks where the coordinator is named johnson",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:49.059Z",
+      "success": false
+    },
+    {
+      "id": "1754546389162",
+      "original_query": "list all clients from texas whose exchanges have a replacement property value between 800k and 1.2m",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:49.162Z",
+      "success": false
+    },
+    {
+      "id": "1754546389265",
+      "original_query": "how many overdue tasks are there for exchanges managed by coordinators hired in 2023?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:49.265Z",
+      "success": false
+    },
+    {
+      "id": "1754546389412",
+      "original_query": "find exchanges with 'llc' in the client name that have both relinquished and replacement properties in different states",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:49.412Z",
+      "success": false
+    },
+    {
+      "id": "1754546389529",
+      "original_query": "what percentage of exchanges completed this year had proceeds above the median value?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:49.529Z",
+      "success": false
+    },
+    {
+      "id": "1754546389634",
+      "original_query": "show me exchanges where the client's email domain is gmail.com and the exchange type is simultaneous",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:49.634Z",
+      "success": false
+    },
+    {
+      "id": "1754546389740",
+      "original_query": "find all contacts whose phone number starts with 212 or 646 and are involved in active exchanges",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:49.740Z",
+      "success": false
+    },
+    {
+      "id": "1754546389842",
+      "original_query": "list exchanges that missed their 180-day deadline, ordered by how many days past due",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:49.842Z",
+      "success": false
+    },
+    {
+      "id": "1754546390048",
+      "original_query": "show exchanges where the relinquished property is in a different zip code than the replacement property",
+      "error_message": "Could not generate SQL for query: \"Show exchanges where the relinquished property is in a different zip code than the replacement property\". Try asking about exchanges, users, tasks, documents, or messages.",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:50.048Z",
+      "success": false
+    },
+    {
+      "id": "1754546390149",
+      "original_query": "find the top 5 coordinators by total exchange value managed, but only for exchanges closed in 2024",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:50.149Z",
+      "success": false
+    },
+    {
+      "id": "1754546390252",
+      "original_query": "what's the most common property type being relinquished in florida-based exchanges?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T05:59:50.252Z",
+      "success": false
+    },
+    {
+      "id": "1754546610209",
+      "original_query": "how many exchanges names are with - katzovitz, yechiel?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T06:03:30.209Z",
+      "success": false
+    },
+    {
+      "id": "1754546610211",
+      "original_query": "show me all exchanges where the client's last name contains 'smith' but the exchange was created before january 2024",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T06:03:30.211Z",
+      "success": false
+    },
+    {
+      "id": "1754546610214",
+      "original_query": "find properties in nyc, la, or chicago with proceeds over $2.5 million",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T06:03:30.214Z",
+      "success": false
+    },
+    {
+      "id": "1754546610215",
+      "original_query": "show exchanges approaching their 45-day deadline in the next 2 weeks where the coordinator is named johnson",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T06:03:30.215Z",
+      "success": false
+    },
+    {
+      "id": "1754546610215",
+      "original_query": "list exchanges created this month",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T06:03:30.215Z",
+      "success": false
+    },
+    {
+      "id": "1754571175641",
+      "original_query": "how many exchanges names are with - katzovitz, yechiel?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:55.641Z",
+      "success": false
+    },
+    {
+      "id": "1754571175744",
+      "original_query": "show me all exchanges where the client's last name contains 'smith' but the exchange was created before january 2024",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:55.744Z",
+      "success": false
+    },
+    {
+      "id": "1754571175849",
+      "original_query": "find properties in nyc, la, or chicago with proceeds over $2.5 million",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:55.849Z",
+      "success": false
+    },
+    {
+      "id": "1754571175950",
+      "original_query": "what's the average exchange value for properties sold this quarter in california?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:55.950Z",
+      "success": false
+    },
+    {
+      "id": "1754571176052",
+      "original_query": "show exchanges approaching their 45-day deadline in the next 2 weeks where the coordinator is named johnson",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:56.052Z",
+      "success": false
+    },
+    {
+      "id": "1754571176156",
+      "original_query": "list all clients from texas whose exchanges have a replacement property value between 800k and 1.2m",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:56.156Z",
+      "success": false
+    },
+    {
+      "id": "1754571176259",
+      "original_query": "how many overdue tasks are there for exchanges managed by coordinators hired in 2023?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:56.259Z",
+      "success": false
+    },
+    {
+      "id": "1754571176364",
+      "original_query": "find exchanges with 'llc' in the client name that have both relinquished and replacement properties in different states",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:56.364Z",
+      "success": false
+    },
+    {
+      "id": "1754571176468",
+      "original_query": "what percentage of exchanges completed this year had proceeds above the median value?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:56.468Z",
+      "success": false
+    },
+    {
+      "id": "1754571176573",
+      "original_query": "show me exchanges where the client's email domain is gmail.com and the exchange type is simultaneous",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:56.573Z",
+      "success": false
+    },
+    {
+      "id": "1754571176675",
+      "original_query": "find all contacts whose phone number starts with 212 or 646 and are involved in active exchanges",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:56.675Z",
+      "success": false
+    },
+    {
+      "id": "1754571176778",
+      "original_query": "list exchanges that missed their 180-day deadline, ordered by how many days past due",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:56.778Z",
+      "success": false
+    },
+    {
+      "id": "1754571176880",
+      "original_query": "how many documents were uploaded last month by clients vs coordinators vs third parties?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:56.880Z",
+      "success": false
+    },
+    {
+      "id": "1754571176982",
+      "original_query": "show exchanges where the relinquished property is in a different zip code than the replacement property",
+      "error_message": "Could not generate SQL for query: \"Show exchanges where the relinquished property is in a different zip code than the replacement property\". Try asking about exchanges, users, tasks, documents, or messages.",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:56.982Z",
+      "success": false
+    },
+    {
+      "id": "1754571177085",
+      "original_query": "find the top 5 coordinators by total exchange value managed, but only for exchanges closed in 2024",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:57.085Z",
+      "success": false
+    },
+    {
+      "id": "1754571177195",
+      "original_query": "what's the most common property type being relinquished in florida-based exchanges?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:57.195Z",
+      "success": false
+    },
+    {
+      "id": "1754571177297",
+      "original_query": "show exchanges that have messages containing the word 'urgent' or 'emergency' in the last 48 hours",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:57.297Z",
+      "success": false
+    },
+    {
+      "id": "1754571177400",
+      "original_query": "list all exchanges where the client and coordinator have the same area code",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:57.400Z",
+      "success": false
+    },
+    {
+      "id": "1754571177511",
+      "original_query": "find exchanges that have been reassigned (changed coordinators) more than once in the past 6 months",
+      "error_message": "Could not generate SQL for query: \"Find exchanges that have been reassigned (changed coordinators) more than once in the past 6 months\". Try asking about exchanges, users, tasks, documents, or messages.",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:57.511Z",
+      "success": false
+    },
+    {
+      "id": "1754571177613",
+      "original_query": "what's the correlation between exchange value and time to completion for california properties?",
+      "error_message": "Supabase client not initialized",
+      "user_id": null,
+      "timestamp": "2025-08-07T12:52:57.613Z",
+      "success": false
+    }
+  ],
+  "query_patterns": {
+    "count_how_many_documents": {
+      "pattern": "count_how_many_documents",
+      "keywords": [
+        "how",
+        "many",
+        "documents",
+        "were",
+        "uploaded",
+        "last",
+        "month",
+        "clients",
+        "coordinators",
+        "third",
+        "parties?"
+      ],
+      "query_type": "count",
+      "target_table": "documents",
+      "example_query": "how many documents were uploaded last month by clients vs coordinators vs third parties?",
+      "successful_sql": "SELECT id, name, category, file_size, exchange_id, created_at FROM documents ORDER BY created_at DESC LIMIT 20",
+      "count": 1,
+      "success_rate": 1,
+      "first_seen": "2025-08-07T05:59:49.945Z",
+      "last_seen": "2025-08-07T05:59:49.945Z"
+    }
+  },
+  "last_updated": "2025-08-07T12:52:57.613Z",
+  "version": "1.0"
+}

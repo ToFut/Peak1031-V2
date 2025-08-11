@@ -1,6 +1,6 @@
 const { sequelize, useSupabase } = require('../config/database');
 const supabaseService = require('./supabase');
-const { User, Exchange, Contact, Task, Message, Document, AuditLog, Notification, ExchangeParticipant } = require('../models');
+const { User, Exchange, Contact, Task, Message, Document, AuditLog, Notification, ExchangeParticipant, Folder } = require('../models');
 
 class DatabaseService {
   constructor() {
@@ -503,32 +503,352 @@ class DatabaseService {
   async deleteExchangeParticipant(participantId) {
     if (this.useSupabase) {
       return await supabaseService.deleteExchangeParticipant(participantId);
+    } else {
+      const participant = await ExchangeParticipant.findByPk(participantId);
+      if (!participant) throw new Error('Exchange participant not found');
+      return await participant.destroy();
     }
-    
-    // SQLite fallback
-    const participant = await ExchangeParticipant.findByPk(participantId);
-    if (!participant) throw new Error('Participant not found');
-    return await participant.destroy();
+  }
+
+  // Folder operations
+  async getFolders(options = {}) {
+    if (this.useSupabase) {
+      return await supabaseService.getFolders(options);
+    } else {
+      const { where = {}, orderBy = { column: 'name', ascending: true } } = options;
+      
+      let query = {
+        where,
+        order: [[orderBy.column, orderBy.ascending ? 'ASC' : 'DESC']],
+        include: [
+          { model: User, as: 'createdBy', attributes: ['id', 'firstName', 'lastName', 'email'] },
+          { model: Exchange, as: 'exchange', attributes: ['id', 'name'] }
+        ]
+      };
+
+      return await Folder.findAll(query);
+    }
+  }
+
+  async getFolderById(id) {
+    if (this.useSupabase) {
+      return await supabaseService.getFolderById(id);
+    } else {
+      return await Folder.findByPk(id, {
+        include: [
+          { model: User, as: 'createdBy', attributes: ['id', 'firstName', 'lastName', 'email'] },
+          { model: Exchange, as: 'exchange', attributes: ['id', 'name'] },
+          { model: Folder, as: 'parent' },
+          { model: Folder, as: 'children' }
+        ]
+      });
+    }
+  }
+
+  async createFolder(folderData) {
+    if (this.useSupabase) {
+      return await supabaseService.createFolder(folderData);
+    } else {
+      return await Folder.create(folderData);
+    }
+  }
+
+  async updateFolder(id, folderData) {
+    if (this.useSupabase) {
+      return await supabaseService.updateFolder(id, folderData);
+    } else {
+      const folder = await Folder.findByPk(id);
+      if (!folder) throw new Error('Folder not found');
+      return await folder.update(folderData);
+    }
+  }
+
+  async deleteFolder(id) {
+    if (this.useSupabase) {
+      return await supabaseService.deleteFolder(id);
+    } else {
+      const folder = await Folder.findByPk(id);
+      if (!folder) throw new Error('Folder not found');
+      return await folder.destroy();
+    }
+  }
+
+  async moveDocumentsToFolder(documentIds, folderId) {
+    if (this.useSupabase) {
+      return await supabaseService.moveDocumentsToFolder(documentIds, folderId);
+    } else {
+      const documents = await Document.findAll({
+        where: { id: documentIds }
+      });
+      
+      const updatedDocuments = await Promise.all(
+        documents.map(doc => doc.update({ folder_id: folderId }))
+      );
+      
+      return updatedDocuments;
+    }
   }
 
   // Database connection test
   async testConnection() {
-    if (this.useSupabase) {
-      try {
-        await supabaseService.getUsers({ limit: 1 });
-        return true;
-      } catch (error) {
-        console.error('❌ Supabase connection test failed:', error);
-        return false;
-      }
-    } else {
-      try {
+    try {
+      if (this.useSupabase) {
+        return await supabaseService.testConnection();
+      } else {
         await sequelize.authenticate();
-        return true;
-      } catch (error) {
-        console.error('❌ SQLite connection test failed:', error);
-        return false;
+        return { status: 'connected', database: 'local' };
       }
+    } catch (error) {
+      throw new Error(`Database connection failed: ${error.message}`);
+    }
+  }
+
+  // ===== AUDIT SOCIAL FEATURES =====
+
+  // Get audit log by ID
+  async getAuditLogById(id) {
+    if (this.useSupabase) {
+      return await supabaseService.getAuditLogById(id);
+    } else {
+      return await AuditLog.findByPk(id, {
+        include: [{ model: User, as: 'user' }]
+      });
+    }
+  }
+
+  // Get all interactions for an audit log
+  async getAuditInteractions(auditLogId) {
+    if (this.useSupabase) {
+      return await supabaseService.getAuditInteractions(auditLogId);
+    } else {
+      // For local database, we'll need to implement this
+      // For now, return empty object
+      return {
+        comments: [],
+        likes: [],
+        assignments: [],
+        escalations: []
+      };
+    }
+  }
+
+  // Comment operations
+  async createAuditComment(commentData) {
+    if (this.useSupabase) {
+      return await supabaseService.createAuditComment(commentData);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('Audit comments not implemented for local database');
+    }
+  }
+
+  async getAuditCommentById(commentId) {
+    if (this.useSupabase) {
+      return await supabaseService.getAuditCommentById(commentId);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('Audit comments not implemented for local database');
+    }
+  }
+
+  async updateAuditComment(commentId, updateData) {
+    if (this.useSupabase) {
+      return await supabaseService.updateAuditComment(commentId, updateData);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('Audit comments not implemented for local database');
+    }
+  }
+
+  async deleteAuditComment(commentId) {
+    if (this.useSupabase) {
+      return await supabaseService.deleteAuditComment(commentId);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('Audit comments not implemented for local database');
+    }
+  }
+
+  // Like operations
+  async createAuditLike(auditLogId, userId, reactionType) {
+    if (this.useSupabase) {
+      return await supabaseService.createAuditLike(auditLogId, userId, reactionType);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('Audit likes not implemented for local database');
+    }
+  }
+
+  async getAuditLike(auditLogId, userId) {
+    if (this.useSupabase) {
+      return await supabaseService.getAuditLike(auditLogId, userId);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('Audit likes not implemented for local database');
+    }
+  }
+
+  async updateAuditLike(auditLogId, userId, reactionType) {
+    if (this.useSupabase) {
+      return await supabaseService.updateAuditLike(auditLogId, userId, reactionType);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('Audit likes not implemented for local database');
+    }
+  }
+
+  async deleteAuditLike(auditLogId, userId) {
+    if (this.useSupabase) {
+      return await supabaseService.deleteAuditLike(auditLogId, userId);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('Audit likes not implemented for local database');
+    }
+  }
+
+  // Assignment operations
+  async createAuditAssignment(assignmentData) {
+    if (this.useSupabase) {
+      return await supabaseService.createAuditAssignment(assignmentData);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('Audit assignments not implemented for local database');
+    }
+  }
+
+  async getAuditAssignmentById(assignmentId) {
+    if (this.useSupabase) {
+      return await supabaseService.getAuditAssignmentById(assignmentId);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('Audit assignments not implemented for local database');
+    }
+  }
+
+  async updateAuditAssignment(assignmentId, updateData) {
+    if (this.useSupabase) {
+      return await supabaseService.updateAuditAssignment(assignmentId, updateData);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('Audit assignments not implemented for local database');
+    }
+  }
+
+  // Escalation operations
+  async createAuditEscalation(escalationData) {
+    if (this.useSupabase) {
+      return await supabaseService.createAuditEscalation(escalationData);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('Audit escalations not implemented for local database');
+    }
+  }
+
+  async getAuditEscalationById(escalationId) {
+    if (this.useSupabase) {
+      return await supabaseService.getAuditEscalationById(escalationId);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('Audit escalations not implemented for local database');
+    }
+  }
+
+  async updateAuditEscalation(escalationId, updateData) {
+    if (this.useSupabase) {
+      return await supabaseService.updateAuditEscalation(escalationId, updateData);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('Audit escalations not implemented for local database');
+    }
+  }
+
+  // Task creation from interactions
+  async createTaskFromMention(taskData) {
+    if (this.useSupabase) {
+      return await supabaseService.createTaskFromMention(taskData);
+    } else {
+      // Create a task for mentioned user
+      return await this.createTask({
+        title: `Mentioned in audit log comment`,
+        description: taskData.commentContent,
+        status: 'PENDING',
+        priority: 'MEDIUM',
+        assignedTo: taskData.mentionedUserId,
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+        details: {
+          type: 'audit_mention',
+          auditLogId: taskData.auditLogId,
+          mentionedBy: taskData.mentionedBy
+        }
+      });
+    }
+  }
+
+  async createTaskFromAssignment(taskData) {
+    if (this.useSupabase) {
+      return await supabaseService.createTaskFromAssignment(taskData);
+    } else {
+      // Create a task for assigned user
+      return await this.createTask({
+        title: `Audit log assignment: ${taskData.assignmentType}`,
+        description: taskData.notes || `Review audit log assignment`,
+        status: 'PENDING',
+        priority: taskData.priority?.toUpperCase() || 'MEDIUM',
+        assignedTo: taskData.assignedTo,
+        dueDate: taskData.dueDate ? new Date(taskData.dueDate) : new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days default
+        details: {
+          type: 'audit_assignment',
+          auditLogId: taskData.auditLogId,
+          assignmentType: taskData.assignmentType
+        }
+      });
+    }
+  }
+
+  async createTaskFromEscalation(taskData) {
+    if (this.useSupabase) {
+      return await supabaseService.createTaskFromEscalation(taskData);
+    } else {
+      // Create a high-priority task for escalated user
+      return await this.createTask({
+        title: `Escalated audit log - Level ${taskData.escalationLevel}`,
+        description: taskData.reason,
+        status: 'PENDING',
+        priority: 'HIGH',
+        assignedTo: taskData.escalatedTo,
+        dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        details: {
+          type: 'audit_escalation',
+          auditLogId: taskData.auditLogId,
+          escalationLevel: taskData.escalationLevel,
+          priority: taskData.priority
+        }
+      });
+    }
+  }
+
+  // User interaction operations
+  async getUserAuditInteractions(userId, options = {}) {
+    if (this.useSupabase) {
+      return await supabaseService.getUserAuditInteractions(userId, options);
+    } else {
+      // For local database, we'll need to implement this
+      throw new Error('User audit interactions not implemented for local database');
+    }
+  }
+
+  // Statistics
+  async getAuditLogStats(auditLogId) {
+    if (this.useSupabase) {
+      return await supabaseService.getAuditLogStats(auditLogId);
+    } else {
+      // For local database, we'll need to implement this
+      return {
+        comments: 0,
+        likes: 0,
+        assignments: 0,
+        escalations: 0
+      };
     }
   }
 }

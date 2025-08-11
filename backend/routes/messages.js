@@ -3,10 +3,21 @@ const { authenticateToken } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
 const databaseService = require('../services/database');
 const auditService = require('../services/audit');
+const messageAgentService = require('../services/messageAgentService');
 const { Op } = require('sequelize');
 const { Message, User, Document } = require('../models');
 
 const router = express.Router();
+
+// Test endpoint for debugging RBAC
+router.get('/test-rbac', authenticateToken, checkPermission('messages', 'read'), async (req, res) => {
+  console.log('🧪 RBAC test endpoint reached with user:', {
+    id: req.user.id,
+    email: req.user.email,
+    role: req.user.role
+  });
+  res.json({ message: 'RBAC test passed', user: req.user.email, role: req.user.role });
+});
 
 // Get all messages (admin only)
 router.get('/', authenticateToken, async (req, res) => {
@@ -97,9 +108,17 @@ router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
     }
     
     // Check access permissions
+    console.log('🔐 User role check:', { 
+      userId: req.user.id, 
+      role: req.user.role,
+      email: req.user.email,
+      isAdmin: req.user.role === 'admin'
+    });
+    
     let hasAccess = false;
     if (req.user.role === 'admin' || req.user.role === 'staff') {
       hasAccess = true;
+      console.log('✅ Admin/Staff access granted');
     } else if (req.user.role === 'coordinator' && exchange.coordinator_id === req.user.id) {
       hasAccess = true;
     } else {
@@ -178,7 +197,7 @@ router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
 // Send message
 router.post('/', authenticateToken, checkPermission('messages', 'write'), async (req, res) => {
   try {
-    console.log('📨 Message POST request:', {
+    console.log('📨 Message POST request reached main handler:', {
       body: req.body,
       user: { id: req.user.id, role: req.user.role, email: req.user.email }
     });
@@ -270,15 +289,65 @@ router.post('/', authenticateToken, checkPermission('messages', 'write'), async 
       content,
       exchange_id: exchangeId,
       sender_id: senderId, // Now using contact_id
-      attachment_id: attachmentId,
       message_type: messageType,
       created_at: new Date().toISOString(),
       read_by: []
     };
 
+    // Add attachments array if attachmentId is provided
+    if (attachmentId) {
+      messageData.attachments = [attachmentId];
+    }
+
     console.log('💾 Creating message with data:', messageData);
     const message = await databaseService.createMessage(messageData);
     console.log('✅ Message created:', message);
+
+    // Process special message commands (@TASK, @ADD, etc.)
+    let agentResults = { taskCreated: null, contactAdded: null, errors: [] };
+    if (content.includes('@TASK') || content.includes('@ADD')) {
+      try {
+        console.log('🤖 Message agent detected special commands...');
+        agentResults = await messageAgentService.processMessage(content, exchangeId, req.user.id, message);
+        
+        // Log any successful agent actions
+        if (agentResults.taskCreated) {
+          await auditService.logUserAction(
+            req.user.id,
+            'auto_create_task',
+            'task',
+            agentResults.taskCreated.id,
+            req,
+            { 
+              sourceMessageId: message.id,
+              taskTitle: agentResults.taskCreated.title,
+              priority: agentResults.taskCreated.priority,
+              agent: 'messageAgent'
+            }
+          );
+        }
+
+        if (agentResults.contactAdded) {
+          await auditService.logUserAction(
+            req.user.id,
+            'auto_add_contact',
+            'contact',
+            agentResults.contactAdded.contact.id,
+            req,
+            { 
+              sourceMessageId: message.id,
+              action: agentResults.contactAdded.action,
+              mobile: agentResults.contactAdded.mobile,
+              agent: 'messageAgent'
+            }
+          );
+        }
+      } catch (agentError) {
+        console.error('❌ Error in message agent processing:', agentError);
+        // Don't fail the message creation if agent processing fails
+        agentResults.errors.push(agentError.message);
+      }
+    }
 
     // Log the message creation for audit
     await auditService.logUserAction(
@@ -291,7 +360,9 @@ router.post('/', authenticateToken, checkPermission('messages', 'write'), async 
         exchangeId, 
         messageType,
         hasAttachment: !!attachmentId,
-        contentLength: content.length 
+        attachmentId: attachmentId,
+        contentLength: content.length,
+        agentResults: agentResults
       }
     );
 
@@ -307,7 +378,8 @@ router.post('/', authenticateToken, checkPermission('messages', 'write'), async 
     // Format response
     const responseMessage = {
       ...message,
-      sender: senderData
+      sender: senderData,
+      agentResults: agentResults // Include agent processing results
     };
 
     // Emit real-time message to exchange participants
@@ -353,19 +425,24 @@ router.post('/', authenticateToken, checkPermission('messages', 'write'), async 
 // Mark message as read
 router.put('/:id/read', authenticateToken, async (req, res) => {
   try {
+    console.log('📖 Marking message as read:', req.params.id, 'by user:', req.user.id);
+    
     const message = await databaseService.getMessageById(req.params.id);
     
     if (!message) {
+      console.log('❌ Message not found:', req.params.id);
       return res.status(404).json({ error: 'Message not found' });
     }
 
     // Update read status
     const updatedMessage = await databaseService.markMessageAsRead(req.params.id, req.user.id);
+    console.log('✅ Message marked as read successfully');
     
     // Emit read receipt to other participants
     const io = req.app.get('io');
-    if (io) {
-      io.to(`exchange-${message.exchangeId}`).emit('message-read', {
+    if (io && (message.exchangeId || message.exchange_id)) {
+      const exchangeId = message.exchangeId || message.exchange_id;
+      io.to(`exchange-${exchangeId}`).emit('message-read', {
         messageId: req.params.id,
         userId: req.user.id
       });
@@ -373,7 +450,11 @@ router.put('/:id/read', authenticateToken, async (req, res) => {
 
     res.json({ message: 'Message marked as read', data: updatedMessage });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('❌ Error marking message as read:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to mark message as read',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 

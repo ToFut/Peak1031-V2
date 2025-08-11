@@ -276,10 +276,10 @@ const EnterpriseDocumentManager: React.FC<EnterpriseDocumentManagerProps> = ({
       // Search filter
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
-        const matchesName = doc.originalFilename.toLowerCase().includes(searchLower);
-        const matchesDescription = doc.metadata.description?.toLowerCase().includes(searchLower);
-        const matchesTags = doc.tags.some(tag => tag.toLowerCase().includes(searchLower));
-        const matchesExchange = doc.exchange?.name.toLowerCase().includes(searchLower);
+        const matchesName = (doc.originalFilename || '').toLowerCase().includes(searchLower);
+        const matchesDescription = (doc.metadata?.description || '').toLowerCase().includes(searchLower);
+        const matchesTags = (doc.tags || []).some(tag => (tag || '').toLowerCase().includes(searchLower));
+        const matchesExchange = (doc.exchange?.name || '').toLowerCase().includes(searchLower);
         
         if (!matchesName && !matchesDescription && !matchesTags && !matchesExchange) {
           return false;

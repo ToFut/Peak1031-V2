@@ -115,59 +115,21 @@ class PracticePartnerService {
    */
   async getStoredToken() {
     try {
-      if (!this.supabase) {
-        console.log('🔍 PP: Supabase not available, cannot get stored token');
+      console.log('🔍 PP: Getting stored token using token manager');
+      
+      // Use the token manager to get a valid access token
+      const accessToken = await this.tokenManager.getValidAccessToken();
+      
+      if (accessToken) {
+        console.log('✅ PP: Got valid access token from token manager');
+        return {
+          access_token: accessToken,
+          token_type: 'Bearer'
+        };
+      } else {
+        console.log('❌ PP: No valid access token available');
         return null;
       }
-
-      // First try to get the most recent active token
-      let { data, error } = await this.supabase
-        .from('oauth_tokens')
-        .select('*')
-        .eq('provider', 'practicepanther')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      // If no active token, get the most recent token regardless of status
-      if (error || !data) {
-        console.log('🔍 PP: No active token found, looking for any recent token...');
-        const { data: recentData, error: recentError } = await this.supabase
-          .from('oauth_tokens')
-          .select('*')
-          .eq('provider', 'practicepanther')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (recentError || !recentData) {
-          console.log('🔍 PP: No stored token found');
-          return null;
-        }
-
-        data = recentData;
-      }
-
-      // Check if token is still valid
-      if (data.expires_at && new Date(data.expires_at) > new Date()) {
-        console.log('✅ PP: Using stored valid token');
-        this.accessToken = data.access_token;
-        this.tokenExpiry = new Date(data.expires_at).getTime();
-        return data;
-      }
-
-      // Try to refresh token if available
-      if (data.refresh_token) {
-        console.log('🔄 PP: Refreshing expired token...');
-        const refreshResult = await this.refreshToken(data.refresh_token);
-        if (refreshResult) {
-          return refreshResult;
-        }
-      }
-
-      console.log('⚠️ PP: Stored token expired and no refresh token available');
-      return null;
     } catch (error) {
       console.error('❌ PP: Error getting stored token:', error);
       return null;

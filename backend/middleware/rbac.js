@@ -31,12 +31,27 @@ function checkPermission(resource, action) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
+    console.log('🔐 RBAC Permission Check:', {
+      userId: req.user.id,
+      email: req.user.email,
+      role: req.user.role,
+      resource,
+      action,
+      requiredPermission: `${resource}:${action}`
+    });
+
     const userPerms = permissions[req.user.role] || [];
     const requiredPermission = `${resource}:${action}`;
 
+    console.log('🔐 RBAC User permissions:', userPerms);
+    console.log('🔐 RBAC Has * permission:', userPerms.includes('*'));
+    console.log('🔐 RBAC Has specific permission:', userPerms.includes(requiredPermission));
+
     if (userPerms.includes('*') || userPerms.includes(requiredPermission)) {
+      console.log('✅ RBAC Permission granted');
       next();
     } else {
+      console.log('❌ RBAC Permission denied');
       res.status(403).json({ error: 'Insufficient permissions' });
     }
   };

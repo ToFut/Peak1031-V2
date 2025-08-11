@@ -5,7 +5,7 @@ export interface Exchange {
   exchangeNumber: string; // Unique exchange number
   name: string; // Exchange name/title
   exchangeName: string; // Display name for the exchange
-  status: 'PENDING' | '45D' | '180D' | 'COMPLETED' | 'TERMINATED' | 'ON_HOLD' | 'In Progress' | 'Completed' | 'Cancelled' | 'Draft' | 'ACTIVE';
+  status: 'PENDING' | '45D' | '180D' | 'COMPLETED' | 'TERMINATED' | 'ON_HOLD' | 'In Progress' | 'Completed' | 'Cancelled' | 'Draft';
   
   // Relationships
   clientId: string; // UUID
@@ -58,13 +58,16 @@ export interface Exchange {
   deadline45?: string;
   deadline180?: string;
   
-  // Count properties for UI display
-  taskCount?: number;
-  documentCount?: number;
-  
   // Timestamps
   createdAt: string; // ISO date-time string
   updatedAt: string; // ISO date-time string
+  
+  // Legacy snake_case properties for backward compatibility
+  exchange_number?: string;
+  exchange_value?: number;
+  relinquished_property_value?: number;
+  created_at?: string;
+  updated_at?: string;
   
   // Legacy fields for backward compatibility
   exchangeCoordinator?: string;
@@ -93,10 +96,16 @@ export interface Exchange {
   
   // Computed fields from backend
   progress?: number;
+  progressPercentage?: number; // For UI progress bars
   deadlines?: any;
   urgencyLevel?: string;
   isOverdue?: boolean;
   participantCount?: number;
+  
+  // Timeline and status tracking
+  timelineStatus?: string; // For timeline badges
+  days_remaining?: number; // Days remaining for deadlines
+  projectedCompletion?: string; // Projected completion date
   
   // Exchange participants
   exchangeParticipants?: Array<{

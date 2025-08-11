@@ -38,10 +38,27 @@ interface UpdateContactData {
   is_active?: boolean;
 }
 
-export function useContacts() {
+export function useContacts(options?: { page?: number; limit?: number; search?: string }) {
+  const { page = 1, limit = 50, search } = options || {};
+  
+  // Create cache key that includes pagination parameters
+  const cacheKey = `contacts-${page}-${limit}${search ? `-${search}` : ''}`;
+  
+  // Build endpoint with pagination parameters
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString()
+  });
+  
+  if (search) {
+    params.append('search', search);
+  }
+  
+  const endpoint = `/contacts?${params.toString()}`;
+  
   const { data: contacts = [], loading, error, refetch } = useCachedData<Contact[]>({
-    cacheKey: 'contacts',
-    endpoint: '/contacts',
+    cacheKey,
+    endpoint,
     cacheInstance: generalCache,
     ttl: 5 * 60 * 1000, // 5 minutes
   });
@@ -116,11 +133,11 @@ export function useContacts() {
   const searchContacts = useCallback((searchTerm: string) => {
     const term = searchTerm.toLowerCase();
     return contacts?.filter(contact => 
-      contact.email.toLowerCase().includes(term) ||
-      contact.first_name.toLowerCase().includes(term) ||
-      contact.last_name.toLowerCase().includes(term) ||
-      contact.company?.toLowerCase().includes(term) ||
-      contact.role?.toLowerCase().includes(term)
+      (contact.email || '').toLowerCase().includes(term) ||
+      (contact.first_name || '').toLowerCase().includes(term) ||
+      (contact.last_name || '').toLowerCase().includes(term) ||
+      (contact.company || '').toLowerCase().includes(term) ||
+      (contact.role || '').toLowerCase().includes(term)
     ) || [];
   }, [contacts]);
 

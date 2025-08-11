@@ -23,11 +23,15 @@ import {
   LinkIcon,
   ArrowPathIcon,
   BuildingOfficeIcon,
-  UserIcon
+  UserIcon,
+  CloudArrowUpIcon,
+  FolderIcon,
+  FolderOpenIcon
 } from '@heroicons/react/24/outline';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
 import { usePermissions } from '../../../hooks/usePermissions';
+import { DocumentUploader } from '../../../components/shared';
 
 interface DocumentVersion {
   id: string;
@@ -80,11 +84,15 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
   const [selectedExchangeId, setSelectedExchangeId] = useState<string>(exchangeId || '');
   const [users, setUsers] = useState<any[]>([]);
   const [exchanges, setExchanges] = useState<any[]>([]);
+  const [showFolderView, setShowFolderView] = useState(false);
+  const [folders, setFolders] = useState<any[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   
   const categories = ['all', 'contract', 'financial', 'legal', 'identification', 'deed', 'other'];
 
   useEffect(() => {
     loadDocuments();
+    loadFolders();
     if (isAdmin()) {
       loadUsers();
       loadExchanges();
@@ -96,7 +104,7 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
 
   useEffect(() => {
     filterDocuments();
-  }, [documents, searchTerm, selectedCategory]);
+  }, [documents, searchTerm, selectedCategory, selectedFolderId]);
 
   const loadDocuments = async () => {
     setIsLoading(true);
@@ -104,21 +112,44 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
     
     try {
       if (exchangeId || selectedExchangeId) {
-        response = exchangeId || selectedExchangeId
-          ? await apiService.getGeneratedDocuments(exchangeId || selectedExchangeId)
-          : await apiService.getDocuments();
+        // Load all documents for the specific exchange
+        const targetExchangeId = exchangeId || selectedExchangeId;
+        response = await apiService.get(`/documents/exchange/${targetExchangeId}`);
       } else {
-        response = [];
+        // Load all documents if no exchange is specified
+        response = await apiService.getDocuments();
       }
       
-      // Handle different response formats
+      // Handle different response formats and map to expected structure
+      let rawDocs = [];
       if (Array.isArray(response)) {
-        setDocuments(response);
+        rawDocs = response;
       } else if (response && typeof response === 'object') {
-        setDocuments(response.documents || response.data || []);
-      } else {
-        setDocuments([]);
+        rawDocs = response.documents || response.data || [];
       }
+      
+      // Map backend response to frontend expected format
+      const mappedDocs = rawDocs.map((doc: any) => ({
+        id: doc.id,
+        fileName: doc.original_filename || doc.originalFilename || doc.fileName || 'Unnamed Document',
+        category: doc.category || 'general',
+        uploadedBy: doc.uploaded_by || doc.uploadedBy,
+        uploadedAt: doc.created_at || doc.createdAt || doc.uploadedAt,
+        size: doc.file_size || doc.fileSize || 0,
+        status: doc.status || 'active',
+        pinRequired: doc.pin_required || doc.pinRequired || false,
+        exchangeId: doc.exchange_id || doc.exchangeId,
+        filePath: doc.file_path || doc.filePath,
+        mimeType: doc.mime_type || doc.mimeType,
+        // Additional properties for compatibility
+        originalFilename: doc.original_filename || doc.originalFilename,
+        fileSize: doc.file_size || doc.fileSize,
+        // Keep all original properties
+        ...doc
+      }));
+      
+      console.log('📄 Loaded documents:', mappedDocs.length);
+      setDocuments(mappedDocs);
     } catch (error) {
       console.error('Failed to load documents:', error);
       setDocuments([]);
@@ -149,6 +180,21 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
     }
   };
 
+  const loadFolders = async () => {
+    try {
+      const targetExchangeId = exchangeId || selectedExchangeId;
+      if (targetExchangeId) {
+        const response = await apiService.get(`/folders?exchange_id=${targetExchangeId}`);
+        const foldersData = Array.isArray(response) ? response : (response.data || response.folders || []);
+        console.log('📁 Loaded folders:', foldersData.length);
+        setFolders(foldersData);
+      }
+    } catch (error) {
+      console.error('Failed to load folders:', error);
+      setFolders([]);
+    }
+  };
+
   const filterDocuments = () => {
     let filtered = documents;
 
@@ -163,6 +209,14 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
       );
     }
 
+    // Filter by selected folder
+    if (selectedFolderId) {
+      filtered = filtered.filter(doc => {
+        const docAny = doc as any;
+        return docAny.folderId === selectedFolderId || docAny.folder_id === selectedFolderId;
+      });
+    }
+
     setFilteredDocuments(filtered);
   };
 
@@ -171,8 +225,12 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
       const response = await apiService.getDocumentVersions(documentId);
       setVersions(response.versions || []);
       setShowVersions(documentId);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load document versions:', error);
+      // For now, versions feature is not implemented in the backend
+      // Show empty versions to prevent errors
+      setVersions([]);
+      setShowVersions(documentId);
     }
   };
 
@@ -192,6 +250,70 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
       console.error('Failed to share document:', error);
       alert('Failed to share document. Please try again.');
     }
+  };
+
+  const handleDownload = async (document: Document) => {
+    try {
+      const blob = await apiService.downloadDocument(document.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = window.document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = document.fileName;
+      window.document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to download document:', error);
+      alert('Failed to download document. Please try again.');
+    }
+  };
+
+  const handleDelete = async (documentId: string) => {
+    if (!window.confirm('Are you sure you want to delete this document?')) {
+      return;
+    }
+
+    try {
+      await apiService.delete(`/documents/${documentId}`);
+      alert('Document deleted successfully');
+      loadDocuments();
+    } catch (error) {
+      console.error('Failed to delete document:', error);
+      alert('Failed to delete document. Please try again.');
+    }
+  };
+
+  const handlePreview = (document: Document) => {
+    // Create a preview modal or open in new tab
+    const previewUrl = `${process.env.REACT_APP_API_URL || window.location.origin + '/api'}/documents/${document.id}/preview`;
+    window.open(previewUrl, '_blank');
+  };
+
+  const handleVersionDownload = async (version: DocumentVersion) => {
+    try {
+      const blob = await apiService.downloadDocument(version.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = window.document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = version.fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      alert(`Downloaded ${version.fileName} successfully`);
+    } catch (error) {
+      console.error('Error downloading version:', error);
+      alert('Failed to download version. Please try again.');
+    }
+  };
+
+  const handleVersionPreview = (version: DocumentVersion) => {
+    // Create a preview modal or open in new tab for version
+    const previewUrl = `${process.env.REACT_APP_API_URL || window.location.origin + '/api'}/documents/${version.id}/preview`;
+    window.open(previewUrl, '_blank');
   };
 
   const handleBulkOperation = async (operation: 'delete' | 'move' | 'tag') => {
@@ -328,6 +450,29 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
                 </button>
               </div>
             )}
+            <button
+              onClick={() => setShowFolderView(!showFolderView)}
+              className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
+                showFolderView 
+                  ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              title={showFolderView ? 'Hide folders' : 'Show folders'}
+            >
+              {showFolderView ? (
+                <FolderOpenIcon className="h-4 w-4 mr-2" />
+              ) : (
+                <FolderIcon className="h-4 w-4 mr-2" />
+              )}
+              Folders
+            </button>
+            <DocumentUploader
+              exchangeId={selectedExchangeId || exchangeId}
+              onUploadSuccess={() => {
+                loadDocuments(); // Refresh the document list
+              }}
+              compact={true}
+            />
           </div>
         </div>
       </div>
@@ -553,6 +698,40 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
       {/* Documents Tab */}
       {activeTab === 'documents' && (
         <div className="bg-white rounded-lg shadow border overflow-hidden">
+          {/* Folder View */}
+          {showFolderView && folders.length > 0 && (
+            <div className="p-4 border-b border-gray-200 bg-gray-50">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Folders</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {folders.map((folder: any) => (
+                  <button
+                    key={folder.id}
+                    onClick={() => setSelectedFolderId(folder.id === selectedFolderId ? null : folder.id)}
+                    className={`flex items-center p-3 rounded-lg border transition-colors ${
+                      selectedFolderId === folder.id
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50'
+                    }`}
+                  >
+                    <FolderIcon className="h-5 w-5 mr-2 flex-shrink-0" />
+                    <span className="text-sm truncate">{folder.name || 'Unnamed Folder'}</span>
+                    <span className="ml-auto text-xs text-gray-500">
+                      ({folder.document_count || 0})
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {selectedFolderId && (
+                <button
+                  onClick={() => setSelectedFolderId(null)}
+                  className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Clear folder filter
+                </button>
+              )}
+            </div>
+          )}
+          
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <ArrowPathIcon className="h-8 w-8 animate-spin text-gray-400" />
@@ -651,12 +830,14 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
                             <ShareIcon className="h-4 w-4" />
                           </button>
                           <button
+                            onClick={() => handleDownload(document)}
                             className="text-gray-400 hover:text-gray-600"
                             title="Download"
                           >
                             <ArrowDownTrayIcon className="h-4 w-4" />
                           </button>
                           <button
+                            onClick={() => handleDelete(document.id)}
                             className="text-red-600 hover:text-red-900"
                             title="Delete"
                           >
@@ -724,10 +905,18 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
                         {formatFileSize(version.size)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button className="text-blue-600 hover:text-blue-900 mr-3">
+                        <button 
+                          onClick={() => handleVersionDownload(version)}
+                          className="text-blue-600 hover:text-blue-900 mr-3"
+                          title="Download Version"
+                        >
                           <ArrowDownTrayIcon className="h-4 w-4" />
                         </button>
-                        <button className="text-green-600 hover:text-green-900">
+                        <button 
+                          onClick={() => handleVersionPreview(version)}
+                          className="text-green-600 hover:text-green-900"
+                          title="Preview Version"
+                        >
                           <EyeIcon className="h-4 w-4" />
                         </button>
                       </td>
@@ -825,6 +1014,7 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
           </div>
         </div>
       )}
+
     </div>
   );
 };

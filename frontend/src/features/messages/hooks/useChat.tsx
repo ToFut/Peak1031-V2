@@ -14,6 +14,8 @@ export const useChat = () => {
   const subscriptionsRef = useRef<Map<string, any>>(new Map());
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const loadExchangesTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasInitializedRef = useRef(false);
+  const loadingMessagesRef = useRef<string | null>(null);
 
   // Load exchanges for the current user
   const loadExchanges = useCallback(async (retries = 0) => {
@@ -76,8 +78,15 @@ export const useChat = () => {
 
   // Load messages for a specific exchange
   const loadMessages = useCallback(async (exchangeId: string, retries = 0) => {
+    // Prevent duplicate loading
+    if (loadingMessagesRef.current === exchangeId) {
+      console.log('⏭️ useChat: Already loading messages for exchange:', exchangeId);
+      return;
+    }
+    
     try {
       console.log('📥 useChat: Loading messages for exchange:', exchangeId);
+      loadingMessagesRef.current = exchangeId;
       setError(null);
       
       const chatMessages = await chatService.getMessages(exchangeId);
@@ -134,6 +143,11 @@ export const useChat = () => {
       
       // Clear messages on error to avoid showing stale data
       setMessages([]);
+    } finally {
+      // Clear loading state
+      if (loadingMessagesRef.current === exchangeId) {
+        loadingMessagesRef.current = null;
+      }
     }
   }, [user?.id]);
 
@@ -207,22 +221,41 @@ export const useChat = () => {
     }
   }, [selectedExchange, user?.id]);
 
-  // Upload and send file attachment
-  const sendFile = useCallback(async (file: File) => {
+  // Upload and send file attachment with optional message and PIN protection
+  const sendFile = useCallback(async (file: File, message?: string, pinRequired: boolean = false, pin?: string) => {
     if (!selectedExchange || !user?.id) return;
 
     try {
       setSending(true);
       setError(null);
       
-      // Upload the file
-      const attachmentId = await chatService.uploadFile(file);
+      console.log('📤 useChat: Uploading file with parameters:', {
+        fileName: file.name,
+        exchangeId: selectedExchange.id,
+        pinRequired,
+        hasMessage: !!message
+      });
+      
+      // Upload the file with exchange ID and PIN settings
+      const attachmentId = await chatService.uploadFile(
+        file, 
+        selectedExchange.id, 
+        'chat', // category
+        pinRequired, 
+        pin
+      );
+      
+      console.log('✅ useChat: File uploaded, attachment ID:', attachmentId);
       
       // Send message with attachment
-      await sendMessage(`📎 ${file.name}`, attachmentId);
+      const messageContent = message || `📎 ${file.name}`;
+      await sendMessage(messageContent, attachmentId);
+      
+      console.log('✅ useChat: Message with attachment sent successfully');
     } catch (err: any) {
-      console.error('Error sending file:', err);
+      console.error('❌ useChat: Error sending file:', err);
       setError(err.message || 'Failed to send file');
+      throw err; // Re-throw so UI can handle it
     } finally {
       setSending(false);
     }
@@ -321,28 +354,51 @@ export const useChat = () => {
 
   // Load exchanges on mount and when user changes
   useEffect(() => {
+    let mounted = true;
+    
     const initializeExchanges = async () => {
+      // Prevent duplicate initialization
+      if (hasInitializedRef.current) {
+        console.log('⏭️ useChat: Already initialized, skipping...');
+        return;
+      }
+      
       try {
         console.log('🚀 useChat: Initializing exchanges...');
+        hasInitializedRef.current = true;
         const exchanges = await loadExchanges();
+        
+        if (!mounted) return; // Prevent state updates if unmounted
         
         // Auto-select first exchange if none selected and exchanges exist
         if (exchanges && exchanges.length > 0 && !selectedExchange) {
-          console.log('🎯 useChat: Auto-selecting first exchange:', exchanges[0].exchange_name);
-          await selectExchange(exchanges[0]);
+          // Double-check we still don't have a selected exchange (race condition prevention)
+          setSelectedExchange((currentSelected) => {
+            if (!currentSelected) {
+              console.log('🎯 useChat: Auto-selecting first exchange:', exchanges[0].exchange_name);
+              selectExchange(exchanges[0]);
+              return exchanges[0];
+            }
+            return currentSelected;
+          });
         } else if (exchanges && exchanges.length === 0) {
           console.log('📋 useChat: No exchanges found for user');
           setMessages([]);
         }
       } catch (err) {
         console.error('❌ useChat: Failed to initialize exchanges:', err);
+        hasInitializedRef.current = false; // Reset on error
       }
     };
     
     if (user?.id) {
       initializeExchanges();
     }
-  }, [user?.id]); // Only depend on user.id to avoid infinite loops
+    
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]); // Only depend on user.id
 
   // Cleanup subscriptions on unmount
   useEffect(() => {

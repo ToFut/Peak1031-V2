@@ -1,0 +1,45 @@
+{
+  "summary": {
+    "feature": "Exchange Management",
+    "total": 4,
+    "passed": 2,
+    "failed": 2,
+    "successRate": "50.00%",
+    "timestamp": "2025-08-07T21:45:54.458Z"
+  },
+  "tests": [
+    {
+      "test": "Admin Authentication",
+      "success": true,
+      "details": {
+        "token": "obtained"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T21:45:53.584Z"
+    },
+    {
+      "test": "Get All Exchanges",
+      "success": true,
+      "details": {
+        "count": 0,
+        "hasData": false
+      },
+      "error": null,
+      "timestamp": "2025-08-07T21:45:54.106Z"
+    },
+    {
+      "test": "Exchange Status Management",
+      "success": false,
+      "details": {},
+      "error": "No test exchange available",
+      "timestamp": "2025-08-07T21:45:54.106Z"
+    },
+    {
+      "test": "Test Suite Execution",
+      "success": false,
+      "details": {},
+      "error": "completedExchanges.every is not a function",
+      "timestamp": "2025-08-07T21:45:54.458Z"
+    }
+  ]
+}

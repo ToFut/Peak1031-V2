@@ -145,15 +145,15 @@ const AgencyManagement: React.FC = () => {
   };
 
   const filteredAgencies = agencies.filter(agency =>
-    agency.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    agency.contactInfo?.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    (agency.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (agency.contactInfo?.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredThirdParties = thirdParties.filter(tp =>
-    tp.user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tp.user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tp.user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tp.agencyName.toLowerCase().includes(searchTerm.toLowerCase())
+    (tp.user.firstName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (tp.user.lastName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (tp.user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (tp.agencyName || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (

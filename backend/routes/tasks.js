@@ -1,267 +1,551 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/rbac');
-const databaseService = require('../services/database');
+const supabaseService = require('../services/supabase');
+const enhancedTaskService = require('../services/enhancedTaskService');
 const { transformToCamelCase, transformToSnakeCase } = require('../utils/caseTransform');
-const { Op } = require('sequelize');
-const { Task, User, Exchange } = require('../models');
 
 const router = express.Router();
 
 // Get all tasks (role-filtered)
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, status, priority, exchangeId, assignedTo, sortBy = 'due_date', sortOrder = 'ASC' } = req.query;
+    const { page = 1, limit = 20, search, status, priority, exchangeId, assignedTo, sortBy = 'due_date', sortOrder = 'asc' } = req.query;
     
-    const whereClause = {};
+    let query = supabaseService.client.from('tasks').select(`
+      *,
+      assignee:assigned_to (
+        id,
+        first_name,
+        last_name,
+        email
+      ),
+      exchange:exchange_id (
+        id,
+        exchange_number,
+        status
+      )
+    `);
+
+    // Apply filters
     if (search) {
-      whereClause[Op.or] = [
-        { title: { [Op.like]: `%${search}%` } },
-        { description: { [Op.like]: `%${search}%` } }
-      ];
+      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
     }
     
     if (status) {
-      whereClause.status = status;
+      query = query.eq('status', status.toUpperCase());
     }
     
     if (priority) {
-      whereClause.priority = priority;
+      query = query.eq('priority', priority.toUpperCase());
     }
     
     if (exchangeId) {
-      whereClause.exchange_id = exchangeId;
+      query = query.eq('exchange_id', exchangeId);
     }
     
     if (assignedTo) {
-      whereClause.assigned_to = assignedTo;
+      query = query.eq('assigned_to', assignedTo);
     }
 
     // Role-based filtering
     if (req.user.role === 'client') {
-      // Clients can only see tasks for their exchanges
-      const userExchanges = await databaseService.getExchanges({
-        where: { client_id: req.user.id }
-      });
-      whereClause.exchange_id = { [Op.in]: userExchanges.map(e => e.id) };
-    } else if (req.user.role === 'coordinator') {
-      // Coordinators can see tasks for exchanges they coordinate
-      const userExchanges = await databaseService.getExchanges({
-        where: { coordinator_id: req.user.id }
-      });
-      whereClause.exchange_id = { [Op.in]: userExchanges.map(e => e.id) };
+      // Get client's exchanges first
+      const { data: exchanges } = await supabaseService.client
+        .from('exchanges')
+        .select('id')
+        .eq('client_id', req.user.id);
+      
+      if (exchanges?.length) {
+        query = query.in('exchange_id', exchanges.map(e => e.id));
+      } else {
+        return res.json({ success: true, data: [], total: 0 });
+      }
     }
 
-    const tasks = await databaseService.getTasks({
-      where: whereClause,
-      limit: parseInt(limit),
-      offset: (page - 1) * limit,
-      orderBy: { column: sortBy, ascending: sortOrder === 'ASC' }
+    // Apply sorting and pagination
+    query = query
+      .order(sortBy, { ascending: sortOrder.toLowerCase() === 'asc' })
+      .range((page - 1) * limit, page * limit - 1);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      console.error('Error fetching tasks:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch tasks',
+        details: error.message 
+      });
+    }
+
+    res.json({
+      success: true,
+      data: transformToCamelCase(data || []),
+      total: count || 0,
+      page: parseInt(page),
+      totalPages: Math.ceil((count || 0) / limit)
     });
 
-    // For now, return tasks without pagination since database service doesn't support findAndCountAll
-    res.json({
-      data: tasks,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: tasks.length,
-        totalPages: Math.ceil(tasks.length / limit)
-      }
-    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error in GET /tasks:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      details: error.message 
+    });
   }
 });
 
-// Get tasks for specific exchange
+// Get tasks for a specific exchange
 router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
   try {
-    const tasks = await databaseService.getTasks({
-      where: { exchange_id: req.params.exchangeId },
-      orderBy: { column: 'due_date', ascending: true }
-    });
+    const { exchangeId } = req.params;
+    const { status, priority, assignedTo, limit = '50' } = req.query;
+    
+    let query = supabaseService.client.from('tasks').select(`
+      *,
+      assignee:assigned_to (
+        id,
+        first_name,
+        last_name,
+        email
+      ),
+      exchange:exchange_id (
+        id,
+        exchange_number,
+        status
+      )
+    `);
 
-    res.json(transformToCamelCase({ data: tasks }));
+    // Filter by exchange ID
+    query = query.eq('exchange_id', exchangeId);
+    
+    // Apply additional filters
+    if (status) {
+      query = query.eq('status', status.toUpperCase());
+    }
+    
+    if (priority) {
+      query = query.eq('priority', priority.toUpperCase());
+    }
+    
+    if (assignedTo) {
+      query = query.eq('assigned_to', assignedTo);
+    }
+
+    // Order by due_date and limit results
+    query = query
+      .order('due_date', { ascending: true })
+      .order('created_at', { ascending: false })
+      .limit(parseInt(limit));
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching tasks for exchange:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch tasks', 
+        details: error.message 
+      });
+    }
+
+    res.json(data || []);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching tasks for exchange:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error', 
+      details: error.message 
+    });
   }
 });
 
-// Get task by ID
+// Get single task
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const task = await Task.findByPk(req.params.id, {
-      include: [
-        { model: Exchange, as: 'exchange' },
-        { model: User, as: 'assignedToUser' }
-      ]
+    const { data, error } = await supabaseService.client
+      .from('tasks')
+      .select(`
+        *,
+        assignee:assigned_to (
+          id,
+          first_name,
+          last_name,
+          email
+        ),
+        exchange:exchange_id (
+          id,
+          exchange_number,
+          status
+        )
+      `)
+      .eq('id', req.params.id)
+      .single();
+
+    if (error) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Task not found' 
+      });
+    }
+
+    res.json({
+      success: true,
+      data: transformToCamelCase(data)
     });
 
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
-    }
-
-    res.json(transformToCamelCase({ data: task }));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error in GET /tasks/:id:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      details: error.message 
+    });
   }
 });
 
-// Update task status
-router.put('/:id/status', authenticateToken, checkPermission('tasks', 'write'), async (req, res) => {
+// Create task
+router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { status } = req.body;
-    const task = await Task.findByPk(req.params.id);
+    const taskData = transformToSnakeCase({
+      ...req.body,
+      createdBy: req.user.id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
 
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
+    const { data, error } = await supabaseService.client
+      .from('tasks')
+      .insert([taskData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating task:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to create task',
+        details: error.message 
+      });
     }
 
-    const updateData = { status };
-    if (status === 'COMPLETED') {
-      updateData.completedAt = new Date();
-    } else {
-      updateData.completedAt = null;
-    }
+    res.status(201).json({
+      success: true,
+      data: transformToCamelCase(data)
+    });
 
-    await task.update(updateData);
-
-    res.json(transformToCamelCase({ data: task }));
   } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Update task assignment
-router.put('/:id/assign', authenticateToken, checkPermission('tasks', 'write'), async (req, res) => {
-  try {
-    const { assignedTo } = req.body;
-    const task = await databaseService.getTask(req.params.id);
-
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
-    }
-
-    const updatedTask = await databaseService.updateTask(req.params.id, { assigned_to: assignedTo });
-
-    res.json(transformToCamelCase({ data: updatedTask }));
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Create custom task
-router.post('/', authenticateToken, checkPermission('tasks', 'write'), async (req, res) => {
-  try {
-    const { title, description, priority, exchangeId, assignedTo, dueDate } = req.body;
-    
-    const taskData = {
-      title,
-      description,
-      priority: priority || 'MEDIUM',
-      exchange_id: exchangeId,
-      assigned_to: assignedTo,
-      due_date: dueDate,
-      status: 'PENDING',
-      created_by: req.user.id
-    };
-
-    const task = await databaseService.createTask(taskData);
-
-    res.status(201).json({ data: task });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error in POST /tasks:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      details: error.message 
+    });
   }
 });
 
 // Update task
-router.put('/:id', authenticateToken, checkPermission('tasks', 'write'), async (req, res) => {
+router.put('/:id', authenticateToken, async (req, res) => {
   try {
-    const { title, description, priority, assignedTo, dueDate, status } = req.body;
-    const task = await databaseService.getTask(req.params.id);
+    const updateData = transformToSnakeCase({
+      ...req.body,
+      updatedAt: new Date().toISOString()
+    });
 
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
+    const { data, error } = await supabaseService.client
+      .from('tasks')
+      .update(updateData)
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating task:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to update task',
+        details: error.message 
+      });
     }
 
-    const updateData = {};
-    if (title !== undefined) updateData.title = title;
-    if (description !== undefined) updateData.description = description;
-    if (priority !== undefined) updateData.priority = priority;
-    if (assignedTo !== undefined) updateData.assigned_to = assignedTo;
-    if (dueDate !== undefined) updateData.due_date = dueDate;
-    if (status !== undefined) {
-      updateData.status = status;
-      if (status === 'COMPLETED') {
-        updateData.completed_at = new Date();
-      } else {
-        updateData.completed_at = null;
-      }
-    }
+    res.json({
+      success: true,
+      data: transformToCamelCase(data)
+    });
 
-    const updatedTask = await databaseService.updateTask(req.params.id, updateData);
-
-    res.json(transformToCamelCase({ data: updatedTask }));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error in PUT /tasks/:id:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      details: error.message 
+    });
   }
 });
 
 // Delete task
-router.delete('/:id', authenticateToken, checkPermission('tasks', 'write'), async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
-    const task = await databaseService.getTask(req.params.id);
+    const { error } = await supabaseService.client
+      .from('tasks')
+      .delete()
+      .eq('id', req.params.id);
 
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
+    if (error) {
+      console.error('Error deleting task:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to delete task',
+        details: error.message 
+      });
     }
 
-    await databaseService.deleteTask(req.params.id);
+    res.json({
+      success: true,
+      message: 'Task deleted successfully'
+    });
 
-    res.json({ message: 'Task deleted successfully' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error in DELETE /tasks/:id:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      details: error.message 
+    });
   }
 });
 
-// Get task comments
-router.get('/:id/comments', authenticateToken, async (req, res) => {
+// Enhanced Task Routes
+// ===========================
+
+// Parse natural language task (for preview)
+router.post('/parse-natural', authenticateToken, async (req, res) => {
   try {
-    const task = await databaseService.getTask(req.params.id);
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
+    const { text, exchangeId, ...context } = req.body;
+    
+    if (!text) {
+      return res.status(400).json({
+        success: false,
+        error: 'Text is required'
+      });
     }
 
-    const comments = await databaseService.getTaskComments(req.params.id);
-    res.json(transformToCamelCase({ data: comments }));
+    const result = await enhancedTaskService.parseNaturalLanguageTask(text, {
+      ...context,
+      exchangeId,
+      userId: req.user.id
+    });
+
+    res.json({
+      success: true,
+      data: result
+    });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error parsing natural language:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to parse natural language',
+      details: error.message 
+    });
   }
 });
 
-// Add task comment
-router.post('/:id/comments', authenticateToken, async (req, res) => {
+// Create task from natural language
+router.post('/natural-language', authenticateToken, async (req, res) => {
   try {
-    const { content } = req.body;
-    const task = await databaseService.getTask(req.params.id);
-
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
+    const { text, exchangeId, ...context } = req.body;
+    
+    if (!text) {
+      return res.status(400).json({
+        success: false,
+        error: 'Text is required'
+      });
     }
 
-    const commentData = {
-      task_id: req.params.id,
-      user_id: req.user.id,
-      content,
-      created_at: new Date()
-    };
+    const result = await enhancedTaskService.createTaskFromNaturalLanguage(text, {
+      ...context,
+      exchangeId,
+      userId: req.user.id,
+      createdBy: req.user.id
+    });
 
-    const comment = await databaseService.createTaskComment(commentData);
-    res.status(201).json(transformToCamelCase({ data: comment }));
+    res.status(201).json({
+      success: true,
+      data: result
+    });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error creating task from natural language:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to create task from natural language',
+      details: error.message 
+    });
   }
 });
 
-module.exports = router; 
+// Bulk create tasks from natural language
+router.post('/bulk-natural', authenticateToken, async (req, res) => {
+  try {
+    const { tasks, exchangeId, ...context } = req.body;
+    
+    if (!tasks || !Array.isArray(tasks)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Tasks array is required'
+      });
+    }
+
+    const results = [];
+    for (const taskText of tasks) {
+      try {
+        const result = await enhancedTaskService.createTaskFromNaturalLanguage(taskText, {
+          ...context,
+          exchangeId,
+          userId: req.user.id,
+          createdBy: req.user.id
+        });
+        results.push(result);
+      } catch (error) {
+        console.error(`Error creating task from "${taskText}":`, error);
+        results.push({ error: error.message, text: taskText });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      data: results
+    });
+
+  } catch (error) {
+    console.error('Error bulk creating tasks:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to bulk create tasks',
+      details: error.message 
+    });
+  }
+});
+
+// Extract tasks from chat message
+router.post('/from-chat', authenticateToken, async (req, res) => {
+  try {
+    const { message, exchangeId, senderId, messageId, ...context } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        error: 'Message is required'
+      });
+    }
+
+    const tasks = await enhancedTaskService.extractTasksFromChatMessage(message, {
+      ...context,
+      exchangeId,
+      senderId,
+      messageId,
+      userId: req.user.id,
+      createdBy: req.user.id
+    });
+
+    res.json({
+      success: true,
+      data: tasks || []
+    });
+
+  } catch (error) {
+    console.error('Error extracting tasks from chat:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to extract tasks from chat',
+      details: error.message 
+    });
+  }
+});
+
+// Get task templates
+router.get('/templates', authenticateToken, async (req, res) => {
+  try {
+    const templates = enhancedTaskService.getTaskTemplates();
+    
+    res.json({
+      success: true,
+      data: templates
+    });
+
+  } catch (error) {
+    console.error('Error getting task templates:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to get task templates',
+      details: error.message 
+    });
+  }
+});
+
+// Get task suggestions
+router.get('/suggestions', authenticateToken, async (req, res) => {
+  try {
+    const { exchangeId, userId } = req.query;
+    
+    const suggestions = await enhancedTaskService.generateTaskSuggestions({
+      exchangeId,
+      userId: userId || req.user.id,
+      userRole: req.user.role
+    });
+
+    res.json({
+      success: true,
+      data: suggestions || []
+    });
+
+  } catch (error) {
+    console.error('Error getting task suggestions:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to get task suggestions',
+      details: error.message 
+    });
+  }
+});
+
+// Get auto-complete actions for a task
+router.get('/:id/auto-complete', authenticateToken, async (req, res) => {
+  try {
+    const { data: task } = await supabaseService.client
+      .from('tasks')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        error: 'Task not found'
+      });
+    }
+
+    const autoActions = await enhancedTaskService.getAutoCompleteActions(task);
+
+    res.json({
+      success: true,
+      data: {
+        task: transformToCamelCase(task),
+        autoActions: autoActions || []
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting auto-complete actions:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to get auto-complete actions',
+      details: error.message 
+    });
+  }
+});
+
+module.exports = router;

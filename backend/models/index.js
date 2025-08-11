@@ -11,6 +11,7 @@ const Document = require('./Document');
 const Message = require('./Message');
 const AuditLog = require('./AuditLog');
 const PracticePartnerSync = require('./PracticePartnerSync');
+const Folder = require('./Folder');
 
 // Create models object
 const models = {
@@ -23,6 +24,7 @@ const models = {
   Message,
   AuditLog,
   PracticePartnerSync,
+  Folder,
   sequelize,
   Sequelize
 };
@@ -62,6 +64,10 @@ function defineAssociations() {
     foreignKey: 'userId', 
     as: 'contacts' 
   });
+  User.hasMany(Folder, { 
+    foreignKey: 'createdBy', 
+    as: 'createdFolders' 
+  });
 
   // Contact associations
   Contact.belongsTo(User, { 
@@ -98,15 +104,31 @@ function defineAssociations() {
     foreignKey: 'exchange_id', 
     as: 'exchangeParticipants' 
   });
+  Exchange.hasMany(Folder, { 
+    foreignKey: 'exchangeId', 
+    as: 'folders' 
+  });
 
-  // Task associations
-  Task.belongsTo(Exchange, { 
-    foreignKey: 'exchange_id', 
+  // Folder associations
+  Folder.belongsTo(Folder, { 
+    foreignKey: 'parentId', 
+    as: 'parent' 
+  });
+  Folder.hasMany(Folder, { 
+    foreignKey: 'parentId', 
+    as: 'children' 
+  });
+  Folder.belongsTo(Exchange, { 
+    foreignKey: 'exchangeId', 
     as: 'exchange' 
   });
-  Task.belongsTo(User, { 
-    foreignKey: 'assigned_to', 
-    as: 'assignedUser' 
+  Folder.belongsTo(User, { 
+    foreignKey: 'createdBy', 
+    as: 'creator' 
+  });
+  Folder.hasMany(Document, { 
+    foreignKey: 'folderId', 
+    as: 'documents' 
   });
 
   // Document associations
@@ -116,45 +138,11 @@ function defineAssociations() {
   });
   Document.belongsTo(User, { 
     foreignKey: 'uploadedBy', 
-    as: 'uploader' 
+    as: 'uploadedByUser' 
   });
-  Document.hasMany(Message, { 
-    foreignKey: 'attachment_id', 
-    as: 'attachedMessages' 
-  });
-
-  // Message associations
-  Message.belongsTo(Exchange, { 
-    foreignKey: 'exchange_id', 
-    as: 'exchange' 
-  });
-  Message.belongsTo(User, { 
-    foreignKey: 'sender_id', 
-    as: 'sender' 
-  });
-  Message.belongsTo(Document, { 
-    foreignKey: 'attachment_id', 
-    as: 'attachment' 
-  });
-
-  // ExchangeParticipant associations
-  ExchangeParticipant.belongsTo(Exchange, { 
-    foreignKey: 'exchange_id', 
-    as: 'exchange' 
-  });
-  ExchangeParticipant.belongsTo(Contact, { 
-    foreignKey: 'contact_id', 
-    as: 'contact' 
-  });
-  ExchangeParticipant.belongsTo(User, { 
-    foreignKey: 'user_id', 
-    as: 'user' 
-  });
-
-  // AuditLog associations
-  AuditLog.belongsTo(User, { 
-    foreignKey: 'user_id', 
-    as: 'user' 
+  Document.belongsTo(Folder, { 
+    foreignKey: 'folderId', 
+    as: 'folder' 
   });
 }
 

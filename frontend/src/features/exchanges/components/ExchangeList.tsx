@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Exchange } from '../../../types';
 import { useAuth } from '../../../hooks/useAuth';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { useExchanges } from '../hooks/useExchanges';
+import { useSmartExchanges } from '../../../hooks/useSmartExchanges';
+import { useAnalytics } from '../../../hooks/useAnalytics';
 import { ExchangeCard } from './ExchangeCard';
 import ModernDropdown from './ModernDropdown';
 import { VirtualizedList } from './VirtualizedList';
@@ -20,7 +22,13 @@ import {
   TrendingUp,
   Activity,
   Grid3X3,
-  Table
+  Table,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+  Sparkles,
+  BarChart3
 } from 'lucide-react';
 
 interface ExchangeListProps {
@@ -34,6 +42,8 @@ interface ExchangeListProps {
   showFilters?: boolean;
   showSearch?: boolean;
   showStats?: boolean;
+  enableSmartMode?: boolean; // New: Enable smart pagination and analytics
+  showAIAnalysis?: boolean;  // New: Show AI analysis panel
 }
 
 // Filter Chips Component
@@ -54,8 +64,8 @@ const FilterChip: React.FC<{
   </div>
 );
 
-// Exchange Stats Component
-const ExchangeStats: React.FC<{ exchanges: Exchange[] }> = ({ exchanges }) => {
+// Exchange Stats Component - Memoized
+const ExchangeStats: React.FC<{ exchanges: Exchange[] }> = React.memo(({ exchanges }) => {
   const stats = useMemo(() => ({
     total: exchanges.length,
     active: exchanges.filter(e => e.status === '45D' || e.status === '180D' || e.status === 'In Progress').length,
@@ -131,29 +141,84 @@ const ExchangeStats: React.FC<{ exchanges: Exchange[] }> = ({ exchanges }) => {
       </div>
     </div>
   );
-};
+});
 
-export const ExchangeList: React.FC<ExchangeListProps> = ({ 
+ExchangeStats.displayName = 'ExchangeStats';
+
+// Main ExchangeList Component - Memoized
+export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({ 
   title = "Exchanges", 
   showCreateButton = false,
   filters = {},
   onExchangeSelect,
   showFilters = true,
   showSearch = true,
-  showStats = true
+  showStats = true,
+  enableSmartMode = false,
+  showAIAnalysis = false
 }) => {
   const { user } = useAuth();
   const { isAdmin, isCoordinator } = usePermissions();
   const navigate = useNavigate();
   
-  // Use the exchanges hook instead of manual state management
+  // Optimize hook usage - only use smart mode when explicitly enabled
+  const smartExchanges = useSmartExchanges({
+    initialLimit: 30,
+    enableAutoRefresh: enableSmartMode, // Only enable when smart mode is on
+    refreshInterval: 300000 // 5 minutes
+  });
+
+  // Only use analytics when AI analysis is enabled
+  const analytics = useAnalytics({
+    enableAutoRefresh: showAIAnalysis, // Only enable when AI analysis is on
+    refreshInterval: 300000
+  });
+  
+  // Legacy mode for backward compatibility
+  const legacyExchanges = useExchanges(filters);
+
+  // Memoize data source selection
+  const dataSource = useMemo(() => {
+    if (enableSmartMode) {
+      return smartExchanges;
+    } else {
+      return {
+        ...legacyExchanges,
+        exchanges: legacyExchanges.exchanges || [],
+        summary: null,
+        pagination: { 
+          currentPage: 1, 
+          limit: 50, 
+          total: legacyExchanges.exchanges?.length || 0, 
+          totalPages: 1, 
+          hasNext: false, 
+          hasPrevious: false 
+        },
+        hasNext: false,
+        hasPrevious: false,
+        loadMore: async () => {},
+        setFilters: () => {},
+        clearFilters: () => {},
+        setSortBy: async () => {}
+      };
+    }
+  }, [enableSmartMode, smartExchanges, legacyExchanges]);
+
+  // Extract data with defaults
   const {
-    exchanges,
+    exchanges = [],
     loading,
     error,
+    summary,
+    pagination,
+    hasNext,
+    hasPrevious,
+    loadMore,
     refresh: refreshExchanges,
-    clearError
-  } = useExchanges(filters);
+    setFilters: setSmartFilters,
+    clearFilters,
+    setSortBy
+  } = dataSource;
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -167,47 +232,39 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
   // View toggle state
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
-  // Filter options
-  const statusOptions = [
+  // Memoize filter options
+  const statusOptions = useMemo(() => [
     { value: '', label: 'All Status' },
     { value: 'PENDING', label: 'Pending' },
     { value: '45D', label: '45-Day Period' },
     { value: '180D', label: '180-Day Period' },
     { value: 'COMPLETED', label: 'Completed' },
     { value: 'TERMINATED', label: 'Terminated' }
-  ];
+  ], []);
 
-  const typeOptions = [
+  const typeOptions = useMemo(() => [
     { value: '', label: 'All Types' },
     { value: 'LIKE_KIND', label: 'Like-Kind' },
     { value: 'REVERSE', label: 'Reverse' },
     { value: 'BUILD_TO_SUIT', label: 'Build-to-Suit' },
     { value: 'CONSTRUCTION', label: 'Construction' }
-  ];
+  ], []);
 
-  const dateOptions = [
+  const dateOptions = useMemo(() => [
     { value: '', label: 'All Dates' },
     { value: 'today', label: 'Today' },
     { value: 'week', label: 'This Week' },
     { value: 'month', label: 'This Month' },
     { value: 'quarter', label: 'This Quarter' },
     { value: 'year', label: 'This Year' }
-  ];
+  ], []);
 
-  // Debug user detection and exchanges
-  
-  
-  
-  
-  
-  
-  
-
-  // Filter exchanges based on current filters - memoized to prevent unnecessary re-computations
+  // Memoize filtered exchanges to prevent unnecessary re-computations
   const filteredExchanges = useMemo(() => {
-    return exchanges.filter(exchange => {
+    return (exchanges || []).filter((exchange: Exchange) => {
       const matchesSearch = !searchTerm || 
         exchange.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        exchange.exchangeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         exchange.client?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         exchange.client?.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         exchange.exchangeNumber?.toString().includes(searchTerm);
@@ -246,14 +303,11 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
     });
   }, [exchanges, searchTerm, statusFilter, typeFilter, valueMinFilter, valueMaxFilter, dateFilter]);
 
-  const handleExchangeClick = (exchange: Exchange) => {
+  // Memoize event handlers
+  const handleExchangeClick = useCallback((exchange: Exchange) => {
     if (onExchangeSelect) {
       onExchangeSelect(exchange);
     } else {
-      // Debug log for troubleshooting
-      
-      
-      // Navigate to exchange details page
       if (exchange.id) {
         navigate(`/exchanges/${exchange.id}`);
       } else {
@@ -261,21 +315,22 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
         alert('Cannot view exchange: No ID found');
       }
     }
-  };
+  }, [onExchangeSelect, navigate]);
 
-  const handleCreateExchange = () => {
+  const handleCreateExchange = useCallback(() => {
     navigate('/exchanges/new');
-  };
+  }, [navigate]);
 
-  const clearAllFilters = () => {
+  const clearAllFilters = useCallback(() => {
     setSearchTerm('');
     setStatusFilter('');
     setTypeFilter('');
     setValueMinFilter('');
     setValueMaxFilter('');
     setDateFilter('');
-  };
+  }, []);
 
+  // Memoize active filters check
   const hasActiveFilters = useMemo(() => {
     return searchTerm || statusFilter || typeFilter || valueMinFilter || valueMaxFilter || dateFilter;
   }, [searchTerm, statusFilter, typeFilter, valueMinFilter, valueMaxFilter, dateFilter]);
@@ -533,9 +588,31 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
             <p className="text-gray-500 mb-4">
               {hasActiveFilters 
                 ? "No exchanges match your current filters. Try adjusting your search criteria."
-                : "No exchanges have been created yet."
+                : (user?.role === 'client' || user?.role === 'third_party') 
+                  ? "You haven't been assigned to any exchanges yet. Please contact your coordinator or administrator."
+                  : "No exchanges have been created yet."
               }
             </p>
+            {!hasActiveFilters && (user?.role === 'client' || user?.role === 'third_party') && (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  To be added to an exchange, your coordinator needs to:
+                </p>
+                <ol className="text-sm text-gray-600 text-left max-w-md mx-auto">
+                  <li>1. Navigate to the exchange details page</li>
+                  <li>2. Click on the "Invitations" tab</li>
+                  <li>3. Add your email address as a participant</li>
+                </ol>
+                <div className="mt-4">
+                  <button 
+                    onClick={() => window.location.href = 'mailto:admin@peak1031.com?subject=Request to Join Exchange'}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                  >
+                    Contact Administrator
+                  </button>
+                </div>
+              </div>
+            )}
             {hasActiveFilters && (
               <button
                 onClick={clearAllFilters}
@@ -685,6 +762,6 @@ export const ExchangeList: React.FC<ExchangeListProps> = ({
       )}
     </div>
   );
-};
+});
 
 export default ExchangeList;

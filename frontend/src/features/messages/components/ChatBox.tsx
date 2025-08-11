@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Message, User } from '../../../types';
 import { useSocket } from '../../../hooks/useSocket';
 import { useAuth } from '../../../hooks/useAuth';
+import { ChatDocumentViewer } from '../../../components/shared';
 
 interface ChatBoxProps {
   exchangeId: string;
@@ -92,11 +93,20 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ exchangeId, messages, onSendMe
                     <p className="text-sm">{message.content}</p>
                     
                     {message.attachment && (
-                      <div className="mt-2">
-                        <div className="flex items-center space-x-2 text-xs opacity-75">
-                          <span>📎</span>
-                          <span>{message.attachment.originalFilename}</span>
-                        </div>
+                      <div className="mt-3">
+                        <ChatDocumentViewer 
+                          document={{
+                            id: message.attachment.id,
+                            original_filename: message.attachment.originalFilename || message.attachment.original_filename || message.attachment.filename,
+                            file_size: message.attachment.fileSize || message.attachment.file_size || 0,
+                            mime_type: message.attachment.mimeType || message.attachment.mime_type || 'application/octet-stream',
+                            pin_required: message.attachment.pinRequired,
+                            category: message.attachment.category || 'general',
+                            description: message.attachment.description,
+                            created_at: (message.attachment.createdAt || message.attachment.created_at || new Date().toISOString()) as string
+                          }}
+                          className="max-w-xs"
+                        />
                       </div>
                     )}
                     

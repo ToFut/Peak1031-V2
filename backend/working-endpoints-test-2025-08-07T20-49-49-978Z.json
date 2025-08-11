@@ -1,0 +1,190 @@
+{
+  "passed": 6,
+  "failed": 3,
+  "total": 9,
+  "details": [
+    {
+      "endpoint": "/api/health",
+      "method": "GET",
+      "status": 200,
+      "success": true,
+      "response": {
+        "status": "healthy",
+        "api": "online",
+        "timestamp": "2025-08-07T20:49:48.932Z"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T20:49:48.935Z"
+    },
+    {
+      "endpoint": "/api",
+      "method": "GET",
+      "status": 200,
+      "success": true,
+      "response": {
+        "name": "Peak 1031 Exchange Platform API",
+        "version": "1.0.0",
+        "documentation": "/api/docs",
+        "endpoints": {
+          "auth": "/api/auth",
+          "legacy-auth": "/api/auth/legacy",
+          "contacts": "/api/contacts",
+          "exchanges": "/api/exchanges",
+          "tasks": "/api/tasks",
+          "documents": "/api/documents",
+          "messages": "/api/messages",
+          "notifications": "/api/notifications",
+          "exports": "/api/exports",
+          "sync": "/api/sync",
+          "admin": "/api/admin"
+        }
+      },
+      "error": null,
+      "timestamp": "2025-08-07T20:49:48.940Z"
+    },
+    {
+      "endpoint": "/api/debug/users",
+      "method": "GET",
+      "status": 200,
+      "success": true,
+      "response": {
+        "success": true,
+        "users": [
+          {
+            "id": "3f550ef4-0edb-4733-a2ed-082a168da41b",
+            "email": "aram@peakexchange.com",
+            "first_name": "Aram",
+            "last_name": "Zetlyan",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "246b93f1-2bfa-4f03-948a-2ddc080ffd84",
+            "email": "arielm@peakexchange.com",
+            "first_name": "Ariel",
+            "last_name": "Messian",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "2bdaf055-e6b0-4e86-9eee-3b5ec57054c0",
+            "email": "Joan@peakexchange.com",
+            "first_name": "Joan",
+            "last_name": "Carunungan",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "15a109df-2667-4d7a-ae45-ec518695a293",
+            "email": "joshuam@peakexchange.com",
+            "first_name": "Joshua",
+            "last_name": "Messian",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "983485f7-b63e-4543-bc53-e0a5e98bb39a",
+            "email": "lindag@peakexchange.com",
+            "first_name": "Linda",
+            "last_name": "González",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "6a98270c-0057-44a4-8491-295ddbc75b23",
+            "email": "mark_potente@yahoo.com",
+            "first_name": "Mark",
+            "last_name": "Potente",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "278304de-568f-4138-b35b-6fdcfbd2f1ce",
+            "email": "admin@peak1031.com",
+            "first_name": "System",
+            "last_name": "Administrator",
+            "role": "admin",
+            "is_active": true
+          }
+        ]
+      },
+      "error": null,
+      "timestamp": "2025-08-07T20:49:49.211Z"
+    },
+    {
+      "endpoint": "/api/debug/token",
+      "method": "GET",
+      "status": 200,
+      "success": true,
+      "response": {
+        "success": false,
+        "error": "No token provided"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T20:49:49.212Z"
+    },
+    {
+      "endpoint": "/api/auth/login",
+      "method": "POST",
+      "status": 200,
+      "success": true,
+      "response": {
+        "user": {
+          "id": "278304de-568f-4138-b35b-6fdcfbd2f1ce",
+          "email": "admin@peak1031.com",
+          "first_name": "System",
+          "last_name": "Administrator",
+          "role": "admin",
+          "is_active": true,
+          "email_verified": true,
+          "two_fa_enabled": false,
+          "last_login": "2025-08-07T20:49:49.872Z",
+          "created_at": "2025-08-07T19:31:24.697433",
+          "updated_at": "2025-08-07T19:31:24.697433"
+        },
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIyNzgzMDRkZS01NjhmLTQxMzgtYjM1Yi02ZmRjZmJkMmYxY2UiLCJlbWFpbCI6ImFkbWluQHBlYWsxMDMxLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc1NDU5OTc4OSwiZXhwIjoxNzU0NjAwNjg5LCJhdWQiOiJwZWFrMTAzMS11c2VycyIsImlzcyI6InBlYWsxMDMxIn0.BTELghl5vZvBHTVqER_wKpGb8hKTjZxj63jnSK4zLqY",
+        "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIyNzgzMDRkZS01NjhmLTQxMzgtYjM1Yi02ZmRjZmJkMmYxY2UiLCJlbWFpbCI6ImFkbWluQHBlYWsxMDMxLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc1NDU5OTc4OSwiZXhwIjoxNzU1MjA0NTg5LCJhdWQiOiJwZWFrMTAzMS11c2VycyIsImlzcyI6InBlYWsxMDMxIn0.hSJIZDAbMNyBWkyR55PWGDXBCXjUj-nCLWGxn4W3PPg"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T20:49:49.873Z"
+    },
+    {
+      "endpoint": "/api/auth/logout",
+      "method": "POST",
+      "status": 200,
+      "success": true,
+      "response": {
+        "message": "Logged out successfully"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T20:49:49.876Z"
+    },
+    {
+      "endpoint": "/api/contacts",
+      "method": "GET",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-07T20:49:49.878Z"
+    },
+    {
+      "endpoint": "/api/exchanges",
+      "method": "GET",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-07T20:49:49.879Z"
+    },
+    {
+      "endpoint": "/api/exchanges?page=1&limit=10",
+      "method": "GET",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-07T20:49:49.881Z"
+    }
+  ]
+}

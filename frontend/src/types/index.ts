@@ -70,6 +70,16 @@ export interface Document {
   name?: string;
   template_name?: string;
   file_url?: string;
+  // Folder and organization properties
+  folderId?: string;
+  description?: string;
+  // Backward compatibility properties (snake_case)
+  original_filename?: string;
+  file_size?: number;
+  mime_type?: string;
+  created_at?: string;
+  updated_at?: string;
+  folder_id?: string;
 }
 
 export interface Message {

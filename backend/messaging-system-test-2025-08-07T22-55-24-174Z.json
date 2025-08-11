@@ -1,0 +1,35 @@
+{
+  "summary": {
+    "feature": "Messaging System",
+    "total": 3,
+    "passed": 1,
+    "failed": 2,
+    "successRate": "33.33%",
+    "timestamp": "2025-08-07T22:55:24.174Z"
+  },
+  "tests": [
+    {
+      "test": "Admin Authentication",
+      "success": true,
+      "details": {
+        "token": "obtained"
+      },
+      "error": null,
+      "timestamp": "2025-08-07T22:55:23.395Z"
+    },
+    {
+      "test": "Create Test Client User",
+      "success": false,
+      "details": {},
+      "error": "[object Object]",
+      "timestamp": "2025-08-07T22:55:24.173Z"
+    },
+    {
+      "test": "Test Suite Execution",
+      "success": false,
+      "details": {},
+      "error": "Authentication setup failed - cannot proceed",
+      "timestamp": "2025-08-07T22:55:24.174Z"
+    }
+  ]
+}

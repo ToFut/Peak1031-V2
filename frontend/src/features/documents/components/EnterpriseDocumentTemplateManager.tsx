@@ -256,9 +256,9 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
       // Search filter
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
-        if (!template.name.toLowerCase().includes(search) &&
-            !template.description.toLowerCase().includes(search) &&
-            !template.tags.some(tag => tag.toLowerCase().includes(search))) {
+        if (!(template.name || '').toLowerCase().includes(search) &&
+            !(template.description || '').toLowerCase().includes(search) &&
+            !(template.tags || []).some(tag => (tag || '').toLowerCase().includes(search))) {
           return false;
         }
       }
@@ -297,7 +297,9 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
   const loadTemplates = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await apiService.get('/documents/templates');
+      console.log('Loading document templates...');
+      const response = await apiService.getDocumentTemplates();
+      console.log('Raw API response:', response);
       
       // Transform mock data for 1031 templates
       const mockTemplates: DocumentTemplate[] = [
@@ -472,7 +474,13 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
         }
       ];
 
-      setTemplates(response.data || mockTemplates);
+      // Handle both array response and object with data property
+      const templatesData = Array.isArray(response) ? response : ((response as any).data || []);
+      console.log('Templates loaded from API:', templatesData);
+      
+      // If no templates from API, don't use mock templates - let user know there are no templates
+      setTemplates(templatesData);
+      setError(null); // Clear any previous errors
     } catch (error: any) {
       console.error('Failed to load templates:', error);
       setError('Failed to load document templates');

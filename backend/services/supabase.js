@@ -1,3 +1,6 @@
+// Load environment variables
+require('dotenv').config();
+
 const { createClient } = require('@supabase/supabase-js');
 
 class SupabaseService {
@@ -130,7 +133,17 @@ class SupabaseService {
   }
 
   async getUserById(id) {
-    // Try contacts table first (preferred for user profiles) - use 'id' field, not 'user_id'
+    // Try users table first for authentication purposes (has role and auth fields)
+    try {
+      const users = await this.select('users', { where: { id } });
+      if (users && users.length > 0) {
+        return users[0];
+      }
+    } catch (userError) {
+      console.log('⚠️ Could not query users table with id, trying contacts table:', userError.message);
+    }
+
+    // Try contacts table second (for user profiles) - use 'id' field, not 'user_id'
     try {
       const users = await this.select('contacts', { where: { id } });
       if (users && users.length > 0) {
@@ -140,19 +153,17 @@ class SupabaseService {
       console.log('⚠️ Could not query contacts table with id, trying people table:', contactError.message);
     }
     
-    // Try people table second
+    // Fallback to people table
     try {
       const users = await this.select('people', { where: { id } });
       if (users && users.length > 0) {
         return users[0];
       }
     } catch (peopleError) {
-      console.log('⚠️ Could not query people table, trying users table:', peopleError.message);
+      console.log('⚠️ Could not query people table:', peopleError.message);
     }
     
-    // Fallback to users table
-    const users = await this.select('users', { where: { id } });
-    return users[0] || null;
+    return null;
   }
 
   async getUserByEmail(email) {
@@ -174,30 +185,36 @@ class SupabaseService {
     }
 
     try {
-      const { where = {}, orderBy = { column: 'created_at', ascending: false }, limit, offset } = options;
+      const { where = {}, orderBy = { column: 'created_at', ascending: false }, limit, offset, select } = options;
       
-      // Build query with participants included
+      // Use basic select if specified for performance
+      const selectFields = select || '*';
+      
       let query = this.client
         .from('exchanges')
-        .select('*');
+        .select(selectFields);
 
       // Apply where conditions
-      if (where) {
+      if (where && Object.keys(where).length > 0) {
         Object.keys(where).forEach(key => {
-          query = query.eq(key, where[key]);
+          if (key === 'id' && where[key].in) {
+            // Handle IN clause for id
+            query = query.in('id', where[key].in);
+          } else {
+            query = query.eq(key, where[key]);
+          }
         });
       }
 
       // Apply ordering
       query = query.order(orderBy.column, { ascending: orderBy.ascending });
 
-      // Apply limit and offset
-      if (limit) {
-        query = query.limit(limit);
-      }
+      // Apply limit and offset (reduced default to prevent timeouts)
+      const finalLimit = limit || 1000;
+      query = query.limit(finalLimit);
       
       if (offset !== undefined) {
-        query = query.range(offset, offset + (limit || 100) - 1);
+        query = query.range(offset, offset + finalLimit - 1);
       }
 
       const { data, error } = await query;
@@ -211,8 +228,8 @@ class SupabaseService {
       // Frontend can fetch details when needed
       const exchanges = data || [];
       
-      // Only fetch related data for small result sets (< 10 exchanges)
-      if (exchanges.length <= 10 && exchanges.length > 0) {
+      // Only fetch related data if not using basic select and for small result sets
+      if (!select && exchanges.length <= 10 && exchanges.length > 0) {
         // Batch fetch all client and coordinator IDs
         const clientIds = [...new Set(exchanges.filter(e => e.client_id).map(e => e.client_id))];
         const coordinatorIds = [...new Set(exchanges.filter(e => e.coordinator_id).map(e => e.coordinator_id))];
@@ -258,7 +275,7 @@ class SupabaseService {
         }
       }
 
-      console.log(`✅ Fetched ${exchanges.length} exchanges with participants`);
+      console.log(`✅ Fetched ${exchanges.length} exchanges ${select ? '(basic fields only)' : 'with participants'}`);
       return exchanges;
     } catch (error) {
       console.error('Error in getExchanges:', error);
@@ -334,7 +351,50 @@ class SupabaseService {
   }
 
   async getContacts(options = {}) {
-    return await this.select('contacts', options);
+    if (!this.client) {
+      console.warn('⚠️ Supabase client not initialized');
+      return [];
+    }
+
+    try {
+      const { page = 1, limit = 50, offset = 0, search } = options;
+      
+      let query = this.client
+        .from('contacts')
+        .select('*', { count: 'exact' });
+
+      // Apply search filter if provided
+      if (search) {
+        query = query.or(`firstName.ilike.%${search}%,lastName.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
+      }
+
+      // Apply pagination
+      const start = offset || (page - 1) * limit;
+      const end = start + limit - 1;
+      query = query.range(start, end);
+
+      // Apply ordering
+      query = query.order('created_at', { ascending: false });
+
+      const { data, error, count } = await query;
+
+      if (error) {
+        console.error('❌ Supabase select error for contacts:', error);
+        throw new Error(error.message);
+      }
+
+      // Return with pagination info
+      return {
+        data: data || [],
+        total: count || 0,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil((count || 0) / limit)
+      };
+    } catch (error) {
+      console.error('Error in getContacts:', error);
+      throw error;
+    }
   }
 
   async getContactById(id) {
@@ -413,7 +473,7 @@ class SupabaseService {
     try {
       const { where = {}, orderBy = { column: 'created_at', ascending: false }, limit } = options;
       
-      // First try simple query without relationships to test basic functionality
+      // Query messages without problematic joins
       let query = this.client
         .from('messages')
         .select('*');
@@ -454,25 +514,40 @@ class SupabaseService {
         throw new Error(error.message);
       }
       
-      // If we have messages, try to enrich with user data
+      // Return messages with included relationships
       const messages = data || [];
       
-      // For each message, try to fetch sender info separately
+      // Transform messages and fetch attachments
       if (messages.length > 0) {
         const enrichedMessages = await Promise.all(messages.map(async (message) => {
-          try {
-            // Fetch sender info separately
-            const { data: userData, error: userError } = await this.client
-              .from('users')
-              .select('id, first_name, last_name, email, role')
-              .eq('id', message.sender_id)
-              .single();
-              
-            if (!userError && userData) {
-              message.users = userData;
+          // Add users property for backward compatibility
+          if (message.sender) {
+            message.users = message.sender;
+          }
+          
+          // Handle attachments array
+          if (message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0) {
+            // Get the first attachment ID
+            const attachmentId = message.attachments[0];
+            
+            try {
+              // Fetch document details
+              const { data: docData, error: docError } = await this.client
+                .from('documents')
+                .select('id, original_filename, file_size, mime_type, pin_required, category, created_at')
+                .eq('id', attachmentId)
+                .single();
+                
+              if (!docError && docData) {
+                message.attachment = docData;
+                message.attachment_id = attachmentId;
+                console.log(`✅ Enriched message ${message.id} with attachment data:`, docData.original_filename);
+              } else {
+                console.warn(`⚠️ Could not fetch document ${attachmentId}:`, docError);
+              }
+            } catch (err) {
+              console.warn('Could not fetch attachment:', attachmentId, err);
             }
-          } catch (userErr) {
-            console.warn('⚠️ Could not fetch user data for message:', message.id, userErr.message);
           }
           
           return message;
@@ -509,10 +584,7 @@ class SupabaseService {
     try {
       const { data, error } = await this.client
         .from('messages')
-        .select(`
-          *,
-          sender:users!messages_sender_id_fkey(id, email, first_name, last_name, role)
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
@@ -551,7 +623,7 @@ class SupabaseService {
         .from('messages')
         .update({ read_by: currentReadBy })
         .eq('id', messageId)
-        .select()
+        .select('id, read_by')
         .single();
 
       if (error) throw error;
@@ -589,6 +661,9 @@ class SupabaseService {
       if (where.pinRequired !== undefined) {
         query = query.eq('pin_required', where.pinRequired);
       }
+      if (where.folderId) {
+        query = query.eq('folder_id', where.folderId);
+      }
 
       // Apply ordering
       query = query.order(orderBy.column, { ascending: orderBy.ascending });
@@ -607,6 +682,178 @@ class SupabaseService {
     }
   }
 
+  // Folder operations
+  async getFolders(options = {}) {
+    if (!this.client) {
+      console.warn('⚠️ Supabase client not initialized');
+      return [];
+    }
+
+    try {
+      const { where = {}, orderBy = { column: 'name', ascending: true } } = options;
+      
+      let query = this.client
+        .from('folders')
+        .select(`
+          *,
+          exchange:exchanges(id, name),
+          created_by_user:users!folders_created_by_fkey(id, first_name, last_name, email)
+        `);
+
+      // Apply where conditions
+      if (where.exchange_id) {
+        query = query.eq('exchange_id', where.exchange_id);
+      }
+      if (where.parent_id !== undefined) {
+        query = query.eq('parent_id', where.parent_id);
+      }
+      if (where.name) {
+        query = query.ilike('name', `%${where.name}%`);
+      }
+
+      // Apply ordering
+      query = query.order(orderBy.column, { ascending: orderBy.ascending });
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('❌ Supabase select error for folders:', error);
+        throw new Error(error.message);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getFolders:', error);
+      throw error;
+    }
+  }
+
+  async getFolderById(id) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      const { data, error } = await this.client
+        .from('folders')
+        .select(`
+          *,
+          exchange:exchanges(id, name),
+          created_by_user:users!folders_created_by_fkey(id, first_name, last_name, email),
+          parent:folders!folders_parent_id_fkey(id, name),
+          children:folders!folders_parent_id_fkey(id, name)
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        console.error('❌ Supabase getFolderById error:', error);
+        throw new Error(error.message);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in getFolderById:', error);
+      throw error;
+    }
+  }
+
+  async createFolder(folderData) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      const { data, error } = await this.client
+        .from('folders')
+        .insert(folderData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Supabase createFolder error:', error);
+        throw new Error(error.message);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in createFolder:', error);
+      throw error;
+    }
+  }
+
+  async updateFolder(id, folderData) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      const { data, error } = await this.client
+        .from('folders')
+        .update(folderData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Supabase updateFolder error:', error);
+        throw new Error(error.message);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in updateFolder:', error);
+      throw error;
+    }
+  }
+
+  async deleteFolder(id) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      const { error } = await this.client
+        .from('folders')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ Supabase deleteFolder error:', error);
+        throw new Error(error.message);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in deleteFolder:', error);
+      throw error;
+    }
+  }
+
+  async moveDocumentsToFolder(documentIds, folderId) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      const { data, error } = await this.client
+        .from('documents')
+        .update({ folder_id: folderId })
+        .in('id', documentIds)
+        .select();
+
+      if (error) {
+        console.error('❌ Supabase moveDocumentsToFolder error:', error);
+        throw new Error(error.message);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in moveDocumentsToFolder:', error);
+      throw error;
+    }
+  }
+
   async getDocumentById(id) {
     const documents = await this.select('documents', { where: { id } });
     return documents[0] || null;
@@ -618,6 +865,82 @@ class SupabaseService {
 
   async updateDocument(id, documentData) {
     return await this.update('documents', documentData, { id });
+  }
+
+  // Contact operations
+  async createContact(contactData) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      // Convert camelCase to snake_case for Supabase
+      const supabaseData = {
+        first_name: contactData.firstName,
+        last_name: contactData.lastName,
+        email: contactData.email,
+        phone: contactData.phone,
+        company: contactData.company,
+        contact_type: contactData.contactType || 'client',  // Note: snake_case
+        is_active: contactData.isActive !== false
+      };
+
+      // Add id if provided
+      if (contactData.id) {
+        supabaseData.id = contactData.id;
+      }
+
+      const { data, error } = await this.client
+        .from('contacts')
+        .insert(supabaseData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Supabase createContact error:', error);
+        throw new Error(error.message);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in createContact:', error);
+      throw error;
+    }
+  }
+
+  async updateContact(id, contactData) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      // Convert camelCase to snake_case for Supabase
+      const supabaseData = {};
+      if (contactData.firstName !== undefined) supabaseData.first_name = contactData.firstName;
+      if (contactData.lastName !== undefined) supabaseData.last_name = contactData.lastName;
+      if (contactData.email !== undefined) supabaseData.email = contactData.email;
+      if (contactData.phone !== undefined) supabaseData.phone = contactData.phone;
+      if (contactData.company !== undefined) supabaseData.company = contactData.company;
+      if (contactData.contactType !== undefined) supabaseData.contact_type = contactData.contactType;
+      if (contactData.isActive !== undefined) supabaseData.is_active = contactData.isActive;
+
+      const { data, error } = await this.client
+        .from('contacts')
+        .update(supabaseData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Supabase updateContact error:', error);
+        throw new Error(error.message);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in updateContact:', error);
+      throw error;
+    }
   }
 
   async getAuditLogs(options = {}) {
@@ -646,23 +969,49 @@ class SupabaseService {
       throw new Error('Supabase client not initialized');
     }
 
-    const { data, error } = await this.client
-      .from('exchanges')
-      .select(`
-        *,
-        exchange_participants (
-          *,
-          users (*),
-          contacts (*)
-        )
-      `);
+    try {
+      // First get exchanges
+      const { data: exchanges, error: exchangesError } = await this.client
+        .from('exchanges')
+        .select('*')
+        .limit(5000);
 
-    if (error) {
+      if (exchangesError) {
+        console.error('❌ Error fetching exchanges:', exchangesError);
+        throw exchangesError;
+      }
+
+      // Then get participants separately to avoid relationship issues
+      if (exchanges && exchanges.length > 0) {
+        const exchangeIds = exchanges.map(e => e.id);
+        
+        const { data: participants, error: participantsError } = await this.client
+          .from('exchange_participants')
+          .select('*')
+          .in('exchange_id', exchangeIds);
+
+        if (!participantsError && participants) {
+          // Map participants to exchanges
+          const participantsByExchange = {};
+          participants.forEach(p => {
+            if (!participantsByExchange[p.exchange_id]) {
+              participantsByExchange[p.exchange_id] = [];
+            }
+            participantsByExchange[p.exchange_id].push(p);
+          });
+
+          // Add participants to exchanges
+          exchanges.forEach(exchange => {
+            exchange.exchange_participants = participantsByExchange[exchange.id] || [];
+          });
+        }
+      }
+
+      return exchanges || [];
+    } catch (error) {
       console.error('❌ Supabase query error:', error);
       throw error;
     }
-
-    return data;
   }
 
   async getMessagesWithSender(exchangeId = null) {
@@ -672,15 +1021,7 @@ class SupabaseService {
 
     let query = this.client
       .from('messages')
-      .select(`
-        *,
-        users!messages_sender_id_fkey (
-          id,
-          first_name,
-          last_name,
-          email
-        )
-      `);
+      .select('*');
 
     if (exchangeId) {
       query = query.eq('exchange_id', exchangeId);
@@ -705,13 +1046,10 @@ class SupabaseService {
     try {
       const { where = {}, orderBy = { column: 'created_at', ascending: false } } = options;
       
+      // Simplified query to avoid relationship errors
       let query = this.client
         .from('exchange_participants')
-        .select(`
-          *,
-          contact:contacts(*),
-          users!exchange_participants_user_id_fkey(id, first_name, last_name, email, role)
-        `);
+        .select('*');
 
       // Apply where conditions
       if (where.exchangeId) {
@@ -985,6 +1323,217 @@ class SupabaseService {
       contactsCount,
       tasksCount,
       messagesCount
+    };
+  }
+
+  // Audit Social Features - Mock implementations
+  async getAuditLogById(id) {
+    // Mock implementation
+    return {
+      id,
+      action: 'login',
+      entityType: 'user',
+      entityId: 'mock-entity-id',
+      userId: 'mock-user-id',
+      ipAddress: '127.0.0.1',
+      userAgent: 'Mock User Agent',
+      details: { message: 'Mock audit log details' },
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  async getAuditInteractions(auditLogId) {
+    // Mock implementation
+    return {
+      comments: [],
+      likes: [],
+      assignments: [],
+      escalations: []
+    };
+  }
+
+  async createAuditComment(commentData) {
+    // Mock implementation
+    return {
+      id: 'mock-comment-id',
+      ...commentData,
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  async getAuditCommentById(commentId) {
+    // Mock implementation
+    return {
+      id: commentId,
+      content: 'Mock comment',
+      userId: 'mock-user-id',
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  async updateAuditComment(commentId, updateData) {
+    // Mock implementation
+    return {
+      id: commentId,
+      ...updateData,
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  async deleteAuditComment(commentId) {
+    // Mock implementation
+    return { success: true };
+  }
+
+  async createAuditLike(auditLogId, userId, reactionType) {
+    // Mock implementation
+    return {
+      id: 'mock-like-id',
+      auditLogId,
+      userId,
+      reactionType,
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  async getAuditLike(auditLogId, userId) {
+    // Mock implementation - return null to simulate no existing like
+    return null;
+  }
+
+  async updateAuditLike(auditLogId, userId, reactionType) {
+    // Mock implementation
+    return {
+      id: 'mock-like-id',
+      auditLogId,
+      userId,
+      reactionType,
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  async deleteAuditLike(auditLogId, userId) {
+    // Mock implementation
+    return { success: true };
+  }
+
+  async createAuditAssignment(assignmentData) {
+    // Mock implementation
+    return {
+      id: 'mock-assignment-id',
+      ...assignmentData,
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  async getAuditAssignmentById(assignmentId) {
+    // Mock implementation
+    return {
+      id: assignmentId,
+      assignedTo: 'mock-user-id',
+      assignmentType: 'review',
+      priority: 'normal',
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  async updateAuditAssignment(assignmentId, updateData) {
+    // Mock implementation
+    return {
+      id: assignmentId,
+      ...updateData,
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  async createAuditEscalation(escalationData) {
+    // Mock implementation
+    return {
+      id: 'mock-escalation-id',
+      ...escalationData,
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  async getAuditEscalationById(escalationId) {
+    // Mock implementation
+    return {
+      id: escalationId,
+      escalatedTo: 'mock-user-id',
+      escalationLevel: 1,
+      reason: 'Mock escalation reason',
+      priority: 'normal',
+      status: 'open',
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  async updateAuditEscalation(escalationId, updateData) {
+    // Mock implementation
+    return {
+      id: escalationId,
+      ...updateData,
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  async createTaskFromMention(taskData) {
+    // Mock implementation
+    return {
+      id: 'mock-task-id',
+      title: 'Mentioned in audit log comment',
+      description: taskData.commentContent,
+      status: 'PENDING',
+      priority: 'MEDIUM',
+      assignedTo: taskData.mentionedUserId,
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  async createTaskFromAssignment(taskData) {
+    // Mock implementation
+    return {
+      id: 'mock-task-id',
+      title: `Audit log assignment: ${taskData.assignmentType}`,
+      description: taskData.notes || 'Review audit log assignment',
+      status: 'PENDING',
+      priority: taskData.priority?.toUpperCase() || 'MEDIUM',
+      assignedTo: taskData.assignedTo,
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  async createTaskFromEscalation(taskData) {
+    // Mock implementation
+    return {
+      id: 'mock-task-id',
+      title: `Escalated audit log - Level ${taskData.escalationLevel}`,
+      description: taskData.reason,
+      status: 'PENDING',
+      priority: 'HIGH',
+      assignedTo: taskData.escalatedTo,
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  async getUserAuditInteractions(userId, options = {}) {
+    // Mock implementation
+    return {
+      comments: [],
+      likes: [],
+      assignments: [],
+      escalations: []
+    };
+  }
+
+  async getAuditLogStats(auditLogId) {
+    // Mock implementation
+    return {
+      comments: 0,
+      likes: 0,
+      assignments: 0,
+      escalations: 0
     };
   }
 }

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { apiService } from '../services/api';
+import { documentUploadService } from '../services/documentUploadService';
 
 interface UseDocumentUploadReturn {
   uploading: boolean;
@@ -9,7 +9,7 @@ interface UseDocumentUploadReturn {
   selectedCategory: string;
   setSelectedCategory: (category: string) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
-  uploadDocument: (file: File) => Promise<boolean>;
+  uploadDocument: (file: File, description?: string) => Promise<boolean>;
   resetUpload: () => void;
 }
 
@@ -23,16 +23,33 @@ export function useDocumentUpload(
   const [selectedCategory, setSelectedCategory] = useState('general');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const uploadDocument = useCallback(async (file: File): Promise<boolean> => {
+  const uploadDocument = useCallback(async (file: File, description?: string): Promise<boolean> => {
     if (!file || !exchangeId) return false;
 
     try {
       setUploading(true);
       setUploadError(null);
 
-      const response = await apiService.uploadDocument(file, exchangeId, selectedCategory);
+      console.log('🚀 useDocumentUpload: Starting upload via unified service', {
+        fileName: file.name,
+        exchangeId,
+        category: selectedCategory,
+        description
+      });
+
+      const result = await documentUploadService.uploadDocument(
+        file,
+        exchangeId,
+        selectedCategory,
+        description
+      );
       
-      if (response) {
+      if (result) {
+        console.log('✅ useDocumentUpload: Upload successful', {
+          documentId: result.id,
+          filename: result.originalFilename
+        });
+
         if (onUploadSuccess) {
           await onUploadSuccess();
         }
@@ -42,7 +59,7 @@ export function useDocumentUpload(
       }
       return false;
     } catch (err: any) {
-      console.error('Error uploading document:', err);
+      console.error('❌ useDocumentUpload: Upload failed', err);
       setUploadError(err.message || 'Failed to upload document');
       return false;
     } finally {

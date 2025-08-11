@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
+import Layout from '../../../components/Layout';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
 import { 
@@ -175,18 +175,21 @@ const Reports: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="animate-pulse">
-        <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="bg-gray-200 rounded-lg h-48"></div>
-          ))}
+      <Layout>
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="bg-gray-200 rounded-lg h-48"></div>
+            ))}
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -499,6 +502,7 @@ const Reports: React.FC = () => {
           </div>
         )}
       </div>
+    </Layout>
   );
 };
 

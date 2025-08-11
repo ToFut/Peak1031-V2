@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Document Templates</title>
+</head>
+<body>
+    <h1>Document Templates Test</h1>
+    <button onclick="testTemplates()">Test Templates API</button>
+    <div id="results"></div>
+
+    <script>
+        async function testTemplates() {
+            const results = document.getElementById('results');
+            results.innerHTML = 'Loading...';
+            
+            try {
+                // Get token from localStorage (if exists)
+                const user = JSON.parse(localStorage.getItem('user') || '{}');
+                const token = localStorage.getItem('token') || user.token;
+                
+                console.log('Token:', token ? 'Present' : 'Missing');
+                
+                const response = await fetch('http://localhost:5001/api/documents/templates', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                results.innerHTML = `
+                    <h2>Success!</h2>
+                    <p>Found ${data.length} templates</p>
+                    <pre>${JSON.stringify(data.slice(0, 3), null, 2)}</pre>
+                `;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                results.innerHTML = `
+                    <h2>Error!</h2>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+        
+        // Auto-run test
+        setTimeout(testTemplates, 1000);
+    </script>
+</body>
+</html>

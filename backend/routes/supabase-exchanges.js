@@ -74,6 +74,10 @@ router.get('/', async (req, res) => {
       page = 1, 
       limit = 20 
     } = req.query;
+    
+    // Enforce reasonable limits to prevent performance issues
+    const maxLimit = req.user?.role === 'admin' ? 100 : 50;
+    const actualLimit = Math.min(parseInt(limit), maxLimit);
 
     // Check if Supabase client is initialized
     if (!supabase) {
@@ -131,8 +135,8 @@ router.get('/', async (req, res) => {
       }
 
       // Add pagination
-      const offset = (parseInt(page) - 1) * parseInt(limit);
-      query = query.range(offset, offset + parseInt(limit) - 1);
+      const offset = (parseInt(page) - 1) * actualLimit;
+      query = query.range(offset, offset + actualLimit - 1);
 
       // Order by creation date
       query = query.order('created_at', { ascending: false });
@@ -149,86 +153,44 @@ router.get('/', async (req, res) => {
         transformApiResponse(exchange, { includeComputed: true })
       );
 
+      // Normalize replacementProperties to always be an array
+      const normalizeReplacementProps = (ex) => {
+        let rp = ex.replacementProperties;
+        if (typeof rp === 'string') {
+          try { rp = JSON.parse(rp); } catch (e) { rp = undefined; }
+        }
+        if (rp && !Array.isArray(rp)) {
+          rp = [rp];
+        }
+        ex.replacementProperties = Array.isArray(rp) ? rp : [];
+        return ex;
+      };
+
+      const normalizedExchanges = transformedExchanges.map(normalizeReplacementProps);
+
       // Calculate pagination
-      const totalPages = Math.ceil(count / parseInt(limit));
+      const totalPages = Math.ceil(count / actualLimit);
 
       return res.json(transformToCamelCase({
-        exchanges: transformedExchanges,
+        exchanges: normalizedExchanges,
         pagination: {
           current_page: parseInt(page),
           total_pages: totalPages,
           total_items: count,
-          items_per_page: parseInt(limit),
+          items_per_page: actualLimit,
           has_next: parseInt(page) < totalPages,
           has_previous: parseInt(page) > 1
         }
       }));
 
     } catch (supabaseError) {
-      // Fall back to local database
-      console.log('📋 Using local database fallback for exchanges list');
-      
-      const { Exchange, User, Contact } = require('../models');
-      const { Op } = require('sequelize');
-      
-      // Build where clause
-      const whereClause = {};
-      
-      // Role-based filtering
-      if (req.user?.role === 'client') {
-        whereClause.client_id = req.user.contact_id;
-      } else if (req.user?.role === 'coordinator') {
-        whereClause.coordinator_id = req.user.id;
-      }
-
-      // Apply filters
-      if (status) {
-        whereClause.status = status;
-      }
-      if (coordinator_id) {
-        whereClause.coordinator_id = coordinator_id;
-      }
-      if (client_id) {
-        whereClause.client_id = client_id;
-      }
-      if (search) {
-        whereClause[Op.or] = [
-          { name: { [Op.like]: `%${search}%` } },
-          { notes: { [Op.like]: `%${search}%` } }
-        ];
-      }
-
-      // Get exchanges with pagination
-      const { count, rows: exchanges } = await Exchange.findAndCountAll({
-        where: whereClause,
-        include: [
-          { model: Contact, as: 'client' },
-          { model: User, as: 'coordinator' }
-        ],
-        order: [['created_at', 'DESC']],
-        limit: parseInt(limit),
-        offset: (parseInt(page) - 1) * parseInt(limit)
+      // Don't fall back to SQLite if Supabase is configured - just return the error
+      console.log('❌ Supabase error, returning error instead of fallback:', supabaseError.message);
+      return res.status(500).json({
+        error: 'Database timeout',
+        message: 'Database query timed out. Please try again or reduce the number of results.',
+        suggestion: 'Try refreshing the page or use filters to narrow down results.'
       });
-
-      // Transform data for frontend
-      const transformedExchanges = exchanges.map(exchange => 
-        transformApiResponse(exchange.toJSON(), { includeComputed: true })
-      );
-
-      // Calculate pagination
-      const totalPages = Math.ceil(count / parseInt(limit));
-
-      res.json(transformToCamelCase({
-        exchanges: transformedExchanges,
-        pagination: {
-          current_page: parseInt(page),
-          total_pages: totalPages,
-          total_items: count,
-          items_per_page: parseInt(limit),
-          has_next: parseInt(page) < totalPages,
-          has_previous: parseInt(page) > 1
-        }
-      }));
     }
 
   } catch (error) {
@@ -310,7 +272,7 @@ router.get('/:id', async (req, res) => {
         .limit(10);
 
       // Transform and enhance data
-      const enhancedExchange = {
+      const enhancedExchangeRaw = {
         ...transformApiResponse(exchange),
         tasks: tasks ? tasks.map(task => transformApiResponse(task)) : [],
         recentMessages: messages ? messages.map(msg => transformToCamelCase(msg)) : [],
@@ -321,6 +283,21 @@ router.get('/:id', async (req, res) => {
           recentActivityCount: messages?.length || 0
         }
       };
+
+      // Normalize replacementProperties to always be an array
+      const normalizeReplacementPropsSingle = (ex) => {
+        let rp = ex.replacementProperties;
+        if (typeof rp === 'string') {
+          try { rp = JSON.parse(rp); } catch (e) { rp = undefined; }
+        }
+        if (rp && !Array.isArray(rp)) {
+          rp = [rp];
+        }
+        ex.replacementProperties = Array.isArray(rp) ? rp : [];
+        return ex;
+      };
+
+      const enhancedExchange = normalizeReplacementPropsSingle(enhancedExchangeRaw);
 
       return res.json(transformToCamelCase(enhancedExchange));
 
@@ -372,7 +349,22 @@ router.get('/:id', async (req, res) => {
         }
       };
 
-      res.json(transformToCamelCase(enhancedExchange));
+      // Normalize replacementProperties to always be an array
+      const normalizeReplacementPropsSingleFallback = (ex) => {
+        let rp = ex.replacementProperties;
+        if (typeof rp === 'string') {
+          try { rp = JSON.parse(rp); } catch (e) { rp = undefined; }
+        }
+        if (rp && !Array.isArray(rp)) {
+          rp = [rp];
+        }
+        ex.replacementProperties = Array.isArray(rp) ? rp : [];
+        return ex;
+      };
+
+      const enhancedExchangeFallback = normalizeReplacementPropsSingleFallback(enhancedExchange);
+
+      res.json(transformToCamelCase(enhancedExchangeFallback));
     }
 
   } catch (error) {

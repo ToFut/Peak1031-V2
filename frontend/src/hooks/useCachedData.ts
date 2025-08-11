@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiService } from '../services/api';
-import { documentsCache, exchangesCache, userCache, generalCache } from '../services/cache';
+import { generalCache } from '../services/cache';
 
 interface UseCachedDataOptions {
   cacheKey: string;
@@ -112,7 +112,7 @@ export function useDocuments(filter: string = 'all') {
   return useCachedData({
     cacheKey: `documents-${filter}`,
     endpoint: filter !== 'all' ? `/documents?category=${filter}` : '/documents',
-    cacheInstance: documentsCache,
+    cacheInstance: generalCache,
     ttl: 2 * 60 * 1000, // 2 minutes
     dependencies: [filter]
   });
@@ -122,7 +122,7 @@ export function useExchanges() {
   return useCachedData({
     cacheKey: 'exchanges',
     endpoint: '/exchanges',
-    cacheInstance: exchangesCache,
+    cacheInstance: generalCache,
     ttl: 10 * 60 * 1000, // 10 minutes
     transform: (data) => data.exchanges || data || []
   });
@@ -132,8 +132,28 @@ export function useUserProfile(userId: string) {
   return useCachedData({
     cacheKey: `user-${userId}`,
     endpoint: `/users/${userId}`,
-    cacheInstance: userCache,
+    cacheInstance: generalCache,
     ttl: 30 * 60 * 1000, // 30 minutes
     dependencies: [userId]
+  });
+}
+
+export function useFolders() {
+  return useCachedData({
+    cacheKey: 'folders',
+    endpoint: '/folders',
+    cacheInstance: generalCache,
+    ttl: 5 * 60 * 1000, // 5 minutes
+    transform: (data) => data.folders || data || []
+  });
+}
+
+export function useTemplates() {
+  return useCachedData({
+    cacheKey: 'document-templates',
+    endpoint: '/documents/templates',
+    cacheInstance: generalCache,
+    ttl: 10 * 60 * 1000, // 10 minutes
+    transform: (data) => data.templates || data || []
   });
 } 

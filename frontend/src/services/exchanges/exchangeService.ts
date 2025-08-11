@@ -20,7 +20,7 @@ export class ExchangeService {
         const user = JSON.parse(userStr);
         
         if (user.role === 'admin') {
-          limit = '2000'; // Admin gets ALL exchanges
+          limit = '5000'; // Admin gets ALL exchanges (we have 2885)
           isAdmin = true;
           
         }

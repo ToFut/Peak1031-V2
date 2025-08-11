@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useChat } from '../hooks/useChat';
 import { useAuth } from '../../../hooks/useAuth';
+import { useSocket } from '../../../hooks/useSocket';
 import { ChatMessage } from '../../../services/chatService';
 // import ExchangeParticipantsManager from '../../../components/ExchangeParticipantsManager'; // Component not found
 import StatusBadge from '../../../components/ui/StatusBadge';
 import DebugChatInfo from './DebugChatInfo';
+import { FileAttachmentPreview, ChatDocumentViewer } from '../../../components/shared';
 import { 
   PaperAirplaneIcon,
   PaperClipIcon,
@@ -19,14 +21,23 @@ import {
   ExclamationTriangleIcon,
   SparklesIcon,
   BoltIcon,
-  HeartIcon
+  HeartIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 import { 
   CheckIcon as CheckSolidIcon,
   HeartIcon as HeartSolidIcon
 } from '@heroicons/react/24/solid';
 
-const UnifiedChatInterface: React.FC = () => {
+interface UnifiedChatInterfaceProps {
+  exchangeId?: string;  // Optional: If provided, locks to this exchange only
+  hideExchangeList?: boolean;  // Optional: Hide the exchange list sidebar
+}
+
+const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({ 
+  exchangeId,
+  hideExchangeList = false 
+}) => {
   const {
     exchanges,
     selectedExchange,
@@ -45,6 +56,8 @@ const UnifiedChatInterface: React.FC = () => {
   } = useChat();
 
   const { user } = useAuth();
+  const { connectionStatus } = useSocket();
+  const isConnected = connectionStatus === 'connected';
   const [newMessage, setNewMessage] = useState('');
   const [showParticipants, setShowParticipants] = useState(false);
   const [showParticipantsManager, setShowParticipantsManager] = useState(false);
@@ -52,6 +65,8 @@ const UnifiedChatInterface: React.FC = () => {
   const [dragOver, setDragOver] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'closed' | '45' | '180'>('all');
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
@@ -60,6 +75,16 @@ const UnifiedChatInterface: React.FC = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // If exchangeId is provided, auto-select that exchange
+  useEffect(() => {
+    if (exchangeId && exchanges.length > 0) {
+      const targetExchange = exchanges.find(ex => ex.id === exchangeId);
+      if (targetExchange && (!selectedExchange || selectedExchange.id !== exchangeId)) {
+        selectExchange(targetExchange);
+      }
+    }
+  }, [exchangeId, exchanges, selectedExchange, selectExchange]);
 
   // Enhanced message send with better UX and error handling
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -142,12 +167,28 @@ const UnifiedChatInterface: React.FC = () => {
       return;
     }
 
+    // Show the file attachment preview instead of immediately uploading
+    setPendingFile(file);
+    
+    // Clear the file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Handle sending file with message from preview modal
+  const handleSendFileWithMessage = async (message: string, file: File, pinRequired: boolean, pin?: string) => {
     try {
-      console.log('📤 UnifiedChatInterface: Uploading file:', file.name, file.size + ' bytes');
-      await sendFile(file);
-      console.log('✅ UnifiedChatInterface: File uploaded successfully');
+      setUploadingFile(true);
+      console.log('📤 UnifiedChatInterface: Uploading file with message:', file.name, file.size + ' bytes', 'PIN required:', pinRequired);
+      
+      // Use sendFile method which should handle the file upload and message creation
+      await sendFile(file, message, pinRequired, pin);
+      
+      console.log('✅ UnifiedChatInterface: File with message uploaded successfully');
+      setPendingFile(null); // Close the preview modal
     } catch (err: any) {
-      console.error('❌ UnifiedChatInterface: Error uploading file:', err);
+      console.error('❌ UnifiedChatInterface: Error uploading file with message:', err);
       
       const errorMessage = err.message || 'Failed to upload file';
       if (errorMessage.includes('session has expired')) {
@@ -160,10 +201,14 @@ const UnifiedChatInterface: React.FC = () => {
         alert(`Failed to upload file: ${errorMessage}`);
       }
     } finally {
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      setUploadingFile(false);
     }
+  };
+
+  // Handle canceling file attachment
+  const handleCancelFileAttachment = () => {
+    setPendingFile(null);
+    setUploadingFile(false);
   };
 
   // Drag and drop handlers
@@ -252,10 +297,14 @@ const UnifiedChatInterface: React.FC = () => {
   // Filter exchanges based on search and status
   const filteredExchanges = exchanges.filter(exchange => {
     // Search filter
-    const matchesSearch = exchange.exchange_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      exchange.participants.some(p => 
-        `${p.first_name} ${p.last_name}`.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+    const exchangeName = exchange.exchange_name || '';
+    const matchesSearch = exchangeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      exchange.participants.some(p => {
+        const firstName = p.first_name || '';
+        const lastName = p.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        return fullName.toLowerCase().includes(searchQuery.toLowerCase());
+      });
     
     if (!matchesSearch) return false;
     
@@ -365,8 +414,9 @@ const UnifiedChatInterface: React.FC = () => {
 
   return (
     <div className="h-full flex bg-gradient-to-br from-gray-50 via-white to-blue-50 rounded-2xl shadow-2xl overflow-hidden border border-gray-200/50">
-      {/* Enhanced Sidebar */}
-      <div className="w-96 bg-gradient-to-b from-gray-50 to-white border-r border-gray-200 flex flex-col">
+      {/* Enhanced Sidebar - Only show if not hidden and no specific exchangeId */}
+      {!hideExchangeList && !exchangeId && (
+        <div className="w-96 bg-gradient-to-b from-gray-50 to-white border-r border-gray-200 flex flex-col">
         {/* Enhanced Sidebar Header */}
         <div className="p-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-4">
@@ -596,6 +646,7 @@ const UnifiedChatInterface: React.FC = () => {
           )}
         </div>
       </div>
+      )}
 
       {/* Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -636,6 +687,20 @@ const UnifiedChatInterface: React.FC = () => {
                 </div>
 
                 <div className="flex items-center space-x-2">
+                  {/* Connection Status */}
+                  <div className="flex items-center space-x-2 px-2">
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+                    <span className="text-xs text-gray-500 hidden sm:inline">
+                      {isConnected ? 'Online' : 'Offline'}
+                    </span>
+                  </div>
+                  
+                  {/* Security Badge */}
+                  <div className="hidden lg:flex items-center space-x-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                    <ShieldCheckIcon className="w-3 h-3" />
+                    <span>Secure</span>
+                  </div>
+                  
                   {(user?.role === 'admin' || user?.role === 'coordinator') && (
                     <button
                       onClick={() => setShowParticipantsManager(true)}
@@ -740,12 +805,14 @@ const UnifiedChatInterface: React.FC = () => {
                           
                           <div
                             className={`px-5 py-3 rounded-2xl shadow-sm transition-all duration-200 group-hover:shadow-lg ${
-                              isOwn
+                              message.message_type === 'system'
+                                ? 'bg-yellow-50 border border-yellow-200 text-yellow-800 mx-auto text-center'
+                                : isOwn
                                 ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
                                 : 'bg-white border border-gray-100 text-gray-900'
                             }`}
                           >
-                            {!isOwn && (
+                            {!isOwn && message.message_type !== 'system' && (
                               <p className="text-xs font-semibold mb-1 opacity-70">
                                 {sender.name}
                               </p>
@@ -753,12 +820,44 @@ const UnifiedChatInterface: React.FC = () => {
                             
                             <p className="text-sm leading-relaxed">{message.content}</p>
                             
-                            {message.attachment && (
-                              <div className="mt-3 p-2 rounded-lg bg-black/10 flex items-center space-x-2">
-                                <PaperClipIcon className="h-4 w-4 opacity-70" />
-                                <span className="text-xs opacity-70">{message.attachment.original_filename}</span>
-                              </div>
-                            )}
+                            {(message.attachment || message.attachment_id || ((message as any).attachments && (message as any).attachments.length > 0)) && (() => {
+                              // Debug log to see the actual data structure
+                              console.log('📎 Message attachment data:', {
+                                attachment: message.attachment,
+                                attachment_id: message.attachment_id,
+                                attachments: (message as any).attachments,
+                                fullMessage: message
+                              });
+                              
+                              // Extract attachment ID from various possible locations
+                              const attachmentId = message.attachment_id || 
+                                                 message.attachment?.id || 
+                                                 ((message as any).attachments && (message as any).attachments[0]) || 
+                                                 '';
+                              
+                              if (!attachmentId) {
+                                console.warn('⚠️ No attachment ID found for message:', message.id);
+                                return null;
+                              }
+                              
+                              return (
+                                <div className="mt-3">
+                                  <ChatDocumentViewer
+                                    document={{
+                                      id: attachmentId,
+                                      original_filename: message.attachment?.original_filename || message.attachment?.filename || 'Attachment',
+                                      file_size: message.attachment?.file_size || message.attachment?.size || 0,
+                                      mime_type: message.attachment?.mime_type || message.attachment?.type || 'application/octet-stream',
+                                      pin_required: message.attachment?.pin_required || false,
+                                      category: message.attachment?.category || 'chat',
+                                      description: message.attachment?.description,
+                                      created_at: message.attachment?.created_at || message.created_at
+                                    }}
+                                    className={isOwn ? 'border-blue-200 bg-blue-50/50' : ''}
+                                  />
+                                </div>
+                              );
+                            })()}
                             
                             <div className="flex items-center justify-between mt-2">
                               <p className={`text-xs ${isOwn ? 'text-blue-100' : 'text-gray-500'}`}>
@@ -832,8 +931,9 @@ const UnifiedChatInterface: React.FC = () => {
                     onBlur={stopTypingIndicator}
                     placeholder="Type your message..."
                     className="w-full px-5 py-3 pr-12 bg-gray-50/80 border border-gray-200/50 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-transparent transition-all resize-none"
-                    disabled={sending}
+                    disabled={sending || !isConnected}
                     rows={1}
+                    maxLength={1000}
                     style={{ minHeight: '44px', maxHeight: '120px' }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
@@ -855,7 +955,7 @@ const UnifiedChatInterface: React.FC = () => {
                 
                 <button
                   type="submit"
-                  disabled={!newMessage.trim() || sending}
+                  disabled={!newMessage.trim() || sending || !isConnected}
                   className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
                 >
                   {sending ? (
@@ -958,6 +1058,16 @@ const UnifiedChatInterface: React.FC = () => {
             </button>
           </div>
         </div>
+      )}
+
+      {/* File Attachment Preview Modal */}
+      {pendingFile && (
+        <FileAttachmentPreview
+          file={pendingFile}
+          onSend={handleSendFileWithMessage}
+          onCancel={handleCancelFileAttachment}
+          uploading={uploadingFile}
+        />
       )}
       
       {/* Debug Info in Development */}

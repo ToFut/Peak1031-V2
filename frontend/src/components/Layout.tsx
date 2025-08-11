@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useRolePermissions } from '../hooks/useRolePermissions';
 import { useSocket } from '../hooks/useSocket';
+import { useDelayedTooltip } from '../hooks/useDelayedTooltip';
 import { apiService } from '../services/api';
 
 // Icons (using heroicons or lucide-react)
@@ -65,6 +66,37 @@ interface LayoutProps {
   headerContent?: React.ReactNode;
 }
 
+interface DelayedTooltipWrapperProps {
+  children: React.ReactNode;
+  itemName: string;
+  isCollapsed: boolean;
+  settings: any;
+}
+
+const DelayedTooltipWrapper: React.FC<DelayedTooltipWrapperProps> = ({ children, itemName, isCollapsed, settings }) => {
+  const { showTooltip, handleMouseEnter, handleMouseLeave } = useDelayedTooltip({
+    delay: (settings.menuExperience?.tooltipDelay || 4) * 1000,
+    enabled: settings.menuExperience?.delayedTooltipEnabled !== false && isCollapsed
+  });
+
+  return (
+    <div 
+      className="relative group"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {children}
+      {/* Delayed tooltip for collapsed state */}
+      {isCollapsed && showTooltip && (
+        <div className="absolute left-full ml-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-50 max-w-xs">
+          <div className="font-medium">{itemName}</div>
+          <div className="absolute top-1/2 right-full transform -translate-y-1/2 border-4 border-transparent border-r-gray-900"></div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   const { user, logout } = useAuth();
   const { ui, getSidebarItems } = useRolePermissions();
@@ -83,6 +115,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [settings, setSettings] = useState<any>({});
 
   // State for desktop sidebar collapse - persist in localStorage
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(() => {
@@ -94,6 +127,25 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', JSON.stringify(isDesktopSidebarCollapsed));
   }, [isDesktopSidebarCollapsed]);
+
+  // Load settings for menu experience
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await apiService.getSettings();
+        setSettings(response || {});
+      } catch (error) {
+        console.log('Using default settings for menu experience');
+        setSettings({
+          menuExperience: {
+            delayedTooltipEnabled: true,
+            tooltipDelay: 4
+          }
+        });
+      }
+    };
+    loadSettings();
+  }, []);
 
   // Navigation configuration based on user role using permissions system
   const getNavigation = (): NavigationItem[] => {
@@ -350,6 +402,93 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
     return roleNames[role as keyof typeof roleNames] || role;
   };
 
+  // Get current context for sidebar display
+  const getCurrentContext = () => {
+    const path = location.pathname;
+    const pathSegments = path.split('/').filter(Boolean);
+    
+    // Check for specific contexts
+    if (path.includes('/exchanges/') && pathSegments.length > 2) {
+      return {
+        type: 'exchange',
+        title: 'Exchange Details',
+        subtitle: `ID: ${pathSegments[2]}`,
+        icon: 'BuildingOfficeIcon'
+      };
+    }
+    
+    if (path.includes('/users/') && pathSegments.length > 2) {
+      return {
+        type: 'user',
+        title: 'User Profile',
+        subtitle: `ID: ${pathSegments[2]}`,
+        icon: 'UsersIcon'
+      };
+    }
+    
+    if (path.includes('/messages') || path.includes('/chat')) {
+      return {
+        type: 'chat',
+        title: 'Messages',
+        subtitle: 'Communication',
+        icon: 'ChatBubbleLeftRightIcon'
+      };
+    }
+    
+    if (path.includes('/documents')) {
+      return {
+        type: 'documents',
+        title: 'Documents',
+        subtitle: 'File Management',
+        icon: 'DocumentTextIcon'
+      };
+    }
+    
+    if (path.includes('/tasks')) {
+      return {
+        type: 'tasks',
+        title: 'Tasks',
+        subtitle: 'Task Management',
+        icon: 'CheckCircleIcon'
+      };
+    }
+    
+    if (path.includes('/contacts')) {
+      return {
+        type: 'contacts',
+        title: 'Contacts',
+        subtitle: 'Contact Management',
+        icon: 'UsersIcon'
+      };
+    }
+    
+    if (path.includes('/admin')) {
+      return {
+        type: 'admin',
+        title: 'Administration',
+        subtitle: 'System Management',
+        icon: 'CogIcon'
+      };
+    }
+    
+    if (path.includes('/settings') || path.includes('/profile') || path.includes('/preferences')) {
+      return {
+        type: 'settings',
+        title: 'Settings',
+        subtitle: 'User Preferences',
+        icon: 'CogIcon'
+      };
+    }
+    
+    // Default dashboard context
+    return {
+      type: 'dashboard',
+      title: 'Dashboard',
+      subtitle: 'Overview',
+      icon: 'HomeIcon'
+    };
+  };
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'warning':
@@ -384,8 +523,8 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
         />
       )}
 
-      {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-white shadow-xl transform transition-all duration-300 ease-in-out lg:relative lg:translate-x-0 lg:flex-shrink-0 border-r border-gray-200 ${
+      {/* Sidebar - Fixed and non-scrollable */}
+      <div className={`fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-white shadow-xl transform transition-all duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:flex-shrink-0 border-r border-gray-200 ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       } ${
         isDesktopSidebarCollapsed ? 'lg:w-16' : 'lg:w-64'
@@ -416,8 +555,48 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
           </button>
         </div>
 
+        {/* Current Context Display */}
+        <DelayedTooltipWrapper
+          itemName={`${getCurrentContext().title} - ${getCurrentContext().subtitle}`}
+          isCollapsed={isDesktopSidebarCollapsed}
+          settings={settings}
+        >
+          <div className="px-3 sm:px-4 py-3 border-b border-gray-200 bg-blue-50 hover:bg-blue-100 transition-colors duration-200 cursor-pointer">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-200 rounded-lg flex items-center justify-center shadow-sm">
+                  {(() => {
+                    const context = getCurrentContext();
+                    const IconComponent = context.icon === 'BuildingOfficeIcon' ? BuildingOfficeIcon :
+                                        context.icon === 'UsersIcon' ? UsersIcon :
+                                        context.icon === 'ChatBubbleLeftRightIcon' ? ChatBubbleLeftRightIcon :
+                                        context.icon === 'DocumentTextIcon' ? DocumentTextIcon :
+                                        context.icon === 'CheckCircleIcon' ? CheckCircleIcon :
+                                        context.icon === 'CogIcon' ? CogIcon :
+                                        HomeIcon;
+                    return <IconComponent className="w-4 h-4 text-blue-700" />;
+                  })()}
+                </div>
+              </div>
+              {!isDesktopSidebarCollapsed && (
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-blue-600 uppercase tracking-wider">
+                    Current Context
+                  </p>
+                  <p className="text-sm font-semibold text-blue-900 truncate">
+                    {getCurrentContext().title}
+                  </p>
+                  <p className="text-xs text-blue-600 truncate">
+                    {getCurrentContext().subtitle}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </DelayedTooltipWrapper>
+
         {/* Navigation */}
-        <nav className="flex-1 px-2 sm:px-4 py-4 sm:py-6 overflow-y-auto">
+        <nav className="flex-1 px-2 sm:px-4 py-4 sm:py-6 overflow-y-auto lg:overflow-y-visible">
           <div className="space-y-1 sm:space-y-2">
             {getNavigation().map((item) => {
               const Icon = isCurrentPath(item.href) ? item.iconSolid : item.icon;
@@ -436,27 +615,26 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
                       const isChildActive = isCurrentPath(child.href);
                       return (
                         <div key={child.href} className="relative group">
-                          <button
-                            onClick={() => {
-                              navigate(child.href);
-                              setSidebarOpen(false); // Close sidebar on mobile after navigation
-                            }}
-                            className={`w-full group flex items-center ${isDesktopSidebarCollapsed ? 'justify-center px-2' : 'px-3 sm:px-4'} py-2.5 sm:py-3 text-sm font-medium rounded-lg sm:rounded-xl transition-all duration-200 ${
-                              isChildActive
-                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
-                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                            }`}
+                          <DelayedTooltipWrapper
+                            itemName={child.name}
+                            isCollapsed={isDesktopSidebarCollapsed}
+                            settings={settings}
                           >
-                            <ChildIcon className={`flex-shrink-0 h-5 w-5 ${isDesktopSidebarCollapsed ? '' : 'mr-3'} ${isChildActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                            {!isDesktopSidebarCollapsed && child.name}
-                          </button>
-                          {/* Tooltip for collapsed state */}
-                          {isDesktopSidebarCollapsed && (
-                            <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                              {child.name}
-                              <div className="absolute top-1/2 right-full transform -translate-y-1/2 border-4 border-transparent border-r-gray-900"></div>
-                            </div>
-                          )}
+                            <button
+                              onClick={() => {
+                                navigate(child.href);
+                                setSidebarOpen(false); // Close sidebar on mobile after navigation
+                              }}
+                              className={`w-full group flex items-center ${isDesktopSidebarCollapsed ? 'justify-center px-2' : 'px-3 sm:px-4'} py-2.5 sm:py-3 text-sm font-medium rounded-lg sm:rounded-xl transition-all duration-200 ${
+                                isChildActive
+                                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
+                                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                              }`}
+                            >
+                              <ChildIcon className={`flex-shrink-0 h-5 w-5 ${isDesktopSidebarCollapsed ? '' : 'mr-3'} ${isChildActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                              {!isDesktopSidebarCollapsed && child.name}
+                            </button>
+                          </DelayedTooltipWrapper>
                         </div>
                       );
                     })}
@@ -466,40 +644,39 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
 
               return (
                 <div key={item.href} className="relative group">
-                  <button
-                    onClick={() => {
-                      navigate(item.href);
-                      setSidebarOpen(false); // Close sidebar on mobile after navigation
-                    }}
-                    className={`w-full group flex items-center ${isDesktopSidebarCollapsed ? 'justify-center px-2' : 'px-3 sm:px-4'} py-2.5 sm:py-3 text-sm font-medium rounded-lg sm:rounded-xl transition-all duration-200 ${
-                      isActive
-                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                    }`}
+                  <DelayedTooltipWrapper
+                    itemName={item.name}
+                    isCollapsed={isDesktopSidebarCollapsed}
+                    settings={settings}
                   >
-                    <Icon className={`flex-shrink-0 h-5 w-5 ${isDesktopSidebarCollapsed ? '' : 'mr-3'} ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                    {!isDesktopSidebarCollapsed && (
-                      <>
-                        <span className="flex-1 text-left">{item.name}</span>
-                        {item.badge && item.badge > 0 && (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            isActive 
-                              ? 'bg-white bg-opacity-20 text-white' 
-                              : 'bg-red-100 text-red-600'
-                          }`}>
-                            {item.badge > 99 ? '99+' : item.badge}
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </button>
-                  {/* Tooltip for collapsed state */}
-                  {isDesktopSidebarCollapsed && (
-                    <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                      {item.name}
-                      <div className="absolute top-1/2 right-full transform -translate-y-1/2 border-4 border-transparent border-r-gray-900"></div>
-                    </div>
-                  )}
+                    <button
+                      onClick={() => {
+                        navigate(item.href);
+                        setSidebarOpen(false); // Close sidebar on mobile after navigation
+                      }}
+                      className={`w-full group flex items-center ${isDesktopSidebarCollapsed ? 'justify-center px-2' : 'px-3 sm:px-4'} py-2.5 sm:py-3 text-sm font-medium rounded-lg sm:rounded-xl transition-all duration-200 ${
+                        isActive
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      }`}
+                    >
+                      <Icon className={`flex-shrink-0 h-5 w-5 ${isDesktopSidebarCollapsed ? '' : 'mr-3'} ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                      {!isDesktopSidebarCollapsed && (
+                        <>
+                          <span className="flex-1 text-left">{item.name}</span>
+                          {item.badge && item.badge > 0 && (
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              isActive 
+                                ? 'bg-white bg-opacity-20 text-white' 
+                                : 'bg-red-100 text-red-600'
+                            }`}>
+                              {item.badge > 99 ? '99+' : item.badge}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </button>
+                  </DelayedTooltipWrapper>
                 </div>
               );
             })}

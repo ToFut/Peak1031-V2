@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/overview', authenticateToken, async (req, res) => {
   try {
     const [exchanges, users, tasks] = await Promise.all([
-      databaseService.getExchanges(),
+      databaseService.getExchanges({ limit: 5000 }),
       databaseService.getUsers(),
       databaseService.getTasks()
     ]);
@@ -40,7 +40,7 @@ router.get('/overview', authenticateToken, async (req, res) => {
 // Exchange metrics
 router.get('/exchange-metrics', authenticateToken, async (req, res) => {
   try {
-    const exchanges = await databaseService.getExchanges();
+    const exchanges = await databaseService.getExchanges({ limit: 5000 });
     
     const metrics = {
       total: exchanges.length,
@@ -59,7 +59,7 @@ router.get('/exchange-metrics', authenticateToken, async (req, res) => {
 // Deadlines
 router.get('/deadlines', authenticateToken, async (req, res) => {
   try {
-    const exchanges = await databaseService.getExchanges();
+    const exchanges = await databaseService.getExchanges({ limit: 5000 });
     const now = new Date();
     const deadlines = [];
     
@@ -97,7 +97,7 @@ router.get('/deadlines', authenticateToken, async (req, res) => {
 // Financial summary
 router.get('/financial-summary', authenticateToken, async (req, res) => {
   try {
-    const exchanges = await databaseService.getExchanges();
+    const exchanges = await databaseService.getExchanges({ limit: 5000 });
     
     const summary = {
       totalValue: exchanges.reduce((sum, e) => sum + (e.value || 0), 0),
@@ -115,7 +115,7 @@ router.get('/financial-summary', authenticateToken, async (req, res) => {
 // Recent activity
 router.get('/recent-activity', authenticateToken, async (req, res) => {
   try {
-    const exchanges = await databaseService.getExchanges();
+    const exchanges = await databaseService.getExchanges({ limit: 5000 });
     const activities = exchanges.slice(0, 10).map(exchange => ({
       id: exchange.id,
       type: 'exchange',

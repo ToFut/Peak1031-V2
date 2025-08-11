@@ -3,7 +3,7 @@ module.exports = {
   jwt: {
     secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
-    expiresIn: '15m',
+    expiresIn: '2h', // Extended from 15m to 2 hours
     refreshExpiresIn: '7d',
     issuer: 'peak1031',
     audience: 'peak1031-users'
