@@ -157,17 +157,37 @@ const AuditLogSystem: React.FC = () => {
   const loadAuditData = async () => {
     try {
       setLoading(true);
-      const [logsData, usersData] = await Promise.all([
+      console.log('🔍 Loading audit data...');
+      
+      const [logsResponse, usersData] = await Promise.all([
         apiService.getAuditLogs(),
         apiService.getUsers()
       ]);
 
-      const logs = Array.isArray(logsData) ? logsData : [];
+      console.log('📋 Audit logs response:', logsResponse);
+      
+      // Handle different response formats
+      let logs: AuditLog[] = [];
+      const logsResponseAny = logsResponse as any;
+      if (logsResponseAny?.success && logsResponseAny?.data) {
+        logs = Array.isArray(logsResponseAny.data) ? logsResponseAny.data : [];
+      } else if (Array.isArray(logsResponse)) {
+        logs = logsResponse;
+      } else if (logsResponseAny?.data && Array.isArray(logsResponseAny.data)) {
+        logs = logsResponseAny.data;
+      }
+
+      console.log('✅ Processed audit logs:', logs.length);
+      
       setAuditLogs(logs);
-      setUsers(Array.isArray(usersData) ? usersData : []);
+      const usersDataAny = usersData as any;
+      setUsers(Array.isArray(usersData) ? usersData : (usersDataAny?.data || []));
       calculateStats(logs);
     } catch (error) {
-      console.error('Failed to load audit data:', error);
+      console.error('❌ Failed to load audit data:', error);
+      // Set empty arrays as fallback
+      setAuditLogs([]);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -383,8 +403,7 @@ const AuditLogSystem: React.FC = () => {
       await apiService.escalateAuditLog(auditLogId, {
         escalatedTo: selectedUserForEscalation,
         reason: escalationReason,
-        priority: 'high',
-        escalationLevel: 1
+        priority: 'high'
       });
       
       setShowEscalationModal(false);
