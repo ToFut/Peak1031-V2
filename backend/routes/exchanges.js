@@ -28,12 +28,34 @@ router.get('/:id/participants', [
 ], async (req, res) => {
   console.log('🎯 PARTICIPANTS ROUTE HIT:', req.params.id);
   try {
-    const participants = await databaseService.getExchangeParticipants({
-      where: { exchange_id: req.params.id }
-    });
+    // Get exchange participants with user details
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    
+    const { data: participants, error } = await supabase
+      .from('exchange_participants')
+      .select(`
+        *,
+        user:user_id(id, first_name, last_name, email, role)
+      `)
+      .eq('exchange_id', req.params.id);
+
+    if (error) throw error;
+
+    // Format the response
+    const formattedParticipants = (participants || [])
+      .filter(p => p.user)
+      .map(p => ({
+        id: p.user.id,
+        firstName: p.user.first_name,
+        lastName: p.user.last_name,
+        email: p.user.email,
+        role: p.user.role || p.role
+      }));
 
     res.json({
-      participants: participants || []
+      data: formattedParticipants,
+      participants: formattedParticipants // for backward compatibility
     });
 
   } catch (error) {

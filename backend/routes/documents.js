@@ -1183,4 +1183,106 @@ router.get('/:documentId/versions', authenticateToken, checkPermission('document
   }
 });
 
+// Get active document templates
+router.get('/templates/active', authenticateToken, async (req, res) => {
+  try {
+    const { data: templates, error } = await supabase
+      .from('document_templates')
+      .select('*')
+      .eq('is_active', true)
+      .order('category', { ascending: true })
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+
+    res.json({ data: templates || [] });
+  } catch (error) {
+    console.error('Error fetching templates:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generate document from template
+router.post('/generate', authenticateToken, async (req, res) => {
+  try {
+    const { templateId, exchangeId, additionalData } = req.body;
+    
+    if (!templateId || !exchangeId) {
+      return res.status(400).json({ error: 'Template ID and Exchange ID are required' });
+    }
+
+    // Get template details
+    const { data: template, error: templateError } = await supabase
+      .from('document_templates')
+      .select('*')
+      .eq('id', templateId)
+      .single();
+
+    if (templateError || !template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    // Get exchange details
+    const { data: exchange, error: exchangeError } = await supabase
+      .from('exchanges')
+      .select(`
+        *,
+        client:client_id(id, first_name, last_name, email, phone, company)
+      `)
+      .eq('id', exchangeId)
+      .single();
+
+    if (exchangeError || !exchange) {
+      return res.status(404).json({ error: 'Exchange not found' });
+    }
+
+    // Generate document name
+    const timestamp = new Date().toISOString().split('T')[0];
+    const documentName = `${template.name} - ${exchange.client?.first_name || ''} ${exchange.client?.last_name || ''} - ${timestamp}.pdf`;
+
+    // Create generated document record
+    const generatedDoc = {
+      id: databaseService.generateId(),
+      template_id: templateId,
+      exchange_id: exchangeId,
+      name: documentName,
+      file_path: `generated/${exchangeId}/${documentName}`,
+      status: 'pending',
+      generated_by: req.user.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    const { error: insertError } = await supabase
+      .from('generated_documents')
+      .insert([generatedDoc]);
+
+    if (insertError) throw insertError;
+
+    // Log generation
+    await AuditService.log({
+      action: 'DOCUMENT_GENERATED',
+      resourceType: 'document',
+      resourceId: generatedDoc.id,
+      userId: req.user.id,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: {
+        templateId,
+        exchangeId,
+        documentName
+      }
+    });
+
+    res.json({ 
+      success: true, 
+      data: generatedDoc,
+      message: 'Document generation initiated'
+    });
+  } catch (error) {
+    console.error('Error generating document:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router; 

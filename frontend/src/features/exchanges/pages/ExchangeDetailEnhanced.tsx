@@ -3,10 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useExchanges } from '../hooks/useExchanges';
 import { Exchange } from '../../../types';
 import { apiService } from '../../../services/api';
-import { useAuth } from '../../../hooks/useAuth';
 import { usePermissions } from '../../../hooks/usePermissions';
 import Layout from '../../../components/Layout';
 import UnifiedChatInterface from '../../messages/components/UnifiedChatInterface';
+import { ExchangeDocuments } from '../components/ExchangeDocuments';
 import {
   ArrowLeft,
   Calendar,
@@ -17,12 +17,7 @@ import {
   Users,
   CheckCircle,
   AlertTriangle,
-  TrendingUp,
-  Activity,
-  Send,
   MoreVertical,
-  Shield,
-  Zap,
   Building2,
   Target,
   AlertCircle,
@@ -38,7 +33,6 @@ import {
 // Tab Components
 import { ExchangeOverview } from '../components/ExchangeOverview';
 import { TasksList } from '../components/TasksList';
-import { DocumentsList } from '../components/DocumentsList';
 import InvitationManager from '../components/InvitationManager';
 import { DocumentUploader } from '../../../components/shared';
 
@@ -384,7 +378,6 @@ const ExchangeDetailEnhanced: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [documents, setDocuments] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
-  const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   
   useEffect(() => {
@@ -413,7 +406,6 @@ const ExchangeDetailEnhanced: React.FC = () => {
   const loadDocuments = async () => {
     if (!id) return;
     try {
-      setLoadingDocuments(true);
       const docs = await apiService.get(`/documents/exchange/${id}`);
       // Handle different response formats
       const documentsList = Array.isArray(docs) ? docs : (docs.documents || docs.data || []);
@@ -421,8 +413,6 @@ const ExchangeDetailEnhanced: React.FC = () => {
     } catch (error) {
       console.error('Error loading documents:', error);
       setDocuments([]);
-    } finally {
-      setLoadingDocuments(false);
     }
   };
 
@@ -460,16 +450,6 @@ const ExchangeDetailEnhanced: React.FC = () => {
     }
   };
 
-  const handleDocumentDelete = async (documentId: string) => {
-    if (!window.confirm('Are you sure you want to delete this document?')) return;
-    try {
-      await apiService.delete(`/documents/${documentId}`);
-      await loadDocuments();
-    } catch (error) {
-      console.error('Error deleting document:', error);
-      alert('Failed to delete document');
-    }
-  };
   
   if (loading) {
     return (
@@ -633,14 +613,13 @@ const ExchangeDetailEnhanced: React.FC = () => {
             {activeTab === 'overview' && <ExchangeOverview exchange={exchange as any} participants={[]} tasks={tasks} documents={documents} />}
             {activeTab === 'tasks' && <TasksList tasks={tasks} />}
             {activeTab === 'documents' && (
-              <div className="space-y-6">
-                <DocumentsList 
+              <>
+                <ExchangeDocuments 
+                  exchangeId={exchange.id}
                   documents={documents} 
                   onUploadClick={() => setShowUploadModal(true)} 
-                  onDownload={handleDocumentDownload} 
-                  onDelete={handleDocumentDelete}
-                  canUpload={true} 
-                  canDelete={isAdmin() || isCoordinator()} 
+                  onDownload={handleDocumentDownload}
+                  onRefresh={loadDocuments}
                 />
                 {showUploadModal && (
                   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -661,7 +640,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
                     </div>
                   </div>
                 )}
-              </div>
+              </>
             )}
             {activeTab === 'messages' && <MessagesTab exchange={exchange} />}
             {activeTab === 'invitations' && canManageInvitations && (

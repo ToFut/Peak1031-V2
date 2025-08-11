@@ -49,15 +49,20 @@ export interface Task {
 export interface Document {
   id: string;
   filename: string;
-  originalFilename: string;
+  originalFilename?: string;
   filePath: string;
+  file_path?: string;
   fileSize?: number;
   mimeType?: string;
   exchangeId: string;
+  exchange_id?: string;
   uploadedBy: string;
+  uploaded_by?: string;
+  uploaded_by_name?: string;
   category?: string;
   tags: string[];
   pinRequired: boolean;
+  pin_required?: boolean;
   pinHash?: string;
   isTemplate: boolean;
   templateData: DocumentTemplateData;
@@ -72,6 +77,7 @@ export interface Document {
   file_url?: string;
   // Folder and organization properties
   folderId?: string;
+  folder_id?: string;
   description?: string;
   // Backward compatibility properties (snake_case)
   original_filename?: string;
@@ -79,7 +85,6 @@ export interface Document {
   mime_type?: string;
   created_at?: string;
   updated_at?: string;
-  folder_id?: string;
 }
 
 export interface Message {

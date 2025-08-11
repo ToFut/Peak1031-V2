@@ -191,10 +191,10 @@ class ApiService {
             await this.refreshToken();
             console.log('✅ Token refresh successful, retrying request');
             return await this.request<T>(endpoint, options, true, apiOptions);
-          } catch (refreshError) {
+          } catch (refreshError: any) {
             console.error('❌ Token refresh failed:', refreshError);
             console.error('🔍 Request was to:', endpoint);
-            console.error('🔍 Refresh error details:', refreshError.message);
+            console.error('🔍 Refresh error details:', refreshError?.message || refreshError);
             
             // Clear tokens and redirect to login
             localStorage.removeItem('token');
