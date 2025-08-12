@@ -365,6 +365,13 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
     try {
       clearError();
       
+      // Check if user is authenticated
+      const token = getAuthToken();
+      if (!token) {
+        console.error('❌ No authentication token found');
+        throw new Error('Please login first to create tasks');
+      }
+      
       // Validate exchangeId is present (from prop or selection)
       const targetExchangeId = exchangeId || selectedExchange;
       console.log('🔍 Exchange ID validation:', {

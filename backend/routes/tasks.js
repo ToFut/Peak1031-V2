@@ -423,6 +423,16 @@ router.post('/', authenticateToken, async (req, res) => {
     // Enhanced validation with detailed logging
     const validationErrors = [];
 
+    // Check if user exists and has ID
+    if (!req.user || !req.user.id) {
+      validationErrors.push('User authentication failed - no user ID found');
+      console.log('❌ VALIDATION: User ID missing:', {
+        hasUser: !!req.user,
+        userId: req.user?.id,
+        userEmail: req.user?.email
+      });
+    }
+
     if (!req.body.title || typeof req.body.title !== 'string' || req.body.title.trim() === '') {
       validationErrors.push('Task title is required and must be a non-empty string');
     }

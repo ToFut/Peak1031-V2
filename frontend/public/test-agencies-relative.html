@@ -1,84 +1,127 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Test Agencies API with Relative URLs</title>
+    <title>Test Agencies API - Relative URL</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; }
+    </style>
 </head>
 <body>
-    <h1>Agencies API Test (Relative URLs)</h1>
-    <div id="status">Loading...</div>
-    <div id="result"></div>
+    <h1>Test Agencies API - Using Relative URLs</h1>
+    <p>This test uses relative URLs to test the proxy configuration.</p>
+    
+    <div id="status">Starting test...</div>
+    <div id="results"></div>
     
     <script>
-        async function testAgenciesAPI() {
+        async function runTests() {
             const statusDiv = document.getElementById('status');
-            const resultDiv = document.getElementById('result');
+            const resultsDiv = document.getElementById('results');
+            let html = '';
             
+            // Test 1: Login
+            statusDiv.textContent = 'Test 1: Logging in as admin...';
             try {
-                statusDiv.textContent = 'Getting existing token from localStorage...';
-                
-                // Try to use existing token first
-                let token = localStorage.getItem('token');
-                
-                if (!token) {
-                    statusDiv.textContent = 'No token found, logging in...';
-                    
-                    // Login if no token
-                    const loginResponse = await fetch('/api/auth/login', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            email: 'admin@peak1031.com',
-                            password: 'admin123'
-                        })
-                    });
-                    
-                    if (!loginResponse.ok) {
-                        throw new Error('Login failed: ' + loginResponse.status);
-                    }
-                    
-                    const loginData = await loginResponse.json();
-                    token = loginData.token;
-                    localStorage.setItem('token', token);
-                }
-                
-                statusDiv.textContent = 'Testing /api/agencies endpoint...';
-                
-                // Test agencies endpoint with relative URL
-                const agenciesResponse = await fetch('/api/agencies', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + token
-                    }
+                const loginRes = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@peak1031.com',
+                        password: 'admin123'
+                    })
                 });
                 
-                statusDiv.textContent = `Response status: ${agenciesResponse.status}`;
+                html += '<h3>Test 1: Login</h3>';
+                html += `<p>URL: /api/auth/login</p>`;
+                html += `<p>Status: ${loginRes.status} ${loginRes.statusText}</p>`;
                 
-                if (!agenciesResponse.ok) {
-                    const errorText = await agenciesResponse.text();
-                    throw new Error('Agencies API failed: ' + agenciesResponse.status + ' ' + agenciesResponse.statusText + '\n' + errorText);
+                if (loginRes.ok) {
+                    const data = await loginRes.json();
+                    const token = data.token;
+                    html += '<p class="success">✅ Login successful</p>';
+                    html += `<pre>${JSON.stringify(data.user, null, 2)}</pre>`;
+                    
+                    // Test 2: Get Agencies
+                    statusDiv.textContent = 'Test 2: Fetching agencies...';
+                    html += '<h3>Test 2: Get Agencies</h3>';
+                    html += `<p>URL: /api/agencies</p>`;
+                    
+                    const agenciesRes = await fetch('/api/agencies', {
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    html += `<p>Status: ${agenciesRes.status} ${agenciesRes.statusText}</p>`;
+                    
+                    if (agenciesRes.ok) {
+                        const agenciesData = await agenciesRes.json();
+                        html += '<p class="success">✅ Agencies fetched successfully</p>';
+                        html += `<p>Count: ${agenciesData.data ? agenciesData.data.length : 0}</p>`;
+                        html += `<pre>${JSON.stringify(agenciesData, null, 2)}</pre>`;
+                    } else {
+                        const errorText = await agenciesRes.text();
+                        html += '<p class="error">❌ Failed to fetch agencies</p>';
+                        html += `<pre>${errorText}</pre>`;
+                    }
+                    
+                } else {
+                    const errorText = await loginRes.text();
+                    html += '<p class="error">❌ Login failed</p>';
+                    html += `<pre>${errorText}</pre>`;
                 }
                 
-                const agenciesData = await agenciesResponse.json();
-                
-                statusDiv.textContent = 'SUCCESS! API is working';
-                resultDiv.innerHTML = '<h2>Agencies Data:</h2>' +
-                    '<p>Success: ' + agenciesData.success + '</p>' +
-                    '<p>Count: ' + (agenciesData.data ? agenciesData.data.length : 0) + '</p>' +
-                    '<h3>Full Response:</h3>' +
-                    '<pre>' + JSON.stringify(agenciesData, null, 2) + '</pre>';
-                
             } catch (error) {
-                statusDiv.textContent = 'ERROR: ' + error.message;
-                resultDiv.innerHTML = '<h2>Error details:</h2><pre>' + error.stack + '</pre>';
-                console.error('Test failed:', error);
+                html += '<p class="error">❌ Network error: ' + error.message + '</p>';
+                html += `<pre>${error.stack}</pre>`;
             }
+            
+            // Test 3: Direct Backend Test
+            statusDiv.textContent = 'Test 3: Testing direct backend connection...';
+            html += '<h3>Test 3: Direct Backend Connection</h3>';
+            html += `<p>URL: http://localhost:5001/api/health</p>`;
+            
+            try {
+                const healthRes = await fetch('http://localhost:5001/api/health');
+                html += `<p>Status: ${healthRes.status} ${healthRes.statusText}</p>`;
+                
+                if (healthRes.ok) {
+                    const healthData = await healthRes.json();
+                    html += '<p class="success">✅ Backend is reachable directly</p>';
+                    html += `<pre>${JSON.stringify(healthData, null, 2)}</pre>`;
+                } else {
+                    html += '<p class="error">❌ Backend health check failed</p>';
+                }
+            } catch (error) {
+                html += '<p class="error">❌ Cannot reach backend directly: ' + error.message + '</p>';
+            }
+            
+            statusDiv.textContent = 'Tests complete!';
+            resultsDiv.innerHTML = html;
+            
+            // Add diagnostic info
+            resultsDiv.innerHTML += `
+                <h3>Diagnostic Information</h3>
+                <p><strong>Current URL:</strong> ${window.location.href}</p>
+                <p><strong>Origin:</strong> ${window.location.origin}</p>
+                <p><strong>Port:</strong> ${window.location.port || '80'}</p>
+                <hr>
+                <h3>If you see 404 errors:</h3>
+                <ol>
+                    <li>Make sure the React dev server is running: <code>cd frontend && npm start</code></li>
+                    <li>Check that setupProxy.js is being loaded (you should see proxy logs in the React terminal)</li>
+                    <li>Try restarting the React dev server to reload the proxy configuration</li>
+                    <li>Clear browser cache: Ctrl+Shift+R (Windows/Linux) or Cmd+Shift+R (Mac)</li>
+                </ol>
+            `;
         }
         
-        // Run test when page loads
-        testAgenciesAPI();
+        runTests();
     </script>
 </body>
 </html>
