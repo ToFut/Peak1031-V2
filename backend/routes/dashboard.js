@@ -7,7 +7,8 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const dashboardService = require('../services/dashboardService');
-const auditService = require('../services/audit');
+const fastDashboardService = require('../services/fastDashboardService');
+const AuditService = require('../services/audit');
 
 /**
  * GET /api/dashboard
@@ -18,7 +19,7 @@ router.get('/', authenticateToken, async (req, res) => {
         console.log('📊 Dashboard request from user:', req.user.email, 'Role:', req.user.role);
         
         // Log dashboard access
-        await auditService.logUserAction(
+        await AuditService.logUserAction(
             req.user.id,
             'view_dashboard',
             'dashboard',
@@ -27,12 +28,22 @@ router.get('/', authenticateToken, async (req, res) => {
             { role: req.user.role }
         );
 
-        // Get dashboard data based on role
-        const dashboardData = await dashboardService.getDashboardData(
-            req.user.id,
-            req.user.role
-        );
+        // Use fast dashboard service for quick loading (check query param)
+        const useFast = req.query.fast !== 'false'; // Default to fast unless explicitly disabled
+        
+        const dashboardData = useFast 
+            ? await fastDashboardService.getFastDashboardData(req.user.id, req.user.role)
+            : await dashboardService.getDashboardData(req.user.id, req.user.role);
 
+        // Extra logging to debug 1000 issue
+        console.log('📤 Sending dashboard response:', {
+            userEmail: req.user.email,
+            userRole: req.user.role,
+            'exchanges.total': dashboardData.exchanges.total,
+            'stats.totalExchanges': dashboardData.stats?.totalExchanges,
+            timestamp: new Date().toISOString()
+        });
+        
         res.json({
             success: true,
             data: dashboardData,
@@ -51,24 +62,24 @@ router.get('/', authenticateToken, async (req, res) => {
 
 /**
  * GET /api/dashboard/overview
- * Get dashboard overview data based on user role
+ * Get dashboard overview data based on user role (FAST VERSION)
  */
 router.get('/overview', authenticateToken, async (req, res) => {
     try {
-        console.log('📊 Dashboard overview request from user:', req.user.email, 'Role:', req.user.role);
+        console.log('⚡ FAST Dashboard overview request from user:', req.user.email, 'Role:', req.user.role);
         
-        // Log dashboard access
-        await auditService.logUserAction(
-            req.user.id,
-            'view_dashboard_overview',
-            'dashboard',
-            null,
-            req,
-            { role: req.user.role }
-        );
+        // Skip audit logging for performance (or make it async)
+        // await AuditService.logUserAction(
+        //     req.user.id,
+        //     'view_dashboard_overview',
+        //     'dashboard',
+        //     null,
+        //     req,
+        //     { role: req.user.role }
+        // );
 
-        // Get dashboard data based on role
-        const dashboardData = await dashboardService.getDashboardData(
+        // Use fast dashboard service for quick loading
+        const dashboardData = await fastDashboardService.getFastDashboardData(
             req.user.id,
             req.user.role
         );
@@ -80,7 +91,7 @@ router.get('/overview', authenticateToken, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Dashboard overview error:', error);
+        console.error('Fast dashboard overview error:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to fetch dashboard overview',
@@ -89,6 +100,41 @@ router.get('/overview', authenticateToken, async (req, res) => {
     }
 });
 
+/**
+ * GET /api/dashboard/fast
+ * Super fast dashboard endpoint optimized for initial page load
+ */
+router.get('/fast', authenticateToken, async (req, res) => {
+    try {
+        console.log('⚡ SUPER FAST Dashboard request from user:', req.user.email, 'Role:', req.user.role);
+        
+        const startTime = Date.now();
+        
+        // Use fast dashboard service - no audit logging for max speed
+        const dashboardData = await fastDashboardService.getFastDashboardData(
+            req.user.id,
+            req.user.role
+        );
+        
+        const loadTime = Date.now() - startTime;
+        console.log(`⚡ Fast dashboard loaded in ${loadTime}ms`);
+
+        res.json({
+            success: true,
+            data: dashboardData,
+            loadTime: `${loadTime}ms`,
+            timestamp: new Date()
+        });
+
+    } catch (error) {
+        console.error('Super fast dashboard error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch fast dashboard',
+            message: error.message
+        });
+    }
+});
 
 /**
  * GET /api/dashboard/stats

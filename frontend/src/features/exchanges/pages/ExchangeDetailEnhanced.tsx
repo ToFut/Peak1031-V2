@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useExchanges } from '../hooks/useExchanges';
 import { Exchange } from '../../../types';
 import { apiService } from '../../../services/api';
 import { usePermissions } from '../../../hooks/usePermissions';
+import { useSocket } from '../../../hooks/useSocket';
 import Layout from '../../../components/Layout';
 import UnifiedChatInterface from '../../messages/components/UnifiedChatInterface';
 import { ExchangeDocuments } from '../components/ExchangeDocuments';
@@ -40,6 +41,357 @@ interface TabProps {
   exchange: Exchange;
   onUpdate?: () => void;
 }
+
+// Google-style Participant Display Component
+const ParticipantAvatars: React.FC<{ 
+  participants: any[], 
+  maxVisible?: number,
+  onViewAll?: () => void,
+  onRemoveParticipant?: (participantId: string, participantName: string) => void,
+  onAddParticipant?: () => void,
+  onSendMessage?: (participant: any, fullName: string) => void,
+  canManage?: boolean,
+  exchangeId?: string
+}> = ({ participants, maxVisible = 3, onViewAll, onRemoveParticipant, onAddParticipant, onSendMessage, canManage = false, exchangeId }) => {
+  const [showAll, setShowAll] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const visibleParticipants = showAll ? participants : participants.slice(0, maxVisible);
+  const remainingCount = participants.length - maxVisible;
+
+  const getInitials = (firstName?: string, lastName?: string) => {
+    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase() || '??';
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'admin': return 'bg-red-500 text-white';
+      case 'coordinator': return 'bg-blue-500 text-white';
+      case 'client': return 'bg-green-500 text-white';
+      case 'third_party': return 'bg-purple-500 text-white';
+      case 'agency': return 'bg-orange-500 text-white';
+      default: return 'bg-gray-500 text-white';
+    }
+  };
+
+  const getRoleName = (role: string) => {
+    switch (role) {
+      case 'admin': return 'Admin';
+      case 'coordinator': return 'Coordinator';
+      case 'client': return 'Client';
+      case 'third_party': return '3rd Party';
+      case 'agency': return 'Agency';
+      default: return role;
+    }
+  };
+
+  if (participants.length === 0) {
+    return (
+      <div className="flex items-center text-sm text-gray-500">
+        <Users className="w-4 h-4 mr-1" />
+        No participants yet
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex items-center">
+        <Users className="w-4 h-4 text-gray-600 mr-2" />
+        
+        {/* Avatar Stack */}
+        <div className="flex -space-x-2 hover:space-x-0 transition-all duration-300">
+          {visibleParticipants.map((participant, index) => {
+            const user = participant.user || participant;
+            const firstName = user.first_name || user.firstName;
+            const lastName = user.last_name || user.lastName;
+            const email = user.email;
+            
+            return (
+              <div
+                key={participant.id || index}
+                className={`
+                  relative inline-flex items-center justify-center w-8 h-8 text-xs font-medium rounded-full border-2 border-white
+                  ${getRoleColor(participant.role)} hover:scale-110 transition-transform duration-200 cursor-pointer
+                  hover:z-10 group
+                `}
+                title={`${firstName} ${lastName} (${getRoleName(participant.role)})`}
+              >
+                {getInitials(firstName, lastName)}
+                
+                {/* Tooltip */}
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20">
+                  <div className="font-medium">{firstName} {lastName}</div>
+                  <div className="text-gray-300">{getRoleName(participant.role)}</div>
+                  <div className="text-gray-400 text-xs">{email}</div>
+                  {/* Arrow */}
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
+            );
+          })}
+          
+          {/* Show remaining count */}
+          {remainingCount > 0 && !showAll && (
+            <button
+              onClick={() => setShowAll(true)}
+              className="relative inline-flex items-center justify-center w-8 h-8 text-xs font-medium text-gray-600 bg-gray-100 border-2 border-white rounded-full hover:bg-gray-200 transition-colors"
+              title={`View ${remainingCount} more participants`}
+            >
+              +{remainingCount}
+            </button>
+          )}
+        </div>
+        
+        {/* Participant count and expand button */}
+        <div className="ml-3 flex items-center gap-2">
+          <span className="text-sm text-gray-600">
+            {participants.length} participant{participants.length !== 1 ? 's' : ''}
+          </span>
+          
+          {participants.length > maxVisible && (
+            <button
+              onClick={() => setShowAll(!showAll)}
+              className="text-xs text-blue-600 hover:text-blue-800 font-medium underline"
+            >
+              {showAll ? 'Show Less' : 'View All'}
+            </button>
+          )}
+        </div>
+        
+        {/* Management Dropdown */}
+        {canManage && (
+          <div className="relative ml-2">
+            <button
+              onClick={() => setShowDropdown(!showDropdown)}
+              className="flex items-center justify-center w-8 h-8 text-gray-500 hover:text-white hover:bg-blue-500 rounded-full transition-all duration-200 shadow-sm border border-gray-300"
+              title="Manage participants"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+              </svg>
+            </button>
+            
+            {showDropdown && (
+              <>
+                {/* Dropdown Backdrop */}
+                <div 
+                  className="fixed inset-0 z-30" 
+                  onClick={() => setShowDropdown(false)}
+                ></div>
+                
+                {/* Dropdown Menu */}
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-40 transform animate-in fade-in duration-200">
+                  {/* Header */}
+                  <div className="px-4 py-2 bg-gray-50 rounded-t-xl border-b border-gray-100 mb-1">
+                    <h4 className="text-sm font-semibold text-gray-800">Manage Participants</h4>
+                  </div>
+
+                  {/* Add Participant */}
+                  <button
+                    onClick={() => {
+                      setShowDropdown(false);
+                      onAddParticipant?.();
+                    }}
+                    className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors group"
+                  >
+                    <div className="w-8 h-8 bg-green-100 group-hover:bg-green-200 rounded-lg flex items-center justify-center mr-3">
+                      <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                    </div>
+                    <div className="text-left">
+                      <div className="font-medium">Add Participant</div>
+                      <div className="text-xs text-gray-500">Invite new users to this exchange</div>
+                    </div>
+                  </button>
+                  
+                  {/* View All Participants */}
+                  <button
+                    onClick={() => {
+                      setShowDropdown(false);
+                      setShowAll(true);
+                    }}
+                    className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors group"
+                  >
+                    <div className="w-8 h-8 bg-blue-100 group-hover:bg-blue-200 rounded-lg flex items-center justify-center mr-3">
+                      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    </div>
+                    <div className="text-left">
+                      <div className="font-medium">View All Participants</div>
+                      <div className="text-xs text-gray-500">See detailed participant list</div>
+                    </div>
+                  </button>
+                  
+                  {participants.length > 0 && (
+                    <>
+                      <div className="border-t border-gray-100 my-2"></div>
+                      <div className="px-4 py-2">
+                        <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">
+                          Quick Actions
+                        </div>
+                        <div className="space-y-1">
+                          {participants.slice(0, 3).map((participant, index) => {
+                            const user = participant.user || participant;
+                            const firstName = user.first_name || user.firstName;
+                            const lastName = user.last_name || user.lastName;
+                            const fullName = `${firstName} ${lastName}`;
+                            const email = user.email;
+                            
+                            return (
+                              <div key={participant.id || index} className="bg-gray-50 rounded-lg p-2">
+                                {/* Participant Info */}
+                                <div className="flex items-center mb-2">
+                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium mr-2 ${getRoleColor(participant.role)}`}>
+                                    {getInitials(firstName, lastName)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-sm text-gray-900 truncate">{fullName}</div>
+                                    <div className="text-xs text-gray-500 truncate">{getRoleName(participant.role)}</div>
+                                  </div>
+                                </div>
+                                
+                                {/* Action Buttons */}
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => {
+                                      setShowDropdown(false);
+                                      onSendMessage?.(participant, fullName);
+                                    }}
+                                    className="flex-1 flex items-center justify-center px-2 py-1 text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                                    title={`Send message to ${fullName}`}
+                                  >
+                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                    Message
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setShowDropdown(false);
+                                      onRemoveParticipant?.(participant.participantId || participant.id, fullName);
+                                    }}
+                                    className="flex-1 flex items-center justify-center px-2 py-1 text-xs text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors"
+                                    disabled={!participant.participantId && !participant.id}
+                                    title={`Remove ${fullName} from exchange`}
+                                  >
+                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Remove
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {participants.length > 3 && (
+                            <div className="text-center py-2 text-xs text-gray-500 bg-gray-50 rounded-lg">
+                              +{participants.length - 3} more participants
+                              <br />
+                              <button 
+                                onClick={() => {
+                                  setShowDropdown(false);
+                                  setShowAll(true);
+                                }}
+                                className="text-blue-600 hover:text-blue-800 underline"
+                              >
+                                View all to manage
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+      
+      {/* Modal-style Expanded participant list */}
+      {showAll && participants.length > maxVisible && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-25 z-40"
+            onClick={() => setShowAll(false)}
+          ></div>
+          
+          {/* Modal */}
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl border border-gray-200 p-6 min-w-96 max-w-md z-50">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-semibold text-gray-900">Exchange Participants ({participants.length})</h4>
+              <button
+                onClick={() => setShowAll(false)}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {participants.map((participant, index) => {
+                const user = participant.user || participant;
+                const firstName = user.first_name || user.firstName;
+                const lastName = user.last_name || user.lastName;
+                const email = user.email;
+                
+                return (
+                  <div key={participant.id || index} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 border border-gray-100">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${getRoleColor(participant.role)} shadow-sm`}>
+                      {getInitials(firstName, lastName)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm text-gray-900 truncate">
+                        {firstName} {lastName}
+                      </div>
+                      <div className="text-xs text-gray-500 truncate">{email}</div>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <div className={`text-xs px-2 py-1 rounded-full font-medium bg-opacity-20 ${getRoleColor(participant.role).replace('text-white', 'text-gray-700')}`}>
+                        {getRoleName(participant.role)}
+                      </div>
+                      {participant.assigned_at && (
+                        <div className="text-xs text-gray-400 mt-1">
+                          Added {new Date(participant.assigned_at).toLocaleDateString()}
+                        </div>
+                      )}
+                      {/* Remove button for admins/coordinators */}
+                      {canManage && onRemoveParticipant && participant.participantId && (
+                        <button
+                          onClick={() => onRemoveParticipant(participant.participantId, `${firstName} ${lastName}`)}
+                          className="text-xs text-red-600 hover:text-red-800 font-medium mt-1 hover:underline"
+                          title={`Remove ${firstName} ${lastName} from exchange`}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowAll(false)}
+                className="w-full py-2 text-sm text-gray-600 hover:text-gray-800 font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 // Enhanced Status Component
 const StatusIndicator: React.FC<{ status: string; daysRemaining?: number }> = ({ status, daysRemaining }) => {
@@ -397,35 +749,18 @@ const ExchangeDetailEnhanced: React.FC = () => {
   const navigate = useNavigate();
   const { getExchange } = useExchanges();
   const { isAdmin, isCoordinator } = usePermissions();
+  const { socket, joinExchange, leaveExchange } = useSocket();
   
   const [exchange, setExchange] = useState<Exchange | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [documents, setDocuments] = useState<any[]>([]);
+  const [participants, setParticipants] = useState<any[]>([]);
   // Tasks are now managed by EnhancedTaskManager component
   const [showUploadModal, setShowUploadModal] = useState(false);
   
-  useEffect(() => {
-    if (id) {
-      loadExchange();
-    }
-  }, [id]);
-  
-  const loadExchange = async () => {
-    try {
-      setLoading(true);
-      const data = await getExchange(id!);
-      setExchange(data);
-      // Load associated documents and tasks
-      await loadDocuments();
-    } catch (error) {
-      console.error('Error loading exchange:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadDocuments = async () => {
+  // Define functions before using them in useEffect
+  const loadDocuments = useCallback(async () => {
     if (!id) return;
     try {
       const docs = await apiService.get(`/documents/exchange/${id}`);
@@ -436,7 +771,126 @@ const ExchangeDetailEnhanced: React.FC = () => {
       console.error('Error loading documents:', error);
       setDocuments([]);
     }
-  };
+  }, [id]);
+
+  const loadParticipants = useCallback(async () => {
+    if (!id) return;
+    try {
+      console.log('📥 Loading participants for exchange:', id);
+      const response = await apiService.get(`/exchanges/${id}/participants`);
+      const participantsList = Array.isArray(response) ? response : (response.participants || response.data || []);
+      console.log('✅ Loaded participants:', participantsList);
+      setParticipants(participantsList);
+    } catch (error) {
+      console.error('Error loading participants:', error);
+      setParticipants([]);
+    }
+  }, [id]);
+
+  const loadExchange = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await getExchange(id!);
+      setExchange(data);
+      // Load associated documents, participants, and tasks
+      await Promise.all([
+        loadDocuments(),
+        loadParticipants()
+      ]);
+    } catch (error) {
+      console.error('Error loading exchange:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [id, getExchange, loadDocuments, loadParticipants]);
+  
+  useEffect(() => {
+    if (id) {
+      loadExchange();
+      // Join the exchange room for real-time updates
+      joinExchange(id);
+    }
+    
+    // Cleanup when component unmounts or exchange changes
+    return () => {
+      if (id) {
+        leaveExchange(id);
+      }
+    };
+  }, [id, joinExchange, leaveExchange, loadExchange]);
+
+  // Socket.IO event listeners for real-time updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleParticipantAdded = (data: any) => {
+      console.log('🔥 Participant added:', data);
+      if (data.exchangeId === id) {
+        loadParticipants(); // Reload participants
+      }
+    };
+
+    const handleParticipantRemoved = (data: any) => {
+      console.log('🔥 Participant removed:', data);
+      if (data.exchangeId === id) {
+        loadParticipants(); // Reload participants
+      }
+    };
+
+    const handleDocumentUploaded = (data: any) => {
+      console.log('🔥 Document uploaded:', data);
+      if (data.exchangeId === id) {
+        loadDocuments(); // Reload documents
+      }
+    };
+
+    const handleTaskCreated = (data: any) => {
+      console.log('🔥 Task created:', data);
+      if (data.exchangeId === id) {
+        // The EnhancedTaskManager will handle its own real-time updates
+        // but we could trigger a refresh here if needed
+      }
+    };
+
+    const handleTaskUpdated = (data: any) => {
+      console.log('🔥 Task updated:', data);
+      if (data.exchangeId === id) {
+        // The EnhancedTaskManager will handle its own real-time updates
+        // but we could trigger a refresh here if needed
+      }
+    };
+
+    const handleTaskDeleted = (data: any) => {
+      console.log('🔥 Task deleted:', data);
+      if (data.exchangeId === id) {
+        // The EnhancedTaskManager will handle its own real-time updates
+        // but we could trigger a refresh here if needed
+      }
+    };
+
+    // Listen for real-time events
+    socket.on('participant_added', handleParticipantAdded);
+    socket.on('participant_removed', handleParticipantRemoved);
+    socket.on('document_uploaded', handleDocumentUploaded);
+    socket.on('task_created', handleTaskCreated);
+    socket.on('task_updated', handleTaskUpdated);
+    socket.on('task_deleted', handleTaskDeleted);
+    socket.on('exchange_updated', () => {
+      console.log('🔥 Exchange updated, reloading...');
+      loadExchange();
+    });
+
+    // Cleanup event listeners
+    return () => {
+      socket.off('participant_added', handleParticipantAdded);
+      socket.off('participant_removed', handleParticipantRemoved);
+      socket.off('document_uploaded', handleDocumentUploaded);
+      socket.off('task_created', handleTaskCreated);
+      socket.off('task_updated', handleTaskUpdated);
+      socket.off('task_deleted', handleTaskDeleted);
+      socket.off('exchange_updated');
+    };
+  }, [socket, id, loadParticipants, loadDocuments, loadExchange]);
 
 
   const handleDocumentUploadSuccess = async () => {
@@ -459,6 +913,58 @@ const ExchangeDetailEnhanced: React.FC = () => {
       console.error('Error downloading document:', error);
       alert('Failed to download document');
     }
+  };
+
+  const handleRemoveParticipant = async (participantId: string, participantName: string) => {
+    if (!id || !(isAdmin() || isCoordinator())) {
+      alert('You do not have permission to remove participants from this exchange.');
+      return;
+    }
+    
+    // Enhanced confirmation dialog for coordinators and admins
+    const userRole = isAdmin() ? 'Administrator' : 'Coordinator';
+    const confirmMessage = `⚠️ REMOVE PARTICIPANT CONFIRMATION ⚠️\n\n` +
+      `You are about to remove "${participantName}" from this exchange.\n\n` +
+      `This action will:\n` +
+      `• Remove their access to exchange documents\n` +
+      `• Remove their access to exchange messages\n` +
+      `• Remove their ability to participate in this exchange\n\n` +
+      `Acting as: ${userRole}\n\n` +
+      `This action cannot be undone. Are you sure you want to proceed?`;
+    
+    const confirmed = window.confirm(confirmMessage);
+    if (!confirmed) return;
+
+    try {
+      console.log(`🗑️ Removing participant ${participantId} (${participantName}) from exchange ${id}`);
+      
+      const response = await apiService.delete(`/exchanges/${id}/participants/${participantId}`);
+      
+      if (response.success) {
+        console.log(`✅ Successfully removed ${participantName} from exchange`);
+        // Reload participants to update the list
+        await loadParticipants();
+        // Show success message
+        alert(`Successfully removed ${participantName} from the exchange`);
+      } else {
+        throw new Error(response.message || 'Failed to remove participant');
+      }
+    } catch (error) {
+      console.error('❌ Error removing participant:', error);
+      alert(`Failed to remove ${participantName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleAddParticipant = () => {
+    // Switch to the invitations tab to add participants
+    setActiveTab('invitations');
+  };
+
+  const handleSendMessage = (participant: any, fullName: string) => {
+    // Switch to messages tab and pre-fill message
+    setActiveTab('messages');
+    // You could add logic here to focus on the message input and pre-fill @mention
+    console.log(`📨 Opening message to ${fullName}:`, participant);
   };
 
   
@@ -656,10 +1162,19 @@ const ExchangeDetailEnhanced: React.FC = () => {
                 </h1>
                 
                 <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-4">
-                  <span className="flex items-center">
-                    <Users className="w-4 h-4 mr-1" />
-                    {exchange.client?.firstName} {exchange.client?.lastName}
-                  </span>
+                  {/* Google-style Participant Display */}
+                  <div className="relative">
+                    <ParticipantAvatars 
+                      participants={participants} 
+                      maxVisible={4} 
+                      canManage={isAdmin() || isCoordinator()}
+                      exchangeId={id}
+                      onRemoveParticipant={handleRemoveParticipant}
+                      onAddParticipant={handleAddParticipant}
+                      onSendMessage={handleSendMessage}
+                    />
+                  </div>
+                  
                   <span className="flex items-center">
                     <Calendar className="w-4 h-4 mr-1" />
                     {new Date(exchange.createdAt || '').toLocaleDateString()}
@@ -860,10 +1375,11 @@ const ExchangeDetailEnhanced: React.FC = () => {
             </div>
             
             <div className="p-6">
-            {activeTab === 'overview' && <ExchangeOverview exchange={exchange as any} participants={[]} tasks={[]} documents={documents} />}
+            {activeTab === 'overview' && <ExchangeOverview exchange={exchange as any} participants={participants} tasks={[]} documents={documents} />}
             {activeTab === 'tasks' && (
               <EnhancedTaskManager 
                 exchangeId={exchange.id}
+                exchangeName={exchange.name}
               />
             )}
             {activeTab === 'all-details' && <AllDetailsView />}

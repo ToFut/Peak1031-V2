@@ -699,6 +699,25 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
       });
     }
     
+    // Ensure auditActivity has all required properties with defaults
+    const safeAuditActivity = {
+      totalActions: 0,
+      actionsLast30Days: 0,
+      actionBreakdown: {},
+      entityBreakdown: {},
+      dailyActivity: {},
+      recentActivity: [],
+      systemUsageStats: {
+        mostUsedFeatures: [],
+        mostCommonActions: [],
+        averageActionsPerDay: 0,
+        activeDays: 0,
+        lastActiveDate: null
+      },
+      loginHistory: [],
+      ...auditActivity
+    };
+
     const profile = {
       user: userInfo,
       stats,
@@ -708,7 +727,7 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
       recentExchanges,
       monthlyActivity,
       participationCount: exchangeParticipations.length,
-      auditActivity
+      auditActivity: safeAuditActivity
     };
     
     // Log audit trail

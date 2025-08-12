@@ -47,11 +47,12 @@ const invitationRoutes = require('./routes/invitations');
 
 // New routes
 const userRoutes = require('./routes/users');
-const dashboardRoutes = require('./routes/dashboard-new');
+const dashboardRoutes = require('./routes/dashboard');
 const analyticsRoutes = require('./routes/analytics');
 const settingsRoutes = require('./routes/settings');
 const userProfileRoutes = require('./routes/user-profile');
 const performanceRoutes = require('./routes/performance');
+const agencyRoutes = require('./routes/agency');
 
 // Enterprise routes
 const enterpriseExchangesRoutes = require('./routes/enterprise-exchanges');
@@ -79,6 +80,10 @@ class PeakServer {
     });
     
     this.messageService = new MessageService(this.io);
+    
+    // Make Socket.IO available to routes
+    this.app.set('io', this.io);
+    
     this.initializeMiddleware();
     this.initializeRoutes();
     this.initializeSocketHandlers();
@@ -177,6 +182,12 @@ class PeakServer {
 
     // Performance monitoring middleware (only in development or when explicitly enabled)
     if (process.env.NODE_ENV === 'development' || process.env.ENABLE_PERFORMANCE_MONITORING === 'true') {
+    
+    // Audit tracking middleware
+    const { auditTrackingMiddleware, userActivityTracking, securityEventTracking } = require('./middleware/auditTracking');
+    this.app.use(auditTrackingMiddleware());
+    this.app.use(userActivityTracking());
+    this.app.use(securityEventTracking());
       console.log('🔍 Performance monitoring enabled');
       this.app.use(performanceMiddleware());
     }
@@ -327,6 +338,8 @@ class PeakServer {
     this.app.use('/api/analytics', analyticsRoutes);
     this.app.use('/api/settings', settingsRoutes);
     this.app.use('/api/user-profile', userProfileRoutes);
+    this.app.use('/api/agency', agencyRoutes);
+    this.app.use('/api/agencies', require('./routes/agencies'));
     this.app.use('/api/enterprise-exchanges', enterpriseExchangesRoutes);
     this.app.use('/api/account-management', accountManagementRoutes);
     
@@ -335,6 +348,8 @@ class PeakServer {
     
     // Audit logs routes
     this.app.use('/api/audit-logs', auditLogsRoutes);
+    this.app.use('/api/audit', require('./routes/audit'));
+    this.app.use('/api/user-audit', require('./routes/user-audit'));
     
     // Performance monitoring routes (admin only)
     this.app.use('/api/performance', performanceRoutes);
@@ -655,6 +670,14 @@ class PeakServer {
         console.error('⚠️ Failed to initialize OSS LLM service:', error.message);
         console.log('⚠️ AI features will be limited');
       }
+
+      // Initialize audit notification bridge
+      const auditNotificationBridge = require('./services/auditNotificationBridge');
+      
+      // Start listening to audit log changes for notifications
+      auditNotificationBridge.startListening().catch(error => {
+        console.error('❌ Failed to start audit notification bridge:', error);
+      });
 
       // Database models are for reference only
       console.log('✅ Server ready (Supabase mode)');

@@ -97,7 +97,19 @@ export const AuditLogFeed: React.FC = () => {
       // Process audit logs into social posts
       const logs = logsResponse?.data || [];
       const processedPosts = logs.map((log: any) => ({
-        ...log,
+        id: log.id || '',
+        action: log.action || '',
+        entity_type: log.entity_type || '',
+        entity_id: log.entity_id || '',
+        details: log.details || {},
+        user_id: log.user_id || '',
+        userName: log.userName || 'System',
+        userEmail: log.userEmail || '',
+        ip: log.ip || '',
+        userAgent: log.userAgent || '',
+        timestamp: log.timestamp || new Date().toISOString(),
+        severity: log.severity || 'info',
+        exchangeId: log.exchangeId || null,
         likes: Math.floor(Math.random() * 20), // Mock data for now
         comments: Math.floor(Math.random() * 15),
         shares: Math.floor(Math.random() * 8),
@@ -115,43 +127,47 @@ export const AuditLogFeed: React.FC = () => {
   };
 
   const formatActionText = (action: string, details: any, userName: string) => {
-    const actionMap: Record<string, string> = {
-      'LOGIN': '🔐 logged into the system',
-      'LOGOUT': '🚪 signed out',
-      'DOCUMENT_UPLOAD': '📄 uploaded a new document',
-      'DOCUMENT_DOWNLOAD': '⬇️ downloaded a document',
-      'MESSAGE_SENT': '💬 sent a message',
-      'EXCHANGE_CREATED': '🆕 created a new exchange',
-      'EXCHANGE_UPDATED': '✏️ updated exchange details',
-      'TASK_CREATED': '📋 created a new task',
-      'TASK_COMPLETED': '✅ completed a task',
-      'USER_INVITED': '👥 invited a new user',
-      'PERMISSION_CHANGED': '🔒 updated user permissions',
-      'SYNC_COMPLETED': '🔄 synchronized data with PracticePanther',
-      'PERFORMANCE_ISSUE': '⚡ system performance alert',
-      'APPLICATION_ERROR': '🚨 system error detected',
-      'view_report': '📊 viewed a report'
-    };
+    try {
+      const actionMap: Record<string, string> = {
+        'LOGIN': '🔐 logged into the system',
+        'LOGOUT': '🚪 signed out',
+        'DOCUMENT_UPLOAD': '📄 uploaded a new document',
+        'DOCUMENT_DOWNLOAD': '⬇️ downloaded a document',
+        'MESSAGE_SENT': '💬 sent a message',
+        'EXCHANGE_CREATED': '🆕 created a new exchange',
+        'EXCHANGE_UPDATED': '✏️ updated exchange details',
+        'TASK_CREATED': '📋 created a new task',
+        'TASK_COMPLETED': '✅ completed a task',
+        'USER_INVITED': '👥 invited a new user',
+        'PERMISSION_CHANGED': '🔒 updated user permissions',
+        'SYNC_COMPLETED': '🔄 synchronized data with PracticePanther',
+        'PERFORMANCE_ISSUE': '⚡ system performance alert',
+        'APPLICATION_ERROR': '🚨 system error detected',
+        'view_report': '📊 viewed a report'
+      };
 
-    const actionText = actionMap[action] || `performed ${action.toLowerCase().replace(/_/g, ' ')}`;
-    
-    // Add specific details based on action
-    let contextText = '';
-    if (action === 'DOCUMENT_UPLOAD' && details?.documentName) {
-      contextText = `: "${details.documentName}"`;
-    } else if (action === 'EXCHANGE_CREATED' && details?.exchangeName) {
-      contextText = `: "${details.exchangeName}"`;
-    } else if (action === 'MESSAGE_SENT' && details?.exchangeId) {
-      contextText = ` in Exchange #${details.exchangeId}`;
-    } else if (action === 'TASK_COMPLETED' && details?.taskTitle) {
-      contextText = `: "${details.taskTitle}"`;
-    } else if (action === 'PERFORMANCE_ISSUE' && details?.duration) {
-      contextText = ` (${details.duration}ms response time)`;
-    } else if (action === 'APPLICATION_ERROR' && details?.error) {
-      contextText = `: ${details.error.substring(0, 100)}...`;
+      const actionText = actionMap[action] || `performed ${String(action || '').toLowerCase().replace(/_/g, ' ')}`;
+      
+      // Add specific details based on action
+      let contextText = '';
+      if (action === 'DOCUMENT_UPLOAD' && details?.documentName) {
+        contextText = `: "${String(details.documentName)}"`;
+      } else if (action === 'EXCHANGE_CREATED' && details?.exchangeName) {
+        contextText = `: "${String(details.exchangeName)}"`;
+      } else if (action === 'MESSAGE_SENT' && details?.exchangeId) {
+        contextText = ` in Exchange #${String(details.exchangeId)}`;
+      } else if (action === 'TASK_COMPLETED' && details?.taskTitle) {
+        contextText = `: "${String(details.taskTitle)}"`;
+      } else if (action === 'PERFORMANCE_ISSUE' && details?.duration) {
+        contextText = ` (${String(details.duration)}ms response time)`;
+      } else if (action === 'APPLICATION_ERROR' && details?.error) {
+        contextText = `: ${String(details.error).substring(0, 100)}...`;
+      }
+
+      return `${actionText}${contextText}`;
+    } catch (error) {
+      return `performed ${String(action || 'unknown action')}`;
     }
-
-    return `${actionText}${contextText}`;
   };
 
   const getPostIcon = (action: string, severity: string) => {
@@ -307,18 +323,26 @@ export const AuditLogFeed: React.FC = () => {
   };
 
   const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) {
+        return 'Invalid date';
+      }
+      
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString();
+    } catch (error) {
+      return 'Invalid date';
+    }
   };
 
   const getSeverityColor = (severity: string) => {
@@ -371,16 +395,16 @@ export const AuditLogFeed: React.FC = () => {
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
-                    <span className="font-semibold text-gray-900">{post.userName || 'System'}</span>
-                    <span className="text-gray-600">{formatActionText(post.action, post.details, post.userName)}</span>
+                    <span className="font-semibold text-gray-900">{String(post.userName || 'System')}</span>
+                    <span className="text-gray-600">{formatActionText(String(post.action || ''), post.details || {}, String(post.userName || ''))}</span>
                   </div>
                   <div className="flex items-center space-x-2 text-sm text-gray-500 mt-1">
                     <ClockIcon className="w-4 h-4" />
-                    <span>{formatTimestamp(post.timestamp)}</span>
+                    <span>{formatTimestamp(String(post.timestamp || ''))}</span>
                     {post.ip && (
                       <>
                         <span>•</span>
-                        <span>IP: {post.ip}</span>
+                        <span>IP: {String(post.ip)}</span>
                       </>
                     )}
                   </div>
@@ -396,22 +420,22 @@ export const AuditLogFeed: React.FC = () => {
               <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                 <div className="text-sm text-gray-700">
                   {post.details.description && (
-                    <p className="mb-2">{post.details.description}</p>
+                    <p className="mb-2">{String(post.details.description)}</p>
                   )}
                   {post.details.path && (
-                    <p className="mb-1"><strong>Path:</strong> {post.details.path}</p>
+                    <p className="mb-1"><strong>Path:</strong> {String(post.details.path)}</p>
                   )}
                   {post.details.method && (
-                    <p className="mb-1"><strong>Method:</strong> <span className="font-mono">{post.details.method}</span></p>
+                    <p className="mb-1"><strong>Method:</strong> <span className="font-mono">{String(post.details.method)}</span></p>
                   )}
                   {post.details.duration && (
-                    <p className="mb-1"><strong>Duration:</strong> {post.details.duration}ms</p>
+                    <p className="mb-1"><strong>Duration:</strong> {String(post.details.duration)}ms</p>
                   )}
                   {post.details.statusCode && (
-                    <p className="mb-1"><strong>Status:</strong> <span className={`font-mono ${post.details.statusCode >= 400 ? 'text-red-600' : 'text-green-600'}`}>{post.details.statusCode}</span></p>
+                    <p className="mb-1"><strong>Status:</strong> <span className={`font-mono ${Number(post.details.statusCode) >= 400 ? 'text-red-600' : 'text-green-600'}`}>{String(post.details.statusCode)}</span></p>
                   )}
                   {post.exchangeId && (
-                    <p className="mb-1"><strong>Exchange:</strong> <span className="text-blue-600">#{post.exchangeId}</span></p>
+                    <p className="mb-1"><strong>Exchange:</strong> <span className="text-blue-600">#{String(post.exchangeId)}</span></p>
                   )}
                 </div>
               </div>
@@ -467,7 +491,7 @@ export const AuditLogFeed: React.FC = () => {
                   post.severity === 'success' ? 'bg-green-100 text-green-800' :
                   'bg-blue-100 text-blue-800'
                 }`}>
-                  {post.severity}
+                  {String(post.severity || 'info')}
                 </span>
               </div>
             </div>
@@ -483,10 +507,10 @@ export const AuditLogFeed: React.FC = () => {
                       <div className="flex-1">
                         <div className="bg-gray-50 rounded-lg p-3">
                           <div className="flex items-center space-x-2 mb-1">
-                            <span className="font-semibold text-sm text-gray-900">{comment.userName}</span>
-                            <span className="text-xs text-gray-500">{formatTimestamp(comment.createdAt)}</span>
+                            <span className="font-semibold text-sm text-gray-900">{String(comment.userName || '')}</span>
+                            <span className="text-xs text-gray-500">{formatTimestamp(String(comment.createdAt || ''))}</span>
                           </div>
-                          <p className="text-sm text-gray-700">{comment.content}</p>
+                          <p className="text-sm text-gray-700">{String(comment.content || '')}</p>
                         </div>
                       </div>
                     </div>
@@ -517,7 +541,7 @@ export const AuditLogFeed: React.FC = () => {
                               className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center space-x-2"
                             >
                               <UserCircleIcon className="w-6 h-6 text-gray-400" />
-                              <span className="font-medium">{user.first_name} {user.last_name}</span>
+                              <span className="font-medium">{String(user.first_name || '')} {String(user.last_name || '')}</span>
                             </button>
                           ))}
                         </div>

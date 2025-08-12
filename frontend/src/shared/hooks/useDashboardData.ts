@@ -61,6 +61,7 @@ export interface UseDashboardDataReturn {
   refreshData: () => Promise<void>;
   syncPracticePanther: () => Promise<void>;
   syncing: boolean;
+  clearCache: () => void;
 }
 
 // Cache for dashboard data to prevent unnecessary API calls
@@ -157,7 +158,9 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
     try {
       console.log('🚀 Loading fresh dashboard data...');
 
-      // Try enhanced analytics endpoint first for better data
+      // Skip enhanced analytics endpoint - it might have inconsistent data
+      // Go directly to dashboard overview which has proper RBAC
+      /*
       try {
         const enhancedData = await apiService.getEnhancedDashboardStats();
         
@@ -229,13 +232,35 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
       } catch (enhancedError) {
         console.log('⚠️ Enhanced analytics failed, falling back to standard:', enhancedError);
       }
+      */
 
-      // Fallback to V2 dashboard overview endpoint
+      // Use FAST dashboard overview endpoint for super quick loading
       try {
-        const overviewData = await apiService.getDashboardOverview();
+        console.log('⚡ Using FAST dashboard endpoint...');
+        const response = await apiService.getFastDashboardOverview();
         
-        if (overviewData && typeof overviewData === 'object') {
-          console.log('✅ Standard dashboard overview data received');
+        console.log('📊 Raw dashboard response:', response);
+        
+        if (response && typeof response === 'object') {
+          // Handle wrapped response structure { success: true, data: {...} }
+          const overviewData = (response as any).data || response;
+          
+          console.log('✅ Dashboard overview data:', {
+            hasData: !!overviewData,
+            exchanges: overviewData.exchanges,
+            stats: overviewData.stats,
+            user: overviewData.user
+          });
+          
+          // Debug: Log the exact total being received
+          console.log('🔍 DEBUG - Exchange totals:', {
+            'role': role,
+            'cacheKey': getCacheKey(),
+            'overviewData.exchanges.total': overviewData.exchanges?.total,
+            'overviewData.stats.totalExchanges': overviewData.stats?.totalExchanges,
+            'mappedTotal': (overviewData.exchanges as any)?.total || 0,
+            'raw overviewData': overviewData
+          });
           
           // Map V2 response to our standard format
           const mappedStats: DashboardStats = {
@@ -297,88 +322,22 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
           setMessages((overviewData as any).messagesList || []);
           setUsers((overviewData as any).usersList || []);
           
+          console.log('✅ Dashboard data loaded successfully:', {
+            exchanges: mappedStats.exchanges.total,
+            tasks: mappedStats.tasks.total,
+            role: role
+          });
+          
           return; // Success, no need for fallback
         }
       } catch (v2Error) {
-        console.log('⚠️ V2 dashboard overview failed, falling back to V1:', v2Error);
+        console.error('⚠️ V2 dashboard overview failed:', v2Error);
+        // Don't fall back to broken client-side filtering
+        throw v2Error;
       }
 
-      // Fallback to V1 individual calls (only if needed)
-      console.log('📊 Falling back to V1 individual API calls...');
-      
-      const apiToUse = role === 'admin' ? apiService : roleBasedApiService;
-      
-      // Load only essential data in parallel for better performance
-      const [exchangesRes, tasksRes] = await Promise.allSettled([
-        apiToUse.getExchanges().catch(err => {
-          console.log('⚠️ Exchanges API failed:', err);
-          return [];
-        }),
-        apiToUse.getTasks().catch(err => {
-          console.log('⚠️ Tasks API failed:', err);
-          return [];
-        })
-      ]);
-
-      // Extract data from settled promises
-      const exchangesResult = exchangesRes.status === 'fulfilled' ? exchangesRes.value : { exchanges: [] };
-      const tasksResult = tasksRes.status === 'fulfilled' ? tasksRes.value : [];
-
-      // Extract exchanges array from the result object
-      const exchangesData = Array.isArray(exchangesResult) ? exchangesResult : (exchangesResult as any).exchanges || [];
-      const tasksData = Array.isArray(tasksResult) ? tasksResult : [];
-
-      // Filter data based on role and user permissions
-      const filteredExchanges = filterExchangesByRole(exchangesData, role);
-      const filteredTasks = filterTasksByRole(tasksData, role);
-
-      // Optimize stats calculation
-      const now = new Date();
-      const calculatedStats: DashboardStats = {
-        exchanges: {
-          total: filteredExchanges.length,
-          pending: filteredExchanges.filter((e: any) => e.status === 'PENDING').length,
-          active: filteredExchanges.filter((e: any) => e.status === 'In Progress' || e.status === '45D' || e.status === '180D').length,
-          completed: filteredExchanges.filter((e: any) => e.status === 'COMPLETED').length,
-          ppSynced: filteredExchanges.filter((e: any) => e.ppId).length,
-        },
-        tasks: {
-          total: filteredTasks.length,
-          pending: filteredTasks.filter((t: any) => t.status === 'PENDING').length,
-          overdue: filteredTasks.filter((t: any) => {
-            if (!t.dueDate || t.status === 'COMPLETED') return false;
-            return new Date(t.dueDate) < now;
-          }).length,
-          completed: filteredTasks.filter((t: any) => t.status === 'COMPLETED').length,
-          urgent: filteredTasks.filter((t: any) => t.priority === 'HIGH' && t.status !== 'COMPLETED').length,
-          thisWeek: filteredTasks.filter((t: any) => {
-            if (!t.dueDate) return false;
-            const taskDate = new Date(t.dueDate);
-            const weekFromNow = new Date();
-            weekFromNow.setDate(now.getDate() + 7);
-            return taskDate <= weekFromNow && taskDate >= now;
-          }).length,
-        },
-      };
-
-      const resultData = {
-        stats: calculatedStats,
-        exchanges: filteredExchanges,
-        tasks: filteredTasks,
-        documents: [],
-        messages: [],
-        users: []
-      };
-
-      // Cache the result
-      setCache(cacheKey, resultData);
-
-      setStats(calculatedStats);
-      setExchanges(filteredExchanges);
-      setTasks(filteredTasks);
-      setDocuments([]);
-      setMessages([]);
-      setUsers([]);
+      // No fallback - dashboard overview endpoint should always work
+      // The old fallback was using broken client-side filtering that showed all data
 
     } catch (err: any) {
       console.error('❌ Dashboard data loading failed:', err);
@@ -416,19 +375,42 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
       throw new Error('Only admins can sync PracticePanther data');
     }
 
+    if (syncing) {
+      console.log('🔄 PracticePanther sync already in progress...');
+      return;
+    }
+
     setSyncing(true);
     try {
-      await apiService.post('/sync/all', {});
-      // Clear cache to force fresh data load
+      console.log('🔄 Starting PracticePanther sync...');
+      
+      // Call the sync endpoint
+      const response = await fetch('/api/admin/sync-practice-panther', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Sync failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ PracticePanther sync completed:', result);
+
+      // Clear cache and reload data to show updated information
       dashboardCache.clear();
-      await loadDashboardData(); // Refresh data after sync
-    } catch (err: any) {
-      console.error('PracticePanther sync failed:', err);
-      throw new Error('Failed to sync PracticePanther data');
+      await loadDashboardData();
+      
+    } catch (error) {
+      console.error('❌ PracticePanther sync failed:', error);
+      setError(error instanceof Error ? error.message : 'PracticePanther sync failed');
     } finally {
       setSyncing(false);
     }
-  }, [role, loadDashboardData]);
+  }, [role, syncing, loadDashboardData]);
 
   // Optimized auto-refresh functionality
   useEffect(() => {
@@ -462,7 +444,17 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
     };
   }, []);
 
-  return {
+  // Clear cache function
+  const clearDashboardCache = useCallback(() => {
+    console.log('🗑️ Clearing dashboard cache...');
+    console.log('Current cache keys:', Array.from(dashboardCache.keys()));
+    dashboardCache.clear();
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+
+
+  const returnValue: UseDashboardDataReturn = {
     stats,
     exchanges,
     tasks,
@@ -473,6 +465,9 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
     error,
     refreshData: loadDashboardData,
     syncPracticePanther,
-    syncing
+    syncing,
+    clearCache: clearDashboardCache
   };
+
+  return returnValue;
 };

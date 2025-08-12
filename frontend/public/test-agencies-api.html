@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Agencies API</title>
+</head>
+<body>
+    <h1>Agencies API Test</h1>
+    <div id="status">Loading...</div>
+    <div id="result"></div>
+    
+    <script>
+        async function testAgenciesAPI() {
+            const statusDiv = document.getElementById('status');
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                statusDiv.textContent = 'Logging in...';
+                
+                // Login first
+                const loginResponse = await fetch('http://localhost:5001/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@peak1031.com',
+                        password: 'admin123'
+                    })
+                });
+                
+                if (!loginResponse.ok) {
+                    throw new Error('Login failed: ' + loginResponse.status);
+                }
+                
+                const loginData = await loginResponse.json();
+                const token = loginData.token;
+                
+                statusDiv.textContent = 'Testing agencies API...';
+                
+                // Test agencies endpoint
+                const agenciesResponse = await fetch('http://localhost:5001/api/agencies', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+                
+                if (!agenciesResponse.ok) {
+                    throw new Error('Agencies API failed: ' + agenciesResponse.status + ' ' + agenciesResponse.statusText);
+                }
+                
+                const agenciesData = await agenciesResponse.json();
+                
+                statusDiv.textContent = 'SUCCESS!';
+                resultDiv.innerHTML = '<h2>Result:</h2><pre>' + JSON.stringify(agenciesData, null, 2) + '</pre>';
+                
+            } catch (error) {
+                statusDiv.textContent = 'ERROR: ' + error.message;
+                resultDiv.innerHTML = '<h2>Error details:</h2><pre>' + error.stack + '</pre>';
+            }
+        }
+        
+        // Run test when page loads
+        testAgenciesAPI();
+    </script>
+</body>
+</html>

@@ -25,7 +25,7 @@ import { EnhancedTaskBoard } from '../../../components/tasks/EnhancedTaskBoard';
 import { SmartTaskCreationModal } from '../../../components/tasks/SmartTaskCreationModal';
 import { useEnhancedTasks } from '../../../hooks/useEnhancedTasks';
 
-const EnhancedTaskManager: React.FC<{ exchangeId?: string }> = ({ exchangeId }) => {
+const EnhancedTaskManager: React.FC<{ exchangeId?: string; exchangeName?: string }> = ({ exchangeId, exchangeName }) => {
   const {
     taskStats,
     tasksByPriority,
@@ -334,6 +334,7 @@ const EnhancedTaskManager: React.FC<{ exchangeId?: string }> = ({ exchangeId }) 
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         exchangeId={exchangeId}
+        exchangeName={exchangeName}
         onTaskCreated={(task) => {
           console.log('Task created:', task);
           // Task list will auto-refresh via the hook

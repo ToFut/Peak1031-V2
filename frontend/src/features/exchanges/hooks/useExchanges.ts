@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Exchange } from '../../../types';
 import { apiService } from '../../../services/api';
+import { useSocketEvent } from '../../../hooks/useSocket';
 
 interface UseExchangesState {
   exchanges: Exchange[];
@@ -135,6 +136,27 @@ export const useExchanges = (filters?: UseExchangesFilters) => {
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
   }, []);
+
+  // Listen for real-time participant changes that might affect exchange visibility
+  useSocketEvent('participant_added', useCallback((data: any) => {
+    console.log('🔔 useExchanges: Received participant_added event, refreshing exchanges...', data);
+    // Refresh exchanges when someone is added as participant (user might see new exchanges)
+    // Force immediate refresh without loading state to maintain UX
+    setTimeout(() => loadExchanges(), 100);
+  }, [loadExchanges]));
+
+  useSocketEvent('participant_removed', useCallback((data: any) => {
+    console.log('🔔 useExchanges: Received participant_removed event, refreshing exchanges...', data);
+    // Refresh exchanges when someone is removed as participant (user might lose access)
+    setTimeout(() => loadExchanges(), 100);
+  }, [loadExchanges]));
+
+  // Listen for invitation notifications to immediately refresh exchange list
+  useSocketEvent('invitation_notification', useCallback((data: any) => {
+    console.log('🔔 useExchanges: Received invitation_notification, refreshing exchanges immediately...', data);
+    // Immediate refresh when user is invited to ensure they see the new exchange
+    setTimeout(() => loadExchanges(), 200);
+  }, [loadExchanges]));
 
   // Load exchanges on mount
   useEffect(() => {

@@ -1,11 +1,12 @@
 {
   "version": 2,
+  "name": "peak-1031-platform",
   "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/build",
-  "installCommand": "cd frontend && npm install",
+  "installCommand": "npm run install:all",
   "functions": {
-    "api/*.js": {
-      "runtime": "nodejs18.x"
+    "api/index.js": {
+      "runtime": "@vercel/node"
     }
   },
   "routes": [
@@ -17,5 +18,9 @@
       "src": "/(.*)",
       "dest": "/frontend/build/index.html"
     }
-  ]
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "5001"
+  }
 }

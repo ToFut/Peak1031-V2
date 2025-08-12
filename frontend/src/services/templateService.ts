@@ -79,7 +79,11 @@ class TemplateService {
    */
   async getTemplates(): Promise<DocumentTemplate[]> {
     try {
-      const response = await apiService.get<DocumentTemplate[]>(this.baseUrl);
+      const response = await apiService.get<any>(this.baseUrl);
+      // Handle both response formats (wrapped in { success, data } or direct array)
+      if (response && response.success && response.data) {
+        return response.data || [];
+      }
       return response || [];
     } catch (error) {
       console.error('Failed to fetch templates:', error);

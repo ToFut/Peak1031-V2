@@ -138,19 +138,58 @@ class AuthService {
   }
 
   static async createUser(userData) {
-    const existingUser = await User.findOne({ where: { email: userData.email } });
+    console.log('👤 AUTH SERVICE: Creating new user:', userData.email);
+    
+    // Check if user already exists
+    const existingUser = await databaseService.getUserByEmail(userData.email);
     if (existingUser) {
       throw new Error('User already exists');
     }
-
-    return await User.create({
+    
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(userData.password, 12);
+    const { v4: uuidv4 } = require('uuid');
+    
+    // Create contact record first
+    const contactData = {
+      id: uuidv4(),
+      first_name: userData.firstName,
+      last_name: userData.lastName,
       email: userData.email,
-      passwordHash: userData.password,
-      firstName: userData.firstName,
-      lastName: userData.lastName,
+      phone: userData.phone || null,
+      contact_type: 'person',
+      source: 'user_signup',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    console.log('📇 AUTH SERVICE: Creating contact record...');
+    await databaseService.insert('contacts', contactData);
+    
+    // Create user record with link to contact
+    const userRecord = {
+      id: uuidv4(),
+      email: userData.email,
+      password_hash: hashedPassword,
+      first_name: userData.firstName,
+      last_name: userData.lastName,
       role: userData.role || 'client',
-      phone: userData.phone
-    });
+      phone: userData.phone || null,
+      contact_id: contactData.id, // Link to the contact record
+      is_active: true,
+      email_verified: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    console.log('👤 AUTH SERVICE: Creating user record...');
+    const user = await databaseService.createUser(userRecord);
+    
+    console.log('✅ AUTH SERVICE: User and contact created successfully');
+    console.log('👤 User ID:', user.id);
+    console.log('📇 Contact ID:', contactData.id);
+    
+    return user;
   }
 
   static async getUserById(userId) {

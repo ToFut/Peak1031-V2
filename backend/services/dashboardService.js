@@ -3,7 +3,11 @@
  * Handles all dashboard-related database operations and business logic
  */
 
+// Ensure environment variables are loaded
+require('dotenv').config();
+
 const databaseService = require('./database');
+const rbacService = require('./rbacService');
 
 class DashboardService {
     /**
@@ -11,14 +15,68 @@ class DashboardService {
      */
     async getDashboardData(userId, userRole) {
         try {
+            const user = await this.getUserInfo(userId);
+            const stats = await this.getStatsByRole(userId, userRole);
+            const recentActivity = await this.getRecentActivity(userId, userRole);
+            const notifications = await this.getNotifications(userId);
+            const quickActions = this.getQuickActionsByRole(userRole);
+
+            // Format the response to match what the frontend expects
             const dashboardData = {
-                user: await this.getUserInfo(userId),
-                stats: await this.getStatsByRole(userId, userRole),
-                recentActivity: await this.getRecentActivity(userId, userRole),
-                notifications: await this.getNotifications(userId),
-                quickActions: this.getQuickActionsByRole(userRole)
+                user,
+                stats,
+                recentActivity,
+                notifications,
+                quickActions,
+                
+                // Frontend-expected format for dashboard overview
+                exchanges: {
+                    total: stats.totalExchanges || stats.myExchanges || stats.managedExchanges || stats.assignedExchanges || 0,
+                    active: stats.activeExchanges || 0,
+                    completed: stats.completedExchanges || 0,
+                    pending: stats.pendingExchanges || 0,
+                    ppSynced: 0
+                },
+                tasks: {
+                    total: stats.totalTasks || 0,
+                    pending: stats.pendingTasks || 0,
+                    completed: stats.completedTasks || 0,
+                    overdue: 0,
+                    urgent: 0,
+                    thisWeek: 0
+                },
+                documents: {
+                    total: 0,
+                    requireSignature: 0,
+                    recent: 0
+                },
+                messages: {
+                    unread: 0,
+                    recent: 0
+                },
+                users: {
+                    total: stats.totalUsers || 0,
+                    active: 0,
+                    admins: 0,
+                    clients: 0,
+                    coordinators: 0
+                },
+                system: {
+                    lastSync: null,
+                    syncStatus: 'success',
+                    totalDocuments: 0,
+                    systemHealth: 'healthy'
+                },
+                
+                // Lists for the frontend (empty for now, will be populated by specific role-filtered endpoints)
+                exchangesList: [],
+                tasksList: [],
+                documentsList: [],
+                messagesList: [],
+                usersList: []
             };
 
+            console.log(`📊 Dashboard response for ${userRole}: ${dashboardData.exchanges.total} exchanges`);
             return dashboardData;
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
@@ -56,69 +114,93 @@ class DashboardService {
     }
 
     /**
-     * Get statistics based on user role
+     * Get statistics based on user role - USING RBAC SERVICE FOR CONSISTENCY
      */
     async getStatsByRole(userId, role) {
         const stats = {};
 
         try {
+            // Create user object for RBAC service
+            const user = await databaseService.getUserById(userId);
+            if (!user) {
+                return { error: 'User not found' };
+            }
+
+            console.log(`📊 Dashboard stats request for ${role} user: ${user.email}`);
+
             switch (role) {
                 case 'admin':
-                    // Admin sees all system stats
+                    // Admin sees all system stats - use RBAC service for consistency
+                    const adminExchanges = await rbacService.getExchangesForUser(user);
+                    const adminTasks = await rbacService.getTasksForUser(user);
                     const allUsers = await databaseService.getUsers({});
-                    const allExchanges = await databaseService.getExchanges({});
-                    const allTasks = await databaseService.getTasks({});
                     
                     stats.totalUsers = allUsers.length;
-                    stats.totalExchanges = allExchanges.length;
-                    stats.totalTasks = allTasks.length;
-                    stats.activeExchanges = allExchanges.filter(e => e.status === 'active').length;
-                    stats.pendingTasks = allTasks.filter(t => t.status === 'pending').length;
+                    stats.totalExchanges = adminExchanges.count || 0;  // Use count from RBAC
+                    stats.totalTasks = adminTasks.count || 0;
+                    
+                    // For status counts, we'll use the returned data (limited to 1000)
+                    // TODO: Implement separate count queries for accurate status counts
+                    const exchanges = adminExchanges.data || [];
+                    const tasks = adminTasks.data || [];
+                    stats.activeExchanges = exchanges.filter(e => e.status === 'active' || e.status === 'In Progress').length;
+                    stats.pendingTasks = tasks.filter(t => t.status === 'pending' || t.status === 'PENDING').length;
+                    
+                    console.log(`   ✅ Admin stats: ${stats.totalExchanges} total exchanges, ${stats.totalUsers} users`);
                     break;
 
                 case 'coordinator':
-                    // Coordinator sees exchanges they manage
-                    const coordExchanges = await databaseService.getExchanges({
-                        where: { coordinator_id: userId }
-                    });
-                    
-                    stats.managedExchanges = coordExchanges.length;
-                    stats.activeExchanges = coordExchanges.filter(e => e.status === 'active').length;
-                    stats.completedExchanges = coordExchanges.filter(e => e.status === 'completed').length;
-                    break;
-
                 case 'client':
-                    // Client sees their own exchanges
-                    const clientExchanges = await databaseService.getExchanges({
-                        where: { client_id: userId }
-                    });
-                    
-                    stats.myExchanges = clientExchanges.length;
-                    stats.activeExchanges = clientExchanges.filter(e => e.status === 'active').length;
-                    stats.completedExchanges = clientExchanges.filter(e => e.status === 'completed').length;
-                    break;
-
                 case 'third_party':
-                    // Third party sees assigned exchanges (read-only)
-                    const participants = await databaseService.getExchangeParticipants({
-                        where: { user_id: userId }
-                    });
-                    
-                    stats.assignedExchanges = participants.length;
-                    break;
-
                 case 'agency':
-                    // Agency sees their clients' exchanges
-                    const agencyClients = await databaseService.getUsers({
-                        where: { agency_id: userId }
-                    });
+                    // Use RBAC service to get authorized exchanges
+                    const userExchanges = await rbacService.getExchangesForUser(user);
+                    const userExchangeData = userExchanges.data || [];
+                    const totalExchangeCount = userExchanges.count || 0;  // Use the total count from DB
                     
-                    stats.totalClients = agencyClients.length;
-                    stats.activeClients = agencyClients.filter(c => c.is_active).length;
+                    console.log(`   ✅ RBAC filtered: ${totalExchangeCount} total exchanges for ${role} (${userExchangeData.length} returned)`);
+                    
+                    // Get tasks for user's exchanges
+                    let userTasks = [];
+                    if (totalExchangeCount > 0) {
+                        userTasks = await rbacService.getTasksForUser(user);
+                    }
+                    
+                    // Build role-appropriate stats - use the total count, not array length
+                    stats.totalExchanges = totalExchangeCount;
+                    stats.activeExchanges = userExchangeData.filter(e => e.status === 'active' || e.status === 'In Progress').length;
+                    stats.completedExchanges = userExchangeData.filter(e => e.status === 'completed' || e.status === 'COMPLETED').length;
+                    stats.pendingExchanges = userExchangeData.filter(e => e.status === 'pending' || e.status === 'PENDING').length;
+                    
+                    // Task stats - use count if available
+                    if (userTasks && userTasks.data) {
+                        const tasks = userTasks.data;
+                        stats.totalTasks = userTasks.count || tasks.length;
+                        // For now, use the returned data for status counts
+                        // TODO: Implement separate count queries for accurate status counts
+                        stats.pendingTasks = tasks.filter(t => t.status === 'pending' || t.status === 'PENDING').length;
+                        stats.completedTasks = tasks.filter(t => t.status === 'completed' || t.status === 'COMPLETED').length;
+                    } else {
+                        stats.totalTasks = 0;
+                        stats.pendingTasks = 0;
+                        stats.completedTasks = 0;
+                    }
+                    
+                    // Role-specific naming
+                    if (role === 'coordinator') {
+                        stats.managedExchanges = stats.totalExchanges;
+                    } else if (role === 'client') {
+                        stats.myExchanges = stats.totalExchanges;
+                    } else if (role === 'third_party') {
+                        stats.assignedExchanges = stats.totalExchanges;
+                    }
+                    
+                    console.log(`   📈 ${role} stats: ${stats.totalExchanges} exchanges, ${stats.totalTasks} tasks`);
                     break;
 
                 default:
                     stats.message = 'No statistics available for this role';
+                    console.log(`   ❌ Unknown role: ${role}`);
             }
 
             return stats;

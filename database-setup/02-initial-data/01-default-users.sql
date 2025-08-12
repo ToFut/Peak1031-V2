@@ -47,7 +47,7 @@ INSERT INTO users (
 ) VALUES (
     gen_random_uuid(),
     'coordinator@peak1031.com',
-    '$2a$12$LQv3c1yqBTVHNdwzNdcyPu.xH/oV0D6EqjMZD0ksJ.dYkGHVz7HYq', -- password: coordinator123
+    '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj3bp.gS.Oi', -- password: coordinator123
     'Demo',
     'Coordinator',
     'coordinator',
@@ -76,7 +76,7 @@ INSERT INTO users (
 ) VALUES (
     gen_random_uuid(),
     'client@peak1031.com',
-    '$2a$12$LQv3c1yqBTVHNdwzNdcyPu.xH/oV0D6EqjMZD0ksJ.dYkGHVz7HYq', -- password: client123
+    '$2a$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- password: client123
     'Demo',
     'Client',
     'client',

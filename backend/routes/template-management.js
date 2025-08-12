@@ -5,7 +5,61 @@ const { authenticateToken } = require('../middleware/auth');
 const { enforceRBAC } = require('../middleware/rbac');
 const documentTemplateService = require('../services/documentTemplateService');
 const AuditService = require('../services/audit');
+const { createClient } = require('@supabase/supabase-js');
 const router = express.Router();
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
+
+// Test endpoint for template debugging
+router.get('/test/:templateId', authenticateToken, async (req, res) => {
+  try {
+    const templateId = req.params.templateId;
+    
+    console.log('🧪 Testing template:', templateId);
+    
+    // Get template details
+    const template = await documentTemplateService.getTemplateById(templateId);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+    
+    // Test template data preparation
+    const sampleData = documentTemplateService.preparePreviewData();
+    
+    console.log('📋 Template info:', {
+      id: template.id,
+      name: template.name,
+      type: template.template_type,
+      hasFileTemplate: !!template.file_template,
+      hasFilePath: !!template.file_path,
+      sampleDataKeys: Object.keys(sampleData).length
+    });
+    
+    res.json({
+      success: true,
+      template: {
+        id: template.id,
+        name: template.name,
+        type: template.template_type,
+        hasFileTemplate: !!template.file_template,
+        hasFilePath: !!template.file_path
+      },
+      sampleData: sampleData,
+      message: 'Template test completed successfully'
+    });
+    
+  } catch (error) {
+    console.error('❌ Template test error:', error);
+    res.status(500).json({
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 // Simple permission check function
 const checkPermission = (resource, action) => {
@@ -340,25 +394,65 @@ router.post('/:id/generate', authenticateToken, checkPermission('documents', 'wr
       return res.status(400).json({ error: 'Exchange ID is required' });
     }
 
+    // Enhanced validation and debugging
+    console.log('📋 Validating template and exchange...');
+    
+    // Check if template exists
+    const template = await documentTemplateService.getTemplateById(templateId);
+    if (!template) {
+      console.log('❌ Template not found:', templateId);
+      return res.status(404).json({ error: 'Template not found' });
+    }
+    
+    console.log('✅ Template found:', {
+      id: template.id,
+      name: template.name,
+      type: template.template_type,
+      hasFileTemplate: !!template.file_template,
+      hasFilePath: !!template.file_path
+    });
+
+    // Check if exchange exists
+    const { data: exchange, error: exchangeError } = await supabase
+      .from('exchanges')
+      .select('id, exchange_number, status')
+      .eq('id', exchangeId)
+      .single();
+    
+    if (exchangeError || !exchange) {
+      console.log('❌ Exchange not found:', exchangeId, exchangeError);
+      return res.status(404).json({ error: 'Exchange not found' });
+    }
+    
+    console.log('✅ Exchange found:', {
+      id: exchange.id,
+      number: exchange.exchange_number,
+      status: exchange.status
+    });
+
     console.log('📋 Calling documentTemplateService.generateDocument...');
     const result = await documentTemplateService.generateDocument(templateId, exchangeId, additionalData);
     console.log('✅ Document generated successfully:', result);
     
     // Log document generation
-    await AuditService.log({
-      action: 'DOCUMENT_GENERATED_FROM_TEMPLATE',
-      entityType: 'document',
-      entityId: result.document.id,
-      userId: req.user.id,
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent'),
-      details: {
-        templateId,
-        templateName: result.template,
-        exchangeId,
-        documentName: result.document.original_filename
-      }
-    });
+    try {
+      await AuditService.log({
+        action: 'DOCUMENT_GENERATED_FROM_TEMPLATE',
+        entityType: 'document',
+        entityId: result.document.id,
+        userId: req.user.id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+        details: {
+          templateId,
+          templateName: result.template,
+          exchangeId,
+          documentName: result.document.original_filename
+        }
+      });
+    } catch (auditError) {
+      console.error('⚠️ Audit logging failed:', auditError);
+    }
 
     res.status(201).json({
       success: true,
@@ -368,7 +462,20 @@ router.post('/:id/generate', authenticateToken, checkPermission('documents', 'wr
   } catch (error) {
     console.error('❌ Error generating document:', error);
     console.error('❌ Error stack:', error.stack);
-    res.status(500).json({ error: error.message });
+    
+    // Provide more detailed error information
+    let errorResponse = {
+      error: error.message || 'Unknown error occurred',
+      timestamp: new Date().toISOString()
+    };
+    
+    // Add additional context for debugging
+    if (error.message && error.message.includes('Multi error')) {
+      errorResponse.details = 'Template processing failed due to multiple errors. Check template format and data.';
+      errorResponse.suggestion = 'Verify template file is valid DOCX and contains proper placeholders.';
+    }
+    
+    res.status(500).json(errorResponse);
   }
 });
 

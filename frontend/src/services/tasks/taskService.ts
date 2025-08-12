@@ -17,7 +17,15 @@ export class TaskService {
   }
 
   async createTask(taskData: Partial<Task>): Promise<Task> {
-    return httpClient.post<Task>('/tasks', taskData);
+    console.log('📋 TaskService: Creating task with data:', taskData);
+    try {
+      const result = await httpClient.post<Task>('/tasks', taskData);
+      console.log('✅ TaskService: Task created successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ TaskService: Task creation failed:', error);
+      throw error;
+    }
   }
 
   async updateTask(id: string, taskData: Partial<Task>): Promise<Task> {

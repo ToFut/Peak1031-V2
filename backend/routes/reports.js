@@ -14,7 +14,7 @@ const { authenticateToken } = require('../middleware/auth');
 const { enforceRBAC } = require('../middleware/rbac');
 const databaseService = require('../services/database');
 const ossLLMQueryService = require('../services/oss-llm-query');
-const auditService = require('../services/audit');
+const AuditService = require('../services/audit');
 
 const router = express.Router();
 
@@ -118,7 +118,7 @@ router.get('/overview', authenticateToken, async (req, res) => {
     }
 
     // Log the report access
-    await auditService.logUserAction(
+    await AuditService.logUserAction(
       req.user.id,
       'view_report',
       'report',
@@ -187,7 +187,7 @@ router.get('/exchanges', authenticateToken, async (req, res) => {
       exchanges: filteredExchanges.slice(0, 100) // Limit for performance
     };
 
-    await auditService.logUserAction(
+    await AuditService.logUserAction(
       req.user.id,
       'view_report',
       'report',
@@ -246,7 +246,7 @@ router.get('/users', authenticateToken, checkPermission('users', 'view'), async 
       })).slice(0, 100)
     };
 
-    await auditService.logUserAction(
+    await AuditService.logUserAction(
       req.user.id,
       'view_report',
       'report',
@@ -294,7 +294,7 @@ router.get('/tasks', authenticateToken, async (req, res) => {
       tasks: tasks.slice(0, 100)
     };
 
-    await auditService.logUserAction(
+    await AuditService.logUserAction(
       req.user.id,
       'view_report',
       'report',
@@ -329,7 +329,7 @@ router.post('/generate', authenticateToken, checkPermission('system', 'view_anal
     const report = await ossLLMQueryService.generateReport(reportType, parameters);
 
     // Log the report generation
-    await auditService.logUserAction(
+    await AuditService.logUserAction(
       req.user.id,
       'generate_ai_report',
       'report',
@@ -367,7 +367,7 @@ router.get('/audit', authenticateToken, checkPermission('system', 'view_analytic
 
     console.log('📊 Fetching audit logs report');
 
-    const auditLogs = await auditService.getAuditLogs({
+    const auditLogs = await AuditService.getAuditLogs({
       limit: parseInt(limit),
       offset: parseInt(offset),
       action,
@@ -377,12 +377,12 @@ router.get('/audit', authenticateToken, checkPermission('system', 'view_analytic
       endDate
     });
 
-    const auditStats = await auditService.getAuditStats({
+    const auditStats = await AuditService.getAuditStats({
       startDate,
       endDate
     });
 
-    await auditService.logUserAction(
+    await AuditService.logUserAction(
       req.user.id,
       'view_audit_report',
       'report',
@@ -443,7 +443,7 @@ router.post('/export', authenticateToken, async (req, res) => {
     }
 
     // Log the export
-    await auditService.logUserAction(
+    await AuditService.logUserAction(
       req.user.id,
       'export_report',
       'report',

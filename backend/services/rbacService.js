@@ -16,7 +16,8 @@ class RBACService {
 
     console.log(`🔒 RBAC: Getting exchanges for ${user.role} user: ${user.email}`);
 
-    let query = supabaseService.client.from('exchanges').select('*');
+    // Use count: 'exact' to get total count even with limit
+    let query = supabaseService.client.from('exchanges').select('*', { count: 'exact' });
 
     // Apply role-based filtering
     switch (user.role) {
@@ -26,9 +27,36 @@ class RBACService {
         break;
 
       case 'coordinator':
-        // Only exchanges they coordinate
+        // Exchanges where they're coordinator (in coordinator_id field) OR participant
         console.log(`   ✓ Coordinator filter - user ID: ${user.id}`);
-        query = query.eq('coordinator_id', user.id);
+        
+        // Get participant exchanges for coordinator
+        const coordParticipantExchanges = await supabaseService.client
+          .from('exchange_participants')
+          .select('exchange_id')
+          .eq('user_id', user.id)
+          .eq('is_active', true);
+        
+        const coordParticipantIds = coordParticipantExchanges.data?.map(p => p.exchange_id) || [];
+        console.log(`   ✓ Coordinator participant in ${coordParticipantIds.length} exchanges: [${coordParticipantIds.join(', ')}]`);
+        
+        // Build OR query to check both coordinator_id field and participation
+        let coordOrConditions = [];
+        
+        // Check if user is the coordinator in coordinator_id field
+        coordOrConditions.push(`coordinator_id.eq.${user.id}`);
+        
+        // Add participant exchanges
+        if (coordParticipantIds.length > 0) {
+          coordOrConditions.push(`id.in.(${coordParticipantIds.join(',')})`);
+        }
+        
+        if (coordOrConditions.length > 0) {
+          query = query.or(coordOrConditions.join(','));
+        } else {
+          // No conditions matched, return empty
+          return { data: [], count: 0 };
+        }
         break;
 
       case 'client':
@@ -40,11 +68,20 @@ class RBACService {
         console.log(`   ✓ Client filter - user ID: ${clientUserId}, contact ID: ${clientContactId}`);
         
         // Get participant exchanges
-        const { data: participantExchanges } = await supabaseService.client
+        console.log(`   🔍 Looking for participants with contact_id: ${clientContactId}`);
+        
+        // First try with contact_id only (since user_id column might not exist)
+        const { data: participantExchanges, error: participantError } = await supabaseService.client
           .from('exchange_participants')
-          .select('exchange_id')
-          .or(`contact_id.eq.${clientContactId || clientUserId},user_id.eq.${clientUserId}`)
+          .select('exchange_id, contact_id, is_active')
+          .eq('contact_id', clientContactId || clientUserId)
           .eq('is_active', true);
+        
+        if (participantError) {
+          console.log(`   ❌ Error fetching participants:`, participantError);
+        } else {
+          console.log(`   📊 Raw participant query result:`, participantExchanges);
+        }
         
         const participantIds = participantExchanges?.map(p => p.exchange_id) || [];
         
@@ -82,7 +119,7 @@ class RBACService {
         const { data: tpExchanges } = await supabaseService.client
           .from('exchange_participants')
           .select('exchange_id')
-          .or(`contact_id.eq.${tpContactId || tpUserId},user_id.eq.${tpUserId}`)
+          .eq('contact_id', tpContactId || tpUserId)
           .eq('is_active', true);
         
         const tpIds = tpExchanges?.map(p => p.exchange_id) || [];
@@ -98,8 +135,44 @@ class RBACService {
         break;
 
       case 'agency':
-        // TODO: Implement agency filtering
-        console.log('   ⚠️ Agency filtering not implemented');
+        // Agency sees exchanges from all their assigned third parties
+        const agencyUserId = user.id;
+        const agencyContactId = user.contact_id;
+        
+        console.log(`   ✓ Agency filter - user ID: ${agencyUserId}, contact ID: ${agencyContactId}`);
+        
+        // First, find all third parties assigned to this agency
+        const { data: thirdPartyAssignments } = await supabaseService.client
+          .from('agency_third_party_assignments')
+          .select('third_party_contact_id, is_active')
+          .eq('agency_contact_id', agencyContactId)  // Use contact ID for agency assignments
+          .eq('is_active', true);
+        
+        if (!thirdPartyAssignments || thirdPartyAssignments.length === 0) {
+          console.log('   ❌ No third party assignments found for agency');
+          return { data: [], count: 0 };
+        }
+        
+        const thirdPartyContactIds = thirdPartyAssignments.map(a => a.third_party_contact_id);
+        console.log(`   ✓ Agency manages ${thirdPartyContactIds.length} third parties: [${thirdPartyContactIds.join(', ')}]`);
+        
+        // Get all exchanges where the third parties are participants
+        const { data: agencyExchanges } = await supabaseService.client
+          .from('exchange_participants')
+          .select('exchange_id')
+          .in('contact_id', thirdPartyContactIds)
+          .eq('is_active', true);
+        
+        const agencyExchangeIds = agencyExchanges?.map(p => p.exchange_id) || [];
+        
+        console.log(`   ✓ Agency can see ${agencyExchangeIds.length} exchanges: [${agencyExchangeIds.join(', ')}]`);
+        
+        if (agencyExchangeIds.length > 0) {
+          query = query.in('id', agencyExchangeIds);
+        } else {
+          // Return empty result if no exchanges found
+          return { data: [], count: 0 };
+        }
         break;
 
       default:
@@ -127,9 +200,13 @@ class RBACService {
       throw error;
     }
 
-    console.log(`   📊 RBAC Result: ${data?.length || 0} exchanges returned`);
+    console.log(`   📊 RBAC Result: ${data?.length || 0} exchanges returned, total count: ${count}`);
 
-    return { data: data || [], count: count || data?.length || 0 };
+    return { 
+      data: data || [], 
+      count: count || 0,  // This is the total count from the database
+      returnedCount: data?.length || 0  // This is how many were actually returned
+    };
   }
 
   /**
@@ -161,7 +238,7 @@ class RBACService {
       return { data: [], count: 0 };
     }
 
-    let query = supabaseService.client.from('tasks').select('*');
+    let query = supabaseService.client.from('tasks').select('*', { count: 'exact' });
 
     // Filter by authorized exchanges
     if (user.role !== 'admin') {
@@ -176,14 +253,14 @@ class RBACService {
       query = query.eq('status', options.status);
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
 
     if (error) {
       console.error('RBAC tasks query error:', error);
       throw error;
     }
 
-    return { data: data || [], count: data?.length || 0 };
+    return { data: data || [], count: count || 0 };
   }
 
   /**

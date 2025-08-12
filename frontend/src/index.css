@@ -37,6 +37,20 @@ code {
   background: #a8a8a8;
 }
 
+/* Notification animations */
+@keyframes shrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.shrink-animation {
+  animation: shrink linear forwards;
+}
+
 /* Smooth tab transitions */
 .tab-transition {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);

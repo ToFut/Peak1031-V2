@@ -1,0 +1,318 @@
+{
+  "passed": 5,
+  "failed": 4,
+  "total": 9,
+  "details": [
+    {
+      "endpoint": "/api/health",
+      "method": "GET",
+      "status": 200,
+      "success": true,
+      "response": {
+        "status": "healthy",
+        "api": "online",
+        "timestamp": "2025-08-12T17:10:19.064Z"
+      },
+      "error": null,
+      "timestamp": "2025-08-12T17:10:19.076Z"
+    },
+    {
+      "endpoint": "/api",
+      "method": "GET",
+      "status": 200,
+      "success": true,
+      "response": {
+        "name": "Peak 1031 Exchange Platform API",
+        "version": "1.0.0",
+        "documentation": "/api/docs",
+        "endpoints": {
+          "auth": "/api/auth",
+          "legacy-auth": "/api/auth/legacy",
+          "contacts": "/api/contacts",
+          "exchanges": "/api/exchanges",
+          "tasks": "/api/tasks",
+          "documents": "/api/documents",
+          "messages": "/api/messages",
+          "notifications": "/api/notifications",
+          "exports": "/api/exports",
+          "sync": "/api/sync",
+          "admin": "/api/admin"
+        }
+      },
+      "error": null,
+      "timestamp": "2025-08-12T17:10:19.085Z"
+    },
+    {
+      "endpoint": "/api/debug/users",
+      "method": "GET",
+      "status": 200,
+      "success": true,
+      "response": {
+        "success": true,
+        "users": [
+          {
+            "id": "86ff2e3e-cba2-48d9-af47-dd25d14ebaee",
+            "email": "test-client@peak1031.com",
+            "first_name": "Test",
+            "last_name": "client",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "dfbc3f10-fe65-4169-81ea-89293ccec039",
+            "email": "test-doc-client@peak1031.com",
+            "first_name": "Document",
+            "last_name": "Client",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "c960624a-5fe1-46a2-b0ee-643e6e3a841b",
+            "email": "test-messaging-client@peak1031.com",
+            "first_name": "Messaging",
+            "last_name": "Client",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "e1ade7de-be32-4429-ad33-f40a94e79b6a",
+            "email": "test@peak1031.com",
+            "first_name": "Test",
+            "last_name": "User",
+            "role": "client",
+            "is_active": true
+          },
+          {
+            "id": "e6a2aa2d-045e-4c94-baa3-4c90263cc85c",
+            "email": "thirdparty2@peak1031.com",
+            "first_name": "Sarah",
+            "last_name": "Johnson",
+            "role": "third_party",
+            "is_active": true
+          },
+          {
+            "id": "bbeafb4b-877c-4448-bcb2-d9af10b5a134",
+            "email": "arielm@peak1031.com",
+            "first_name": "Ariel",
+            "last_name": "Messian",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "2bdaf055-e6b0-4e86-9eee-3b5ec57054c0",
+            "email": "Joan@peak1031.com",
+            "first_name": "Joan",
+            "last_name": "Carunungan",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "7ba8dbc4-a9cf-4c5f-baf0-ee915848764d",
+            "email": "joshuam@peak1031.com",
+            "first_name": "Joshua",
+            "last_name": "Messian",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "360c802e-9a31-4f5c-95ff-f1660096e9dc",
+            "email": "lindag@peak1031.com",
+            "first_name": "Linda",
+            "last_name": "González",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "6f4a0ce0-12ea-4a44-be6a-2ce768000021",
+            "email": "mark_potente@peak1031.com",
+            "first_name": "Mark",
+            "last_name": "Potente",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "01f1aa6f-19d1-4d75-83a1-0f2c76f0e420",
+            "email": "test-agency@peak1031.com",
+            "first_name": "Test",
+            "last_name": "agency",
+            "role": "agency",
+            "is_active": true
+          },
+          {
+            "id": "e7553dd6-be0f-4039-b0cc-eed797953395",
+            "email": "test-coordinator@peak1031.com",
+            "first_name": "Test",
+            "last_name": "coordinator",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "fd9171cd-f9cb-4ea2-87e5-3e30e86047f6",
+            "email": "test-doc-thirdparty@peak1031.com",
+            "first_name": "Document",
+            "last_name": "ThirdParty",
+            "role": "third_party",
+            "is_active": true
+          },
+          {
+            "id": "61901e35-a4b0-40b1-bbc2-d0f1c55c41b4",
+            "email": "test-thirdparty@peak1031.com",
+            "first_name": "Test",
+            "last_name": "third party",
+            "role": "third_party",
+            "is_active": true
+          },
+          {
+            "id": "f68cc15c-426d-49c5-9378-6e6d71d63f66",
+            "email": "thirdparty3@peak1031.com",
+            "first_name": "Mike",
+            "last_name": "Davis",
+            "role": "third_party",
+            "is_active": true
+          },
+          {
+            "id": "3f550ef4-0edb-4733-a2ed-082a168da41b",
+            "email": "aram@peak1031.com",
+            "first_name": "Aram",
+            "last_name": "Zetlyan",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "0772aa76-81ff-49fa-8d64-cf354a60cca1",
+            "email": "thirdparty1@peak1031.com",
+            "first_name": "John",
+            "last_name": "Smith",
+            "role": "third_party",
+            "is_active": true
+          },
+          {
+            "id": "278304de-568f-4138-b35b-6fdcfbd2f1ce",
+            "email": "admin@peak1031.com",
+            "first_name": "Updated",
+            "last_name": "Admin",
+            "role": "admin",
+            "is_active": true
+          },
+          {
+            "id": "12bbeccd-4c85-43ac-8bcf-bfe73fee3525",
+            "email": "coordinator@peak1031.com",
+            "first_name": "Demo",
+            "last_name": "Coordinator",
+            "role": "coordinator",
+            "is_active": true
+          },
+          {
+            "id": "dcd1d389-55ed-4091-b6e2-366e9c01dc03",
+            "email": "agency@peak1031.com",
+            "first_name": "Agency",
+            "last_name": "User",
+            "role": "agency",
+            "is_active": true
+          },
+          {
+            "id": "557dc07c-3ca7-46bf-94cd-c99f3d1e3bb1",
+            "email": "client@peak1031.com",
+            "first_name": "Jane",
+            "last_name": "Client",
+            "role": "client",
+            "is_active": true
+          }
+        ]
+      },
+      "error": null,
+      "timestamp": "2025-08-12T17:10:19.217Z"
+    },
+    {
+      "endpoint": "/api/debug/token",
+      "method": "GET",
+      "status": 200,
+      "success": true,
+      "response": {
+        "success": false,
+        "error": "No token provided"
+      },
+      "error": null,
+      "timestamp": "2025-08-12T17:10:19.222Z"
+    },
+    {
+      "endpoint": "/api/auth/login",
+      "method": "POST",
+      "status": 200,
+      "success": true,
+      "response": {
+        "user": {
+          "id": "278304de-568f-4138-b35b-6fdcfbd2f1ce",
+          "email": "admin@peak1031.com",
+          "passwordHash": "$2a$10$ACXbWikb7FoBzRX1kPLYZeozQpDv9cWR1h7.7IlblC/zSAib/REOG",
+          "role": "admin",
+          "firstName": "Updated",
+          "lastName": "Admin",
+          "phone": "555-1234-5678",
+          "isActive": true,
+          "twoFaEnabled": false,
+          "twoFaSecret": null,
+          "lastLogin": "2025-08-12T17:10:19.561",
+          "contactId": "278304de-568f-4138-b35b-6fdcfbd2f1ce",
+          "createdAt": "2025-08-07T19:31:24.697433",
+          "updatedAt": "2025-08-12T01:53:04.189",
+          "ppUserId": null,
+          "ppDisplayName": null,
+          "ppIsActive": true,
+          "ppSyncedAt": null,
+          "middleName": null,
+          "ppMiddleName": null,
+          "ppRawData": {},
+          "ppCreatedAt": null,
+          "ppUpdatedAt": null,
+          "ppEmail": null,
+          "phonePrimaryNew": null,
+          "phoneMobileNew": null,
+          "phoneWorkNew": null,
+          "phoneHomeNew": null,
+          "displayName": null
+        },
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIyNzgzMDRkZS01NjhmLTQxMzgtYjM1Yi02ZmRjZmJkMmYxY2UiLCJlbWFpbCI6ImFkbWluQHBlYWsxMDMxLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc1NTAxODYxOSwiZXhwIjoxNzU1MDI1ODE5LCJhdWQiOiJwZWFrMTAzMS11c2VycyIsImlzcyI6InBlYWsxMDMxIn0.qUVDs-lUHoHUbfgSvzqNRQge9Trf6MtPkt22y1EXTAI",
+        "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIyNzgzMDRkZS01NjhmLTQxMzgtYjM1Yi02ZmRjZmJkMmYxY2UiLCJlbWFpbCI6ImFkbWluQHBlYWsxMDMxLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc1NTAxODYxOSwiZXhwIjoxNzU1NjIzNDE5LCJhdWQiOiJwZWFrMTAzMS11c2VycyIsImlzcyI6InBlYWsxMDMxIn0.bYlxTJkmFYsgaTXofjiNE5B1yPdgQgm_VqLGZ44Ag_Y"
+      },
+      "error": null,
+      "timestamp": "2025-08-12T17:10:20.002Z"
+    },
+    {
+      "endpoint": "/api/auth/logout",
+      "method": "POST",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-12T17:10:20.010Z"
+    },
+    {
+      "endpoint": "/api/contacts",
+      "method": "GET",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-12T17:10:20.018Z"
+    },
+    {
+      "endpoint": "/api/exchanges",
+      "method": "GET",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-12T17:10:20.026Z"
+    },
+    {
+      "endpoint": "/api/exchanges?page=1&limit=10",
+      "method": "GET",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-12T17:10:20.036Z"
+    }
+  ]
+}

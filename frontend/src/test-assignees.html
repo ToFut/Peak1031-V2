@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Assignees API</title>
+</head>
+<body>
+    <h1>Test Assignees API</h1>
+    <button onclick="testAssignees()">Test API</button>
+    <pre id="result"></pre>
+
+    <script>
+        async function testAssignees() {
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    resultEl.textContent = 'No token found. Please log in first.';
+                    return;
+                }
+
+                // Test exchange context
+                resultEl.textContent = 'Testing exchange context...\n';
+                const exchangeRes = await fetch('/api/tasks/assignees/valid?context=exchange&exchangeId=9334eb38-d6ce-4e49-956b-0a38ef4382c9', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const exchangeData = await exchangeRes.json();
+                resultEl.textContent += 'Exchange Context Response:\n' + JSON.stringify(exchangeData, null, 2) + '\n\n';
+
+                // Test dashboard context
+                resultEl.textContent += 'Testing dashboard context...\n';
+                const dashboardRes = await fetch('/api/tasks/assignees/valid?context=dashboard', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const dashboardData = await dashboardRes.json();
+                resultEl.textContent += 'Dashboard Context Response:\n' + JSON.stringify(dashboardData, null, 2);
+                
+            } catch (error) {
+                resultEl.textContent = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

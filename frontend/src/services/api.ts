@@ -30,7 +30,7 @@ class ApiService {
 
   constructor() {
     // Resolve base URL from env or current origin, trim trailing slashes
-    const resolvedBaseUrl = (process.env.REACT_APP_API_URL || `${window.location.origin}/api`).replace(/\/+$/, '');
+    const resolvedBaseUrl = (process.env.REACT_APP_API_URL || 'http://localhost:5001/api').replace(/\/+$/, '');
     this.baseURL = resolvedBaseUrl;
     console.log('🔗 API base URL:', this.baseURL);
     // Monitor connection status
@@ -226,7 +226,11 @@ class ApiService {
       }
       
       // Return data.data if it exists (backend format), otherwise return the whole response
-      return data.data || data;
+      // Handle both {data: [...]} and {success: true, data: [...]} formats
+      if (data.data !== undefined) {
+        return data.data;
+      }
+      return data;
     } catch (error) {
       console.error(`❌ API request failed for ${endpoint}:`, error);
       
@@ -1071,6 +1075,19 @@ class ApiService {
   }
 
   /**
+   * Get FAST dashboard overview - optimized for quick loading
+   * Uses minimal queries and estimations for super-fast response
+   */
+  async getFastDashboardOverview(): Promise<{
+    exchanges: { total: number; active: number; completed: number };
+    users: { total: number; active: number };
+    tasks: { total: number; pending: number; completed: number };
+    loadTime?: string;
+  }> {
+    return this.request('/dashboard/fast');
+  }
+
+  /**
    * Get exchange performance metrics
    */
   async getExchangeMetrics(): Promise<{
@@ -1847,6 +1864,92 @@ class ApiService {
     });
 
     return await this.request(`/tasks/exchange/${exchangeId}?${params}`);
+  }
+
+
+
+  // ===========================================
+  // USER AUDIT LOGS API METHODS
+  // ===========================================
+
+  /**
+   * Get user's activity history for audit logs
+   */
+  async getUserAuditActivity(options?: {
+    page?: number;
+    limit?: number;
+    action?: string;
+    entityType?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    Object.entries(options || {}).forEach(([key, value]) => {
+      if (value) queryParams.append(key, value.toString());
+    });
+    
+    return await this.request(`/user-audit/my-activity?${queryParams}`);
+  }
+
+  /**
+   * Get activities related to user's assignments
+   */
+  async getAssignedActivities(options?: {
+    page?: number;
+    limit?: number;
+    action?: string;
+    entityType?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    Object.entries(options || {}).forEach(([key, value]) => {
+      if (value) queryParams.append(key, value.toString());
+    });
+    
+    return await this.request(`/user-audit/assigned-activities?${queryParams}`);
+  }
+
+  /**
+   * Get user's audit-related notifications
+   */
+  async getAuditNotifications(options?: {
+    page?: number;
+    limit?: number;
+    unreadOnly?: boolean;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    Object.entries(options || {}).forEach(([key, value]) => {
+      if (value) queryParams.append(key, value.toString());
+    });
+    
+    return await this.request(`/user-audit/notifications?${queryParams}`);
+  }
+
+  /**
+   * Mark audit notification as read
+   */
+  async markAuditNotificationAsRead(notificationId: string): Promise<any> {
+    return await this.request(`/user-audit/notifications/${notificationId}/read`, {
+      method: 'PUT'
+    });
+  }
+
+  /**
+   * Mark all notifications as read
+   */
+  async markAllNotificationsAsRead(): Promise<any> {
+    return await this.request('/user-audit/notifications/read-all', {
+      method: 'PUT'
+    });
+  }
+
+  /**
+   * Get user's audit summary
+   */
+  async getAuditSummary(): Promise<any> {
+    return await this.request('/user-audit/summary');
   }
 }
 

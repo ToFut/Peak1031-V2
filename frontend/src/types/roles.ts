@@ -108,7 +108,7 @@ export const ROLE_CONFIGS: Record<UserRole, RoleConfig> = {
       }
     },
     ui: {
-      sidebar_items: ['overview', 'exchanges', 'tasks', 'users', 'documents', 'messages', 'reports', 'ai_gpt', 'pp_management', 'system', 'templates', 'audit', 'sync'],
+      sidebar_items: ['overview', 'exchanges', 'tasks', 'users', 'documents', 'messages', 'reports', 'ai_gpt', 'agency_assignments', 'pp_management', 'system', 'templates', 'audit', 'sync'],
       dashboard_widgets: ['system_stats', 'exchange_analytics', 'user_management', 'quick_actions', 'audit_logs'],
       page_titles: {
         exchanges: 'Exchange Management',

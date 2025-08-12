@@ -1,395 +1,161 @@
-import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import StandardDashboard from './StandardDashboard';
-import { EnhancedStatCard, QuickAction } from './SharedDashboardComponents';
 import { useAnalytics } from '../../../hooks/useAnalytics';
+import { useDashboardData } from '../../../shared/hooks/useDashboardData';
 import {
   ChartBarIcon,
   UsersIcon,
   DocumentTextIcon,
-  ChatBubbleLeftRightIcon,
   CogIcon,
   FolderIcon,
-  ServerIcon,
   EyeIcon,
   CircleStackIcon,
   ShieldCheckIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  ExclamationTriangleIcon,
+  ClockIcon,
+  ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
 
-// Lazy load heavy components
-const UnifiedChatInterface = lazy(() => import('../../messages/components/UnifiedChatInterface'));
-const EnterpriseDocumentManager = lazy(() => import('../../documents/components/EnterpriseDocumentManager'));
-const UserManagement = lazy(() => import('../../users/components/UserManagement'));
-const TemplateManager = lazy(() => import('../../documents/components/TemplateManager'));
-const ExchangeList = lazy(() => import('../../exchanges/components/ExchangeList').then(module => ({ default: module.ExchangeList })));
-const TaskBoard = lazy(() => import('../../tasks/components/TaskBoard').then(module => ({ default: module.TaskBoard })));
+// Remove unused lazy loading components since we're using StandardDashboard
 
-// Loading component for lazy-loaded tabs
-const TabLoadingFallback = () => (
-  <div className="flex items-center justify-center p-8">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-    <span className="ml-2 text-gray-600">Loading...</span>
-  </div>
-);
-
-interface AdminTabContentProps {
-  activeTab: string;
-  role: string;
-}
-
-// Memoized tab content component
-const AdminTabContent: React.FC<AdminTabContentProps> = React.memo(({ activeTab, role }) => {
-  const [userViewMode, setUserViewMode] = useState<'card' | 'table'>('card');
-  
-  // Memoize tab content to prevent unnecessary re-renders
-  const tabContent = useMemo(() => {
-    switch (activeTab) {
-      case 'exchanges':
-        return (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">All Exchanges</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Manage and monitor all 1031 exchanges in the system
-                </p>
-              </div>
-              <div className="p-6">
-                <Suspense fallback={<TabLoadingFallback />}>
-                  <ExchangeList />
-                </Suspense>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'tasks':
-        return (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Task Management</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Monitor and assign tasks across all exchanges
-                </p>
-              </div>
-              <div className="p-6">
-                <Suspense fallback={<TabLoadingFallback />}>
-                  <TaskBoard 
-                    tasks={[]} 
-                    showExchangeInfo={true}
-                    showPPInfo={true}
-                  />
-                </Suspense>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'users':
-        return (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">User Management</h2>
-                <div className="flex items-center space-x-3">
-                  <div className="flex rounded-md shadow-sm">
-                    <button
-                      onClick={() => setUserViewMode('card')}
-                      className={`px-4 py-2 text-sm font-medium border ${
-                        userViewMode === 'card'
-                          ? 'bg-blue-50 border-blue-200 text-blue-700'
-                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                      } rounded-l-md`}
-                    >
-                      Card View
-                    </button>
-                    <button
-                      onClick={() => setUserViewMode('table')}
-                      className={`px-4 py-2 text-sm font-medium border-t border-b border-r ${
-                        userViewMode === 'table'
-                          ? 'bg-blue-50 border-blue-200 text-blue-700'
-                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                      } rounded-r-md`}
-                    >
-                      Table View
-                    </button>
-                  </div>
-                </div>
-              </div>
-                             <Suspense fallback={<TabLoadingFallback />}>
-                 <UserManagement />
-               </Suspense>
-            </div>
-          </div>
-        );
-
-      case 'documents':
-        return (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Enterprise Document Manager</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Manage documents with advanced security and collaboration features
-                </p>
-              </div>
-              <div className="p-6">
-                               <Suspense fallback={<TabLoadingFallback />}>
-                 <EnterpriseDocumentManager 
-                   isOpen={true}
-                   onClose={() => {}}
-                 />
-               </Suspense>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'chat':
-        return (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Unified Chat Interface</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Real-time messaging and collaboration across all exchanges
-                </p>
-              </div>
-              <div className="p-6">
-                <Suspense fallback={<TabLoadingFallback />}>
-                  <UnifiedChatInterface />
-                </Suspense>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'templates':
-        return (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Template Manager</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Create and manage document templates for consistent workflows
-                </p>
-              </div>
-              <div className="p-6">
-                <Suspense fallback={<TabLoadingFallback />}>
-                  <TemplateManager />
-                </Suspense>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'system':
-        return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <EnhancedStatCard
-                title="System Status"
-                value="Healthy"
-                subtitle="All systems operational"
-                icon={ShieldCheckIcon}
-                color="green"
-                trend="up"
-                trendValue="99.9% uptime"
-              />
-              <EnhancedStatCard
-                title="Active Sessions"
-                value="12"
-                subtitle="Users online now"
-                icon={UsersIcon}
-                color="blue"
-                trend="up"
-                trendValue="+3 from yesterday"
-              />
-              <EnhancedStatCard
-                title="API Requests"
-                value="2.4K"
-                subtitle="Last 24 hours"
-                icon={ServerIcon}
-                color="blue"
-                trend="up"
-                trendValue="+15% from yesterday"
-              />
-            </div>
-          </div>
-        );
-
-      default:
-        return (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Content
-            </h3>
-            <p className="text-gray-600">
-              Advanced {activeTab} management features coming soon.
-            </p>
-          </div>
-        );
-    }
-  }, [activeTab, userViewMode]);
-
-  return tabContent;
-});
-
-AdminTabContent.displayName = 'AdminTabContent';
+// Remove AdminTabContent since we're using StandardDashboard for navigation
 
 const StandardizedAdminDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('overview');
   const [aiMode, setAiMode] = useState(false);
+  
+  // Get dashboard data for correct RBAC-filtered totals
+  const { stats: dashboardStats } = useDashboardData({ 
+    role: 'admin', 
+    autoRefresh: true, 
+    refreshInterval: 300000 
+  });
   
   // Optimize analytics hook - only enable auto-refresh when needed
   const analytics = useAnalytics({
-    enableAutoRefresh: aiMode && activeTab === 'overview', // Only auto-refresh in AI mode on overview
+    enableAutoRefresh: aiMode, // Always enable in AI mode since we're on overview
     refreshInterval: 300000
   });
 
-  // Memoize tabs configuration
-  const customTabs = useMemo(() => [
-    {
-      id: 'overview',
-      name: 'Overview',
-      icon: ChartBarIcon
-    },
-    {
-      id: 'exchanges',
-      name: 'Exchanges',
-      icon: DocumentTextIcon
-    },
-    {
-      id: 'tasks',
-      name: 'Tasks',
-      icon: DocumentTextIcon
-    },
-    {
-      id: 'users',
-      name: 'Users',
-      icon: UsersIcon
-    },
-    {
-      id: 'documents',
-      name: 'Documents',
-      icon: FolderIcon
-    },
-    {
-      id: 'chat',
-      name: 'Chat',
-      icon: ChatBubbleLeftRightIcon
-    },
-    {
-      id: 'templates',
-      name: 'Templates',
-      icon: FolderIcon
-    },
-    {
-      id: 'system',
-      name: 'System',
-      icon: CogIcon
-    }
-  ], []);
-
-  // Memoize tab change handler
-  const handleTabChange = useCallback((tabId: string) => {
-    setActiveTab(tabId);
-  }, []);
-
-  // Memoize AI mode toggle handlers
+  // AI mode handlers
   const handleSetClassicMode = useCallback(() => setAiMode(false), []);
   const handleSetAiMode = useCallback(() => setAiMode(true), []);
 
+
   const customOverviewContent = (
     <div className="space-y-6">
-      {/* Dashboard Mode Toggle */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">Admin Dashboard</h2>
-            <p className="text-gray-600 mt-1">
-              {aiMode ? 'AI-powered insights and predictions' : 'Classic system monitoring and management'}
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-1">
-              <button
-                onClick={handleSetClassicMode}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  !aiMode
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <ChartBarIcon className="h-4 w-4" />
-                Classic
-              </button>
-              <button
-                onClick={handleSetAiMode}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  aiMode
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <div className="w-4 h-4 flex items-center justify-center">🤖</div>
-                AI Mode
-              </button>
+      {/* Admin Control Center Header */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Admin Control Center</h1>
+              <p className="text-gray-600 mt-1">System management and monitoring dashboard</p>
             </div>
+            <div className="flex items-center gap-2">
+              <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+                <button
+                  onClick={handleSetClassicMode}
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                    !aiMode ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Standard
+                </button>
+                <button
+                  onClick={handleSetAiMode}
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                    aiMode ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  AI Insights
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Critical Alerts & Actions */}
+        <div className="px-6 py-4">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            <button className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
+              <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
+              <div className="text-left">
+                <div className="text-sm font-semibold text-red-900">3 Critical Issues</div>
+                <div className="text-xs text-red-600">Require immediate attention</div>
+              </div>
+            </button>
+            <button className="flex items-center gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg hover:bg-yellow-100 transition-colors">
+              <ClockIcon className="h-5 w-5 text-yellow-600" />
+              <div className="text-left">
+                <div className="text-sm font-semibold text-yellow-900">5 Pending Tasks</div>
+                <div className="text-xs text-yellow-600">Admin review needed</div>
+              </div>
+            </button>
+            <button className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
+              <ArrowPathIcon className="h-5 w-5 text-blue-600" />
+              <div className="text-left">
+                <div className="text-sm font-semibold text-blue-900">Sync Available</div>
+                <div className="text-xs text-blue-600">Last: 2 hours ago</div>
+              </div>
+            </button>
+            <button className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
+              <UsersIcon className="h-5 w-5 text-green-600" />
+              <div className="text-left">
+                <div className="text-sm font-semibold text-green-900">2 New Users</div>
+                <div className="text-xs text-green-600">Awaiting activation</div>
+              </div>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Mode-specific Overview Content */}
       {aiMode ? (
-        /* AI Mode Overview */
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg border-2 border-blue-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <ChartBarIcon className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">🤖 AI-Powered System Intelligence</h2>
-                <p className="text-sm text-gray-600">Advanced analytics with predictive insights</p>
-              </div>
+        /* AI Insights Mode */
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-blue-600 rounded-lg">
+              <ChartBarIcon className="h-5 w-5 text-white" />
             </div>
-            <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-100 px-3 py-1 rounded-full">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-              AI Active
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">AI System Analysis</h3>
+              <p className="text-sm text-blue-700">Intelligent insights and recommendations</p>
             </div>
           </div>
         
-          {/* AI Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            <div className="bg-white/70 backdrop-blur rounded-lg p-4 border border-blue-200">
-              <div className="text-xl font-bold text-blue-900 mb-1">🧠 AI Insights</div>
-              <div className="text-sm text-blue-700">
-                {analytics.loading ? 'Analyzing...' : '"System efficiency up 15% this month"'}
+          {/* AI-Powered Insights */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-white rounded-lg p-4 border border-blue-200">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium text-gray-900">Performance Alert</span>
               </div>
-              <div className="text-xs text-blue-600 mt-1">Machine learning analysis</div>
+              <p className="text-sm text-gray-600 mb-2">
+                {analytics.loading ? 'Analyzing system performance...' : 'Database queries taking 23% longer than baseline'}
+              </p>
+              <button className="text-xs text-blue-600 hover:text-blue-800 font-medium">Investigate →</button>
             </div>
             
-            <div className="bg-white/70 backdrop-blur rounded-lg p-4 border border-green-200">
-              <div className="text-2xl font-bold text-green-700 mb-1">8.7/10</div>
-              <div className="text-sm text-green-600">Efficiency Score</div>
-              <div className="text-xs text-green-500 mt-1">Industry avg: 6.2/10</div>
-            </div>
-            
-            <div className="bg-white/70 backdrop-blur rounded-lg p-4 border border-red-200">
-              <div className="text-2xl font-bold text-red-700 mb-1">
-                {analytics.loading ? '...' : (analytics.financialOverview?.riskAnalysis?.high || '5')}
+            <div className="bg-white rounded-lg p-4 border border-blue-200">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span className="text-sm font-medium text-gray-900">Optimization Found</span>
               </div>
-              <div className="text-sm text-red-600">High Risk Predicted</div>
-              <div className="text-xs text-red-500 mt-1">ML confidence: 94%</div>
+              <p className="text-sm text-gray-600 mb-2">
+                User workflow patterns suggest 15% efficiency improvement possible
+              </p>
+              <button className="text-xs text-blue-600 hover:text-blue-800 font-medium">Apply Changes →</button>
             </div>
             
-            <div className="bg-white/70 backdrop-blur rounded-lg p-4 border border-purple-200">
-              <div className="text-xl font-bold text-purple-700 mb-1">🔔 Smart Alert</div>
-              <div className="text-sm text-purple-600">"Review workload distribution"</div>
-              <div className="text-xs text-purple-500 mt-1">AI optimization suggestion</div>
+            <div className="bg-white rounded-lg p-4 border border-blue-200">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                <span className="text-sm font-medium text-gray-900">Resource Usage</span>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">
+                Storage will reach 80% capacity in approximately 14 days
+              </p>
+              <button className="text-xs text-blue-600 hover:text-blue-800 font-medium">Plan Upgrade →</button>
             </div>
           </div>
 
@@ -420,182 +186,264 @@ const StandardizedAdminDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* AI Quick Actions */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-            <button 
-              onClick={() => setActiveTab('exchanges')}
-              className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-            >
-              🤖 Ask AI Anything
+          {/* AI Actions */}
+          <div className="flex gap-3">
+            <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+              Run Full Analysis
             </button>
-            <button 
-              onClick={() => setActiveTab('system')}
-              className="inline-flex items-center gap-2 px-3 py-2 bg-white text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors text-sm"
-            >
-              🎯 Smart Optimization
+            <button className="px-4 py-2 bg-white text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium">
+              Export Report
             </button>
-            <button 
-              onClick={() => setActiveTab('exchanges')}
-              className="inline-flex items-center gap-2 px-3 py-2 bg-white text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors text-sm"
-            >
-              📈 Predictive Analytics
-            </button>
-            <button 
-              className="inline-flex items-center gap-2 px-3 py-2 bg-white text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors text-sm"
-            >
-              🔮 Risk Forecasting
-            </button>
-            <button 
-              className="inline-flex items-center gap-2 px-3 py-2 bg-white text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors text-sm"
-            >
-              ⚡ Auto-Suggestions
-            </button>
-            <button 
-              className="inline-flex items-center gap-2 px-3 py-2 bg-white text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors text-sm"
-            >
-              🧠 AI Dashboard
+            <button className="px-4 py-2 bg-white text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium">
+              Schedule Analysis
             </button>
           </div>
         </div>
       ) : (
-        /* Classic Mode Overview */
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">📊 System Overview</h2>
+        /* System Status & Monitoring */
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">System Status</h3>
+                <p className="text-sm text-gray-600">Real-time system monitoring and health</p>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-green-700 bg-green-100 px-3 py-1 rounded-full">
+                <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                All Systems Operational
+              </div>
+            </div>
+          </div>
+          <div className="p-6">
             
-            {/* Classic Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-gray-50 rounded-lg p-4 border">
-                <div className="text-2xl font-bold text-gray-900 mb-1">🟢 99.8%</div>
-                <div className="text-sm text-gray-600">System Health</div>
-                <div className="text-xs text-gray-500 mt-1">All systems normal</div>
-              </div>
-              
-              <div className="bg-gray-50 rounded-lg p-4 border">
-                <div className="text-2xl font-bold text-gray-900 mb-1">47</div>
-                <div className="text-sm text-gray-600">Total Users</div>
-                <div className="text-xs text-gray-500 mt-1">2 admins, 45 clients</div>
-              </div>
-              
-              <div className="bg-gray-50 rounded-lg p-4 border">
-                <div className="text-2xl font-bold text-green-600 mb-1">12</div>
-                <div className="text-sm text-gray-600">Active Sessions</div>
-                <div className="text-xs text-gray-500 mt-1">Last hour activity</div>
-              </div>
-              
-              <div className="bg-gray-50 rounded-lg p-4 border">
-                <div className="text-2xl font-bold text-blue-600 mb-1">23%</div>
-                <div className="text-sm text-gray-600">Storage Used</div>
-                <div className="text-xs text-gray-500 mt-1">2.3GB / 10GB</div>
-              </div>
-            </div>
-
-            {/* Second Row - Business Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-gray-50 rounded-lg p-4 border">
-                <div className="text-2xl font-bold text-gray-900 mb-1">
-                  {analytics.loading ? '...' : (
-                    analytics.financialOverview?.performanceMetrics?.totalExchanges ? 
-                    analytics.financialOverview.performanceMetrics.totalExchanges.toLocaleString() : 
-                    (analytics.error ? 'Error' : 'Loading...')
-                  )}
-                </div>
-                <div className="text-sm text-gray-600">Total Exchanges</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {analytics.error ? `Error: ${analytics.error}` : '1,731 active, 577 completed'}
+            {/* System Metrics - Actionable */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="group cursor-pointer">
+                <div className="bg-white border-2 border-green-200 rounded-lg p-4 hover:border-green-300 transition-colors">
+                  <div className="flex items-center justify-between mb-2">
+                    <ShieldCheckIcon className="h-8 w-8 text-green-600" />
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">HEALTHY</span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">99.8%</div>
+                  <div className="text-sm text-gray-600">System Uptime</div>
+                  <div className="text-xs text-green-600 mt-1 group-hover:text-green-700">View details →</div>
                 </div>
               </div>
               
-              <div className="bg-gray-50 rounded-lg p-4 border">
-                <div className="text-2xl font-bold text-green-600 mb-1">+23</div>
-                <div className="text-sm text-gray-600">This Month</div>
-                <div className="text-xs text-gray-500 mt-1">+5 completed</div>
+              <div className="group cursor-pointer">
+                <div className="bg-white border-2 border-blue-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-2xl font-bold text-gray-900">{dashboardStats ? dashboardStats.exchanges.total : '...'}</div>
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">EXCHANGES</span>
+                  </div>
+                  <div className="text-sm text-gray-600 mb-1">Total Exchanges</div>
+                  <div className="text-xs text-blue-600 group-hover:text-blue-700">
+                    {dashboardStats ? `${dashboardStats.exchanges.active} active` : 'Loading...'} →
+                  </div>
+                </div>
               </div>
               
-              <div className="bg-gray-50 rounded-lg p-4 border">
-                <div className="text-2xl font-bold text-orange-600 mb-1">3</div>
-                <div className="text-sm text-gray-600">System Alerts</div>
-                <div className="text-xs text-gray-500 mt-1">1 critical, 2 warnings</div>
+              <div className="group cursor-pointer">
+                <div className="bg-white border-2 border-purple-200 rounded-lg p-4 hover:border-purple-300 transition-colors">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-2xl font-bold text-gray-900">12</div>
+                    <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">ONLINE</span>
+                  </div>
+                  <div className="text-sm text-gray-600 mb-1">Active Users</div>
+                  <div className="text-xs text-purple-600 group-hover:text-purple-700">Manage users →</div>
+                </div>
               </div>
               
-              <div className="bg-gray-50 rounded-lg p-4 border">
-                <div className="text-2xl font-bold text-gray-900 mb-1">✅ 2hrs ago</div>
-                <div className="text-sm text-gray-600">Last Backup</div>
-                <div className="text-xs text-gray-500 mt-1">Next: Tonight</div>
+              <div className="group cursor-pointer">
+                <div className="bg-white border-2 border-amber-200 rounded-lg p-4 hover:border-amber-300 transition-colors">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-2xl font-bold text-gray-900">5</div>
+                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">PENDING</span>
+                  </div>
+                  <div className="text-sm text-gray-600 mb-1">Tasks Waiting</div>
+                  <div className="text-xs text-amber-600 group-hover:text-amber-700">Review tasks →</div>
+                </div>
               </div>
             </div>
 
-            {/* Classic Quick Actions */}
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-              <button 
-                onClick={() => setActiveTab('users')}
-                className="inline-flex items-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
-              >
-                👥 User Management
-              </button>
-              <button 
-                onClick={() => setActiveTab('system')}
-                className="inline-flex items-center gap-2 px-3 py-2 bg-white text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-              >
-                📊 System Reports
-              </button>
-              <button 
-                onClick={() => setActiveTab('system')}
-                className="inline-flex items-center gap-2 px-3 py-2 bg-white text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-              >
-                ⚙️ Settings
-              </button>
-              <button 
-                className="inline-flex items-center gap-2 px-3 py-2 bg-white text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-              >
-                🔍 Audit Logs
-              </button>
-              <button 
-                className="inline-flex items-center gap-2 px-3 py-2 bg-white text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-              >
-                📂 Data Backup
-              </button>
-              <button 
-                className="inline-flex items-center gap-2 px-3 py-2 bg-white text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-              >
-                🔄 Sync Status
-              </button>
-            </div>
           </div>
         </div>
       )}
 
-      {/* Advanced Admin Analytics */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">System Analytics</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <EnhancedStatCard
-            title="Active Sessions"
-            value={12}
-            subtitle="Users online now"
-            icon={UsersIcon}
-            color="green"
-            trend="up"
-            trendValue="+3 from yesterday"
-          />
-          <EnhancedStatCard
-            title="API Requests"
-            value="2.4K"
-            subtitle="Last 24 hours"
-            icon={ServerIcon}
-            color="blue"
-            trend="up"
-            trendValue="+15% from yesterday"
-          />
-          <EnhancedStatCard
-            title="Storage Used"
-            value="47.2 GB"
-            subtitle="of 100 GB allocated"
-            icon={CircleStackIcon}
-            color="yellow"
-            trend="up"
-            trendValue="+2.1 GB this week"
-          />
+      {/* Quick Actions Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* User Management */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <UsersIcon className="h-5 w-5 text-blue-600" />
+              <h4 className="font-semibold text-gray-900">User Management</h4>
+            </div>
+          </div>
+          <div className="p-4 space-y-3">
+            <button 
+              onClick={() => window.location.href = '/users'}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-left"
+            >
+              <div>
+                <div className="font-medium text-gray-900">Active Users (47)</div>
+                <div className="text-sm text-gray-600">2 admins, 45 clients</div>
+              </div>
+              <div className="text-gray-400">→</div>
+            </button>
+            <button className="w-full flex items-center justify-between p-3 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition-colors text-left">
+              <div>
+                <div className="font-medium text-gray-900">Pending Approvals (2)</div>
+                <div className="text-sm text-amber-600">New user registrations</div>
+              </div>
+              <div className="text-gray-400">→</div>
+            </button>
+            <button className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-left">
+              <div>
+                <div className="font-medium text-gray-900">Role Assignments</div>
+                <div className="text-sm text-gray-600">Manage permissions</div>
+              </div>
+              <div className="text-gray-400">→</div>
+            </button>
+          </div>
+        </div>
+
+        {/* System Operations */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <CogIcon className="h-5 w-5 text-green-600" />
+              <h4 className="font-semibold text-gray-900">System Operations</h4>
+            </div>
+          </div>
+          <div className="p-4 space-y-3">
+            <button className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors text-left">
+              <div>
+                <div className="font-medium text-gray-900">Sync PracticePanther</div>
+                <div className="text-sm text-blue-600">Last sync: 2 hours ago</div>
+              </div>
+              <ArrowPathIcon className="h-4 w-4 text-blue-600" />
+            </button>
+            <button className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-left">
+              <div>
+                <div className="font-medium text-gray-900">Database Backup</div>
+                <div className="text-sm text-gray-600">Schedule: Daily 2:00 AM</div>
+              </div>
+              <div className="text-gray-400">→</div>
+            </button>
+            <button className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-left">
+              <div>
+                <div className="font-medium text-gray-900">System Settings</div>
+                <div className="text-sm text-gray-600">Configure system</div>
+              </div>
+              <div className="text-gray-400">→</div>
+            </button>
+          </div>
+        </div>
+
+        {/* Monitoring & Alerts */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <EyeIcon className="h-5 w-5 text-purple-600" />
+              <h4 className="font-semibold text-gray-900">Monitoring & Alerts</h4>
+            </div>
+          </div>
+          <div className="p-4 space-y-3">
+            <button className="w-full flex items-center justify-between p-3 bg-red-50 hover:bg-red-100 rounded-lg transition-colors text-left">
+              <div>
+                <div className="font-medium text-gray-900">Critical Issues (3)</div>
+                <div className="text-sm text-red-600">Require immediate attention</div>
+              </div>
+              <ExclamationCircleIcon className="h-4 w-4 text-red-600" />
+            </button>
+            <button className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-left">
+              <div>
+                <div className="font-medium text-gray-900">System Logs</div>
+                <div className="text-sm text-gray-600">View activity logs</div>
+              </div>
+              <div className="text-gray-400">→</div>
+            </button>
+            <button className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-left">
+              <div>
+                <div className="font-medium text-gray-900">Performance Metrics</div>
+                <div className="text-sm text-gray-600">Server performance</div>
+              </div>
+              <div className="text-gray-400">→</div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+
+      {/* Recent Activity & Tasks */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent System Activity */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-4 border-b border-gray-200">
+            <h4 className="font-semibold text-gray-900">Recent System Activity</h4>
+          </div>
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-900">Backup completed successfully</div>
+                <div className="text-xs text-gray-600">2 hours ago</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-900">New user registered: John Smith</div>
+                <div className="text-xs text-gray-600">4 hours ago</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg">
+              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-900">System maintenance scheduled</div>
+                <div className="text-xs text-gray-600">6 hours ago</div>
+              </div>
+            </div>
+            <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">View all activity →</button>
+          </div>
+        </div>
+
+        {/* Admin Tasks Queue */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-gray-900">Admin Tasks Queue</h4>
+              <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">5 Pending</span>
+            </div>
+          </div>
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <ExclamationCircleIcon className="h-4 w-4 text-red-600" />
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-900">Review failed sync errors</div>
+                <div className="text-xs text-red-600">High priority - 3 exchanges affected</div>
+              </div>
+              <button className="text-xs bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">Review</button>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <ClockIcon className="h-4 w-4 text-yellow-600" />
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-900">Approve user permissions</div>
+                <div className="text-xs text-yellow-600">2 users waiting for coordinator access</div>
+              </div>
+              <button className="text-xs bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700">Review</button>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <DocumentTextIcon className="h-4 w-4 text-blue-600" />
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-900">Update system templates</div>
+                <div className="text-xs text-blue-600">New compliance requirements</div>
+              </div>
+              <button className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">Update</button>
+            </div>
+            <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">View all tasks →</button>
+          </div>
         </div>
       </div>
     </div>

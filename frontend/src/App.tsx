@@ -26,17 +26,19 @@ import Preferences from './features/settings/pages/Preferences';
 import AuthTest from './features/auth/pages/AuthTest';
 import TemplateDocumentManager from './pages/TemplateDocumentManager';
 import { AdminGPT, PracticePantherManager } from './features/admin/components';
-import AuditLogFeed from './features/admin/components/AuditLogFeed';
+import AuditLogSystem from './features/admin/components/AuditLogSystem';
+import AgencyManagement from './pages/admin/AgencyManagement';
+import AgencyAssignments from './components/admin/AgencyAssignments';
 
 // Lazy load heavy components for better performance
-const Login = lazy(() => import('./features/auth/pages/Login'));
-const AdminDashboard = lazy(() => import('./features/dashboard/components/StandardizedAdminDashboard'));
-const ClientDashboard = lazy(() => import('./features/dashboard/components/StandardizedClientDashboard'));
-const CoordinatorDashboard = lazy(() => import('./features/dashboard/components/StandardizedCoordinatorDashboard'));
-const ThirdPartyDashboard = lazy(() => import('./features/dashboard/components/StandardizedThirdPartyDashboard'));
-const AgencyDashboard = lazy(() => import('./features/dashboard/components/StandardizedAgencyDashboard'));
-const InvitationSignup = lazy(() => import('./pages/InvitationSignup'));
-const AuthCallback = lazy(() => import('./pages/AuthCallback'));
+const Login = lazy(() => import(/* webpackChunkName: "login" */ './features/auth/pages/Login'));
+const AdminDashboard = lazy(() => import(/* webpackChunkName: "admin-dashboard" */ './features/dashboard/components/StandardizedAdminDashboard'));
+const ClientDashboard = lazy(() => import(/* webpackChunkName: "client-dashboard" */ './features/dashboard/components/StandardizedClientDashboard'));
+const CoordinatorDashboard = lazy(() => import(/* webpackChunkName: "coordinator-dashboard" */ './features/dashboard/components/StandardizedCoordinatorDashboard'));
+const ThirdPartyDashboard = lazy(() => import(/* webpackChunkName: "thirdparty-dashboard" */ './features/dashboard/components/StandardizedThirdPartyDashboard'));
+const AgencyDashboard = lazy(() => import(/* webpackChunkName: "agency-dashboard" */ './features/dashboard/components/StandardizedAgencyDashboard'));
+const InvitationSignup = lazy(() => import(/* webpackChunkName: "invitation" */ './pages/InvitationSignup'));
+const AuthCallback = lazy(() => import(/* webpackChunkName: "auth-callback" */ './pages/AuthCallback'));
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -90,15 +92,35 @@ const DashboardRoute: React.FC = () => {
   // Route to appropriate dashboard based on user role
   switch (user.role) {
     case 'admin':
-      return <AdminDashboard />;
+      return (
+        <RouteErrorBoundary routeName="AdminDashboard">
+          <AdminDashboard />
+        </RouteErrorBoundary>
+      );
     case 'coordinator':
-      return <CoordinatorDashboard />;
+      return (
+        <RouteErrorBoundary routeName="CoordinatorDashboard">
+          <CoordinatorDashboard />
+        </RouteErrorBoundary>
+      );
     case 'client':
-      return <ClientDashboard />;
+      return (
+        <RouteErrorBoundary routeName="ClientDashboard">
+          <ClientDashboard />
+        </RouteErrorBoundary>
+      );
     case 'third_party':
-      return <ThirdPartyDashboard />;
+      return (
+        <RouteErrorBoundary routeName="ThirdPartyDashboard">
+          <ThirdPartyDashboard />
+        </RouteErrorBoundary>
+      );
     case 'agency':
-      return <AgencyDashboard />;
+      return (
+        <RouteErrorBoundary routeName="AgencyDashboard">
+          <AgencyDashboard />
+        </RouteErrorBoundary>
+      );
     default:
       return <Navigate to="/login" replace />;
   }
@@ -350,8 +372,8 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
-                      <RouteErrorBoundary routeName="AuditLogFeed">
-                        <AuditLogFeed />
+                      <RouteErrorBoundary routeName="AuditLogSystem">
+                        <AuditLogSystem />
                       </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
@@ -391,6 +413,45 @@ const App: React.FC = () => {
                     <Layout>
                       <RouteErrorBoundary routeName="PracticePantherManager">
                         <PracticePantherManager />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/admin/agencies" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <RouteErrorBoundary routeName="AgencyManagement">
+                        <AgencyManagement />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/admin/agency-assignments" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <RouteErrorBoundary routeName="AgencyAssignments">
+                        <AgencyAssignments />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/admin/agencies" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <RouteErrorBoundary routeName="AgencyManagement">
+                        <AgencyManagement />
                       </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>

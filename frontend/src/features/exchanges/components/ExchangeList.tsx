@@ -65,16 +65,16 @@ const FilterChip: React.FC<{
 );
 
 // Exchange Stats Component - Memoized
-const ExchangeStats: React.FC<{ exchanges: Exchange[] }> = React.memo(({ exchanges }) => {
+const ExchangeStats: React.FC<{ exchanges: Exchange[]; total?: number }> = React.memo(({ exchanges, total }) => {
   const stats = useMemo(() => ({
-    total: exchanges.length,
+    total: total || exchanges.length,
     active: exchanges.filter(e => e.status === '45D' || e.status === '180D' || e.status === 'In Progress').length,
     completed: exchanges.filter(e => e.status === 'COMPLETED' || e.status === 'Completed').length,
     pending: exchanges.filter(e => e.status === 'PENDING' || e.status === 'Draft').length,
     totalValue: exchanges.reduce((sum, e) => sum + (e.exchangeValue || 0), 0),
     avgProgress: exchanges.length > 0 ? 
       exchanges.reduce((sum, e) => sum + (e.progress || 0), 0) / exchanges.length : 0
-  }), [exchanges]);
+  }), [exchanges, total]);
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
@@ -359,8 +359,8 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
           <div>
             <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
             <p className="text-gray-600 text-sm mt-1">
-              {filteredExchanges.length} of {exchanges.length} exchanges
-              {user?.role === 'admin' && exchanges.length >= 100 && (
+              {filteredExchanges.length} of {pagination?.total || exchanges.length} exchanges
+              {user?.role === 'admin' && (pagination?.total || exchanges.length) >= 100 && (
                 <span className="ml-2 text-green-600 text-xs font-medium bg-green-100 px-2 py-1 rounded-full">
                   Admin View
                 </span>
@@ -405,7 +405,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
               <div className="text-xs text-gray-600">Avg Progress</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">{exchanges.length}</div>
+              <div className="text-2xl font-bold text-gray-900">{pagination?.total || exchanges.length}</div>
               <div className="text-xs text-gray-600">Total</div>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
   UserIcon, 
@@ -13,15 +13,47 @@ import {
   ComputerDesktopIcon,
   ShieldCheckIcon,
   EyeIcon,
-  BoltIcon
+  BoltIcon,
+  BuildingOfficeIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline';
 import { useUserProfile } from '../../../hooks/useUserProfile';
 import { UserProfileService } from '../../../services/userProfileService';
 import { EnhancedStatCard } from '../../dashboard/components/SharedDashboardComponents';
 
+interface AgencyAssignment {
+  id: string;
+  agency_name: string;
+  agency_email: string;
+  agency_company?: string;
+  assignment_date: string;
+  can_view_performance: boolean;
+  performance_score: number;
+}
+
 const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const { profile, summary, loading, error, refreshAll } = useUserProfile(userId);
+  const [agencyAssignments, setAgencyAssignments] = useState<AgencyAssignment[]>([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(false);
+
+  // Load agency assignments for third party users
+  useEffect(() => {
+    // TODO: Implement agency assignments for third party users
+    // This feature requires contact_id mapping which is not yet implemented
+  }, [profile]);
+
+  const loadAgencyAssignments = async () => {
+    try {
+      setLoadingAssignments(true);
+      // TODO: Implement agency assignments API call
+      console.log('Agency assignments feature not yet implemented');
+    } catch (error) {
+      console.error('Error loading agency assignments:', error);
+    } finally {
+      setLoadingAssignments(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -118,7 +150,7 @@ const UserProfile: React.FC = () => {
         
         <EnhancedStatCard
           title="System Actions"
-          value={profile.auditActivity.totalActions}
+          value={profile.auditActivity?.totalActions || 0}
           icon={BoltIcon}
           color="purple"
           subtitle="Total activity"
@@ -126,7 +158,7 @@ const UserProfile: React.FC = () => {
         
         <EnhancedStatCard
           title="Recent Activity"
-          value={profile.auditActivity.actionsLast30Days}
+          value={profile.auditActivity?.actionsLast30Days || 0}
           icon={CalendarIcon}
           color="yellow"
           subtitle="Last 30 days"
@@ -271,7 +303,7 @@ const UserProfile: React.FC = () => {
           <div>
             <h4 className="text-md font-medium text-gray-900 mb-3">Most Used Features</h4>
             <div className="space-y-2">
-              {profile.auditActivity.systemUsageStats.mostUsedFeatures.map((feature, index) => (
+              {(profile.auditActivity?.systemUsageStats?.mostUsedFeatures || []).map((feature, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">
                     {UserProfileService.formatEntityType(feature.feature)}
@@ -288,7 +320,7 @@ const UserProfile: React.FC = () => {
                   </div>
                 </div>
               ))}
-              {profile.auditActivity.systemUsageStats.mostUsedFeatures.length === 0 && (
+              {(!profile.auditActivity?.systemUsageStats?.mostUsedFeatures || profile.auditActivity.systemUsageStats.mostUsedFeatures.length === 0) && (
                 <p className="text-sm text-gray-500">No feature usage data available</p>
               )}
             </div>
@@ -301,19 +333,19 @@ const UserProfile: React.FC = () => {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Active Days</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {profile.auditActivity.systemUsageStats.activeDays}
+                  {profile.auditActivity?.systemUsageStats?.activeDays || 0}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Avg Actions/Day</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {profile.auditActivity.systemUsageStats.averageActionsPerDay}
+                  {profile.auditActivity?.systemUsageStats?.averageActionsPerDay || 0}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Last Active</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {profile.auditActivity.systemUsageStats.lastActiveDate 
+                  {profile.auditActivity?.systemUsageStats?.lastActiveDate 
                     ? UserProfileService.getTimePeriodDisplay(profile.auditActivity.systemUsageStats.lastActiveDate)
                     : 'Never'
                   }
@@ -331,7 +363,7 @@ const UserProfile: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
         </div>
         <div className="space-y-3 max-h-96 overflow-y-auto">
-          {profile.auditActivity.recentActivity.map((activity) => (
+          {(profile.auditActivity?.recentActivity || []).map((activity) => (
             <div key={activity.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
               <div className="flex-shrink-0">
                 <div className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${UserProfileService.getActionColor(activity.action)}`}>
@@ -359,21 +391,21 @@ const UserProfile: React.FC = () => {
               </div>
             </div>
           ))}
-          {profile.auditActivity.recentActivity.length === 0 && (
+          {(!profile.auditActivity?.recentActivity || profile.auditActivity.recentActivity.length === 0) && (
             <p className="text-sm text-gray-500 text-center py-4">No recent activity</p>
           )}
         </div>
       </div>
 
       {/* Login History */}
-      {profile.auditActivity.loginHistory.length > 0 && (
+      {(profile.auditActivity?.loginHistory || []).length > 0 && (
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex items-center mb-4">
             <ShieldCheckIcon className="h-6 w-6 text-gray-500 mr-3" />
             <h3 className="text-lg font-semibold text-gray-900">Login History</h3>
           </div>
           <div className="space-y-3">
-            {profile.auditActivity.loginHistory.map((login, index) => (
+            {(profile.auditActivity?.loginHistory || []).map((login, index) => (
               <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <div className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${UserProfileService.getActionColor(login.action)}`}>
@@ -392,15 +424,103 @@ const UserProfile: React.FC = () => {
         </div>
       )}
 
+      {/* Agency Assignments - Only for third party users */}
+      {profile.user.role === 'third_party' && (
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              <BuildingOfficeIcon className="h-6 w-6 text-gray-500 mr-3" />
+              <h3 className="text-lg font-semibold text-gray-900">Agency Assignments</h3>
+            </div>
+            {loadingAssignments && (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+            )}
+          </div>
+          
+          {agencyAssignments.length > 0 ? (
+            <div className="space-y-3">
+              {agencyAssignments.map((assignment) => (
+                <div key={assignment.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <BuildingOfficeIcon className="h-5 w-5 text-blue-600" />
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        <h4 className="text-sm font-medium text-gray-900">
+                          {assignment.agency_name}
+                        </h4>
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                          assignment.can_view_performance 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {assignment.can_view_performance ? 'Performance Monitoring' : 'Basic Access'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{assignment.agency_email}</p>
+                      {assignment.agency_company && (
+                        <p className="text-xs text-gray-500">{assignment.agency_company}</p>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">
+                        Assigned: {new Date(assignment.assignment_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="text-center">
+                      <div className={`text-lg font-bold ${
+                        assignment.performance_score >= 80 ? 'text-green-600' :
+                        assignment.performance_score >= 60 ? 'text-yellow-600' :
+                        'text-red-600'
+                      }`}>
+                        {assignment.performance_score}
+                      </div>
+                      <div className="text-xs text-gray-500">Performance Score</div>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <UserGroupIcon className="h-5 w-5 text-purple-500" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center text-sm text-blue-700">
+                  <EyeIcon className="h-4 w-4 mr-2" />
+                  <span>
+                    You are assigned to <strong>{agencyAssignments.length}</strong> {agencyAssignments.length === 1 ? 'agency' : 'agencies'} 
+                    who can monitor your exchange performance and portfolio.
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <BuildingOfficeIcon className="mx-auto h-12 w-12 text-gray-400 mb-3" />
+              <h4 className="text-sm font-medium text-gray-900 mb-2">No Agency Assignments</h4>
+              <p className="text-sm text-gray-500">
+                You are not currently assigned to any agencies for performance monitoring.
+              </p>
+              <p className="text-xs text-gray-400 mt-2">
+                Contact your administrator if you need to be assigned to an agency.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Action Breakdown */}
-      {Object.keys(profile.auditActivity.actionBreakdown).length > 0 && (
+      {Object.keys(profile.auditActivity?.actionBreakdown || {}).length > 0 && (
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex items-center mb-4">
             <EyeIcon className="h-6 w-6 text-gray-500 mr-3" />
             <h3 className="text-lg font-semibold text-gray-900">Action Breakdown</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(profile.auditActivity.actionBreakdown)
+            {Object.entries(profile.auditActivity?.actionBreakdown || {})
               .sort(([,a], [,b]) => b - a)
               .slice(0, 9)
               .map(([action, count]) => (

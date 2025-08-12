@@ -299,6 +299,56 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       });
       window.dispatchEvent(event);
     });
+
+    // Task created
+    socket.on('task_created', (data: any) => {
+      
+      
+      const event = new CustomEvent('socket_task_created', {
+        detail: data
+      });
+      window.dispatchEvent(event);
+    });
+
+    // Task deleted
+    socket.on('task_deleted', (data: any) => {
+      
+      
+      const event = new CustomEvent('socket_task_deleted', {
+        detail: data
+      });
+      window.dispatchEvent(event);
+    });
+
+    // Document uploaded
+    socket.on('document_uploaded', (data: any) => {
+      
+      
+      const event = new CustomEvent('socket_document_uploaded', {
+        detail: data
+      });
+      window.dispatchEvent(event);
+    });
+
+    // Participant added
+    socket.on('participant_added', (data: any) => {
+      
+      
+      const event = new CustomEvent('socket_participant_added', {
+        detail: data
+      });
+      window.dispatchEvent(event);
+    });
+
+    // Participant removed
+    socket.on('participant_removed', (data: any) => {
+      
+      
+      const event = new CustomEvent('socket_participant_removed', {
+        detail: data
+      });
+      window.dispatchEvent(event);
+    });
   }, [setTypingUsers]); // Add dependencies for useCallback
 
   // Initialize socket connection

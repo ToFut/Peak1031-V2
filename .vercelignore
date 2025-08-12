@@ -1,0 +1,60 @@
+# Development files
+*.log
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Database files
+database.sqlite
+*.db
+
+# Test files
+test-*
+*test.js
+tests/
+
+# Documentation
+*.md
+docs/
+README.md
+
+# Development scripts
+scripts/
+migrations/
+seeds/
+
+# Cache and temporary files
+node_modules/.cache
+.cache
+*.tmp
+*.temp
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Uploads and generated content
+uploads/
+generated/
+previews/
+
+# Backup files
+*.backup
+*.bak
+*.bak2
+
+# V2 repo (if it exists)
+V2-repo/
+
+# Large binary files
+*.pdf
+*.docx
+*.xlsx

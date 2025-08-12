@@ -890,13 +890,15 @@ router.post('/generate', async (req, res) => {
     const timestamp = Date.now();
     const sanitizedExchangeName = exchange.exchangeName?.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-') || exchange.id;
     const sanitizedTemplateName = template.name.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-');
-    const generatedFileName = `generated/${sanitizedExchangeName}-${sanitizedTemplateName}-${timestamp}${fileExtension}`;
+    // For DOCX files processed to text, change extension to .txt
+    const outputExtension = fileExtension === '.docx' ? '.txt' : fileExtension;
+    const generatedFileName = `generated/${sanitizedExchangeName}-${sanitizedTemplateName}-${timestamp}${outputExtension}`;
 
     // Upload processed document to storage
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('documents')
       .upload(generatedFileName, processedBuffer, {
-        contentType: getContentType(fileExtension)
+        contentType: getContentType(outputExtension)
       });
 
     if (uploadError) {
@@ -1139,13 +1141,15 @@ router.post('/check-auto-generation', async (req, res) => {
         const timestamp = Date.now();
         const sanitizedExchangeName = exchange.exchangeName?.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-') || exchange.id;
         const sanitizedTemplateName = template.name.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-');
-        const generatedFileName = `generated/${sanitizedExchangeName}-${sanitizedTemplateName}-${timestamp}${fileExtension}`;
+        // For DOCX files processed to text, change extension to .txt
+        const outputExtension = fileExtension === '.docx' ? '.txt' : fileExtension;
+        const generatedFileName = `generated/${sanitizedExchangeName}-${sanitizedTemplateName}-${timestamp}${outputExtension}`;
 
         // Upload processed document to storage
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('documents')
           .upload(generatedFileName, processedBuffer, {
-            contentType: getContentType(fileExtension)
+            contentType: getContentType(outputExtension)
           });
 
         if (uploadError) {
@@ -1229,11 +1233,36 @@ function buildReplacementData(exchange, additionalData = {}) {
   const clientEmail = exchange.client?.email || exchange.client_email || '';
   const clientPhone = exchange.client?.phone || exchange.client_phone || '';
   const clientCompany = exchange.client?.company || exchange.client_company || '';
+  const clientAddress = exchange.client?.address || exchange.client_address || '';
+  const clientStreet = exchange.client?.street || exchange.client?.street1 || exchange.client_street || '';
+  const clientCity = exchange.client?.city || exchange.client_city || '';
+  const clientState = exchange.client?.state || exchange.client?.province_state || exchange.client_state || '';
+  const clientZip = exchange.client?.zip || exchange.client?.zip_code || exchange.client?.postal_code || exchange.client_zip || '';
   
   const data = {
-    // Matter/Exchange fields
+    // Matter/Exchange fields (matching template placeholders)
     '#Matter.Number#': exchange.exchange_number || exchange.exchangeNumber || exchange.id,
     '#Matter.Name#': exchange.exchange_name || exchange.exchangeName || exchange.name || '',
+    '#Matter.Client Vesting#': exchange.client_vesting || exchange.vesting || clientName || '',
+    '#Matter.Closeout Amount#': formatCurrency(exchange.closeout_amount || exchange.exchange_value || exchange.exchangeValue || 0),
+    '#Matter.Client 1 Signatory Title#': exchange.client1_signatory_title || 'Exchanger',
+    '#Matter.Client 2 Signatory Title#': exchange.client2_signatory_title || '',
+    '#Matter.Client 2 Name#': exchange.client2_name || '',
+    
+    // Contact fields (matching template placeholders)
+    '#Contact.FirstName#': clientFirstName || 'N/A',
+    '#Contact.LastName#': clientLastName || 'N/A',
+    '#Contact.Street1#': clientStreet || clientAddress || 'N/A',
+    '#Contact.City#': clientCity || 'N/A',
+    '#Contact.ProvinceState#': clientState || 'N/A',
+    '#Contact.ZipPostalCode#': clientZip || 'N/A',
+    '#Contact.HomeNumber#': clientPhone || 'N/A',
+    '#Contact.Email#': clientEmail || 'N/A',
+    '#Contact.2nd Signatory Address#': exchange.client2_address || '',
+    '#Contact.2nd Signatory Phone#': exchange.client2_phone || '',
+    '#Contact.2nd Signatory Email#': exchange.client2_email || '',
+    
+    // Additional fields for other templates
     '#Exchange.ID#': exchange.id,
     '#Exchange.Number#': exchange.exchange_number || exchange.exchangeNumber || '',
     '#Exchange.Name#': exchange.exchange_name || exchange.exchangeName || exchange.name || '',
@@ -1241,7 +1270,7 @@ function buildReplacementData(exchange, additionalData = {}) {
     '#Exchange.Status#': exchange.status || '',
     '#Exchange.Value#': formatCurrency(exchange.exchange_value || exchange.exchangeValue),
     
-    // Client fields
+    // Client fields (alternative format)
     '#Client.Name#': clientName || `${clientFirstName} ${clientLastName}`.trim() || 'N/A',
     '#Client.FirstName#': clientFirstName || 'N/A',
     '#Client.LastName#': clientLastName || 'N/A',
@@ -1357,17 +1386,44 @@ async function processPdfTemplate(buffer, replacementData) {
   return buffer;
 }
 
-// Helper function to process DOCX templates (placeholder implementation)
+// Helper function to process DOCX templates
 async function processDocxTemplate(buffer, replacementData) {
-  // For now, return the original buffer
-  // In a production system, you would use docxtemplater or similar to:
-  // 1. Parse the DOCX file
-  // 2. Find text with #field# markers
-  // 3. Replace them with actual values
-  // 4. Return the modified DOCX buffer
-  
-  console.log('📝 DOCX processing would replace:', Object.keys(replacementData).length, 'fields');
-  return buffer;
+  try {
+    console.log('📝 Processing DOCX template with placeholder replacement...');
+    
+    // Extract text content from the DOCX
+    const mammoth = require('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    let content = result.value;
+    
+    console.log('📋 Original content length:', content.length);
+    console.log('🔍 Available placeholders:', Object.keys(replacementData).slice(0, 10));
+    
+    // Replace placeholders in the content
+    let replacementCount = 0;
+    Object.entries(replacementData).forEach(([placeholder, value]) => {
+      const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+      const beforeReplace = content;
+      content = content.replace(regex, String(value || ''));
+      if (beforeReplace !== content) {
+        replacementCount++;
+        console.log(`✅ Replaced ${placeholder} with "${value}"`);
+      }
+    });
+    
+    console.log(`📊 Made ${replacementCount} placeholder replacements`);
+    
+    // Convert the processed text back to a buffer
+    // Note: This creates a plain text file, not a DOCX with formatting
+    // For full DOCX processing with format preservation, use docxtemplater
+    const processedBuffer = Buffer.from(content, 'utf8');
+    
+    return processedBuffer;
+  } catch (error) {
+    console.error('❌ Error processing DOCX template:', error);
+    // Return original buffer if processing fails
+    return buffer;
+  }
 }
 
 module.exports = router;

@@ -468,6 +468,36 @@ router.post('/', authenticateToken, checkPermission('documents', 'write'), uploa
 
     const document = await databaseService.createDocument(documentData);
 
+    // Emit real-time event for document upload
+    const io = req.app.get('io');
+    if (io) {
+      console.log(`📡 Emitting document_uploaded to exchange_${exchangeId}`);
+      io.to(`exchange_${exchangeId}`).emit('document_uploaded', {
+        exchangeId: exchangeId,
+        documentId: document.id,
+        document: document,
+        uploadedBy: req.user.id
+      });
+      
+      // Also emit to all connected users in the exchange (fallback)
+      const participants = await databaseService.getExchangeParticipants({
+        where: { exchange_id: exchangeId }
+      });
+      
+      participants.forEach(participant => {
+        if (participant.user_id) {
+          io.to(`user_${participant.user_id}`).emit('document_uploaded', {
+            exchangeId: exchangeId,
+            documentId: document.id,
+            document: document,
+            uploadedBy: req.user.id
+          });
+        }
+      });
+    } else {
+      console.warn('⚠️ Socket.IO not available for real-time document upload notification');
+    }
+
     res.status(201).json({ 
       data: document,
       message: uploadMessage,
@@ -948,7 +978,7 @@ router.post('/bulk-pin-update', authenticateToken, checkPermission('documents', 
 // Get available templates
 router.get('/templates', authenticateToken, async (req, res) => {
   try {
-    console.log('Templates endpoint called by:', req.user?.email);
+    console.log('📄 Documents templates endpoint called by:', req.user?.email);
     
     // Fetch templates from Supabase
     const templates = await supabaseService.select('document_templates', {

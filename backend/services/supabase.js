@@ -196,12 +196,39 @@ class SupabaseService {
 
       // Apply where conditions
       if (where && Object.keys(where).length > 0) {
+        // Check for Sequelize Op.in operator
+        const Op = require('sequelize').Op;
+        
         Object.keys(where).forEach(key => {
-          if (key === 'id' && where[key].in) {
-            // Handle IN clause for id
-            query = query.in('id', where[key].in);
+          if (key === Op.or) {
+            // Handle OR conditions - for now skip as it's complex
+            console.log('⚠️ Op.or conditions in getExchanges not fully supported yet');
+          } else if (key === 'id') {
+            // Check if it's an Op.in clause
+            if (where[key] && where[key][Op.in]) {
+              // Handle IN clause for id using Sequelize operator
+              const ids = where[key][Op.in];
+              if (Array.isArray(ids) && ids.length > 0) {
+                query = query.in('id', ids);
+              } else {
+                // Empty array means no results
+                query = query.eq('id', null);
+              }
+            } else if (where[key] && where[key].in) {
+              // Handle plain .in property
+              query = query.in('id', where[key].in);
+            } else if (where[key] === null) {
+              // Handle null id (no results)
+              query = query.is('id', null);
+            } else {
+              // Regular equality
+              query = query.eq(key, where[key]);
+            }
           } else {
-            query = query.eq(key, where[key]);
+            // Regular equality for other fields
+            if (where[key] !== undefined) {
+              query = query.eq(key, where[key]);
+            }
           }
         });
       }
@@ -209,12 +236,15 @@ class SupabaseService {
       // Apply ordering
       query = query.order(orderBy.column, { ascending: orderBy.ascending });
 
-      // Apply limit and offset (reduced default to prevent timeouts)
-      const finalLimit = limit || 100; // Reduced from 1000 to 100
-      query = query.limit(finalLimit);
+      // Apply limit and offset (allow up to 5000 for admin users)
+      const finalLimit = limit || 100; // Default 100 for performance
+      
+      // For very large limits, we may hit Supabase's row limit, so cap at 5000
+      const cappedLimit = Math.min(finalLimit, 5000);
+      query = query.limit(cappedLimit);
       
       if (offset !== undefined) {
-        query = query.range(offset, offset + finalLimit - 1);
+        query = query.range(offset, offset + cappedLimit - 1);
       }
 
       const { data, error } = await query;
@@ -550,11 +580,20 @@ class SupabaseService {
       if (where.exchangeId) {
         query = query.eq('exchange_id', where.exchangeId);
       }
+      if (where.exchange_id) {
+        query = query.eq('exchange_id', where.exchange_id);
+      }
       if (where.senderId) {
         query = query.eq('sender_id', where.senderId);
       }
+      if (where.sender_id) {
+        query = query.eq('sender_id', where.sender_id);
+      }
       if (where.content) {
         query = query.ilike('content', `%${where.content}%`);
+      }
+      if (where.created_at && where.created_at.lt) {
+        query = query.lt('created_at', where.created_at.lt.toISOString());
       }
 
       // Apply ordering
@@ -587,9 +626,33 @@ class SupabaseService {
       
       // Transform messages and fetch attachments
       if (messages.length > 0) {
+        // First, get all unique sender IDs
+        const senderIds = [...new Set(messages.map(m => m.sender_id).filter(Boolean))];
+        
+        // Fetch sender information from people table
+        let senderMap = {};
+        if (senderIds.length > 0) {
+          const { data: senders, error: senderError } = await this.client
+            .from('people')
+            .select('id, first_name, last_name, email, role')
+            .in('id', senderIds);
+          
+          if (!senderError && senders) {
+            senderMap = senders.reduce((acc, sender) => {
+              acc[sender.id] = sender;
+              return acc;
+            }, {});
+            console.log(`✅ Loaded sender information for ${Object.keys(senderMap).length} users`);
+          } else {
+            console.warn('⚠️ Could not load sender information:', senderError?.message);
+          }
+        }
+        
         const enrichedMessages = await Promise.all(messages.map(async (message) => {
-          // Add users property for backward compatibility
-          if (message.sender) {
+          // Add sender information
+          if (message.sender_id && senderMap[message.sender_id]) {
+            message.sender = senderMap[message.sender_id];
+            // Add users property for backward compatibility
             message.users = message.sender;
           }
           
@@ -1114,14 +1177,58 @@ class SupabaseService {
     try {
       const { where = {}, orderBy = { column: 'created_at', ascending: false } } = options;
       
-      // Simplified query to avoid relationship errors
+      // Check if we have an Op.or condition (from Sequelize-style query)
+      const Op = require('sequelize').Op;
+      if (where[Op.or]) {
+        // Handle OR conditions
+        const orConditions = where[Op.or];
+        const results = [];
+        
+        // Execute each OR condition separately and combine results
+        for (const condition of orConditions) {
+          let query = this.client
+            .from('exchange_participants')
+            .select('*');
+          
+          // Apply the condition
+          if (condition.user_id) {
+            query = query.eq('user_id', condition.user_id);
+          }
+          if (condition.contact_id) {
+            query = query.eq('contact_id', condition.contact_id);
+          }
+          if (condition.exchange_id) {
+            query = query.eq('exchange_id', condition.exchange_id);
+          }
+          
+          const { data, error } = await query;
+          if (!error && data) {
+            results.push(...data);
+          }
+        }
+        
+        // Deduplicate results by ID
+        const uniqueResults = Array.from(
+          new Map(results.map(item => [item.id, item])).values()
+        );
+        
+        return uniqueResults;
+      }
+      
+      // Original simple query logic
       let query = this.client
         .from('exchange_participants')
         .select('*');
 
       // Apply where conditions
-      if (where.exchangeId) {
-        query = query.eq('exchange_id', where.exchangeId);
+      if (where.exchangeId || where.exchange_id) {
+        query = query.eq('exchange_id', where.exchangeId || where.exchange_id);
+      }
+      if (where.user_id) {
+        query = query.eq('user_id', where.user_id);
+      }
+      if (where.contact_id) {
+        query = query.eq('contact_id', where.contact_id);
       }
 
       // Apply ordering

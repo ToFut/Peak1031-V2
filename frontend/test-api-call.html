@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test API Call</title>
+</head>
+<body>
+    <h1>Test Frontend to Backend API Call</h1>
+    <button onclick="testLogin()">Test Login</button>
+    <button onclick="testExchanges()">Test Exchanges</button>
+    <div id="output"></div>
+
+    <script>
+        let token = null;
+        
+        function log(message) {
+            const output = document.getElementById('output');
+            output.innerHTML += '<br>' + message;
+            console.log(message);
+        }
+        
+        async function testLogin() {
+            try {
+                log('🔐 Testing login...');
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@peak1031.com',
+                        password: 'admin123'
+                    })
+                });
+                
+                log('Login response status: ' + response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    token = data.token;
+                    log('✅ Login successful, token: ' + token?.substring(0, 20) + '...');
+                    
+                    // Store in localStorage like the app does
+                    localStorage.setItem('token', token);
+                } else {
+                    log('❌ Login failed');
+                }
+            } catch (error) {
+                log('❌ Login error: ' + error.message);
+            }
+        }
+        
+        async function testExchanges() {
+            try {
+                log('🏢 Testing exchanges...');
+                
+                const currentToken = localStorage.getItem('token');
+                if (!currentToken) {
+                    log('❌ No token available, login first');
+                    return;
+                }
+                
+                const response = await fetch('/api/exchanges', {
+                    headers: {
+                        'Authorization': 'Bearer ' + currentToken
+                    }
+                });
+                
+                log('Exchanges response status: ' + response.status);
+                log('Response headers: ' + JSON.stringify(Object.fromEntries(response.headers.entries())));
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('✅ Exchanges response: ' + JSON.stringify(data, null, 2));
+                    log('📊 Found ' + (data.exchanges ? data.exchanges.length : 'unknown') + ' exchanges');
+                } else {
+                    const errorText = await response.text();
+                    log('❌ Exchanges failed: ' + errorText);
+                }
+            } catch (error) {
+                log('❌ Exchanges error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

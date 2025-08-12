@@ -4,7 +4,9 @@ import { useAuth } from '../hooks/useAuth';
 import { useRolePermissions } from '../hooks/useRolePermissions';
 import { useSocket } from '../hooks/useSocket';
 import { useDelayedTooltip } from '../hooks/useDelayedTooltip';
+import { useEnhancedNotifications } from '../hooks/useEnhancedNotifications';
 import { apiService } from '../services/api';
+import { NotificationContainer } from './shared/NotificationPopup';
 
 // Icons (using heroicons or lucide-react)
 import {
@@ -101,6 +103,16 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   const { user, logout } = useAuth();
   const { ui, getSidebarItems } = useRolePermissions();
   const { socket, connectionStatus } = useSocket();
+  const { 
+    notifications: enhancedNotifications, 
+    popupNotifications, 
+    unreadCount: enhancedUnreadCount, 
+    removePopupNotification,
+    requestBrowserPermission,
+    browserPermission,
+    soundEnabled,
+    toggleSound
+  } = useEnhancedNotifications();
 
   // Debug: Log user data
   
@@ -245,6 +257,20 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
         href: '/admin/gpt',
         icon: SparklesIcon,
         iconSolid: SparklesIconSolid,
+        roles: ['admin']
+      },
+      agency_assignments: {
+        name: 'Agency Assignments',
+        href: '/admin/agency-assignments',
+        icon: BuildingOfficeIcon,
+        iconSolid: BuildingOfficeIconSolid,
+        roles: ['admin']
+      },
+      agencies: {
+        name: 'Agency Management',
+        href: '/admin/agencies',
+        icon: BuildingOfficeIcon,
+        iconSolid: BuildingOfficeIconSolid,
         roles: ['admin']
       },
       settings: {
@@ -752,9 +778,9 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
                   className="p-2 rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 relative border border-gray-200"
                 >
                   <BellIcon className="h-5 w-5 sm:h-6 sm:w-6" />
-                  {unreadCount > 0 && (
+                  {enhancedUnreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-500 text-white min-w-[18px] h-[18px] justify-center">
-                      {unreadCount > 9 ? '9+' : unreadCount}
+                      {enhancedUnreadCount > 9 ? '9+' : enhancedUnreadCount}
                     </span>
                   )}
                 </button>
@@ -763,51 +789,94 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
                 {notificationsOpen && (
                   <div className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
                     <div className="py-1 max-h-96 overflow-y-auto">
-                      <div className="px-4 py-2 border-b border-gray-200">
+                      <div className="px-4 py-2 border-b border-gray-200 flex items-center justify-between">
                         <h3 className="text-sm font-medium text-gray-900">Notifications</h3>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => requestBrowserPermission()}
+                            className={`text-xs px-2 py-1 rounded ${
+                              browserPermission === 'granted' 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                            title={browserPermission === 'granted' ? 'Browser notifications enabled' : 'Enable browser notifications'}
+                          >
+                            {browserPermission === 'granted' ? '🔔' : '🔕'}
+                          </button>
+                          <button
+                            onClick={toggleSound}
+                            className={`text-xs px-2 py-1 rounded ${
+                              soundEnabled 
+                                ? 'bg-blue-100 text-blue-800' 
+                                : 'bg-gray-100 text-gray-600'
+                            }`}
+                            title={soundEnabled ? 'Sound enabled' : 'Sound disabled'}
+                          >
+                            {soundEnabled ? '🔊' : '🔇'}
+                          </button>
+                        </div>
                       </div>
-                      {notifications.length === 0 ? (
+                      {enhancedNotifications.length === 0 ? (
                         <div className="px-4 py-8 text-center text-gray-500">
                           No notifications
                         </div>
                       ) : (
-                        (notifications || []).slice(0, 10).map((notification) => (
+                        enhancedNotifications.slice(0, 10).map((notification) => (
                           <div
                             key={notification.id}
-                            className={`px-4 py-3 hover:bg-gray-50 cursor-pointer ${
-                              !notification.read ? 'bg-blue-50' : ''
-                            }`}
-                            onClick={() => !notification.read && markNotificationAsRead(notification.id)}
+                            className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                            onClick={() => {
+                              if (notification.actionUrl) {
+                                navigate(notification.actionUrl);
+                                setNotificationsOpen(false);
+                              }
+                            }}
                           >
                             <div className="flex items-start">
                               <div className="flex-shrink-0 mr-3 mt-0.5">
                                 {getNotificationIcon(notification.type)}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className={`text-sm ${!notification.read ? 'font-medium' : ''} text-gray-900`}>
+                                <p className="text-sm font-medium text-gray-900">
                                   {notification.title}
                                 </p>
-                                <p className="text-sm text-gray-500 mt-1">
+                                <p className="text-sm text-gray-600 mt-1">
                                   {notification.message}
                                 </p>
-                                <p className="text-xs text-gray-400 mt-1">
-                                  {new Date(notification.created_at).toLocaleString()}
-                                </p>
+                                <div className="flex items-center justify-between mt-1">
+                                  <p className="text-xs text-gray-400">
+                                    {new Date(notification.timestamp).toLocaleString()}
+                                  </p>
+                                  <span className={`text-xs px-2 py-1 rounded-full ${
+                                    notification.category === 'task' ? 'bg-green-100 text-green-800' :
+                                    notification.category === 'document' ? 'bg-blue-100 text-blue-800' :
+                                    notification.category === 'participant' ? 'bg-purple-100 text-purple-800' :
+                                    notification.category === 'message' ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {notification.category}
+                                  </span>
+                                </div>
+                                {notification.actionUrl && (
+                                  <p className="text-xs text-blue-600 hover:text-blue-800 mt-1">
+                                    Click to view →
+                                  </p>
+                                )}
                               </div>
-                              {!notification.read && (
-                                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                              )}
                             </div>
                           </div>
                         ))
                       )}
-                      {notifications.length > 10 && (
+                      {enhancedNotifications.length > 10 && (
                         <div className="px-4 py-2 border-t border-gray-200">
                           <button
-                            onClick={() => navigate('/notifications')}
+                            onClick={() => {
+                              navigate('/notifications');
+                              setNotificationsOpen(false);
+                            }}
                             className="text-sm text-blue-600 hover:text-blue-500"
                           >
-                            View all notifications
+                            View all {enhancedNotifications.length} notifications
                           </button>
                         </div>
                       )}
@@ -921,6 +990,12 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
           }}
         />
       )}
+
+      {/* Popup notifications */}
+      <NotificationContainer 
+        notifications={popupNotifications}
+        onRemove={removePopupNotification}
+      />
     </div>
   );
 };

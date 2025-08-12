@@ -4,18 +4,21 @@ require('dotenv').config();
 // Set environment for production
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 
-// Import and create the Express server
+// Import the PeakServer class
 const PeakServer = require('../backend/server');
 
 // Global app instance for serverless reuse
-let serverInstance;
+let appInstance;
 
-function createApp() {
-  if (!serverInstance) {
-    serverInstance = new PeakServer();
+function getApp() {
+  if (!appInstance) {
+    console.log('🚀 Initializing Peak1031 serverless function...');
+    const server = new PeakServer();
+    appInstance = server.app;
+    console.log('✅ Peak1031 serverless function ready');
   }
-  return serverInstance.app;
+  return appInstance;
 }
 
 // Export the Express app for Vercel
-module.exports = createApp();
+module.exports = getApp();

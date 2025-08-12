@@ -4,6 +4,7 @@
  */
 
 const supabaseService = require('./supabase');
+const rbacService = require('./rbacService');
 
 class AnalyticsService {
   constructor() {
@@ -12,40 +13,59 @@ class AnalyticsService {
   }
 
   /**
-   * Get comprehensive financial overview
+   * Get comprehensive financial overview with RBAC
    */
-  async getFinancialOverview() {
-    const cacheKey = 'financial_overview';
+  async getFinancialOverview(options = {}) {
+    const { user } = options;
+    const cacheKey = user ? `financial_overview_${user.role}_${user.id}` : 'financial_overview';
     const cached = this.getFromCache(cacheKey);
     if (cached) return cached;
 
     try {
-      // First get the total count
-      const { count: totalCount, error: countError } = await supabaseService.client
-        .from('exchanges')
-        .select('id', { count: 'exact', head: true });
+      let totalCount;
+      let exchanges;
 
-      if (countError) throw countError;
+      if (user) {
+        // Use RBAC to get user's authorized exchanges
+        const rbacResult = await rbacService.getExchangesForUser(user, {
+          limit: 1000, // Sample size for analysis
+          orderBy: { column: 'created_at', ascending: false }
+        });
+        
+        totalCount = rbacResult.count;
+        exchanges = rbacResult.data || [];
+        
+        console.log(`📊 Analytics: Using RBAC for ${user.role} - ${totalCount} total exchanges`);
+      } else {
+        // Fallback to direct query (for backward compatibility)
+        const { count: directCount, error: countError } = await supabaseService.client
+          .from('exchanges')
+          .select('id', { count: 'exact', head: true });
 
-      // Get a sample of exchanges for detailed analysis (last 1000 for performance)
-      const { data: exchanges, error } = await supabaseService.client
-        .from('exchanges')
-        .select(`
-          id, 
-          relinquished_property_value,
-          replacement_property_value,
-          exchange_value,
-          status,
-          exchange_type,
-          created_at,
-          sale_date,
-          identification_deadline,
-          exchange_deadline
-        `)
-        .order('created_at', { ascending: false })
-        .limit(1000);
+        if (countError) throw countError;
 
-      if (error) throw error;
+        const { data: directExchanges, error } = await supabaseService.client
+          .from('exchanges')
+          .select(`
+            id, 
+            relinquished_property_value,
+            replacement_property_value,
+            exchange_value,
+            status,
+            exchange_type,
+            created_at,
+            sale_date,
+            identification_deadline,
+            exchange_deadline
+          `)
+          .order('created_at', { ascending: false })
+          .limit(1000);
+        
+        if (error) throw error;
+        
+        totalCount = directCount;
+        exchanges = directExchanges;
+      }
 
       const now = new Date();
       const currentYear = now.getFullYear();
@@ -450,11 +470,46 @@ class AnalyticsService {
    * Optimized method for quick overview (dashboard stats)
    * Uses aggregated queries instead of fetching all exchanges
    */
-  async getQuickOverview() {
+  async getQuickOverview(options = {}) {
+    const { user } = options;
+    
     try {
       console.log('⚡ Fetching quick overview (optimized)...');
       
-      // Use simple, fast queries instead of complex RPC functions
+      if (user) {
+        // Use RBAC for user-specific overview
+        const rbacResult = await rbacService.getExchangesForUser(user, {
+          limit: 100 // Smaller sample for quick overview
+        });
+        
+        const exchanges = rbacResult.data || [];
+        const totalCount = rbacResult.count;
+        
+        // Calculate metrics from RBAC-filtered data
+        const statusCounts = this.calculateStatusBreakdown(exchanges);
+        const totalValue = exchanges.reduce((sum, e) => sum + (e.exchange_value || 0), 0);
+        const averageValue = exchanges.length > 0 ? totalValue / exchanges.length : 0;
+        
+        return {
+          totalExchanges: totalCount,
+          activeExchanges: statusCounts['active'] || 0,
+          completedExchanges: statusCounts['completed'] || 0,
+          pendingExchanges: statusCounts['pending'] || 0,
+          totalValue: totalValue,
+          averageValue: averageValue,
+          monthlyValue: totalValue / 12, // Simplified calculation
+          completionRate: exchanges.length > 0 ? 
+            ((statusCounts['completed'] || 0) / exchanges.length * 100) : 0,
+          approaching45Day: exchanges.filter(e => this.isApproaching45Day(e)).length,
+          approaching180Day: exchanges.filter(e => this.isApproaching180Day(e)).length,
+          overdueCount: exchanges.filter(e => this.isOverdue(e)).length,
+          highRisk: exchanges.filter(e => this.isHighRisk(e)).length,
+          mediumRisk: exchanges.filter(e => this.isMediumRisk(e)).length,
+          lowRisk: exchanges.filter(e => this.isLowRisk(e)).length
+        };
+      }
+      
+      // Fallback to direct queries for backward compatibility
       const [
         countResult,
         statusResult,
@@ -561,6 +616,68 @@ class AnalyticsService {
       console.error('Recent exchanges error:', error);
       return [];
     }
+  }
+
+  clearCache() {
+    this.cache.clear();
+    console.log('🗑️ Analytics cache cleared');
+  }
+
+  // Helper methods for risk and timeline analysis
+  isApproaching45Day(exchange) {
+    if (!exchange.identification_deadline) return false;
+    const deadline = new Date(exchange.identification_deadline);
+    const now = new Date();
+    const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+    return daysUntil > 0 && daysUntil <= 45;
+  }
+
+  isApproaching180Day(exchange) {
+    if (!exchange.exchange_deadline) return false;
+    const deadline = new Date(exchange.exchange_deadline);
+    const now = new Date();
+    const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+    return daysUntil > 0 && daysUntil <= 180;
+  }
+
+  isOverdue(exchange) {
+    const now = new Date();
+    if (exchange.identification_deadline) {
+      const deadline = new Date(exchange.identification_deadline);
+      if (deadline < now) return true;
+    }
+    if (exchange.exchange_deadline) {
+      const deadline = new Date(exchange.exchange_deadline);
+      if (deadline < now) return true;
+    }
+    return false;
+  }
+
+  isHighRisk(exchange) {
+    // High risk if approaching deadline in less than 7 days
+    if (!exchange.identification_deadline) return false;
+    const deadline = new Date(exchange.identification_deadline);
+    const now = new Date();
+    const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+    return daysUntil > 0 && daysUntil <= 7;
+  }
+
+  isMediumRisk(exchange) {
+    // Medium risk if approaching deadline in 8-30 days
+    if (!exchange.identification_deadline) return false;
+    const deadline = new Date(exchange.identification_deadline);
+    const now = new Date();
+    const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+    return daysUntil > 7 && daysUntil <= 30;
+  }
+
+  isLowRisk(exchange) {
+    // Low risk if deadline is more than 30 days away
+    if (!exchange.identification_deadline) return false;
+    const deadline = new Date(exchange.identification_deadline);
+    const now = new Date();
+    const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+    return daysUntil > 30;
   }
 }
 

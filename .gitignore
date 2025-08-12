@@ -8,6 +8,8 @@ node_modules/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
+VERCEL_ENV_VARIABLES.md
 
 # Logs
 npm-debug.log*

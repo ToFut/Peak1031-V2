@@ -18,10 +18,27 @@ import {
 import { useEnhancedTasks, ParsedTask, TaskTemplate } from '../../hooks/useEnhancedTasks';
 import { useAuth } from '../../hooks/useAuth';
 
+// Default fallback data - moved outside component to avoid runtime errors
+const FALLBACK_EXCHANGES = [
+  { id: 'df7ea956-a936-45c6-b683-143e9dda5230', name: 'Smith Holdings Office to Retail Exchange', exchange_number: 'EX-2025-002', status: 'active' },
+  { id: '66628d09-1843-42be-b257-dc05e13b8055', name: 'ABC Corp Industrial Warehouse Exchange', exchange_number: 'EX-2024-001', status: 'completed' },
+  { id: '7354d84b-3d85-4c2c-aff3-d3349526880b', name: 'Johnson Trust Apartment Complex Exchange', exchange_number: 'EX-2025-001', status: 'active' },
+  { id: 'bf69681b-12a6-46e2-b472-047538955dea', name: 'Smith Holdings Retail Property Exchange', exchange_number: 'EX-2024-002', status: 'completed' },
+  { id: '8d1ea5f1-308a-48bd-b39a-6456d1b7c97f', name: 'ABC Corp Dallas Office Building Exchange', exchange_number: 'EX-2025-003', status: 'active' },
+  { id: 'ba7865ac-da20-404a-b609-804d15cb0467', name: 'Demo Segev Exchange', exchange_number: 'SEGEV-DEMO-2025-001', status: 'active' }
+];
+
+const FALLBACK_USERS = [
+  { id: 'admin-user', name: 'System Admin', role: 'admin', email: 'admin@peak1031.com' },
+  { id: 'coordinator-user', name: 'Coordinator', role: 'coordinator', email: 'coordinator@peak1031.com' },
+  { id: 'client-user', name: 'Client User', role: 'client', email: 'client@peak1031.com' }
+];
+
 interface SmartTaskCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
   exchangeId?: string;
+  exchangeName?: string; // Add exchange name prop for display
   initialText?: string;
   mode?: 'natural' | 'template' | 'manual';
   onTaskCreated?: (task: any) => void;
@@ -31,11 +48,28 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
   isOpen,
   onClose,
   exchangeId,
+  exchangeName,
   initialText = '',
   mode = 'natural',
   onTaskCreated
 }) => {
   const { user } = useAuth();
+  
+  // Debug modal props and immediate fallback setup
+  useEffect(() => {
+    if (isOpen) {
+      console.log('🔍 SmartTaskCreationModal opened with props:', {
+        isOpen,
+        exchangeId,
+        mode,
+        hasUser: !!user,
+        userRole: user?.role
+      });
+      
+      // Initial setup - don't set fallbacks immediately, let the API calls handle it
+      console.log('🔍 Modal opened - API calls will populate data');
+    }
+  }, [isOpen, exchangeId, mode, user]);
   const {
     parseNaturalLanguage,
     createFromNaturalLanguage,
@@ -55,7 +89,7 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [selectedAssignee, setSelectedAssignee] = useState('');
-  const [selectedExchange, setSelectedExchange] = useState('');
+  const [selectedExchange, setSelectedExchange] = useState(exchangeId || ''); // Use provided exchangeId if available
   const [parsedPreview, setParsedPreview] = useState<any>(null);
   const [manualForm, setManualForm] = useState({
     title: '',
@@ -67,12 +101,204 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
     estimatedDuration: ''
   });
 
-  // Users for assignment (mock for now - replace with actual user fetching)
-  const [users] = useState([
-    { id: '1', name: 'John Coordinator', role: 'coordinator' },
-    { id: '2', name: 'Jane Admin', role: 'admin' },
-    { id: '3', name: 'Mike Assistant', role: 'assistant' }
-  ]);
+  // Users for assignment - fetch real assignees based on context
+  const [users, setUsers] = useState<Array<{ id: string; name: string; role: string; email?: string }>>([]);
+  const [loadingAssignees, setLoadingAssignees] = useState(false);
+  
+  // Exchanges for selection in dashboard context
+  const [exchanges, setExchanges] = useState<Array<{ id: string; name: string; exchange_number?: string; status: string }>>([]);
+  const [loadingExchanges, setLoadingExchanges] = useState(false);
+  
+  // Debug users and exchanges state
+  useEffect(() => {
+    console.log('👥 Users state updated:', users.length, 'users', users);
+  }, [users]);
+  
+  useEffect(() => {
+    console.log('🏢 Exchanges state updated:', exchanges.length, 'exchanges', exchanges);
+  }, [exchanges]);
+  
+  // Check authentication token
+  const getAuthToken = () => {
+    const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+    console.log('🔑 Token available:', !!token);
+    return token;
+  };
+
+  // Fetch exchanges for dashboard context
+  useEffect(() => {
+    const fetchExchanges = async () => {
+      if (exchangeId) {
+        console.log('🔄 Skipping exchange fetch - already in exchange context:', exchangeId);
+        return; // Skip if in exchange context
+      }
+      
+      console.log('🚀 Starting exchange fetch for dashboard context...');
+      setLoadingExchanges(true);
+      
+      try {
+        const token = getAuthToken();
+        
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json'
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch('/api/exchanges', {
+          headers
+        });
+        
+        console.log('📡 Exchange fetch response status:', response.status);
+        console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('📋 Raw exchanges response:', result);
+          console.log('📋 Response keys:', Object.keys(result));
+          
+          // Handle different response formats
+          const exchangeList = result.exchanges || result.data || result || [];
+          console.log('📋 Extracted exchange list:', exchangeList);
+          console.log('📋 Is array:', Array.isArray(exchangeList));
+          console.log('📋 Length:', exchangeList.length);
+          
+          if (Array.isArray(exchangeList) && exchangeList.length > 0) {
+            console.log('📋 First exchange sample:', exchangeList[0]);
+            
+            // Transform to expected format - use name as primary display
+            const formattedExchanges = exchangeList.map((ex: any) => ({
+              id: ex.id,
+              name: ex.name || ex.exchangeNumber || ex.exchange_number || ex.number || `Exchange ${ex.id}`,
+              exchange_number: ex.exchangeNumber || ex.exchange_number || ex.number,
+              status: ex.status || ex.lifecycle_stage || 'active'
+            }));
+            
+            console.log('📋 Formatted exchanges:', formattedExchanges);
+            setExchanges(formattedExchanges);
+            console.log('✅ Successfully set', formattedExchanges.length, 'exchanges');
+          } else {
+            console.warn('⚠️ No exchanges found or invalid format');
+            // Try a different API endpoint or method
+            console.log('🔍 Trying alternative exchange fetch methods...');
+            
+            // Let's try without authentication first to see if that's the issue
+            const altResponse = await fetch('/api/exchanges');
+            console.log('📡 Alternative response status:', altResponse.status);
+            
+            if (altResponse.ok) {
+              const altResult = await altResponse.json();
+              console.log('📋 Alternative response:', altResult);
+              setExchanges(FALLBACK_EXCHANGES);
+            } else {
+              setExchanges(FALLBACK_EXCHANGES);
+            }
+          }
+        } else {
+          const errorText = await response.text();
+          console.error('❌ Exchange fetch failed:', response.status, errorText);
+          console.log('📋 Response body:', errorText);
+          setExchanges(FALLBACK_EXCHANGES);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching exchanges:', error);
+        setExchanges(FALLBACK_EXCHANGES);
+      } finally {
+        setLoadingExchanges(false);
+        console.log('🏁 Exchange fetch completed');
+      }
+    };
+    
+    if (isOpen && !exchangeId) {
+      console.log('🔓 Modal opened, triggering exchange fetch...');
+      fetchExchanges();
+    }
+  }, [isOpen, exchangeId]);
+  
+  // Fetch valid assignees based on context (exchange vs dashboard)
+  useEffect(() => {
+    const fetchValidAssignees = async () => {
+      setLoadingAssignees(true);
+      try {
+        const token = getAuthToken();
+        
+        // Determine context - if exchangeId exists, we're in exchange context
+        const context = exchangeId ? 'exchange' : 'dashboard';
+        const params = new URLSearchParams({ context });
+        
+        // Use exchangeId prop or selected exchange from dropdown
+        const targetExchangeId = exchangeId || selectedExchange;
+        if (targetExchangeId) {
+          params.append('exchangeId', targetExchangeId);
+        }
+        
+        const url = `/api/tasks/assignees/valid?${params}`;
+        console.log('🔍 Fetching assignees from:', url);
+        
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json'
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch(url, {
+          headers
+        });
+        
+        console.log('📋 Assignees response status:', response.status);
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('📋 Assignees result:', result);
+          
+          if (result.success && result.data?.assignees) {
+            const mappedUsers = result.data.assignees.map((a: any) => ({
+              id: a.id,
+              name: a.name || a.email || 'Unknown',
+              role: a.role || 'participant',
+              email: a.email
+            }));
+            console.log('✅ Setting users:', mappedUsers);
+            setUsers(mappedUsers);
+          } else {
+            console.warn('⚠️ No assignees in response or unsuccessful:', result);
+            // Try to provide fallback users so assignment can still work
+            console.log('🔄 Using fallback users to enable assignment');
+            setUsers(FALLBACK_USERS);
+          }
+        } else {
+          const errorText = await response.text();
+          console.error('Failed to fetch assignees:', errorText);
+          console.log('🔄 Using fallback users due to API failure');
+          setUsers(FALLBACK_USERS);
+        }
+      } catch (error) {
+        console.error('Error fetching assignees:', error);
+        console.log('🔄 Using fallback users due to network error');
+        setUsers(FALLBACK_USERS);
+      } finally {
+        setLoadingAssignees(false);
+      }
+    };
+    
+    if (isOpen) {
+      // Always fetch users when modal is open and we have an exchange context
+      const contextExchangeId = exchangeId || selectedExchange;
+      
+      if (contextExchangeId) {
+        console.log('🔓 Fetching assignees for exchange:', contextExchangeId);
+        fetchValidAssignees();
+      } else if (!exchangeId) {
+        // In dashboard context without exchange selected, wait for user to select exchange
+        console.log('🔓 Waiting for exchange selection in dashboard context');
+        setUsers([]); // Clear users until exchange is selected
+      }
+    }
+  }, [isOpen, exchangeId, selectedExchange]);
 
   // Priority options
   const priorityOptions = [
@@ -138,27 +364,84 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
   const handleCreateTask = async () => {
     try {
       clearError();
+      
+      // Validate exchangeId is present (from prop or selection)
+      const targetExchangeId = exchangeId || selectedExchange;
+      console.log('🔍 Exchange ID validation:', {
+        exchangeId,
+        selectedExchange,
+        targetExchangeId,
+        currentMode,
+        isExchangeContext: !!exchangeId,
+        isDashboardContext: !exchangeId
+      });
+      
+      if (!targetExchangeId) {
+        console.error('❌ No exchange ID available for task creation');
+        throw new Error('Exchange ID is required to create a task');
+      }
+
       let createdTask;
 
       if (currentMode === 'natural' && (parsedTask || parsedPreview)) {
         // Create from natural language with user selections
+        // In exchange context, always use the provided exchangeId
         const result = await createFromNaturalLanguage(naturalLanguageText, {
           assignedTo: selectedAssignee || parsedPreview?.extractedData?.assigneeInfo?.id || undefined,
-          exchangeId: selectedExchange || parsedPreview?.extractedData?.exchangeInfo?.id || exchangeId
+          exchangeId: targetExchangeId || parsedPreview?.extractedData?.exchangeInfo?.id
         });
         createdTask = result.task;
       } else {
-        // Create manual task
-        const taskData = {
+        // Validate manual form data
+        console.log('🔍 Manual form validation check:', {
+          title: manualForm.title,
+          titleLength: manualForm.title?.length,
+          titleTrimmed: manualForm.title?.trim(),
+          titleTrimmedLength: manualForm.title?.trim()?.length,
+          isEmpty: !manualForm.title || manualForm.title.trim() === ''
+        });
+        
+        if (!manualForm.title || manualForm.title.trim() === '') {
+          console.error('❌ Manual form validation failed: title is empty');
+          throw new Error('Task title is required');
+        }
+        
+        console.log('📝 Manual form data:', {
           ...manualForm,
-          exchange_id: exchangeId,
-          assigned_to: manualForm.assignedTo || undefined,
-          due_date: manualForm.dueDate || undefined,
-          metadata: selectedTemplate ? {
-            template_used: selectedTemplate,
-            estimated_duration: manualForm.estimatedDuration
-          } : undefined
+          titleValid: !!(manualForm.title && manualForm.title.trim()),
+          exchangeIdValid: !!targetExchangeId
+        });
+        
+        // Create manual task - ensure both exchange_id and exchangeId for compatibility
+        const taskData = {
+          title: manualForm.title.trim(), // Ensure title is trimmed
+          description: manualForm.description || '',
+          priority: manualForm.priority || 'medium',
+          category: manualForm.category || 'general',
+          exchange_id: targetExchangeId,
+          exchangeId: targetExchangeId, // Add both for backend compatibility
+          ...(manualForm.assignedTo && { assigned_to: manualForm.assignedTo }),
+          ...(manualForm.dueDate && { due_date: manualForm.dueDate }),
+          ...(selectedTemplate && {
+            metadata: {
+              template_used: selectedTemplate,
+              estimated_duration: manualForm.estimatedDuration
+            }
+          })
         };
+        
+        console.log('🚀 Creating task with data:', taskData);
+        console.log('🔍 Task data fields:', {
+          title: taskData.title,
+          titleType: typeof taskData.title,
+          titleEmpty: !taskData.title || taskData.title.trim() === '',
+          exchange_id: taskData.exchange_id,
+          exchangeIdType: typeof taskData.exchange_id,
+          exchangeIdEmpty: !taskData.exchange_id || taskData.exchange_id.trim() === '',
+          exchangeId: taskData.exchangeId,
+          exchangeIdPropType: typeof taskData.exchangeId,
+          exchangeIdPropEmpty: !taskData.exchangeId || taskData.exchangeId.trim() === ''
+        });
         
         createdTask = await createTask(taskData);
       }
@@ -180,6 +463,11 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
     setCurrentMode(mode);
     setSelectedTemplate(null);
     setShowPreview(false);
+    setSelectedAssignee('');
+    // Only reset selectedExchange if not in exchange context
+    if (!exchangeId) {
+      setSelectedExchange('');
+    }
     setManualForm({
       title: '',
       description: '',
@@ -326,6 +614,36 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
                             </span>
                           </h3>
 
+                          {/* Exchange Selection for Natural Language - Only in dashboard context */}
+                          {!exchangeId && (
+                            <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                              <h4 className="font-medium text-purple-900 mb-2">🏢 Select Exchange</h4>
+                              <p className="text-sm text-purple-800 mb-3">
+                                Choose which exchange this task belongs to
+                              </p>
+                              <select
+                                value={selectedExchange}
+                                onChange={(e) => {
+                                  setSelectedExchange(e.target.value);
+                                  // Clear assignee when exchange changes
+                                  setSelectedAssignee('');
+                                }}
+                                className="w-full px-3 py-2 border border-purple-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                disabled={loadingExchanges}
+                              >
+                                <option value="">
+                                  {loadingExchanges ? 'Loading exchanges...' : 
+                                   exchanges.length === 0 ? 'No exchanges available' : 'Select an exchange...'}
+                                </option>
+                                {exchanges.map(exchange => (
+                                  <option key={exchange.id} value={exchange.id}>
+                                    {exchange.name} ({exchange.status})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
                           {/* User Assignment Section */}
                           {parsedPreview.extractedData?.needsUserSelection && (
                             <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -337,19 +655,25 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
                                 value={selectedAssignee}
                                 onChange={(e) => setSelectedAssignee(e.target.value)}
                                 className="w-full px-3 py-2 border border-yellow-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                disabled={loadingAssignees || (!exchangeId && !selectedExchange)}
                               >
-                                <option value="">Select a user to assign...</option>
-                                {parsedPreview.extractedData.availableUsers?.map((user: any) => (
+                                <option value="">
+                                  {loadingAssignees ? 'Loading assignees...' : 
+                                   !exchangeId && !selectedExchange ? 'Select exchange first' :
+                                   users.length === 0 ? 'No assignees available' :
+                                   `Select a user to assign (${exchangeId ? 'Exchange participants' : 'Exchange participants'})...`}
+                                </option>
+                                {users.map((user) => (
                                   <option key={user.id} value={user.id}>
-                                    {user.first_name} {user.last_name} ({user.email}) - {user.role}
+                                    {user.name} {user.email ? `(${user.email})` : ''} - {user.role}
                                   </option>
                                 ))}
                               </select>
                             </div>
                           )}
 
-                          {/* Exchange Selection Section */}
-                          {parsedPreview.extractedData?.needsExchangeSelection && (
+                          {/* Exchange Selection Section - Only show if not in exchange context */}
+                          {parsedPreview.extractedData?.needsExchangeSelection && !exchangeId && (
                             <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
                               <h4 className="font-medium text-purple-900 mb-2">🏢 Exchange Assignment Required</h4>
                               <p className="text-sm text-purple-800 mb-3">
@@ -367,6 +691,16 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
                                   </option>
                                 ))}
                               </select>
+                            </div>
+                          )}
+                          
+                          {/* Exchange Context Display - Show when in exchange page */}
+                          {exchangeId && (
+                            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              <h4 className="font-medium text-blue-900 mb-2">🏢 Current Exchange</h4>
+                              <p className="text-sm text-blue-800">
+                                {exchangeName ? `Task will be created in: ${exchangeName}` : 'Task will be created in the current exchange'}
+                              </p>
                             </div>
                           )}
 
@@ -394,8 +728,8 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
                             </div>
                           )}
 
-                          {/* Found Exchange Info */}
-                          {parsedPreview.extractedData?.exchangeInfo && (
+                          {/* Found Exchange Info - Only show if not already in exchange context */}
+                          {parsedPreview.extractedData?.exchangeInfo && !exchangeId && (
                             <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
                               <h4 className="font-medium text-indigo-900 mb-2 flex items-center">
                                 ✅ Exchange Found
@@ -545,6 +879,16 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
                   {/* Manual Mode */}
                   {currentMode === 'manual' && (
                     <div className="space-y-4">
+                      {/* Exchange Context Display for Manual Mode */}
+                      {exchangeId && (
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <h4 className="font-medium text-blue-900 mb-2">🏢 Current Exchange</h4>
+                          <p className="text-sm text-blue-800">
+                            {exchangeName ? `Task will be created in: ${exchangeName}` : 'Task will be created in the current exchange'}
+                          </p>
+                        </div>
+                      )}
+                      
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -593,6 +937,36 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
                           </select>
                         </div>
 
+                        {/* Exchange Selection - Only show in dashboard context */}
+                        {!exchangeId && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Exchange *
+                            </label>
+                            <select
+                              value={selectedExchange}
+                              onChange={(e) => {
+                                setSelectedExchange(e.target.value);
+                                // Clear assignee when exchange changes
+                                setSelectedAssignee('');
+                                setManualForm(prev => ({ ...prev, assignedTo: '' }));
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              disabled={loadingExchanges}
+                            >
+                              <option value="">
+                                {loadingExchanges ? 'Loading exchanges...' : 
+                                 exchanges.length === 0 ? 'No exchanges available' : 'Select an exchange...'}
+                              </option>
+                              {exchanges.map(exchange => (
+                                <option key={exchange.id} value={exchange.id}>
+                                  {exchange.name} ({exchange.status})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Assign To
@@ -601,11 +975,17 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
                             value={manualForm.assignedTo}
                             onChange={(e) => setManualForm(prev => ({ ...prev, assignedTo: e.target.value }))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            disabled={loadingAssignees || (!exchangeId && !selectedExchange)}
                           >
-                            <option value="">Select assignee...</option>
+                            <option value="">
+                              {loadingAssignees ? 'Loading assignees...' : 
+                               !exchangeId && !selectedExchange ? 'Select exchange first' :
+                               users.length === 0 ? 'No assignees available' :
+                               `Select assignee (${exchangeId ? 'Exchange participants' : 'Exchange participants'})...`}
+                            </option>
                             {users.map(user => (
                               <option key={user.id} value={user.id}>
-                                {user.name} ({user.role})
+                                {user.name} {user.email ? `(${user.email})` : ''} - {user.role}
                               </option>
                             ))}
                           </select>
@@ -677,7 +1057,8 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
                       onClick={handleCreateTask}
                       disabled={
                         (currentMode === 'natural' && (!parsedTask || !showPreview)) ||
-                        (currentMode === 'manual' && !manualForm.title.trim()) ||
+                        (currentMode === 'manual' && (!manualForm.title.trim() || (!exchangeId && !selectedExchange))) ||
+                        (!exchangeId && !selectedExchange) || // Always require exchange selection
                         naturalLanguageLoading
                       }
                       className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"

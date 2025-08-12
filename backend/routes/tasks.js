@@ -15,12 +15,148 @@ const checkPermission = (resource, action) => {
     next();
   };
 };
-const supabaseService = require('../services/supabase');
-const enhancedTaskService = require('../services/enhancedTaskService');
-const rbacService = require('../services/rbacService');
-const { transformToCamelCase, transformToSnakeCase } = require('../utils/caseTransform');
+
+// Import services with error handling
+let supabaseService, enhancedTaskService, rbacService, AuditService;
+let transformToCamelCase, transformToSnakeCase;
+
+try {
+  supabaseService = require('../services/supabase');
+  console.log('✅ Supabase service loaded successfully');
+} catch (error) {
+  console.error('❌ Failed to load Supabase service:', error.message);
+}
+
+try {
+  enhancedTaskService = require('../services/enhancedTaskService');
+  console.log('✅ Enhanced task service loaded successfully');
+} catch (error) {
+  console.error('❌ Failed to load enhanced task service:', error.message);
+}
+
+try {
+  rbacService = require('../services/rbacService');
+  console.log('✅ RBAC service loaded successfully');
+} catch (error) {
+  console.error('❌ Failed to load RBAC service:', error.message);
+}
+
+try {
+  AuditService = require('../services/audit');
+  console.log('✅ Audit service loaded successfully');
+} catch (error) {
+  console.error('❌ Failed to load audit service:', error.message);
+}
+
+try {
+  const caseTransform = require('../utils/caseTransform');
+  transformToCamelCase = caseTransform.transformToCamelCase;
+  transformToSnakeCase = caseTransform.transformToSnakeCase;
+  console.log('✅ Case transform utilities loaded successfully');
+} catch (error) {
+  console.error('❌ Failed to load case transform utilities:', error.message);
+  // Fallback functions
+  transformToCamelCase = (obj) => obj;
+  transformToSnakeCase = (obj) => obj;
+}
 
 const router = express.Router();
+
+// Test endpoint to verify database connection
+router.get('/test', authenticateToken, async (req, res) => {
+  try {
+    console.log('🧪 Testing database connection...');
+    
+    // Test basic query
+    const { data, error } = await supabaseService.client
+      .from('tasks')
+      .select('count')
+      .limit(1);
+    
+    if (error) {
+      console.error('❌ Database test failed:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Database connection failed',
+        details: error.message
+      });
+    }
+    
+    console.log('✅ Database connection successful');
+    res.json({
+      success: true,
+      message: 'Database connection successful',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Test endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Test failed',
+      details: error.message
+    });
+  }
+});
+
+// Test task creation endpoint
+router.post('/test-create', authenticateToken, async (req, res) => {
+  try {
+    console.log('🧪 Testing task creation...');
+    console.log('📋 Test data:', req.body);
+    
+    // Simple test task
+    const testTask = {
+      title: 'Test Task',
+      description: 'This is a test task',
+      status: 'PENDING',
+      priority: 'MEDIUM',
+      exchange_id: req.body.exchange_id || '00000000-0000-0000-0000-000000000000',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    console.log('📋 Test task data:', testTask);
+    
+    const { data, error } = await supabaseService.client
+      .from('tasks')
+      .insert([testTask])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Test task creation failed:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Test task creation failed',
+        details: error.message
+      });
+    }
+    
+    console.log('✅ Test task created successfully:', data.id);
+    
+    // Clean up - delete the test task
+    await supabaseService.client
+      .from('tasks')
+      .delete()
+      .eq('id', data.id);
+    
+    res.json({
+      success: true,
+      message: 'Test task creation successful',
+      taskId: data.id,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Test task creation error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Test task creation failed',
+      details: error.message
+    });
+  }
+});
 
 // Get all tasks (role-filtered)
 router.get('/', authenticateToken, async (req, res) => {
@@ -29,54 +165,7 @@ router.get('/', authenticateToken, async (req, res) => {
     
     const { page = 1, limit = 20, search, status, priority, exchangeId, assignedTo, sortBy = 'due_date', sortOrder = 'asc' } = req.query;
     
-    // Use RBAC service to get authorized tasks
-    const result = await rbacService.getTasksForUser(req.user, {
-      exchangeId,
-      status: status?.toUpperCase()
-    });
-    
-    // Apply additional filters on the authorized tasks
-    let filteredTasks = result.data;
-    
-    if (search) {
-      filteredTasks = filteredTasks.filter(task => 
-        task.title?.toLowerCase().includes(search.toLowerCase()) ||
-        task.description?.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-    
-    if (priority) {
-      filteredTasks = filteredTasks.filter(task => task.priority === priority.toUpperCase());
-    }
-    
-    if (assignedTo) {
-      filteredTasks = filteredTasks.filter(task => task.assigned_to === assignedTo);
-    }
-    
-    // Sort tasks
-    filteredTasks.sort((a, b) => {
-      const aVal = a[sortBy] || '';
-      const bVal = b[sortBy] || '';
-      return sortOrder === 'asc' ? 
-        (aVal > bVal ? 1 : -1) : 
-        (bVal > aVal ? 1 : -1);
-    });
-    
-    // Paginate
-    const startIndex = (page - 1) * limit;
-    const paginatedTasks = filteredTasks.slice(startIndex, startIndex + limit);
-    
-    res.json({
-      success: true,
-      tasks: paginatedTasks.map(transformToCamelCase),
-      total: filteredTasks.length,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      hasMore: filteredTasks.length > startIndex + limit
-    });
-    
-    return; // Exit early - skip old implementation
-    
+    // Direct Supabase query (simplified to avoid RBAC issues)
     let query = supabaseService.client.from('tasks').select(`
       *,
       assignee:assigned_to (
@@ -90,7 +179,7 @@ router.get('/', authenticateToken, async (req, res) => {
         exchange_number,
         status
       )
-    `);
+    `, { count: 'exact' });
 
     // Apply filters
     if (search) {
@@ -113,7 +202,7 @@ router.get('/', authenticateToken, async (req, res) => {
       query = query.eq('assigned_to', assignedTo);
     }
 
-    // Role-based filtering
+    // Simple role-based filtering
     if (req.user.role === 'client') {
       // Get client's exchanges first
       const { data: exchanges } = await supabaseService.client
@@ -124,7 +213,7 @@ router.get('/', authenticateToken, async (req, res) => {
       if (exchanges?.length) {
         query = query.in('exchange_id', exchanges.map(e => e.id));
       } else {
-        return res.json({ success: true, data: [], total: 0 });
+        return res.json({ success: true, tasks: [], total: 0, page: parseInt(page), limit: parseInt(limit), hasMore: false });
       }
     }
 
@@ -146,10 +235,11 @@ router.get('/', authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      data: transformToCamelCase(data || []),
+      tasks: transformToCamelCase(data || []),
       total: count || 0,
       page: parseInt(page),
-      totalPages: Math.ceil((count || 0) / limit)
+      limit: parseInt(limit),
+      hasMore: (count || 0) > page * limit
     });
 
   } catch (error) {
@@ -320,26 +410,243 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // Create task
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const taskData = transformToSnakeCase({
-      ...req.body,
-      createdBy: req.user.id,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
+    console.log('📋 TASK CREATION: Creating task for user', req.user?.email);
+    console.log('📋 TASK DATA:', JSON.stringify(req.body, null, 2));
+    console.log('📋 USER INFO:', { id: req.user?.id, email: req.user?.email, role: req.user?.role });
 
+    // Enhanced validation with detailed logging
+    const validationErrors = [];
+
+    if (!req.body.title || typeof req.body.title !== 'string' || req.body.title.trim() === '') {
+      validationErrors.push('Task title is required and must be a non-empty string');
+    }
+
+    const exchangeId = req.body.exchange_id || req.body.exchangeId;
+    if (!exchangeId || typeof exchangeId !== 'string' || exchangeId.trim() === '') {
+      validationErrors.push('Exchange ID is required and must be a non-empty string');
+      console.log('❌ VALIDATION: Exchange ID missing or invalid:', { 
+        exchange_id: req.body.exchange_id, 
+        exchangeId: req.body.exchangeId,
+        type_exchange_id: typeof req.body.exchange_id,
+        type_exchangeId: typeof req.body.exchangeId
+      });
+    }
+
+    if (validationErrors.length > 0) {
+      console.log('❌ VALIDATION ERRORS:', validationErrors);
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: validationErrors,
+        receivedData: {
+          title: req.body.title,
+          exchange_id: req.body.exchange_id,
+          exchangeId: req.body.exchangeId,
+          hasTitle: !!req.body.title,
+          hasExchangeId: !!(req.body.exchange_id || req.body.exchangeId)
+        }
+      });
+    }
+
+    // Prepare task data using validated exchangeId
+    const taskData = {
+      title: req.body.title.trim(),
+      description: req.body.description || '',
+      status: (req.body.status || 'PENDING').toUpperCase(),
+      priority: (req.body.priority || 'MEDIUM').toUpperCase(),
+      exchange_id: exchangeId, // Use the validated exchangeId
+      assigned_to: req.body.assigned_to || req.body.assignedTo || null,
+      due_date: req.body.due_date || req.body.dueDate || null,
+      pp_data: req.body.pp_data || req.body.ppData || {},
+      created_by: req.user.id, // Add who created the task
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    console.log('📋 PROCESSED TASK DATA:', JSON.stringify(taskData, null, 2));
+
+    // Verify exchange exists before creating task
+    try {
+      const { data: exchange, error: exchangeError } = await supabaseService.client
+        .from('exchanges')
+        .select('id, exchange_number, status')
+        .eq('id', exchangeId)
+        .single();
+
+      if (exchangeError || !exchange) {
+        console.log('❌ Exchange not found:', exchangeId, exchangeError);
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid exchange ID - exchange not found',
+          exchangeId: exchangeId,
+          details: exchangeError?.message
+        });
+      }
+
+      console.log('✅ Exchange verified:', exchange.exchange_number);
+    } catch (exchangeCheckError) {
+      console.error('❌ Error checking exchange:', exchangeCheckError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to verify exchange',
+        details: exchangeCheckError.message
+      });
+    }
+
+    // Validate assignment if assigned_to is provided
+    if (taskData.assigned_to) {
+      console.log('🔍 Validating assignment:', taskData.assigned_to);
+      
+      try {
+        // Get valid assignees for this exchange context
+        const { data: participants, error: participantsError } = await supabaseService.client
+          .from('exchange_participants')
+          .select('contact_id')
+          .eq('exchange_id', exchangeId)
+          .eq('is_active', true);
+
+        if (participantsError) {
+          console.error('❌ Error fetching exchange participants for validation:', participantsError);
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to validate assignment',
+            details: participantsError.message
+          });
+        }
+
+        // Check if the assigned_to ID is in the list of valid participants
+        const validAssigneeIds = (participants || []).map(p => p.contact_id).filter(id => id);
+        const isValidAssignee = validAssigneeIds.includes(taskData.assigned_to);
+
+        console.log('📋 Assignment validation:', {
+          assignedTo: taskData.assigned_to,
+          validAssigneeIds: validAssigneeIds,
+          isValidAssignee: isValidAssignee
+        });
+
+        if (!isValidAssignee) {
+          console.log('❌ Invalid assignment: User not a participant in this exchange');
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid assignment - user is not a participant in this exchange',
+            details: 'Tasks can only be assigned to participants in the exchange',
+            validAssignees: validAssigneeIds
+          });
+        }
+
+        console.log('✅ Assignment validation passed');
+      } catch (assignmentValidationError) {
+        console.error('❌ Error validating assignment:', assignmentValidationError);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to validate assignment',
+          details: assignmentValidationError.message
+        });
+      }
+    }
+
+    // Insert task into database
     const { data, error } = await supabaseService.client
       .from('tasks')
       .insert([taskData])
-      .select()
+      .select(`
+        *,
+        assignee:assigned_to (
+          id,
+          first_name,
+          last_name,
+          email
+        ),
+        exchange:exchange_id (
+          id,
+          exchange_number,
+          status
+        )
+      `)
       .single();
 
     if (error) {
-      console.error('Error creating task:', error);
+      console.error('❌ Error creating task:', error);
       return res.status(500).json({ 
         success: false, 
         error: 'Failed to create task',
         details: error.message 
       });
+    }
+
+    console.log('✅ Task created successfully:', data.id);
+
+    // Log audit trail (simplified to avoid errors)
+    try {
+      if (AuditService && AuditService.log) {
+        await AuditService.log({
+          action: 'TASK_CREATED',
+          userId: req.user.id,
+          entityType: 'task',
+          entityId: data.id,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
+          details: {
+            taskTitle: data.title,
+            exchangeId: data.exchange_id,
+            assignedTo: data.assigned_to,
+            priority: data.priority
+          }
+        });
+      }
+    } catch (auditError) {
+      console.error('⚠️ Audit logging failed:', auditError);
+    }
+
+    // Enhanced real-time notifications for task creation
+    const taskExchangeId = data.exchange_id;
+    const io = req.app.get('io');
+    if (io && taskExchangeId) {
+      console.log(`📡 Emitting enhanced task_created notifications for exchange_${taskExchangeId}`);
+      
+      const taskEvent = {
+        exchangeId: taskExchangeId,
+        taskId: data.id,
+        task: data,
+        createdBy: req.user.id,
+        timestamp: new Date().toISOString()
+      };
+
+      // 1. Emit to exchange room (for exchange-specific task lists)
+      io.to(`exchange_${taskExchangeId}`).emit('task_created', taskEvent);
+      console.log(`📡 Emitted to exchange room: exchange_${taskExchangeId}`);
+
+      // 2. Emit to creator's dashboard (so they see it in their dashboard)
+      io.to(`user_${req.user.id}`).emit('task_created', taskEvent);
+      console.log(`📡 Emitted to creator dashboard: user_${req.user.id}`);
+
+      // 3. Emit to assignee's dashboard (if task is assigned)
+      if (data.assigned_to && data.assigned_to !== req.user.id) {
+        io.to(`user_${data.assigned_to}`).emit('task_created', taskEvent);
+        io.to(`user_${data.assigned_to}`).emit('task_assigned', taskEvent);
+        console.log(`📡 Emitted to assignee dashboard: user_${data.assigned_to}`);
+      }
+
+      // 4. Emit to all exchange participants for dashboard updates
+      try {
+        const databaseService = require('../services/database');
+        const participants = await databaseService.getExchangeParticipants({
+          where: { exchange_id: taskExchangeId }
+        });
+        
+        participants.forEach(participant => {
+          if (participant.user_id && participant.user_id !== req.user.id) {
+            io.to(`user_${participant.user_id}`).emit('task_created', taskEvent);
+            console.log(`📡 Emitted to participant dashboard: user_${participant.user_id}`);
+          }
+        });
+
+        console.log(`📡 Total real-time notifications sent: ${1 + (data.assigned_to ? 2 : 0) + participants.length}`);
+      } catch (participantError) {
+        console.error('⚠️ Failed to get exchange participants for real-time notifications:', participantError);
+      }
+    } else {
+      console.warn('⚠️ Socket.IO not available for real-time task creation notification');
     }
 
     res.status(201).json({
@@ -348,7 +655,7 @@ router.post('/', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error in POST /tasks:', error);
+    console.error('❌ Error in POST /tasks:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error',
@@ -360,25 +667,110 @@ router.post('/', authenticateToken, async (req, res) => {
 // Update task
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
-    const updateData = transformToSnakeCase({
+    console.log('📋 TASK UPDATE: Updating task', req.params.id, 'for user', req.user?.email);
+    console.log('📋 UPDATE DATA:', req.body);
+
+    // Prepare update data
+    const updateData = {
       ...req.body,
-      updatedAt: new Date().toISOString()
-    });
+      updated_at: new Date().toISOString()
+    };
+
+    // Handle status changes
+    if (req.body.status === 'COMPLETED' && !req.body.completed_at) {
+      updateData.completed_at = new Date().toISOString();
+    } else if (req.body.status !== 'COMPLETED') {
+      updateData.completed_at = null;
+    }
+
+    console.log('📋 PROCESSED UPDATE DATA:', updateData);
 
     const { data, error } = await supabaseService.client
       .from('tasks')
       .update(updateData)
       .eq('id', req.params.id)
-      .select()
+      .select(`
+        *,
+        assignee:assigned_to (
+          id,
+          first_name,
+          last_name,
+          email
+        ),
+        exchange:exchange_id (
+          id,
+          exchange_number,
+          status
+        )
+      `)
       .single();
 
     if (error) {
-      console.error('Error updating task:', error);
+      console.error('❌ Error updating task:', error);
       return res.status(500).json({ 
         success: false, 
         error: 'Failed to update task',
         details: error.message 
       });
+    }
+
+    console.log('✅ Task updated successfully:', data.id);
+
+    // Log audit trail
+    try {
+      await AuditService.log({
+        action: 'TASK_UPDATED',
+        userId: req.user.id,
+        entityType: 'task',
+        entityId: data.id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+        details: {
+          taskTitle: data.title,
+          exchangeId: data.exchange_id,
+          oldStatus: req.body.oldStatus,
+          newStatus: data.status,
+          changes: req.body
+        }
+      });
+    } catch (auditError) {
+      console.error('⚠️ Audit logging failed:', auditError);
+    }
+
+    // Emit real-time event for task update
+    const exchangeId = data.exchange_id;
+    const io = req.app.get('io');
+    if (io && exchangeId) {
+      console.log(`📡 Emitting task_updated to exchange_${exchangeId}`);
+      io.to(`exchange_${exchangeId}`).emit('task_updated', {
+        exchangeId: exchangeId,
+        taskId: data.id,
+        task: data,
+        updatedBy: req.user.id
+      });
+      
+      // Also emit to all connected users in the exchange (fallback)
+      try {
+        const databaseService = require('../services/database');
+        const participants = await databaseService.getExchangeParticipants({
+          where: { exchange_id: exchangeId }
+        });
+        
+        participants.forEach(participant => {
+          if (participant.user_id) {
+            io.to(`user_${participant.user_id}`).emit('task_updated', {
+              exchangeId: exchangeId,
+              taskId: data.id,
+              task: data,
+              updatedBy: req.user.id
+            });
+          }
+        });
+      } catch (participantError) {
+        console.error('⚠️ Failed to get exchange participants:', participantError);
+      }
+    } else {
+      console.warn('⚠️ Socket.IO not available for real-time task update notification');
     }
 
     res.json({
@@ -387,7 +779,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error in PUT /tasks/:id:', error);
+    console.error('❌ Error in PUT /tasks/:id:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error',
@@ -399,6 +791,21 @@ router.put('/:id', authenticateToken, async (req, res) => {
 // Delete task
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
+    // First fetch the task to get exchange_id for real-time notification
+    const { data: taskToDelete, error: fetchError } = await supabaseService.client
+      .from('tasks')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+
+    if (fetchError || !taskToDelete) {
+      console.error('Error fetching task for deletion:', fetchError);
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Task not found'
+      });
+    }
+
     const { error } = await supabaseService.client
       .from('tasks')
       .delete()
@@ -411,6 +818,38 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         error: 'Failed to delete task',
         details: error.message 
       });
+    }
+
+    // Emit real-time event for task deletion
+    const exchangeId = taskToDelete.exchange_id;
+    const io = req.app.get('io');
+    if (io && exchangeId) {
+      console.log(`📡 Emitting task_deleted to exchange_${exchangeId}`);
+      io.to(`exchange_${exchangeId}`).emit('task_deleted', {
+        exchangeId: exchangeId,
+        taskId: req.params.id,
+        task: taskToDelete,
+        deletedBy: req.user.id
+      });
+      
+      // Also emit to all connected users in the exchange (fallback)
+      const databaseService = require('../services/database');
+      const participants = await databaseService.getExchangeParticipants({
+        where: { exchange_id: exchangeId }
+      });
+      
+      participants.forEach(participant => {
+        if (participant.user_id) {
+          io.to(`user_${participant.user_id}`).emit('task_deleted', {
+            exchangeId: exchangeId,
+            taskId: req.params.id,
+            task: taskToDelete,
+            deletedBy: req.user.id
+          });
+        }
+      });
+    } else {
+      console.warn('⚠️ Socket.IO not available for real-time task deletion notification');
     }
 
     res.json({
@@ -609,6 +1048,163 @@ router.get('/:id/auto-complete', authenticateToken, async (req, res) => {
       success: false, 
       error: 'Failed to get auto-complete actions',
       details: error.message 
+    });
+  }
+});
+
+// Get valid assignees based on context (exchange vs dashboard)
+router.get('/assignees/valid', authenticateToken, async (req, res) => {
+  try {
+    const { exchangeId, context = 'dashboard' } = req.query;
+    
+    console.log(`📋 Getting valid assignees for ${req.user?.email} - Context: ${context}, Exchange: ${exchangeId}`);
+
+    let validAssignees = [];
+    
+    if (context === 'exchange' && exchangeId) {
+      // Exchange context: Only get participants of the specific exchange
+      console.log('🔍 Getting exchange participants...');
+      
+      const { data: participants, error: participantsError } = await supabaseService.client
+        .from('exchange_participants')
+        .select('contact_id')
+        .eq('exchange_id', exchangeId)
+        .eq('is_active', true);
+
+      if (participantsError) {
+        console.error('❌ Error fetching exchange participants:', participantsError);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to fetch exchange participants',
+          details: participantsError.message
+        });
+      }
+
+      console.log(`✅ Found ${participants?.length || 0} exchange participants`);
+
+      // Get contact details for each participant
+      const contactIds = (participants || []).map(p => p.contact_id).filter(id => id);
+      let contactDetails = [];
+      
+      if (contactIds.length > 0) {
+        const { data: contacts, error: contactsError } = await supabaseService.client
+          .from('contacts')
+          .select('id, first_name, last_name, email, role')
+          .in('id', contactIds);
+        
+        contactDetails = contacts || [];
+      }
+
+      // Convert participants to assignee format
+      validAssignees = (participants || []).map(p => {
+        const contact = contactDetails.find(c => c.id === p.contact_id);
+        return {
+          id: p.contact_id,
+          name: contact ? `${contact.first_name || ''} ${contact.last_name || ''}`.trim() : 'Unknown',
+          email: contact?.email,
+          role: contact?.role || 'contact',
+          type: 'contact',
+          context: 'exchange_participant'
+        };
+      }).filter(a => a.id && a.name !== 'Unknown');
+
+    } else {
+      // Dashboard context: Get participants from all user's exchanges
+      console.log('🔍 Getting participants from all user exchanges...');
+      
+      // First get all exchanges the user has access to
+      const { data: userExchanges, error: exchangesError } = await supabaseService.client
+        .from('exchange_participants')
+        .select('exchange_id')
+        .eq('contact_id', req.user.contact_id)
+        .eq('is_active', true);
+
+      if (exchangesError) {
+        console.error('❌ Error fetching user exchanges:', exchangesError);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to fetch user exchanges',
+          details: exchangesError.message
+        });
+      }
+
+      const exchangeIds = (userExchanges || []).map(e => e.exchange_id);
+      console.log(`✅ User has access to ${exchangeIds.length} exchanges`);
+
+      if (exchangeIds.length > 0) {
+        // Get all participants from user's exchanges
+        const { data: allParticipants, error: allParticipantsError } = await supabaseService.client
+          .from('exchange_participants')
+          .select('contact_id, exchange_id')
+          .in('exchange_id', exchangeIds)
+          .eq('is_active', true);
+
+        if (allParticipantsError) {
+          console.error('❌ Error fetching all participants:', allParticipantsError);
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to fetch participants',
+            details: allParticipantsError.message
+          });
+        }
+
+        console.log(`✅ Found ${allParticipants?.length || 0} total participants across exchanges`);
+
+        // Get unique contact IDs
+        const allContactIds = [...new Set((allParticipants || []).map(p => p.contact_id).filter(id => id))];
+        let allContactDetails = [];
+        
+        if (allContactIds.length > 0) {
+          const { data: contacts, error: contactsError } = await supabaseService.client
+            .from('contacts')
+            .select('id, first_name, last_name, email, role')
+            .in('id', allContactIds);
+          
+          allContactDetails = contacts || [];
+        }
+
+        // Remove duplicates and convert to assignee format
+        const uniqueParticipants = new Map();
+        
+        (allParticipants || []).forEach(p => {
+          const key = p.contact_id;
+          if (key && !uniqueParticipants.has(key)) {
+            const contact = allContactDetails.find(c => c.id === p.contact_id);
+            if (contact) {
+              uniqueParticipants.set(key, {
+                id: key,
+                name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
+                email: contact.email,
+                role: contact.role || 'contact',
+                type: 'contact',
+                context: 'dashboard_all_exchanges'
+              });
+            }
+          }
+        });
+
+        validAssignees = Array.from(uniqueParticipants.values()).filter(a => a.name !== '');
+      }
+    }
+
+    console.log(`✅ Returning ${validAssignees.length} valid assignees for context: ${context}`);
+
+    res.json({
+      success: true,
+      data: {
+        assignees: validAssignees,
+        context: context,
+        exchangeId: exchangeId || null,
+        total: validAssignees.length
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error getting valid assignees:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get valid assignees',
+      details: error.message
     });
   }
 });

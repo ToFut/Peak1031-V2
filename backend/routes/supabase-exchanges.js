@@ -71,20 +71,140 @@ router.get('/', authenticateToken, async (req, res) => {
   console.log('🚨 SUPABASE-EXCHANGES ROUTE HIT! User:', req.user?.email, 'Role:', req.user?.role);
   
   try {
-    // Use RBAC service to get authorized exchanges
-    const result = await rbacService.getExchangesForUser(req.user, {
-      status: req.query.status,
-      limit: parseInt(req.query.limit) || 50,
-      orderBy: {
-        column: req.query.sortBy || 'created_at',
-        ascending: req.query.sortOrder !== 'desc'
+    let result;
+    
+    // For admin users, bypass RBAC and get all exchanges directly
+    if (req.user.role === 'admin') {
+      console.log('✅ Admin user - bypassing RBAC to get all exchanges');
+      
+      const limit = parseInt(req.query.limit) || 50;
+      const page = parseInt(req.query.page) || 1;
+      const offset = (page - 1) * limit;
+      const sortBy = req.query.sortBy || 'created_at';
+      const sortOrder = req.query.sortOrder === 'asc' ? true : false; // Default to DESC (newest first)
+      
+      // Get total count
+      const { count: totalCount, error: countError } = await supabase
+        .from('exchanges')
+        .select('*', { count: 'exact', head: true });
+        
+      if (countError) {
+        throw new Error(`Count query failed: ${countError.message}`);
       }
-    });
+      
+      // Get exchanges with pagination (basic query first)
+      let query = supabase
+        .from('exchanges')
+        .select(`
+          *,
+          client:people!client_id (
+            id,
+            first_name,
+            last_name,
+            email,
+            company
+          ),
+          coordinator:people!coordinator_id (
+            id,
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .order(sortBy, { ascending: sortOrder });
+        
+      if (req.query.status) {
+        query = query.eq('status', req.query.status);
+      }
+      
+      query = query.range(offset, offset + limit - 1);
+      
+      const { data: exchanges, error } = await query;
+      
+      if (error) {
+        throw new Error(`Exchanges query failed: ${error.message}`);
+      }
+      
+      // Debug logging
+      console.log(`🔍 Admin query returned ${exchanges?.length || 0} exchanges`);
+      if (exchanges && exchanges.length > 0) {
+        const targetExchangeId = 'ba7865ac-da20-404a-b609-804d15cb0467';
+        const hasTarget = exchanges.find(ex => ex.id === targetExchangeId);
+        console.log(`🎯 Target exchange ${targetExchangeId} in results:`, hasTarget ? 'YES' : 'NO');
+        if (hasTarget) {
+          console.log(`✅ Found target: ${hasTarget.name}`);
+        }
+      }
+      
+      // Now get participants for these exchanges with manual joins
+      const exchangeIds = exchanges?.map(ex => ex.id) || [];
+      let exchangeParticipants = [];
+      
+      if (exchangeIds.length > 0) {
+        // Get raw participants
+        const { data: participants, error: participantsError } = await supabase
+          .from('exchange_participants')
+          .select('*')
+          .in('exchange_id', exchangeIds);
+          
+        if (participantsError) {
+          console.warn('⚠️ Could not load participants:', participantsError.message);
+        } else if (participants && participants.length > 0) {
+          // Get all unique contact_ids
+          const contactIds = [...new Set(participants.map(p => p.contact_id).filter(Boolean))];
+          
+          if (contactIds.length > 0) {
+            // Get contact information (using people table, not contacts to avoid FK conflicts)
+            const { data: contacts, error: contactsError } = await supabase
+              .from('people')
+              .select('id, first_name, last_name, email, role')
+              .in('id', contactIds);
+              
+            if (contactsError) {
+              console.warn('⚠️ Could not load contacts:', contactsError.message);
+            } else {
+              // Manually join participants with contact data
+              exchangeParticipants = participants.map(participant => ({
+                ...participant,
+                contact: contacts?.find(c => c.id === participant.contact_id) || null
+              }));
+            }
+          } else {
+            exchangeParticipants = participants;
+          }
+        }
+      }
+      
+      // Attach participants to each exchange (for chat interface compatibility)
+      const exchangesWithParticipants = exchanges?.map(exchange => ({
+        ...exchange,
+        exchange_participants: exchangeParticipants.filter(p => p.exchange_id === exchange.id),
+        exchangeParticipants: exchangeParticipants.filter(p => p.exchange_id === exchange.id) // Also add this format
+      })) || [];
+      
+      result = {
+        data: exchangesWithParticipants,
+        count: totalCount
+      };
+    } else {
+      // For non-admin users, use RBAC service to get authorized exchanges
+      console.log('🔒 Non-admin user - using RBAC filtering');
+      result = await rbacService.getExchangesForUser(req.user, {
+        status: req.query.status,
+        limit: parseInt(req.query.limit) || 50,
+        orderBy: {
+          column: req.query.sortBy || 'created_at',
+          ascending: req.query.sortOrder !== 'desc'
+        }
+      });
+    }
     
     // Transform the response
     const transformedExchanges = result.data.map(exchange => 
       transformApiResponse(exchange, { includeComputed: true })
     );
+    
+    console.log(`📊 Returning ${transformedExchanges.length} exchanges (${result.count} total) for ${req.user.role} user: ${req.user.email}`);
     
     res.json({
       success: true,
@@ -493,11 +613,23 @@ router.put('/:id/status', async (req, res) => {
 
 /**
  * GET /api/exchanges/:id/participants
- * Get exchange participants
+ * Get exchange participants with RBAC
  */
-router.get('/:id/participants', async (req, res) => {
+router.get('/:id/participants', authenticateToken, async (req, res) => {
   try {
-    console.log('🎯 PARTICIPANTS ROUTE HIT:', req.params.id);
+    console.log('🎯 PARTICIPANTS ROUTE HIT:', req.params.id, 'User:', req.user.email);
+    
+    // RBAC: Check if user can access this exchange
+    const canAccess = await rbacService.canUserAccessExchange(req.user, req.params.id);
+    if (!canAccess) {
+      console.log('❌ RBAC: User', req.user.email, 'cannot access exchange', req.params.id);
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'You do not have permission to view participants for this exchange'
+      });
+    }
+    
+    console.log('✅ RBAC: User', req.user.email, 'can access exchange', req.params.id);
     
     // First get participants with contact/user relationships
     const { data: participants, error } = await supabase
@@ -519,28 +651,8 @@ router.get('/:id/participants', async (req, res) => {
       let email = '';
       let avatar = '';
       
-      // Try to get contact details
-      if (participant.contact_id) {
-        const { data: contact } = await supabase
-          .from('people')
-          .select('full_name, email, role')
-          .eq('id', participant.contact_id)
-          .single();
-          
-        if (contact) {
-          name = contact.full_name || 'Unknown';
-          // Filter out placeholder emails
-          if (contact.email && !contact.email.includes('@imported.com') && 
-              !contact.email.includes('@example.com') && 
-              !contact.email.includes('@placeholder.com')) {
-            email = contact.email;
-          }
-          avatar = (contact.full_name || 'U').charAt(0).toUpperCase();
-        }
-      }
-      
-      // Try to get user details if no contact
-      if (!name && participant.user_id) {
+      // Try to get user details first (more reliable and up-to-date)
+      if (participant.user_id) {
         const { data: user } = await supabase
           .from('users')
           .select('first_name, last_name, email')
@@ -556,6 +668,35 @@ router.get('/:id/participants', async (req, res) => {
             email = user.email;
           }
           avatar = name.charAt(0).toUpperCase();
+        }
+      }
+      
+      // Try to get contact details if no user data or if user data is incomplete
+      if ((name === 'Unknown' || !email) && participant.contact_id) {
+        const { data: contact } = await supabase
+          .from('contacts')
+          .select('first_name, last_name, email, display_name')
+          .eq('id', participant.contact_id)
+          .single();
+          
+        if (contact) {
+          // Use contact data if user data wasn't found or incomplete
+          if (name === 'Unknown') {
+            const fullName = contact.display_name || 
+                           `${contact.first_name || ''} ${contact.last_name || ''}`.trim();
+            name = fullName || 'Unknown';
+          }
+          
+          // Use contact email if user email wasn't found
+          if (!email && contact.email && !contact.email.includes('@imported.com') && 
+              !contact.email.includes('@example.com') && 
+              !contact.email.includes('@placeholder.com')) {
+            email = contact.email;
+          }
+          
+          if (!avatar && name !== 'Unknown') {
+            avatar = name.charAt(0).toUpperCase();
+          }
         }
       }
       

@@ -6,6 +6,7 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
 const analyticsService = require('../services/analyticsService');
+const gptQueryService = require('../services/gptQueryService');
 const rbacService = require('../services/rbacService');
 const router = express.Router();
 
@@ -17,14 +18,8 @@ router.get('/financial-overview', authenticateToken, async (req, res) => {
   try {
     console.log('💰 Fetching financial overview for', req.user?.email, 'Role:', req.user?.role);
     
-    // Get exchanges the user can access
-    const userExchanges = await rbacService.getExchangesForUser(req.user, {
-      includeParticipant: true
-    });
-    
-    const exchangeIds = userExchanges.data.map(e => e.id);
-    
-    const overview = await analyticsService.getFinancialOverview({ exchangeIds, userRole: req.user.role });
+    // Pass user context to analytics service for RBAC
+    const overview = await analyticsService.getFinancialOverview({ user: req.user });
     
     res.json({
       success: true,
@@ -49,14 +44,8 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
   try {
     console.log('📈 Fetching dashboard stats for', req.user?.email, 'Role:', req.user?.role);
     
-    // Get exchanges the user can access
-    const userExchanges = await rbacService.getExchangesForUser(req.user, {
-      includeParticipant: true
-    });
-    
-    const exchangeIds = userExchanges.data.map(e => e.id);
-    
-    const overview = await analyticsService.getQuickOverview({ exchangeIds, userRole: req.user.role });
+    // Pass user context to analytics service for RBAC
+    const overview = await analyticsService.getQuickOverview({ user: req.user });
     
     const stats = {
       financial: {
@@ -124,6 +113,144 @@ router.post('/clear-cache', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Clear cache error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * GET /api/analytics/classic-queries
+ * Get list of available pre-built queries
+ */
+router.get('/classic-queries', authenticateToken, async (req, res) => {
+  try {
+    console.log('📊 Fetching classic queries for', req.user?.email);
+    
+    const queries = gptQueryService.getClassicQueries();
+    
+    res.json({
+      success: true,
+      data: queries,
+      count: queries.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Classic queries error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * GET /api/analytics/query-suggestions
+ * Get query suggestions based on context
+ */
+router.get('/query-suggestions', authenticateToken, async (req, res) => {
+  try {
+    console.log('💡 Fetching query suggestions for', req.user?.email);
+    
+    const context = {
+      userRole: req.user?.role,
+      currentPage: req.query.page,
+      recentQueries: req.query.recent ? JSON.parse(req.query.recent) : []
+    };
+    
+    const suggestions = gptQueryService.getQuerySuggestions(context);
+    
+    res.json({
+      success: true,
+      data: suggestions,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Query suggestions error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * POST /api/analytics/classic-query
+ * Execute a pre-built classic query
+ */
+router.post('/classic-query', authenticateToken, async (req, res) => {
+  try {
+    const { queryKey, params } = req.body;
+
+    if (!queryKey) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query key is required',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    console.log(`🔍 Executing classic query: ${queryKey}`);
+    
+    const result = await gptQueryService.executeClassicQuery(queryKey, params);
+    
+    res.json({
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Classic query execution error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * POST /api/analytics/ai-query
+ * Execute natural language query using AI
+ */
+router.post('/ai-query', authenticateToken, async (req, res) => {
+  try {
+    const { query } = req.body;
+
+    if (!query || typeof query !== 'string' || query.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Natural language query is required',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Limit query length for security
+    if (query.length > 500) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query too long. Please keep it under 500 characters.',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    console.log(`🤖 Executing AI query: "${query}"`);
+    
+    const result = await gptQueryService.executeNaturalLanguageQuery(query);
+    
+    res.json({
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('AI query execution error:', error);
     res.status(500).json({
       success: false,
       error: error.message,

@@ -15,6 +15,12 @@ export interface User {
   last_login?: string;
   created_at: string;
   updated_at: string;
+  permissions?: {
+    manage_agencies?: boolean;
+    manage_users?: boolean;
+    view_audit_logs?: boolean;
+    [key: string]: boolean | undefined;
+  };
 }
 
 // Import types explicitly to avoid circular dependencies

@@ -58,7 +58,46 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
             where: { exchangeId }
           });
           
-          const contactId = existingUser.contact_id || existingUser.id;
+          // Ensure user has a contact record
+          let contactId = existingUser.contact_id;
+          
+          if (!contactId) {
+            // Create a contact record for this user if it doesn't exist
+            console.log(`🔗 Creating contact record for existing user: ${existingUser.email}`);
+            const contactData = {
+              id: uuidv4(),
+              first_name: existingUser.first_name || invitation.firstName || 'Unknown',
+              last_name: existingUser.last_name || invitation.lastName || 'User',
+              email: existingUser.email,
+              phone: existingUser.phone || invitation.phone || null,
+              contact_type: 'person',
+              source: 'user_invitation',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            
+            await supabaseService.insert('contacts', contactData);
+            contactId = contactData.id;
+            
+            // Update user record to link to the new contact
+            await supabaseService.update('users', 
+              { contact_id: contactId, updated_at: new Date().toISOString() },
+              { id: existingUser.id }
+            );
+            
+            console.log(`✅ Created contact ${contactId} and linked to user ${existingUser.id}`);
+          }
+          
+          // Verify the contact exists in the contacts table
+          const contactExists = await supabaseService.select('contacts', {
+            where: { id: contactId },
+            limit: 1
+          });
+          
+          if (!contactExists || contactExists.length === 0) {
+            throw new Error(`Contact ${contactId} does not exist in contacts table`);
+          }
+          
           const isAlreadyParticipant = existingParticipants.some(p => 
             (p.user_id === existingUser.id || p.contact_id === contactId) && 
             p.role === invitation.role && 
@@ -78,18 +117,88 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
           const permissions = invitationService.getDefaultPermissions(invitation.role);
           
           // Get the inviter's contact_id (assigned_by must reference contacts table)
-          const inviterContactId = req.user.contact_id || null;
+          let inviterContactId = req.user.contact_id;
           
-          await supabaseService.createExchangeParticipant({
+          if (!inviterContactId) {
+            // If inviter doesn't have a contact_id, create one
+            console.log(`🔗 Creating contact record for inviter: ${req.user.email}`);
+            const inviterContactData = {
+              id: uuidv4(),
+              first_name: req.user.first_name || 'Admin',
+              last_name: req.user.last_name || 'User',
+              email: req.user.email,
+              phone: req.user.phone || null,
+              contact_type: 'person',
+              source: 'user_system',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            
+            await supabaseService.insert('contacts', inviterContactData);
+            inviterContactId = inviterContactData.id;
+            
+            // Update inviter's user record
+            await supabaseService.update('users', 
+              { contact_id: inviterContactId, updated_at: new Date().toISOString() },
+              { id: req.user.id }
+            );
+            
+            console.log(`✅ Created contact ${inviterContactId} and linked to inviter ${req.user.id}`);
+          }
+          
+          const participantResult = await supabaseService.createExchangeParticipant({
             id: uuidv4(),
             exchange_id: exchangeId,
-            contact_id: contactId, // Use the user's linked contact_id
+            contact_id: contactId, // Now guaranteed to be a valid contact_id
+            user_id: existingUser.id, // IMPORTANT: Also set user_id for filtering
             role: invitation.role,
             permissions: permissions, // Store as JSONB array
-            assigned_by: inviterContactId, // Use inviter's contact_id or null
+            assigned_by: inviterContactId, // Now guaranteed to be a valid contact_id
             assigned_at: new Date().toISOString(),
             is_active: true
           });
+          
+          console.log(`✅ Created exchange participant:`, participantResult);
+          
+          // Create database notification for the invited user
+          const notificationData = {
+            id: uuidv4(),
+            user_id: existingUser.id,
+            title: 'You\'ve been added to an exchange!',
+            message: `${req.user.first_name ? `${req.user.first_name} ${req.user.last_name}` : req.user.email} added you to ${exchange.name || exchange.exchange_number} as a ${invitation.role}`,
+            type: 'participant',
+            read: false,
+            related_exchange_id: exchangeId,
+            urgency: 'high',
+            created_at: new Date().toISOString()
+          };
+
+          try {
+            const result = await supabaseService.createNotification(notificationData);
+            console.log(`✅ Created database notification for user ${existingUser.id}:`, result);
+            
+            // Emit immediate socket notification to trigger popup 
+            const io = req.app?.get('io');
+            if (io) {
+              console.log(`📡 Emitting database notification created event to user_${existingUser.id}`);
+              io.to(`user_${existingUser.id}`).emit('database_notification_created', {
+                notification: {
+                  id: result.id || notificationData.id,
+                  title: notificationData.title,
+                  message: notificationData.message,
+                  type: notificationData.type,
+                  read: false,
+                  created_at: notificationData.created_at,
+                  action_url: `/exchanges/${exchangeId}`
+                }
+              });
+            }
+          } catch (notificationError) {
+            console.error('❌ Failed to create database notification:', notificationError);
+            console.error('❌ Notification data was:', notificationData);
+            console.error('❌ Full error:', JSON.stringify(notificationError, null, 2));
+            // Don't fail the invitation process if notification creation fails
+          }
           
           // Send notification to existing user
           await invitationService.sendExchangeNotification({
@@ -102,6 +211,63 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
             customMessage: message,
             type: 'added_to_exchange'
           });
+          
+          // Emit real-time notification for existing user being added
+          const io = req.app?.get('io');
+          if (io) {
+            console.log(`📡 Emitting notifications for user ${existingUser.id} (${existingUser.email})`);
+            
+            // Small delay to ensure database transaction is committed
+            setTimeout(() => {
+              // Emit immediate invitation notification to the user
+              io.to(`user_${existingUser.id}`).emit('invitation_notification', {
+                title: 'You\'ve been added to an exchange!',
+                message: `${req.user.first_name ? `${req.user.first_name} ${req.user.last_name}` : req.user.email} added you to ${exchange.name || exchange.exchange_number} as a ${invitation.role}`,
+                exchangeId: exchangeId,
+                exchangeName: exchange.name || exchange.exchange_number,
+                actionUrl: `/exchanges/${exchangeId}`,
+                type: 'info'
+              });
+              console.log(`✅ Sent invitation_notification to user_${existingUser.id}`);
+            }, 100);
+            
+            // Also emit participant_added with a slight delay to ensure DB consistency  
+            setTimeout(() => {
+              // Emit to the specific user being added
+              io.to(`user_${existingUser.id}`).emit('participant_added', {
+                exchangeId: exchangeId,
+                participantId: participantResult?.id || 'new-participant',
+                participant: {
+                  user_id: existingUser.id,
+                  contact_id: contactId,
+                  role: invitation.role,
+                  email: existingUser.email,
+                  name: `${existingUser.first_name || ''} ${existingUser.last_name || ''}`.trim()
+                },
+                addedBy: req.user.id,
+                exchangeName: exchange.name || exchange.exchange_number
+              });
+              
+              // Also emit to exchange room in case user is already connected
+              io.to(`exchange_${exchangeId}`).emit('participant_added', {
+                exchangeId: exchangeId,
+                participantId: participantResult?.id || 'new-participant',
+                participant: {
+                  user_id: existingUser.id,
+                  contact_id: contactId,
+                  role: invitation.role,
+                  email: existingUser.email,
+                  name: `${existingUser.first_name || ''} ${existingUser.last_name || ''}`.trim()
+                },
+                addedBy: req.user.id,
+                exchangeName: exchange.name || exchange.exchange_number
+              });
+              
+              console.log(`✅ Sent participant_added to user_${existingUser.id} and exchange_${exchangeId}`);
+            }, 200);
+          } else {
+            console.warn('⚠️ Socket.IO not available for participant addition notification');
+          }
           
           results.push({
             email: invitation.email,
@@ -269,23 +435,77 @@ router.post('/accept/:token', [
     // Add user as exchange participant
     const permissions = invitationService.getDefaultPermissions(invitation.role);
     
-    // Use the user's linked contact_id for the exchange participant
-    const contactId = user.contact_id || user.id;
+    // Ensure the new user has a contact_id (AuthService should have created this)
+    let contactId = user.contact_id;
+    
+    if (!contactId) {
+      // This should not happen if AuthService is working correctly, but as a fallback:
+      console.log(`⚠️ Warning: New user ${user.email} doesn't have contact_id, creating one`);
+      const contactData = {
+        id: uuidv4(),
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        phone: user.phone || null,
+        contact_type: 'person',
+        source: 'user_signup',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      await supabaseService.insert('contacts', contactData);
+      contactId = contactData.id;
+      
+      // Update user record to link to the new contact
+      await supabaseService.update('users', 
+        { contact_id: contactId, updated_at: new Date().toISOString() },
+        { id: user.id }
+      );
+      
+      console.log(`✅ Created contact ${contactId} and linked to new user ${user.id}`);
+    }
     
     // Get the inviter's contact_id from their user record
     let inviterContactId = null;
     if (invitation.invited_by) {
       const inviter = await supabaseService.getUserById(invitation.invited_by);
-      inviterContactId = inviter?.contact_id || null;
+      inviterContactId = inviter?.contact_id;
+      
+      // Ensure inviter has contact_id too
+      if (!inviterContactId && inviter) {
+        console.log(`🔗 Creating contact record for inviter: ${inviter.email}`);
+        const inviterContactData = {
+          id: uuidv4(),
+          first_name: inviter.first_name || 'Admin',
+          last_name: inviter.last_name || 'User',
+          email: inviter.email,
+          phone: inviter.phone || null,
+          contact_type: 'person',
+          source: 'user_system',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        await supabaseService.insert('contacts', inviterContactData);
+        inviterContactId = inviterContactData.id;
+        
+        // Update inviter's user record
+        await supabaseService.update('users', 
+          { contact_id: inviterContactId, updated_at: new Date().toISOString() },
+          { id: inviter.id }
+        );
+        
+        console.log(`✅ Created contact ${inviterContactId} and linked to inviter ${inviter.id}`);
+      }
     }
     
     await supabaseService.createExchangeParticipant({
       id: uuidv4(),
       exchange_id: invitation.exchange_id,
-      contact_id: contactId, // Use the user's linked contact_id
+      contact_id: contactId, // Now guaranteed to be a valid contact_id
       role: invitation.role,
       permissions: permissions, // Store as JSONB array
-      assigned_by: inviterContactId, // Use inviter's contact_id or null
+      assigned_by: inviterContactId, // Now guaranteed to be a valid contact_id or null
       assigned_at: new Date().toISOString(),
       is_active: true
     });

@@ -341,8 +341,9 @@ const EnhancedKeyMetrics: React.FC<{ exchange: EnhancedExchange }> = ({ exchange
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
       {metrics.map((metric, index) => {
         const IconComponent = metric.icon;
-        const isUrgent = metric.urgent && metric.value !== null && metric.value !== undefined && metric.value <= 45 && metric.value >= 0;
-        const isOverdue = metric.value !== null && metric.value !== undefined && metric.value < 0;
+        const numericValue = typeof metric.value === 'string' ? parseFloat(metric.value) : metric.value;
+        const isUrgent = metric.urgent && numericValue !== null && numericValue !== undefined && !isNaN(numericValue) && numericValue <= 45 && numericValue >= 0;
+        const isOverdue = numericValue !== null && numericValue !== undefined && !isNaN(numericValue) && numericValue < 0;
         
         return (
           <div

@@ -48,22 +48,27 @@ router.get('/:id/participants', [
       .from('exchange_participants')
       .select(`
         *,
-        user:user_id(id, first_name, last_name, email, role)
+        user:user_id(id, first_name, last_name, email, role),
+        contact:contact_id(id, first_name, last_name, email)
       `)
       .eq('exchange_id', req.params.id);
 
     if (error) throw error;
 
-    // Format the response
+    // Format the response - handle both user_id and contact_id cases
     const formattedParticipants = (participants || [])
-      .filter(p => p.user)
-      .map(p => ({
-        id: p.user.id,
-        firstName: p.user.first_name,
-        lastName: p.user.last_name,
-        email: p.user.email,
-        role: p.user.role || p.role
-      }));
+      .filter(p => p.user || p.contact)
+      .map(p => {
+        const user = p.user || p.contact;
+        return {
+          id: user.id,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          email: user.email,
+          role: p.role,
+          participantId: p.id
+        };
+      });
 
     res.json({
       data: formattedParticipants,
@@ -215,6 +220,7 @@ router.get('/', [
     
     console.log('🔍 DEBUG: whereClause =', JSON.stringify(whereClause, null, 2));
     console.log('🔍 DEBUG: user role =', req.user?.role);
+    console.log('🔍 DEBUG: user =', { id: req.user?.id, email: req.user?.email, role: req.user?.role });
     console.log('🔍 DEBUG: include_inactive =', include_inactive);
     
     // Log for debugging
@@ -253,15 +259,25 @@ router.get('/', [
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     // Use database service instead of direct Sequelize
+    console.log('🔍 DEBUG: Calling databaseService.getExchanges with:', {
+      where: whereClause,
+      limit: parseInt(limit),
+      offset: offset
+    });
+    
     const exchanges = await databaseService.getExchanges({
       where: whereClause,
       limit: parseInt(limit),
       offset: offset,
       orderBy: { column: sort_by, ascending: sort_order === 'asc' }
     });
+    
+    console.log('🔍 DEBUG: databaseService returned exchanges:', exchanges?.length || 0);
 
     // For now, we'll get count separately since our service doesn't support findAndCountAll yet
     const allExchanges = await databaseService.getExchanges({ where: whereClause });
+    
+    console.log('🔍 DEBUG: Total count query returned:', allExchanges?.length || 0);
     const count = allExchanges.length;
 
     // Enhance exchange data with computed fields
@@ -1380,39 +1396,61 @@ async function buildExchangeWhereClause(user, filters) {
       }
     }
   } else if (user.role === 'coordinator') {
-    // Coordinators see assigned exchanges
-    whereClause.coordinator_id = user.id;
+    // Coordinators see exchanges where they are the primary coordinator OR a participant
+    console.log(`🔍 Checking exchanges for coordinator: ${user.email} (ID: ${user.id})`);
+    
+    // Check both user_id and contact_id in participants table
+    const participantQueries = [{ user_id: user.id }];
+    if (user.contact_id) {
+      participantQueries.push({ contact_id: user.contact_id });
+    }
+    
+    const participants = await databaseService.getExchangeParticipants({
+      where: { [Op.or]: participantQueries }
+    });
+    
+    const participantExchangeIds = [...new Set(participants.map(p => p.exchange_id))]; // Dedupe
+    console.log(`📋 Coordinator is participant in ${participantExchangeIds.length} exchanges`);
+    
+    if (participantExchangeIds.length > 0) {
+      // Show exchanges where they are coordinator OR participant
+      whereClause[Op.or] = [
+        { coordinator_id: user.id },
+        { id: { [Op.in]: participantExchangeIds } }
+      ];
+      console.log(`✅ Coordinator can see primary + participant exchanges`);
+    } else {
+      // Only show exchanges where they are the primary coordinator
+      whereClause.coordinator_id = user.id;
+      console.log(`✅ Coordinator can only see primary exchanges`);
+    }
   } else if (user.role === 'third_party' || user.role === 'agency') {
     // Third parties and agencies see exchanges they participate in
+    console.log(`🔍 Checking exchanges for ${user.role}: ${user.email} (ID: ${user.id})`);
+    
+    // Check BOTH user_id and contact_id in participants table (like coordinator logic)
+    const participantQueries = [{ user_id: user.id }];
     if (user.contact_id) {
-      // Find exchanges where their contact is a participant
-      const participants = await databaseService.getExchangeParticipants({
-        where: { contact_id: user.contact_id }
-      });
-      
-      const exchangeIds = participants.map(p => p.exchange_id);
-      
-      if (exchangeIds.length > 0) {
-        whereClause.id = { [Op.in]: exchangeIds };
-      } else {
-        whereClause.id = null; // No exchanges
-      }
-    } else {
-      // Check by user_id in participants
-      const participants = await databaseService.getExchangeParticipants({
-        where: { user_id: user.id }
-      });
-      
-      const exchangeIds = participants.map(p => p.exchange_id);
-      
-      if (exchangeIds.length > 0) {
-        whereClause.id = { [Op.in]: exchangeIds };
-      } else {
-        whereClause.id = null; // No exchanges
-      }
+      participantQueries.push({ contact_id: user.contact_id });
     }
+    
+    const participants = await databaseService.getExchangeParticipants({
+      where: { [Op.or]: participantQueries }
+    });
+    
+    const exchangeIds = [...new Set(participants.map(p => p.exchange_id))]; // Dedupe
+    console.log(`📋 ${user.role} is participant in ${exchangeIds.length} exchanges`);
+    
+    if (exchangeIds.length > 0) {
+      whereClause.id = { [Op.in]: exchangeIds };
+    } else {
+      whereClause.id = null; // No exchanges
+      console.log(`⚠️ No exchanges found for ${user.role} user: ${user.email}`);
+    }
+  } else if (user.role === 'admin' || user.role === 'staff') {
+    // Admin and staff see all exchanges (no additional filtering based on role)
+    console.log(`✅ Admin/Staff user ${user.email} has access to all exchanges`);
   }
-  // Admin and staff see all exchanges (filtered by other criteria only)
 
   // Apply filters
   if (filters.status) {
@@ -1712,6 +1750,147 @@ router.put('/:id/milestone/:milestoneId', [
     console.error('Error updating milestone:', error);
     res.status(500).json({
       error: 'Failed to update milestone',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * DELETE /api/exchanges/:id/participants/:participantId
+ * Remove participant from exchange (Admin only)
+ */
+router.delete('/:id/participants/:participantId', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  param('participantId').isUUID().withMessage('Participant ID must be a valid UUID'),
+  authenticateToken,
+  requireRole(['admin'])
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { id: exchangeId, participantId } = req.params;
+    const adminId = req.user.id;
+
+    console.log(`🗑️ Admin ${req.user.email} attempting to remove participant ${participantId} from exchange ${exchangeId}`);
+
+    // Verify exchange exists
+    const exchange = await databaseService.getExchangeById(exchangeId);
+    if (!exchange) {
+      return res.status(404).json({
+        error: 'Exchange not found'
+      });
+    }
+
+    // Get participant details before removal
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    
+    const { data: participant, error: participantError } = await supabase
+      .from('exchange_participants')
+      .select(`
+        *,
+        user:user_id(id, first_name, last_name, email, role),
+        contact:contact_id(id, first_name, last_name, email)
+      `)
+      .eq('id', participantId)
+      .eq('exchange_id', exchangeId)
+      .single();
+
+    if (participantError || !participant) {
+      return res.status(404).json({
+        error: 'Participant not found in this exchange'
+      });
+    }
+
+    const user = participant.user || participant.contact;
+    const participantName = user ? `${user.first_name} ${user.last_name}` : 'Unknown User';
+    const participantEmail = user?.email || 'Unknown Email';
+
+    // Prevent removing the last admin from an exchange
+    if (participant.role === 'admin') {
+      const { data: adminParticipants, error: adminCountError } = await supabase
+        .from('exchange_participants')
+        .select('id')
+        .eq('exchange_id', exchangeId)
+        .eq('role', 'admin');
+
+      if (!adminCountError && adminParticipants && adminParticipants.length <= 1) {
+        return res.status(400).json({
+          error: 'Cannot remove the last admin from an exchange'
+        });
+      }
+    }
+
+    // Remove participant from exchange
+    const { error: deleteError } = await supabase
+      .from('exchange_participants')
+      .delete()
+      .eq('id', participantId)
+      .eq('exchange_id', exchangeId);
+
+    if (deleteError) {
+      console.error('❌ Error removing participant:', deleteError);
+      return res.status(500).json({
+        error: 'Failed to remove participant from exchange'
+      });
+    }
+
+    // Log the removal action
+    await AuditService.log({
+      action: 'EXCHANGE_PARTICIPANT_REMOVED',
+      entityType: 'exchange',
+      entityId: exchangeId,
+      userId: adminId,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: {
+        participant_id: participantId,
+        participant_name: participantName,
+        participant_email: participantEmail,
+        participant_role: participant.role,
+        removed_by: adminId
+      }
+    });
+
+    // Emit socket event for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`exchange_${exchangeId}`).emit('participant_removed', {
+        exchangeId,
+        participantId,
+        participant: {
+          id: participantId,
+          name: participantName,
+          email: participantEmail,
+          role: participant.role
+        },
+        removedBy: req.user.email
+      });
+    }
+
+    console.log(`✅ Successfully removed participant ${participantName} (${participantEmail}) from exchange ${exchangeId}`);
+
+    res.json({
+      success: true,
+      message: `Successfully removed ${participantName} from the exchange`,
+      participant: {
+        id: participantId,
+        name: participantName,
+        email: participantEmail,
+        role: participant.role
+      }
+    });
+
+  } catch (error) {
+    console.error('Error removing participant from exchange:', error);
+    res.status(500).json({
+      error: 'Failed to remove participant from exchange',
       message: error.message
     });
   }

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Agencies API with Relative URLs</title>
+</head>
+<body>
+    <h1>Agencies API Test (Relative URLs)</h1>
+    <div id="status">Loading...</div>
+    <div id="result"></div>
+    
+    <script>
+        async function testAgenciesAPI() {
+            const statusDiv = document.getElementById('status');
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                statusDiv.textContent = 'Getting existing token from localStorage...';
+                
+                // Try to use existing token first
+                let token = localStorage.getItem('token');
+                
+                if (!token) {
+                    statusDiv.textContent = 'No token found, logging in...';
+                    
+                    // Login if no token
+                    const loginResponse = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            email: 'admin@peak1031.com',
+                            password: 'admin123'
+                        })
+                    });
+                    
+                    if (!loginResponse.ok) {
+                        throw new Error('Login failed: ' + loginResponse.status);
+                    }
+                    
+                    const loginData = await loginResponse.json();
+                    token = loginData.token;
+                    localStorage.setItem('token', token);
+                }
+                
+                statusDiv.textContent = 'Testing /api/agencies endpoint...';
+                
+                // Test agencies endpoint with relative URL
+                const agenciesResponse = await fetch('/api/agencies', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+                
+                statusDiv.textContent = `Response status: ${agenciesResponse.status}`;
+                
+                if (!agenciesResponse.ok) {
+                    const errorText = await agenciesResponse.text();
+                    throw new Error('Agencies API failed: ' + agenciesResponse.status + ' ' + agenciesResponse.statusText + '\n' + errorText);
+                }
+                
+                const agenciesData = await agenciesResponse.json();
+                
+                statusDiv.textContent = 'SUCCESS! API is working';
+                resultDiv.innerHTML = '<h2>Agencies Data:</h2>' +
+                    '<p>Success: ' + agenciesData.success + '</p>' +
+                    '<p>Count: ' + (agenciesData.data ? agenciesData.data.length : 0) + '</p>' +
+                    '<h3>Full Response:</h3>' +
+                    '<pre>' + JSON.stringify(agenciesData, null, 2) + '</pre>';
+                
+            } catch (error) {
+                statusDiv.textContent = 'ERROR: ' + error.message;
+                resultDiv.innerHTML = '<h2>Error details:</h2><pre>' + error.stack + '</pre>';
+                console.error('Test failed:', error);
+            }
+        }
+        
+        // Run test when page loads
+        testAgenciesAPI();
+    </script>
+</body>
+</html>

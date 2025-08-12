@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const supabaseService = require('../services/supabase');
+const databaseService = require('../services/database');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -117,6 +118,36 @@ router.post('/:exchangeId/participants', authenticateToken, async (req, res) => 
     const result = await supabaseService.createExchangeParticipant(participantData);
     console.log('✅ Participant added successfully:', result);
 
+    // Emit real-time event for participant addition
+    const io = req.app.get('io');
+    if (io) {
+      console.log(`📡 Emitting participant_added to exchange_${exchangeId}`);
+      io.to(`exchange_${exchangeId}`).emit('participant_added', {
+        exchangeId: exchangeId,
+        participantId: result.id,
+        participant: result,
+        addedBy: req.user.id
+      });
+      
+      // Also emit to all connected users in the exchange (fallback)
+      const participants = await databaseService.getExchangeParticipants({
+        where: { exchange_id: exchangeId }
+      });
+      
+      participants.forEach(participant => {
+        if (participant.user_id) {
+          io.to(`user_${participant.user_id}`).emit('participant_added', {
+            exchangeId: exchangeId,
+            participantId: result.id,
+            participant: result,
+            addedBy: req.user.id
+          });
+        }
+      });
+    } else {
+      console.warn('⚠️ Socket.IO not available for real-time participant notification');
+    }
+
     res.json({ 
       message: 'Participant added successfully',
       participantId: result.id,
@@ -150,6 +181,34 @@ router.delete('/:exchangeId/participants/:participantId', authenticateToken, asy
     await supabaseService.delete('exchange_participants', {
       where: { id: participantId, exchange_id: exchangeId }
     });
+
+    // Emit real-time event for participant removal
+    const io = req.app.get('io');
+    if (io) {
+      console.log(`📡 Emitting participant_removed to exchange_${exchangeId}`);
+      io.to(`exchange_${exchangeId}`).emit('participant_removed', {
+        exchangeId: exchangeId,
+        participantId: participantId,
+        removedBy: req.user.id
+      });
+      
+      // Also emit to all connected users in the exchange (fallback)
+      const participants = await databaseService.getExchangeParticipants({
+        where: { exchange_id: exchangeId }
+      });
+      
+      participants.forEach(participant => {
+        if (participant.user_id) {
+          io.to(`user_${participant.user_id}`).emit('participant_removed', {
+            exchangeId: exchangeId,
+            participantId: participantId,
+            removedBy: req.user.id
+          });
+        }
+      });
+    } else {
+      console.warn('⚠️ Socket.IO not available for real-time participant removal notification');
+    }
 
     res.json({ 
       message: 'Participant removed successfully'

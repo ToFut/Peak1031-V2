@@ -16,7 +16,7 @@ const checkPermission = (resource, action) => {
   };
 };
 const databaseService = require('../services/database');
-const auditService = require('../services/audit');
+const AuditService = require('../services/audit');
 const messageAgentService = require('../services/messageAgentService');
 const ChatTaskService = require('../services/chatTaskService');
 const { Op } = require('sequelize');
@@ -34,55 +34,81 @@ router.get('/test-rbac', authenticateToken, checkPermission('messages', 'read'),
   res.json({ message: 'RBAC test passed', user: req.user.email, role: req.user.role });
 });
 
-// Get all messages (admin only)
+// Get messages with RBAC filtering
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    console.log('📥 GET /messages - Admin only');
+    console.log('📥 GET /messages - Role-based access for:', req.user.role);
     
-    // Only allow admin users to get all messages
-    if (req.user.role !== 'admin') {
-      console.log('❌ Access denied - not admin:', req.user.role);
-      return res.status(403).json({ 
-        success: false,
-        error: 'Access denied. Admin only.' 
-      });
-    }
-
+    // Use RBAC service to get user's accessible messages
+    const rbacService = require('../services/rbacService');
     const { page = 1, limit = 50, search } = req.query;
     
-    const whereClause = {};
+    let messages = [];
+    
+    if (req.user.role === 'admin') {
+      console.log('🔓 Admin user - getting all messages');
+      // Admin gets all messages
+      const supabaseService = require('../services/supabase');
+      const { data: allMessages, error } = await supabaseService.client
+        .from('messages')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range((parseInt(page) - 1) * parseInt(limit), (parseInt(page) * parseInt(limit)) - 1);
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      messages = allMessages || [];
+    } else {
+      console.log('🔒 Non-admin user - getting role-filtered messages');
+      // Get exchanges user has access to
+      const userExchanges = await rbacService.getExchangesForUser(req.user, { limit: 1000 });
+      const exchangeIds = userExchanges.data.map(ex => ex.id);
+      
+      if (exchangeIds.length > 0) {
+        const supabaseService = require('../services/supabase');
+        const { data: roleMessages, error } = await supabaseService.client
+          .from('messages')
+          .select('*')
+          .in('exchange_id', exchangeIds)
+          .order('created_at', { ascending: false })
+          .range((parseInt(page) - 1) * parseInt(limit), (parseInt(page) * parseInt(limit)) - 1);
+        
+        if (error) {
+          throw new Error(error.message);
+        }
+        messages = roleMessages || [];
+      }
+    }
+    
+    // Apply search filter if provided
+    let filteredMessages = messages || [];
     if (search) {
-      whereClause.content = search; // Will be converted to ilike in service
+      filteredMessages = filteredMessages.filter(msg => 
+        msg.content?.toLowerCase().includes(search.toLowerCase())
+      );
     }
 
-    console.log('🔍 Fetching all messages with where:', whereClause);
-    const messages = await databaseService.getMessages({
-      where: whereClause,
-      limit: parseInt(limit),
-      offset: (parseInt(page) - 1) * parseInt(limit),
-      orderBy: { column: 'created_at', ascending: false }
-    });
-
-    console.log('✅ Found', messages.length, 'messages');
+    console.log('✅ Found', filteredMessages.length, 'messages');
     
     // Log audit trail
-    await auditService.logUserAction(
+    await AuditService.logUserAction(
       req.user.id,
       'view_all_messages',
       'message',
       null,
       req,
-      { messageCount: messages.length, search }
+      { messageCount: filteredMessages.length, search }
     );
 
     res.json({
       success: true,
-      data: messages,
+      data: filteredMessages,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total: messages.length,
-        totalPages: Math.ceil(messages.length / parseInt(limit))
+        total: filteredMessages.length,
+        totalPages: Math.ceil(filteredMessages.length / parseInt(limit))
       }
     });
   } catch (error) {
@@ -90,7 +116,7 @@ router.get('/', authenticateToken, async (req, res) => {
     console.error('Stack trace:', error.stack);
     
     // Log error for audit
-    await auditService.log({
+    await AuditService.log({
       action: 'ERROR',
       userId: req.user?.id,
       resourceType: 'message',
@@ -149,8 +175,8 @@ router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
     
-    // Use correct field name for Supabase
-    const whereClause = { exchangeId }; // This will be converted to exchange_id in the service
+    // Use correct field name for Supabase (snake_case)
+    const whereClause = { exchange_id: exchangeId };
     if (before) {
       whereClause.created_at = { lt: new Date(before) };
     }
@@ -166,7 +192,7 @@ router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
     console.log('✅ Found', messages.length, 'messages');
     
     // Log audit trail
-    await auditService.logUserAction(
+    await AuditService.logUserAction(
       req.user.id,
       'view_messages',
       'exchange',
@@ -190,7 +216,7 @@ router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
     console.error('Stack trace:', error.stack);
     
     // Log error for audit
-    await auditService.log({
+    await AuditService.log({
       action: 'ERROR',
       userId: req.user?.id,
       resourceType: 'message',
@@ -242,24 +268,43 @@ router.post('/', authenticateToken, checkPermission('messages', 'write'), async 
       // For now, allow client users to send messages to any exchange
       console.log('⚠️ Client access check bypassed - user-to-contact mapping not implemented');
     } else if (req.user.role === 'coordinator') {
-      if (exchange.coordinatorId !== req.user.id) {
-        return res.status(403).json({ error: 'Access denied' });
+      // Fix field name for Supabase
+      if (exchange.coordinator_id !== req.user.id) {
+        console.log(`❌ Coordinator access denied: exchange coordinator_id (${exchange.coordinator_id}) !== user id (${req.user.id})`);
+        return res.status(403).json({ error: 'Access denied - not the coordinator of this exchange' });
       }
+      console.log('✅ Coordinator access granted');
     } else if (!['admin', 'staff'].includes(req.user.role)) {
       // For non-admin/staff users who aren't the coordinator or client,
       // check if they are a participant in this exchange
       console.log('🔍 Checking participant access...');
-      const participant = await databaseService.getExchangeParticipants({
+      
+      // Check both user_id and contact_id for participants
+      const participantsByUserId = await databaseService.getExchangeParticipants({
         where: { 
           exchange_id: exchangeId,
           user_id: req.user.id
         }
       });
-      console.log('👥 Participant check result:', participant?.length || 0);
       
-      if (!participant || participant.length === 0) {
+      let participantsByContactId = [];
+      if (req.user.contact_id) {
+        participantsByContactId = await databaseService.getExchangeParticipants({
+          where: { 
+            exchange_id: exchangeId,
+            contact_id: req.user.contact_id
+          }
+        });
+      }
+      
+      const totalParticipants = (participantsByUserId?.length || 0) + (participantsByContactId?.length || 0);
+      console.log(`👥 Participant check result: ${participantsByUserId?.length || 0} by user_id, ${participantsByContactId?.length || 0} by contact_id`);
+      
+      if (totalParticipants === 0) {
+        console.log(`❌ Access denied: user ${req.user.email} is not a participant in exchange ${exchangeId}`);
         return res.status(403).json({ error: 'Access denied - not a participant in this exchange' });
       }
+      console.log('✅ Participant access granted');
     }
     // Admin and staff have access to all exchanges
 
@@ -345,7 +390,7 @@ router.post('/', authenticateToken, checkPermission('messages', 'write'), async 
         
         // Log any successful agent actions
         if (agentResults.taskCreated) {
-          await auditService.logUserAction(
+          await AuditService.logUserAction(
             req.user.id,
             'auto_create_task',
             'task',
@@ -361,7 +406,7 @@ router.post('/', authenticateToken, checkPermission('messages', 'write'), async 
         }
 
         if (agentResults.contactAdded) {
-          await auditService.logUserAction(
+          await AuditService.logUserAction(
             req.user.id,
             'auto_add_contact',
             'contact',
@@ -383,7 +428,7 @@ router.post('/', authenticateToken, checkPermission('messages', 'write'), async 
     }
 
     // Log the message creation for audit
-    await auditService.logUserAction(
+    await AuditService.logUserAction(
       req.user.id,
       'send_message',
       'message',

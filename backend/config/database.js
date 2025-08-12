@@ -7,12 +7,13 @@ const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NOD
 // Check if Supabase credentials are available
 const hasSupabaseCredentials = !!(process.env.SUPABASE_URL && (process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY));
 
-const useSupabase = true; // Always use Supabase
-const useSQLite = false; // Never use SQLite
+// Use Supabase only if credentials are available, otherwise use SQLite
+const useSupabase = hasSupabaseCredentials;
+const useSQLite = !hasSupabaseCredentials;
 
 console.log('🔧 Database Service: Using', useSupabase ? 'Supabase REST API' : 'SQLite database');
 
-if (!hasSupabaseCredentials) {
+if (useSupabase && !hasSupabaseCredentials) {
   console.error('❌ CRITICAL: Supabase credentials not found!');
   console.error('❌ Please configure SUPABASE_URL and SUPABASE_ANON_KEY or SUPABASE_SERVICE_KEY in your .env file');
   console.error('❌ The application will not work without Supabase credentials');

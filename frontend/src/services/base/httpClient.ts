@@ -56,6 +56,13 @@ export class HttpClient {
       }
       
       const errorData = await response.json().catch(() => ({}));
+      console.error('🚨 HTTP Error Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        endpoint,
+        errorData,
+        url
+      });
       throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
     }
 

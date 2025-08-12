@@ -540,6 +540,313 @@ class NotificationService {
       return { success: false, error: error.message };
     }
   }
+
+  /**
+   * Send exchange created notification to participants
+   */
+  async sendExchangeCreatedNotification(exchange) {
+    if (!this.sendGridEnabled) {
+      console.log('📧 SendGrid not enabled - skipping exchange creation notifications');
+      return { success: true, skipped: true };
+    }
+
+    try {
+      const participants = exchange.exchangeParticipants || [];
+      const notifications = [];
+
+      for (const participant of participants) {
+        if (participant.contact && participant.contact.email) {
+          // Send to client contacts
+          const result = await this.sendExchangeInvitationEmail(
+            participant.contact.email,
+            participant.contact.first_name || 'there',
+            exchange.name,
+            exchange.exchange_number,
+            'client'
+          );
+          notifications.push(result);
+        } else if (participant.user && participant.user.email) {
+          // Send to internal users
+          const result = await this.sendExchangeInvitationEmail(
+            participant.user.email,
+            participant.user.first_name || 'there',
+            exchange.name,
+            exchange.exchange_number,
+            participant.role
+          );
+          notifications.push(result);
+        }
+      }
+
+      console.log(`✅ Exchange creation notifications sent: ${notifications.filter(n => n.success).length}/${notifications.length}`);
+      return { success: true, notifications };
+    } catch (error) {
+      console.error('❌ Failed to send exchange creation notifications:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send exchange invitation email
+   */
+  async sendExchangeInvitationEmail(email, firstName, exchangeName, exchangeNumber, role) {
+    if (!this.sendGridEnabled) {
+      console.log('📧 SendGrid not enabled - skipping invitation email to:', email);
+      return { success: true, skipped: true };
+    }
+
+    try {
+      const subject = `You've been invited to join: ${exchangeName}`;
+      
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #2563eb; color: white; padding: 20px; text-align: center;">
+            <h1>📋 Exchange Invitation</h1>
+          </div>
+          
+          <div style="padding: 30px;">
+            <h2>Hello ${firstName},</h2>
+            
+            <p>You have been invited to participate in a 1031 exchange transaction.</p>
+            
+            <div style="background-color: #eff6ff; border-left: 4px solid #2563eb; padding: 15px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>Exchange:</strong> ${exchangeName}</p>
+              <p style="margin: 5px 0;"><strong>Exchange Number:</strong> ${exchangeNumber}</p>
+              <p style="margin: 5px 0;"><strong>Your Role:</strong> ${role}</p>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${this.baseUrl}/exchanges/${exchangeNumber}" 
+                 style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                View Exchange Details
+              </a>
+            </div>
+            
+            <h3>What You Can Do:</h3>
+            <ul>
+              <li>View exchange documents and progress</li>
+              <li>Communicate with other participants</li>
+              <li>Upload required documents</li>
+              <li>Track important deadlines</li>
+            </ul>
+            
+            <p>If you have any questions about this exchange, please contact your coordinator.</p>
+            
+            <p>Best regards,<br>The Peak 1031 Team</p>
+          </div>
+          
+          <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 14px;">
+              This invitation was sent to ${email}. If you didn't expect this invitation, please contact support.
+            </p>
+          </div>
+        </div>
+      `;
+
+      const msg = {
+        to: email,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject,
+        html
+      };
+
+      await sgMail.send(msg);
+      console.log('✅ Exchange invitation sent to:', email);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Failed to send exchange invitation:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send status change notification
+   */
+  async sendStatusChangeNotification(exchange, oldStatus, newStatus) {
+    if (!this.sendGridEnabled) {
+      console.log('📧 SendGrid not enabled - skipping status change notifications');
+      return { success: true, skipped: true };
+    }
+
+    try {
+      const participants = exchange.exchangeParticipants || [];
+      const notifications = [];
+
+      for (const participant of participants) {
+        if (participant.contact && participant.contact.email) {
+          const result = await this.sendStatusChangeEmail(
+            participant.contact.email,
+            participant.contact.first_name || 'there',
+            exchange.name,
+            oldStatus,
+            newStatus
+          );
+          notifications.push(result);
+        } else if (participant.user && participant.user.email) {
+          const result = await this.sendStatusChangeEmail(
+            participant.user.email,
+            participant.user.first_name || 'there',
+            exchange.name,
+            oldStatus,
+            newStatus
+          );
+          notifications.push(result);
+        }
+      }
+
+      console.log(`✅ Status change notifications sent: ${notifications.filter(n => n.success).length}/${notifications.length}`);
+      return { success: true, notifications };
+    } catch (error) {
+      console.error('❌ Failed to send status change notifications:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send status change email
+   */
+  async sendStatusChangeEmail(email, firstName, exchangeName, oldStatus, newStatus) {
+    if (!this.sendGridEnabled) {
+      console.log('📧 SendGrid not enabled - skipping status change email to:', email);
+      return { success: true, skipped: true };
+    }
+
+    try {
+      const subject = `Exchange Status Updated: ${exchangeName}`;
+      
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #16a34a; color: white; padding: 20px; text-align: center;">
+            <h1>🔄 Status Update</h1>
+          </div>
+          
+          <div style="padding: 30px;">
+            <h2>Hello ${firstName},</h2>
+            
+            <p>The status of your exchange has been updated.</p>
+            
+            <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 15px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>Exchange:</strong> ${exchangeName}</p>
+              <p style="margin: 5px 0;"><strong>Previous Status:</strong> ${oldStatus}</p>
+              <p style="margin: 5px 0;"><strong>New Status:</strong> ${newStatus}</p>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${this.baseUrl}/dashboard" 
+                 style="background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                View Exchange
+              </a>
+            </div>
+            
+            <p>Please review any new requirements or deadlines associated with this status change.</p>
+            
+            <p>Best regards,<br>The Peak 1031 Team</p>
+          </div>
+        </div>
+      `;
+
+      const msg = {
+        to: email,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject,
+        html
+      };
+
+      await sgMail.send(msg);
+      console.log('✅ Status change notification sent to:', email);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Failed to send status change notification:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send user invitation notification
+   */
+  async sendUserInvitationNotification(email, firstName, invitedBy, exchangeName, role) {
+    if (!this.sendGridEnabled) {
+      console.log('📧 SendGrid not enabled - skipping user invitation email to:', email);
+      return { success: true, skipped: true };
+    }
+
+    try {
+      const subject = `You've been invited to join Peak 1031 Platform`;
+      
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #2563eb; color: white; padding: 20px; text-align: center;">
+            <h1>👋 Welcome to Peak 1031</h1>
+          </div>
+          
+          <div style="padding: 30px;">
+            <h2>Hello ${firstName},</h2>
+            
+            <p>You have been invited by <strong>${invitedBy}</strong> to join the Peak 1031 Exchange Management Platform.</p>
+            
+            ${exchangeName ? `
+              <div style="background-color: #eff6ff; border-left: 4px solid #2563eb; padding: 15px; margin: 20px 0;">
+                <p style="margin: 0;"><strong>Exchange:</strong> ${exchangeName}</p>
+                <p style="margin: 5px 0;"><strong>Your Role:</strong> ${role}</p>
+              </div>
+            ` : ''}
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${this.baseUrl}/auth/register?email=${encodeURIComponent(email)}" 
+                 style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Create Your Account
+              </a>
+            </div>
+            
+            <h3>What You'll Be Able To Do:</h3>
+            <ul>
+              <li>Access exchange documents and information</li>
+              <li>Communicate with other participants</li>
+              <li>Track important deadlines and milestones</li>
+              <li>Upload required documents</li>
+              <li>Receive real-time updates and notifications</li>
+            </ul>
+            
+            <p>If you have any questions, please don't hesitate to contact our support team.</p>
+            
+            <p>Best regards,<br>The Peak 1031 Team</p>
+          </div>
+          
+          <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 14px;">
+              This invitation was sent to ${email}. If you didn't expect this invitation, please ignore this email.
+            </p>
+          </div>
+        </div>
+      `;
+
+      const msg = {
+        to: email,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject,
+        html
+      };
+
+      await sgMail.send(msg);
+      console.log('✅ User invitation sent to:', email);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Failed to send user invitation:', error);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 module.exports = new NotificationService();

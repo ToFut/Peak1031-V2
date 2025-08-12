@@ -355,16 +355,18 @@ class EnhancedTaskService {
         title: parsedTask.title,
         description: parsedTask.description,
         priority: parsedTask.priority,
-        status: 'pending',
-        category: parsedTask.category,
+        status: 'PENDING',
         exchange_id: exchangeId,
         assigned_to: assignedTo,
         due_date: parsedTask.suggestedDueDate,
         created_by: context.userId,
-        metadata: {
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        // Store template info in pp_data field (JSON field that exists)
+        pp_data: {
           natural_language_source: naturalText,
-          parsed_data: parsedTask.extractedData,
           template_used: parsedTask.templateKey,
+          category: parsedTask.category,
           confidence_score: parsedTask.confidence,
           auto_actions: parsedTask.autoActions,
           estimated_duration: parsedTask.estimatedDuration
