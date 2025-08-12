@@ -212,12 +212,26 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                           }`}>
                             {task.title}
                           </h4>
-                          {showPPInfo && task.ppTaskId && (
-                            <div className="flex items-center mt-1">
-                              <div className="w-2 h-2 bg-green-400 rounded-full mr-1"></div>
-                              <span className="text-xs text-green-600 font-medium">PP</span>
-                            </div>
-                          )}
+                          {/* Source indicators */}
+                          <div className="flex items-center mt-1 space-x-2">
+                            {showPPInfo && task.ppTaskId && (
+                              <div className="flex items-center">
+                                <div className="w-2 h-2 bg-green-400 rounded-full mr-1"></div>
+                                <span className="text-xs text-green-600 font-medium">PP</span>
+                              </div>
+                            )}
+                            {task.source === 'chat' && (
+                              <div className="flex items-center">
+                                <div className="w-2 h-2 bg-purple-400 rounded-full mr-1"></div>
+                                <span className="text-xs text-purple-600 font-medium">Chat</span>
+                              </div>
+                            )}
+                            {task.metadata?.agent && (
+                              <span className="text-xs text-blue-600 bg-blue-50 px-1 rounded">
+                                Agent: {task.metadata.agent}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         
                         <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
@@ -235,8 +249,25 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                         </p>
                       )}
                       
-                      {/* Due Date and Assignment */}
+                      {/* Task Details */}
                       <div className="space-y-2 mb-3">
+                        {/* Created by and When */}
+                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
+                          {task.createdByUser && (
+                            <div className="flex items-center">
+                              <User className="w-3 h-3 mr-1" />
+                              <span>By: {task.createdByUser.first_name} {task.createdByUser.last_name}</span>
+                            </div>
+                          )}
+                          {task.created_at && (
+                            <div className="flex items-center">
+                              <Clock className="w-3 h-3 mr-1" />
+                              <span>Created: {new Date(task.created_at).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Due Date */}
                         {task.dueDate && (
                           <div className={`flex items-center text-xs ${
                             overdue ? 'text-red-600' : 'text-gray-500'
@@ -257,12 +288,30 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                           </div>
                         )}
                         
+                        {/* Assigned to */}
                         {task.assignedUser && (
                           <div className="flex items-center text-xs text-gray-500">
                             <User className="w-3 h-3 mr-1" />
                             <span>
-                              {task.assignedUser.first_name} {task.assignedUser.last_name}
+                              Assigned: {task.assignedUser.first_name} {task.assignedUser.last_name}
                             </span>
+                          </div>
+                        )}
+
+                        {/* Chat task specific info */}
+                        {task.source === 'chat' && task.metadata && (
+                          <div className="bg-purple-50 p-2 rounded text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-purple-700 font-medium">Chat Task</span>
+                              {task.metadata.agent && (
+                                <span className="text-purple-600">Agent: {task.metadata.agent}</span>
+                              )}
+                            </div>
+                            {task.metadata.original_mentions && task.metadata.original_mentions.length > 0 && (
+                              <div className="mt-1 text-purple-600">
+                                Mentions: @{task.metadata.original_mentions.join(', @')}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

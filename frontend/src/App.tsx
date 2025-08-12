@@ -291,7 +291,7 @@ const App: React.FC = () => {
 
               {/* User Profile - Admin only */}
               <Route 
-                path="/users/:id" 
+                path="/users/user-profile/:userId" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>

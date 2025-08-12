@@ -552,6 +552,127 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
       }
     }
     
+    // Get user audit activity and system usage stats
+    let auditActivity = {
+      totalActions: 0,
+      actionsLast30Days: 0,
+      actionBreakdown: {},
+      recentActivity: [],
+      systemUsageStats: {},
+      loginHistory: []
+    };
+    
+    try {
+      console.log('🔍 Fetching audit logs for user:', userId);
+      
+      // Get audit logs for this user (check both person_id and details.userId)
+      const auditLogs = await AuditService.getAuditLogs({
+        userId: userId,
+        limit: 200 // Get more logs for better analysis
+      });
+      
+      // Also get logs where userId is stored in details (newer format)
+      const auditLogsFromDetails = await databaseService.client
+        .from('audit_logs')
+        .select('*')
+        .contains('details', { userId: userId })
+        .order('created_at', { ascending: false })
+        .limit(200);
+      
+      // Combine both sets of logs
+      let allAuditLogs = [...auditLogs];
+      if (auditLogsFromDetails.data) {
+        allAuditLogs = [...allAuditLogs, ...auditLogsFromDetails.data];
+      }
+      
+      // Remove duplicates based on id
+      const uniqueLogs = allAuditLogs.reduce((acc, log) => {
+        if (!acc.find(l => l.id === log.id)) {
+          acc.push(log);
+        }
+        return acc;
+      }, []);
+      
+      // Sort by created_at descending
+      uniqueLogs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      
+      console.log(`✅ Found ${uniqueLogs.length} audit logs for user`);
+      
+      if (uniqueLogs.length > 0) {
+        auditActivity.totalActions = uniqueLogs.length;
+        auditActivity.actionsLast30Days = uniqueLogs.filter(log => 
+          new Date(log.created_at) > thirtyDaysAgo
+        ).length;
+        
+        // Action breakdown
+        const actionCounts = {};
+        const entityCounts = {};
+        const dailyActivity = {};
+        
+        uniqueLogs.forEach(log => {
+          // Count actions
+          actionCounts[log.action] = (actionCounts[log.action] || 0) + 1;
+          
+          // Count entity types
+          if (log.entity_type) {
+            entityCounts[log.entity_type] = (entityCounts[log.entity_type] || 0) + 1;
+          }
+          
+          // Daily activity
+          const day = new Date(log.created_at).toISOString().split('T')[0];
+          dailyActivity[day] = (dailyActivity[day] || 0) + 1;
+        });
+        
+        auditActivity.actionBreakdown = actionCounts;
+        auditActivity.entityBreakdown = entityCounts;
+        auditActivity.dailyActivity = dailyActivity;
+        
+        // Recent activity (last 20 actions)
+        auditActivity.recentActivity = uniqueLogs.slice(0, 20).map(log => ({
+          id: log.id,
+          action: log.action,
+          entityType: log.entity_type,
+          entityId: log.entity_id,
+          timestamp: log.created_at,
+          details: log.details,
+          ipAddress: log.ip_address,
+          userAgent: log.user_agent
+        }));
+        
+        // Login history (filter login/logout actions)
+        auditActivity.loginHistory = uniqueLogs
+          .filter(log => ['login', 'logout', 'token_refresh', 'auth_success', 'auth_failure'].includes(log.action))
+          .slice(0, 10)
+          .map(log => ({
+            action: log.action,
+            timestamp: log.created_at,
+            ipAddress: log.ip_address,
+            userAgent: log.user_agent,
+            details: log.details
+          }));
+        
+        // System usage stats
+        auditActivity.systemUsageStats = {
+          mostUsedFeatures: Object.entries(entityCounts)
+            .sort(([,a], [,b]) => b - a)
+            .slice(0, 5)
+            .map(([entity, count]) => ({ feature: entity, usage: count })),
+          mostCommonActions: Object.entries(actionCounts)
+            .sort(([,a], [,b]) => b - a)
+            .slice(0, 5)
+            .map(([action, count]) => ({ action, count })),
+          averageActionsPerDay: Object.keys(dailyActivity).length > 0 
+            ? Math.round(uniqueLogs.length / Object.keys(dailyActivity).length) 
+            : 0,
+          activeDays: Object.keys(dailyActivity).length,
+          lastActiveDate: uniqueLogs[0]?.created_at
+        };
+      }
+      
+    } catch (auditErr) {
+      console.warn('Could not fetch audit activity:', auditErr.message);
+    }
+    
     // Exchange type distribution
     const typeDistribution = {};
     exchanges.forEach(ex => {
@@ -586,7 +707,8 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
       messageStats,
       recentExchanges,
       monthlyActivity,
-      participationCount: exchangeParticipations.length
+      participationCount: exchangeParticipations.length,
+      auditActivity
     };
     
     // Log audit trail

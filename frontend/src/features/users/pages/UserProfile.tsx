@@ -8,7 +8,12 @@ import {
   CalendarIcon,
   ArrowTrendingUpIcon,
   ExclamationCircleIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  ClockIcon,
+  ComputerDesktopIcon,
+  ShieldCheckIcon,
+  EyeIcon,
+  BoltIcon
 } from '@heroicons/react/24/outline';
 import { useUserProfile } from '../../../hooks/useUserProfile';
 import { UserProfileService } from '../../../services/userProfileService';
@@ -112,16 +117,16 @@ const UserProfile: React.FC = () => {
         />
         
         <EnhancedStatCard
-          title="Total Messages"
-          value={profile.messageStats.totalMessages}
-          icon={ChatBubbleLeftRightIcon}
+          title="System Actions"
+          value={profile.auditActivity.totalActions}
+          icon={BoltIcon}
           color="purple"
-          subtitle="All exchanges"
+          subtitle="Total activity"
         />
         
         <EnhancedStatCard
           title="Recent Activity"
-          value={profile.stats.recentExchanges}
+          value={profile.auditActivity.actionsLast30Days}
           icon={CalendarIcon}
           color="yellow"
           subtitle="Last 30 days"
@@ -251,6 +256,161 @@ const UserProfile: React.FC = () => {
                 <div className="text-2xl font-bold text-blue-600">{count}</div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* System Usage Statistics */}
+      <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="flex items-center mb-4">
+          <ComputerDesktopIcon className="h-6 w-6 text-gray-500 mr-3" />
+          <h3 className="text-lg font-semibold text-gray-900">System Usage</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Most Used Features */}
+          <div>
+            <h4 className="text-md font-medium text-gray-900 mb-3">Most Used Features</h4>
+            <div className="space-y-2">
+              {profile.auditActivity.systemUsageStats.mostUsedFeatures.map((feature, index) => (
+                <div key={index} className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">
+                    {UserProfileService.formatEntityType(feature.feature)}
+                  </span>
+                  <div className="flex items-center">
+                    <div 
+                      className="bg-blue-200 h-2 rounded-full mr-2"
+                      style={{ 
+                        width: `${Math.max(feature.usage * 2, 20)}px`,
+                        maxWidth: '80px'
+                      }}
+                    ></div>
+                    <span className="text-sm font-medium text-gray-900">{feature.usage}</span>
+                  </div>
+                </div>
+              ))}
+              {profile.auditActivity.systemUsageStats.mostUsedFeatures.length === 0 && (
+                <p className="text-sm text-gray-500">No feature usage data available</p>
+              )}
+            </div>
+          </div>
+
+          {/* Usage Statistics */}
+          <div>
+            <h4 className="text-md font-medium text-gray-900 mb-3">Activity Stats</h4>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Active Days</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {profile.auditActivity.systemUsageStats.activeDays}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Avg Actions/Day</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {profile.auditActivity.systemUsageStats.averageActionsPerDay}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Last Active</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {profile.auditActivity.systemUsageStats.lastActiveDate 
+                    ? UserProfileService.getTimePeriodDisplay(profile.auditActivity.systemUsageStats.lastActiveDate)
+                    : 'Never'
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Activity Timeline */}
+      <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="flex items-center mb-4">
+          <ClockIcon className="h-6 w-6 text-gray-500 mr-3" />
+          <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
+        </div>
+        <div className="space-y-3 max-h-96 overflow-y-auto">
+          {profile.auditActivity.recentActivity.map((activity) => (
+            <div key={activity.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+              <div className="flex-shrink-0">
+                <div className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${UserProfileService.getActionColor(activity.action)}`}>
+                  {UserProfileService.formatActionName(activity.action)}
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-900">
+                    {activity.entityType && (
+                      <span className="text-gray-600">
+                        {UserProfileService.formatEntityType(activity.entityType)}
+                      </span>
+                    )}
+                  </p>
+                  <span className="text-xs text-gray-500">
+                    {UserProfileService.getTimePeriodDisplay(activity.timestamp)}
+                  </span>
+                </div>
+                {activity.ipAddress && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    IP: {activity.ipAddress} • {UserProfileService.getBrowserInfo(activity.userAgent)}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+          {profile.auditActivity.recentActivity.length === 0 && (
+            <p className="text-sm text-gray-500 text-center py-4">No recent activity</p>
+          )}
+        </div>
+      </div>
+
+      {/* Login History */}
+      {profile.auditActivity.loginHistory.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center mb-4">
+            <ShieldCheckIcon className="h-6 w-6 text-gray-500 mr-3" />
+            <h3 className="text-lg font-semibold text-gray-900">Login History</h3>
+          </div>
+          <div className="space-y-3">
+            {profile.auditActivity.loginHistory.map((login, index) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${UserProfileService.getActionColor(login.action)}`}>
+                    {UserProfileService.formatActionName(login.action)}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {UserProfileService.getTimePeriodDisplay(login.timestamp)}
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500">
+                  {login.ipAddress} • {UserProfileService.getBrowserInfo(login.userAgent)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Action Breakdown */}
+      {Object.keys(profile.auditActivity.actionBreakdown).length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex items-center mb-4">
+            <EyeIcon className="h-6 w-6 text-gray-500 mr-3" />
+            <h3 className="text-lg font-semibold text-gray-900">Action Breakdown</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(profile.auditActivity.actionBreakdown)
+              .sort(([,a], [,b]) => b - a)
+              .slice(0, 9)
+              .map(([action, count]) => (
+                <div key={action} className="bg-gray-50 p-4 rounded-lg">
+                  <div className="text-sm font-medium text-gray-900 mb-1">
+                    {UserProfileService.formatActionName(action)}
+                  </div>
+                  <div className="text-2xl font-bold text-purple-600">{count}</div>
+                </div>
+              ))}
           </div>
         </div>
       )}

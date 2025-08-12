@@ -245,8 +245,17 @@ router.get('/', authenticateToken, async (req, res) => {
  * GET /api/exchanges/:id
  * Get single exchange with full details
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
+    // Check if user can access this exchange
+    const canAccess = await rbacService.canUserAccessExchange(req.user, req.params.id);
+    
+    if (!canAccess) {
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'You do not have permission to view this exchange'
+      });
+    }
     // Try Supabase first
     try {
       const { data: exchange, error } = await supabase

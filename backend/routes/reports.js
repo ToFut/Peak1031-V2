@@ -11,12 +11,29 @@
 
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
-const { checkPermission } = require('../middleware/rbac');
+const { enforceRBAC } = require('../middleware/rbac');
 const databaseService = require('../services/database');
 const ossLLMQueryService = require('../services/oss-llm-query');
 const auditService = require('../services/audit');
 
 const router = express.Router();
+
+// Simple permission check function
+const checkPermission = (resource, action) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    // For reports, check role-based access
+    if (action === 'write' && !['admin', 'coordinator'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions to generate reports' });
+    }
+    
+    console.log(`🔐 Permission check: ${req.user.role} user accessing ${resource} with ${action} permission`);
+    next();
+  };
+};
 
 // Get overview report data
 router.get('/overview', authenticateToken, async (req, res) => {

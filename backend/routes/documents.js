@@ -20,6 +20,7 @@ const checkPermission = (resource, action) => {
 };
 const databaseService = require('../services/database');
 const supabaseService = require('../services/supabase');
+const rbacService = require('../services/rbacService');
 const AuditService = require('../services/audit');
 // const DocumentTemplateService = require('../services/documentTemplates'); // Uses Sequelize
 const bcrypt = require('bcryptjs');
@@ -117,59 +118,107 @@ router.post('/test-upload', upload.single('file'), async (req, res) => {
 // Get all documents (role-filtered)
 router.get('/', authenticateToken, async (req, res) => {
   try {
+    console.log('📋 DOCUMENTS ROUTE: Getting documents for', req.user?.email, 'Role:', req.user?.role);
+    
     const { page = 1, limit = 20, search, category, exchangeId, pinRequired, sortBy = 'created_at', sortOrder = 'DESC' } = req.query;
     
-    const whereClause = {};
+    // First get the exchanges the user can access
+    const userExchanges = await rbacService.getExchangesForUser(req.user, {
+      includeParticipant: true
+    });
+    
+    const allowedExchangeIds = userExchanges.data.map(e => e.id);
+    
+    console.log(`📊 RBAC Result for ${req.user.role} user ${req.user.email}:`);
+    console.log(`   - User exchanges found: ${userExchanges.data.length}`);
+    console.log(`   - Allowed exchange IDs: [${allowedExchangeIds.join(', ')}]`);
+    
+    if (allowedExchangeIds.length === 0 && req.user.role !== 'admin') {
+      // User has no assigned exchanges
+      return res.json({
+        data: [],
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: 0,
+          totalPages: 0
+        }
+      });
+    }
+    
+    let query = supabase.from('documents').select('*', { count: 'exact' });
+    
+    // Apply role-based filtering
+    if (req.user.role !== 'admin') {
+      if (allowedExchangeIds.length === 0) {
+        // User has no exchanges, return empty result
+        console.log(`   🚫 No exchanges found for user, returning empty result`);
+        return res.json({
+          data: [],
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: 0,
+            totalPages: 0
+          }
+        });
+      }
+      console.log(`   🔍 Filtering documents by exchange IDs: [${allowedExchangeIds.join(', ')}]`);
+      // Also filter out documents with NULL exchange_id
+      query = query.in('exchange_id', allowedExchangeIds).not('exchange_id', 'is', null);
+    }
+    
+    // Apply other filters
+    if (exchangeId) {
+      // Verify user has access to this specific exchange
+      if (req.user.role !== 'admin' && !allowedExchangeIds.includes(exchangeId)) {
+        return res.status(403).json({ error: 'Access denied to this exchange' });
+      }
+      query = query.eq('exchange_id', exchangeId);
+    }
+    
     if (search) {
-      // For Supabase, we'll handle this differently
-      whereClause.or = [
-        { original_filename: { ilike: `%${search}%` } },
-        { category: { ilike: `%${search}%` } }
-      ];
+      query = query.or(`original_filename.ilike.%${search}%,category.ilike.%${search}%`);
     }
     
     if (category) {
-      whereClause.category = category;
-    }
-    
-    if (exchangeId) {
-      whereClause.exchange_id = exchangeId;
+      query = query.eq('category', category);
     }
     
     if (pinRequired !== undefined) {
-      whereClause.pin_required = pinRequired === 'true';
+      query = query.eq('pin_required', pinRequired === 'true');
     }
-
-    // Role-based filtering
-    if (req.user.role === 'client') {
-      const userExchanges = await databaseService.getExchanges({
-        where: { client_id: req.user.id }
-      });
-      whereClause.exchange_id = { in: userExchanges.map(e => e.id) };
-    } else if (req.user.role === 'coordinator') {
-      const userExchanges = await databaseService.getExchanges({
-        where: { coordinator_id: req.user.id }
-      });
-      whereClause.exchange_id = { in: userExchanges.map(e => e.id) };
+    
+    // Apply sorting
+    query = query.order(sortBy, { ascending: sortOrder === 'ASC' });
+    
+    // Apply pagination
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    query = query.range(offset, offset + parseInt(limit) - 1);
+    
+    const { data: documents, error, count } = await query;
+    
+    if (error) {
+      console.error('Error fetching documents:', error);
+      throw error;
     }
-
-    const documents = await databaseService.getDocuments({
-      where: whereClause,
-      limit: parseInt(limit),
-      offset: (page - 1) * limit,
-      orderBy: { column: sortBy, ascending: sortOrder === 'ASC' }
-    });
-
+    
+    console.log(`✅ Document query result for ${req.user.role} user:`);
+    console.log(`   - Documents found: ${documents?.length || 0}`);
+    console.log(`   - Document exchange IDs: [${documents?.map(d => d.exchange_id).filter(Boolean).join(', ') || 'none'}]`);
+    console.log(`   - Documents without exchange_id: ${documents?.filter(d => !d.exchange_id).length || 0}`);
+    
     res.json({
-      data: documents,
+      data: documents || [],
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total: documents.length,
-        totalPages: Math.ceil(documents.length / limit)
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / parseInt(limit))
       }
     });
   } catch (error) {
+    console.error('Error in GET /documents:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -179,6 +228,17 @@ router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
   try {
     const exchangeId = req.params.exchangeId;
     console.log(`📋 Fetching documents for exchange: ${exchangeId}`);
+    
+    // Check if user can access this exchange
+    const canAccess = await rbacService.canUserAccessExchange(req.user, exchangeId);
+    
+    if (!canAccess) {
+      console.log('❌ Access denied for user:', req.user.email, 'to exchange:', exchangeId);
+      return res.status(403).json({ 
+        error: 'Access denied',
+        message: 'You do not have permission to view documents for this exchange'
+      });
+    }
 
     // Get regular documents
     const { data: documents, error: docError } = await supabase

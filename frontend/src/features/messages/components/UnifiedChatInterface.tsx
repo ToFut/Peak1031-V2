@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useChat } from '../hooks/useChat';
 import { useAuth } from '../../../hooks/useAuth';
 import { useSocket } from '../../../hooks/useSocket';
+import { useChatTasks } from '../../../hooks/useChatTasks';
 import { ChatMessage } from '../../../services/chatService';
 // import ExchangeParticipantsManager from '../../../components/ExchangeParticipantsManager'; // Component not found
 import StatusBadge from '../../../components/ui/StatusBadge';
@@ -70,6 +71,17 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Chat task functionality
+  const {
+    parseTaskFromMessage,
+    formatMessageWithMentions,
+    renderTaskCreationIndicator,
+    getTaskPreview,
+    renderTaskPreview
+  } = useChatTasks();
+  
+  const [taskPreview, setTaskPreview] = useState<any>(null);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -143,6 +155,15 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
       handleTyping();
     } else {
       stopTypingIndicator();
+    }
+    
+    // Check for task command
+    const { hasTask, mentions } = parseTaskFromMessage(value);
+    if (hasTask) {
+      const preview = getTaskPreview(value, mentions);
+      setTaskPreview(preview);
+    } else {
+      setTaskPreview(null);
     }
   };
 
@@ -818,7 +839,16 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
                               </p>
                             )}
                             
-                            <p className="text-sm leading-relaxed">{message.content}</p>
+                            <p className="text-sm leading-relaxed">
+                              {formatMessageWithMentions(message.content)}
+                            </p>
+                            
+                            {/* Show task creation indicator if message created a task */}
+                            {message.metadata?.created_task_id && renderTaskCreationIndicator({
+                              id: message.metadata.created_task_id,
+                              title: message.metadata.task_title || 'Task created',
+                              assigned_to_name: message.metadata.assigned_to_name
+                            })}
                             
                             {(message.attachment || message.attachment_id || ((message as any).attachments && (message as any).attachments.length > 0)) && (() => {
                               // Debug log to see the actual data structure
@@ -904,6 +934,13 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
 
             {/* Enhanced Message Input */}
             <div className="border-t border-gray-200 p-4 bg-white/95 backdrop-blur-sm">
+              {/* Task Preview */}
+              {taskPreview && (
+                <div className="max-w-5xl mx-auto mb-2">
+                  {renderTaskPreview(taskPreview)}
+                </div>
+              )}
+              
               <form onSubmit={handleSendMessage} className="flex items-end space-x-3 max-w-5xl mx-auto">
                 <input
                   ref={fileInputRef}

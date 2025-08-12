@@ -2,14 +2,14 @@ const express = require('express');
 const router = express.Router();
 const practicePartnerService = require('../services/practicePartnerService');
 const { authenticateToken } = require('../middleware/auth');
-const { requireAdmin } = require('../middleware/rbac');
+const { requireRole } = require('../middleware/rbac');
 
 /**
  * @route GET /api/oauth/practicepanther/authorize
  * @desc Generate PracticePanther OAuth authorization URL
  * @access Admin only
  */
-router.get('/practicepanther/authorize', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/practicepanther/authorize', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
     const state = Math.random().toString(36).substring(7);
     const authUrl = practicePartnerService.generateAuthUrl(state);
@@ -102,7 +102,7 @@ router.get('/practicepanther/callback', async (req, res) => {
  * @desc Test if current PracticePanther token is valid
  * @access Admin only
  */
-router.post('/practicepanther/test-token', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/practicepanther/test-token', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
     const connectionResult = await practicePartnerService.testConnection();
     
@@ -125,7 +125,7 @@ router.post('/practicepanther/test-token', authenticateToken, requireAdmin, asyn
  * @desc Revoke PracticePanther OAuth token
  * @access Admin only
  */
-router.delete('/practicepanther/revoke', authenticateToken, requireAdmin, async (req, res) => {
+router.delete('/practicepanther/revoke', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
     const { createClient } = require('@supabase/supabase-js');
     const supabase = createClient(
@@ -168,7 +168,7 @@ router.delete('/practicepanther/revoke', authenticateToken, requireAdmin, async 
  * @desc Get OAuth status for all providers
  * @access Admin only
  */
-router.get('/status', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/status', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
     const { createClient } = require('@supabase/supabase-js');
     const supabase = createClient(

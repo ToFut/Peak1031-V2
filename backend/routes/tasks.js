@@ -1,8 +1,23 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
-const { checkPermission } = require('../middleware/rbac');
+const { enforceRBAC } = require('../middleware/rbac');
+
+// Simple permission check function
+const checkPermission = (resource, action) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    // For now, allow all authenticated users to access tasks
+    // This can be enhanced later with more granular permissions
+    console.log(`🔐 Permission check: ${req.user.role} user accessing ${resource} with ${action} permission`);
+    next();
+  };
+};
 const supabaseService = require('../services/supabase');
 const enhancedTaskService = require('../services/enhancedTaskService');
+const rbacService = require('../services/rbacService');
 const { transformToCamelCase, transformToSnakeCase } = require('../utils/caseTransform');
 
 const router = express.Router();
@@ -10,7 +25,57 @@ const router = express.Router();
 // Get all tasks (role-filtered)
 router.get('/', authenticateToken, async (req, res) => {
   try {
+    console.log('📋 TASKS ROUTE: Getting tasks for', req.user?.email, 'Role:', req.user?.role);
+    
     const { page = 1, limit = 20, search, status, priority, exchangeId, assignedTo, sortBy = 'due_date', sortOrder = 'asc' } = req.query;
+    
+    // Use RBAC service to get authorized tasks
+    const result = await rbacService.getTasksForUser(req.user, {
+      exchangeId,
+      status: status?.toUpperCase()
+    });
+    
+    // Apply additional filters on the authorized tasks
+    let filteredTasks = result.data;
+    
+    if (search) {
+      filteredTasks = filteredTasks.filter(task => 
+        task.title?.toLowerCase().includes(search.toLowerCase()) ||
+        task.description?.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+    
+    if (priority) {
+      filteredTasks = filteredTasks.filter(task => task.priority === priority.toUpperCase());
+    }
+    
+    if (assignedTo) {
+      filteredTasks = filteredTasks.filter(task => task.assigned_to === assignedTo);
+    }
+    
+    // Sort tasks
+    filteredTasks.sort((a, b) => {
+      const aVal = a[sortBy] || '';
+      const bVal = b[sortBy] || '';
+      return sortOrder === 'asc' ? 
+        (aVal > bVal ? 1 : -1) : 
+        (bVal > aVal ? 1 : -1);
+    });
+    
+    // Paginate
+    const startIndex = (page - 1) * limit;
+    const paginatedTasks = filteredTasks.slice(startIndex, startIndex + limit);
+    
+    res.json({
+      success: true,
+      tasks: paginatedTasks.map(transformToCamelCase),
+      total: filteredTasks.length,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      hasMore: filteredTasks.length > startIndex + limit
+    });
+    
+    return; // Exit early - skip old implementation
     
     let query = supabaseService.client.from('tasks').select(`
       *,

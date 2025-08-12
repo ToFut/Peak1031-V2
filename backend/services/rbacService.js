@@ -33,39 +33,61 @@ class RBACService {
 
       case 'client':
         // Exchanges where they're client OR participant
-        const clientContactId = user.contact_id || user.id;
+        // Check both user.id and user.contact_id for client_id field
+        const clientUserId = user.id;
+        const clientContactId = user.contact_id;
+        
+        console.log(`   ✓ Client filter - user ID: ${clientUserId}, contact ID: ${clientContactId}`);
         
         // Get participant exchanges
         const { data: participantExchanges } = await supabaseService.client
           .from('exchange_participants')
           .select('exchange_id')
-          .eq('contact_id', clientContactId)
+          .or(`contact_id.eq.${clientContactId || clientUserId},user_id.eq.${clientUserId}`)
           .eq('is_active', true);
         
         const participantIds = participantExchanges?.map(p => p.exchange_id) || [];
         
-        console.log(`   ✓ Client filter - contact ID: ${clientContactId}, participant in ${participantIds.length} exchanges`);
+        console.log(`   ✓ Client filter - participant in ${participantIds.length} exchanges: [${participantIds.join(', ')}]`);
         
+        // Build OR query to check both user ID and contact ID as client, plus participation
+        let orConditions = [];
+        
+        // Check if user is the client (try both user.id and contact_id)
+        orConditions.push(`client_id.eq.${clientUserId}`);
+        if (clientContactId && clientContactId !== clientUserId) {
+          orConditions.push(`client_id.eq.${clientContactId}`);
+        }
+        
+        // Add participant exchanges
         if (participantIds.length > 0) {
-          query = query.or(`client_id.eq.${clientContactId},id.in.(${participantIds.join(',')})`);
+          orConditions.push(`id.in.(${participantIds.join(',')})`);
+        }
+        
+        if (orConditions.length > 0) {
+          query = query.or(orConditions.join(','));
         } else {
-          query = query.eq('client_id', clientContactId);
+          // No conditions matched, return empty
+          return { data: [], count: 0 };
         }
         break;
 
       case 'third_party':
         // Only participant exchanges
-        const tpContactId = user.contact_id || user.id;
+        const tpUserId = user.id;
+        const tpContactId = user.contact_id;
+        
+        console.log(`   ✓ Third party filter - user ID: ${tpUserId}, contact ID: ${tpContactId}`);
         
         const { data: tpExchanges } = await supabaseService.client
           .from('exchange_participants')
           .select('exchange_id')
-          .eq('contact_id', tpContactId)
+          .or(`contact_id.eq.${tpContactId || tpUserId},user_id.eq.${tpUserId}`)
           .eq('is_active', true);
         
         const tpIds = tpExchanges?.map(p => p.exchange_id) || [];
         
-        console.log(`   ✓ Third party filter - ${tpIds.length} exchanges`);
+        console.log(`   ✓ Third party filter - participant in ${tpIds.length} exchanges: [${tpIds.join(', ')}]`);
         
         if (tpIds.length > 0) {
           query = query.in('id', tpIds);

@@ -2,10 +2,27 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const { authenticateToken } = require('../middleware/auth');
-const { checkPermission } = require('../middleware/rbac');
+const { enforceRBAC } = require('../middleware/rbac');
 const documentTemplateService = require('../services/documentTemplateService');
 const AuditService = require('../services/audit');
 const router = express.Router();
+
+// Simple permission check function
+const checkPermission = (resource, action) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    // For templates, only admins and coordinators can write
+    if (action === 'write' && !['admin', 'coordinator'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions to create/modify templates' });
+    }
+    
+    console.log(`🔐 Permission check: ${req.user.role} user accessing ${resource} with ${action} permission`);
+    next();
+  };
+};
 
 // Configure multer for file uploads
 const upload = multer({

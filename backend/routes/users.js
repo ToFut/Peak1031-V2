@@ -1,7 +1,28 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { authenticateToken } = require('../middleware/auth');
-const { checkPermission } = require('../middleware/rbac');
+const { enforceRBAC } = require('../middleware/rbac');
+
+// Simple permission check function
+const checkPermission = (roles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    // Check if user has required role(s)
+    const userRole = req.user.role;
+    const requiredRoles = Array.isArray(roles) ? roles : [roles];
+    
+    if (requiredRoles.includes(userRole)) {
+      console.log(`🔐 Permission granted: ${userRole} user accessing restricted resource`);
+      next();
+    } else {
+      console.log(`❌ Permission denied: ${userRole} user accessing restricted resource (required: ${requiredRoles.join(', ')})`);
+      res.status(403).json({ error: 'Insufficient permissions' });
+    }
+  };
+};
 const databaseService = require('../services/database');
 const AuthService = require('../services/auth');
 const bcrypt = require('bcryptjs');

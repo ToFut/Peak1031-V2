@@ -35,15 +35,34 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   exchangeId: string;
+  exchange_id?: string; // snake_case compatibility
   assignedTo?: string;
+  assigned_to?: string; // snake_case compatibility
   dueDate?: string;
+  due_date?: string; // snake_case compatibility
   completedAt?: string;
-  ppData: PracticePantherTaskData;
+  completed_at?: string; // snake_case compatibility
+  ppData?: PracticePantherTaskData; // Made optional for chat tasks
   lastSyncAt?: string;
+  last_sync_at?: string; // snake_case compatibility
   createdAt: string;
+  created_at?: string; // snake_case compatibility
   updatedAt: string;
+  updated_at?: string; // snake_case compatibility
   exchange?: Exchange;
   assignedUser?: User;
+  created_by?: string; // Creator user ID
+  createdByUser?: User; // Creator user object
+  source?: 'chat' | 'practice_panther' | 'manual'; // Task source
+  source_message_id?: string; // For chat tasks
+  category?: string;
+  metadata?: {
+    created_from_chat?: boolean;
+    original_mentions?: string[];
+    agent?: string;
+    chat_command?: string;
+    [key: string]: any;
+  };
 }
 
 export interface Document {

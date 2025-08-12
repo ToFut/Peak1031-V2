@@ -108,10 +108,17 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
 
       const token = localStorage.getItem('token');
       
-      // Fall back to regular exchanges endpoint if no token or analytics fails
-      const endpoint = token 
-        ? `/analytics/exchanges?${new URLSearchParams(options as any).toString()}`
-        : `/exchanges?limit=${options.limit || 30}`;
+      // Use regular exchanges endpoint since analytics/exchanges is disabled for security
+      const queryParams = new URLSearchParams({
+        limit: (options.limit || 30).toString(),
+        page: (options.page || 1).toString(),
+        ...(options.sortBy && { sortBy: options.sortBy }),
+        ...(options.sortOrder && { sortOrder: options.sortOrder }),
+        ...(options.status && { status: options.status }),
+        ...(options.searchTerm && { search: options.searchTerm })
+      });
+      
+      const endpoint = `/exchanges?${queryParams.toString()}`;
       
       const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}${endpoint}`, {
         method: 'GET',
@@ -167,9 +174,22 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
 
       const result = await response.json();
        
-       // Handle both analytics and regular exchange responses
+       // Handle response from exchanges endpoint
       let paginatedResponse: PaginatedResponse<Exchange>;
-      if (result?.success && result?.data) {
+      if (result?.success && result?.exchanges) {
+        // Response format: { success: true, exchanges: [...], total: ..., page: ..., limit: ... }
+        paginatedResponse = {
+          data: result.exchanges as Exchange[],
+          pagination: {
+            currentPage: result.page || 1,
+            limit: result.limit || options.limit || 30,
+            total: result.total || result.exchanges.length,
+            totalPages: Math.ceil((result.total || result.exchanges.length) / (result.limit || options.limit || 30)),
+            hasNext: result.page < Math.ceil((result.total || result.exchanges.length) / (result.limit || options.limit || 30)),
+            hasPrevious: result.page > 1
+          }
+        };
+      } else if (result?.success && result?.data) {
         const payload = result.data;
         if (Array.isArray(payload?.data)) {
           // { success: true, data: { data: Exchange[], pagination, summary? } }
@@ -179,20 +199,6 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
               currentPage: 1,
               limit: options.limit || 30,
               total: (payload.data as Exchange[]).length,
-              totalPages: 1,
-              hasNext: false,
-              hasPrevious: false
-            },
-            summary: payload.summary
-          };
-        } else if (Array.isArray(payload)) {
-          // { success: true, data: Exchange[] }
-          paginatedResponse = {
-            data: payload as Exchange[],
-            pagination: {
-              currentPage: 1,
-              limit: options.limit || 30,
-              total: (payload as Exchange[]).length,
               totalPages: 1,
               hasNext: false,
               hasPrevious: false
@@ -317,7 +323,7 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
    * Refresh current data
    */
   const refresh = useCallback(async () => {
-    smartFetcher.clearCache('analytics/exchanges');
+    smartFetcher.clearCache('exchanges');
     paginationManager.current.reset();
     await fetchExchanges(false);
   }, [fetchExchanges]);
@@ -401,7 +407,7 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
    * Clear cache
    */
   const clearCache = useCallback(() => {
-    smartFetcher.clearCache('analytics/exchanges');
+    smartFetcher.clearCache('exchanges');
   }, []);
 
   // Effects

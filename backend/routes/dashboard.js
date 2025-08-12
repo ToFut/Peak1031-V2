@@ -89,45 +89,6 @@ router.get('/overview', authenticateToken, async (req, res) => {
     }
 });
 
-/**
- * GET /api/dashboard
- * Get dashboard data based on user role
- */
-router.get('/', authenticateToken, async (req, res) => {
-    try {
-        console.log('📊 Dashboard request from user:', req.user.email, 'Role:', req.user.role);
-        
-        // Log dashboard access
-        await auditService.logUserAction(
-            req.user.id,
-            'view_dashboard',
-            'dashboard',
-            null,
-            req,
-            { role: req.user.role }
-        );
-
-        // Get dashboard data based on role
-        const dashboardData = await dashboardService.getDashboardData(
-            req.user.id,
-            req.user.role
-        );
-
-        res.json({
-            success: true,
-            data: dashboardData,
-            timestamp: new Date()
-        });
-
-    } catch (error) {
-        console.error('Dashboard error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch dashboard data',
-            message: error.message
-        });
-    }
-});
 
 /**
  * GET /api/dashboard/stats

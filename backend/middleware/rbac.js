@@ -122,7 +122,30 @@ function enforceRBAC(resourceType) {
   };
 }
 
+/**
+ * Middleware to require specific roles
+ * @param {string[]} allowedRoles - Array of roles that are allowed access
+ */
+function requireRole(allowedRoles) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    if (!allowedRoles.includes(req.user.role)) {
+      console.log(`❌ Access denied: ${req.user.role} not in allowed roles: ${allowedRoles.join(', ')}`);
+      return res.status(403).json({ 
+        error: 'Access denied',
+        message: `This action requires one of the following roles: ${allowedRoles.join(', ')}`
+      });
+    }
+    
+    next();
+  };
+}
+
 module.exports = {
   enforceRBAC,
-  applyExchangeFilters
+  applyExchangeFilters,
+  requireRole
 };

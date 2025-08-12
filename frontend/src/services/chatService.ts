@@ -12,6 +12,17 @@ export interface ChatMessage {
   created_at: string;
   sender?: User;
   attachment?: any;
+  metadata?: {
+    created_task_id?: string;
+    task_title?: string;
+    assigned_to_name?: string;
+    [key: string]: any;
+  };
+  agentResults?: {
+    taskCreated?: any;
+    contactAdded?: any;
+    errors?: any[];
+  };
 }
 
 export interface ChatExchange {
@@ -309,7 +320,7 @@ class ChatService {
             return null;
           }
           
-          return {
+          const chatMsg: ChatMessage = {
             id: message.id,
             content: message.content || '',
             exchange_id: message.exchangeId || message.exchange_id || exchangeId,
@@ -319,8 +330,20 @@ class ChatService {
             read_by: Array.isArray(message.readBy || message.read_by) ? (message.readBy || message.read_by) : [],
             created_at: message.createdAt || message.created_at || new Date().toISOString(),
             sender: message.sender || message.users,
-            attachment: message.attachment
+            attachment: message.attachment,
+            agentResults: message.agentResults
           };
+
+          // Convert agentResults to metadata format for UI compatibility
+          if (message.agentResults?.taskCreated) {
+            chatMsg.metadata = {
+              created_task_id: message.agentResults.taskCreated.id,
+              task_title: message.agentResults.taskCreated.title,
+              assigned_to_name: message.agentResults.taskCreated.assigned_to_name
+            };
+          }
+
+          return chatMsg;
         } catch (transformError) {
           console.error('Error transforming message:', transformError, message);
           return null;
@@ -407,7 +430,7 @@ class ChatService {
     const message = responseData.data || responseData;
 
     // Transform to ChatMessage format
-    const chatMessage = {
+    const chatMessage: ChatMessage = {
       id: message.id,
       content: message.content,
       exchange_id: message.exchangeId || message.exchange_id,
@@ -417,8 +440,18 @@ class ChatService {
       read_by: message.readBy || message.read_by || [],
       created_at: message.createdAt || message.created_at || new Date().toISOString(),
       sender: message.sender,
-      attachment: message.attachment
+      attachment: message.attachment,
+      agentResults: message.agentResults
     };
+
+    // Convert agentResults to metadata format for UI compatibility
+    if (message.agentResults?.taskCreated) {
+      chatMessage.metadata = {
+        created_task_id: message.agentResults.taskCreated.id,
+        task_title: message.agentResults.taskCreated.title,
+        assigned_to_name: message.agentResults.taskCreated.assigned_to_name
+      };
+    }
 
     
     return chatMessage;

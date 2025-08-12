@@ -980,35 +980,35 @@ class ApiService {
     });
     
     const queryString = params.toString();
-    return this.get(`/audit-logs${queryString ? '?' + queryString : ''}`);
+    return this.request(`/audit-logs${queryString ? '?' + queryString : ''}`);
   }
 
   /**
    * Get audit log statistics
    */
   async getAuditLogStats(): Promise<any> {
-    return this.get('/audit-logs/stats');
+    return this.request('/audit-logs/stats');
   }
 
   /**
    * Get available audit actions for filtering
    */
   async getAuditActions(): Promise<any> {
-    return this.get('/audit-logs/actions');
+    return this.request('/audit-logs/actions');
   }
 
   /**
    * Get audit log by ID
    */
   async getAuditLogById(id: string): Promise<any> {
-    return this.get(`/audit-logs/${id}`);
+    return this.request(`/audit-logs/${id}`);
   }
 
   /**
    * Get audit log interactions (social features)
    */
   async getAuditLogInteractions(auditLogId: string): Promise<any> {
-    return this.get(`/audit-social/${auditLogId}/interactions`);
+    return this.request(`/audit-social/${auditLogId}/interactions`);
   }
 
   /**
@@ -1067,7 +1067,7 @@ class ApiService {
     users: { total: number; active: number };
     tasks: { total: number; pending: number; completed: number };
   }> {
-    return this.get('/dashboard/overview');
+    return this.request('/dashboard/overview');
   }
 
   /**
@@ -1079,7 +1079,7 @@ class ApiService {
     completed: number;
     pending: number;
   }> {
-    return this.get('/dashboard/exchange-metrics');
+    return this.request('/dashboard/exchange-metrics');
   }
 
   // ===========================================
@@ -1109,28 +1109,29 @@ class ApiService {
       }
     });
     
-    return this.get(`/analytics/exchanges?${params.toString()}`);
+    // Use regular exchanges endpoint since analytics/exchanges is disabled for security
+    return this.request(`/exchanges?${params.toString()}`);
   }
 
   /**
    * Get comprehensive financial overview
    */
   async getFinancialOverview(): Promise<any> {
-    return this.get('/analytics/financial-overview');
+    return this.request('/analytics/financial-overview');
   }
 
   /**
    * Get enhanced dashboard statistics
    */
   async getEnhancedDashboardStats(): Promise<any> {
-    return this.get('/analytics/dashboard-stats');
+    return this.request('/analytics/dashboard-stats');
   }
 
   /**
    * Get available classic queries
    */
   async getClassicQueries(): Promise<any> {
-    return this.get('/analytics/classic-queries');
+    return this.request('/analytics/classic-queries');
   }
 
   /**
@@ -1155,7 +1156,7 @@ class ApiService {
     if (context?.page) params.set('page', context.page);
     if (context?.recent) params.set('recent', JSON.stringify(context.recent));
     
-    return this.get(`/analytics/query-suggestions?${params.toString()}`);
+    return this.request(`/analytics/query-suggestions?${params.toString()}`);
   }
 
   /**
@@ -1170,7 +1171,7 @@ class ApiService {
       daysRemaining?: number;
     }>;
   }> {
-    return this.get('/dashboard/deadlines');
+    return this.request('/dashboard/deadlines');
   }
 
   /**
@@ -1182,7 +1183,7 @@ class ApiService {
     pendingValue: number;
     averageExchangeValue: number;
   }> {
-    return this.get('/dashboard/financial-summary');
+    return this.request('/dashboard/financial-summary');
   }
 
   /**
@@ -1198,7 +1199,7 @@ class ApiService {
       exchangeId?: string;
     }>;
   }> {
-    return this.get('/dashboard/recent-activity');
+    return this.request('/dashboard/recent-activity');
   }
 
   /**
@@ -1215,7 +1216,7 @@ class ApiService {
       read: boolean;
     }>;
   }> {
-    return this.get('/dashboard/alerts');
+    return this.request('/dashboard/alerts');
   }
 
   /**
@@ -1228,7 +1229,7 @@ class ApiService {
       details?: any;
     }>;
   }> {
-    return this.get('/dashboard/user-activity');
+    return this.request('/dashboard/user-activity');
   }
 
   // ===========================================
@@ -1245,7 +1246,7 @@ class ApiService {
     requirements: string[];
     progress: number;
   }> {
-    return this.get(`/exchanges/${exchangeId}/workflow`);
+    return this.request(`/exchanges/${exchangeId}/workflow`);
   }
 
   // ===========================================
@@ -1276,7 +1277,7 @@ class ApiService {
     role: string;
     permissions: string[];
   }> {
-    return this.get('/auth/permissions');
+    return this.request('/auth/permissions');
   }
 
   /**
@@ -1297,7 +1298,7 @@ class ApiService {
     };
   }> {
     const queryParams = filters ? '?' + new URLSearchParams(filters).toString() : '';
-    return this.get(`/audit-logs${queryParams}`);
+    return this.request(`/audit-logs${queryParams}`);
   }
 
   // Utility methods

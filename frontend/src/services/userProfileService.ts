@@ -42,6 +42,44 @@ export interface UserInfo {
   createdAt: string;
 }
 
+export interface AuditActivity {
+  id: string;
+  action: string;
+  entityType?: string;
+  entityId?: string;
+  timestamp: string;
+  details?: any;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export interface LoginHistory {
+  action: string;
+  timestamp: string;
+  ipAddress?: string;
+  userAgent?: string;
+  details?: any;
+}
+
+export interface SystemUsageStats {
+  mostUsedFeatures: Array<{ feature: string; usage: number }>;
+  mostCommonActions: Array<{ action: string; count: number }>;
+  averageActionsPerDay: number;
+  activeDays: number;
+  lastActiveDate?: string;
+}
+
+export interface AuditActivityData {
+  totalActions: number;
+  actionsLast30Days: number;
+  actionBreakdown: Record<string, number>;
+  entityBreakdown: Record<string, number>;
+  dailyActivity: Record<string, number>;
+  recentActivity: AuditActivity[];
+  systemUsageStats: SystemUsageStats;
+  loginHistory: LoginHistory[];
+}
+
 export interface UserProfile {
   user: UserInfo;
   stats: UserProfileStats;
@@ -51,6 +89,7 @@ export interface UserProfile {
   recentExchanges: RecentExchange[];
   monthlyActivity: MonthlyActivity[];
   participationCount: number;
+  auditActivity: AuditActivityData;
 }
 
 export interface ExchangesSummary {
@@ -236,5 +275,128 @@ export class UserProfileService {
     } else {
       return `${Math.ceil(diffDays / 365)} years ago`;
     }
+  }
+
+  /**
+   * Format action name for display
+   */
+  static formatActionName(action: string): string {
+    switch (action.toLowerCase()) {
+      case 'login':
+        return 'Logged In';
+      case 'logout':
+        return 'Logged Out';
+      case 'view_profile':
+        return 'Viewed Profile';
+      case 'view_other_user_profile':
+        return 'Viewed User Profile';
+      case 'create_exchange':
+        return 'Created Exchange';
+      case 'update_exchange':
+        return 'Updated Exchange';
+      case 'view_exchange':
+        return 'Viewed Exchange';
+      case 'send_message':
+        return 'Sent Message';
+      case 'upload_document':
+        return 'Uploaded Document';
+      case 'download_document':
+        return 'Downloaded Document';
+      case 'create_task':
+        return 'Created Task';
+      case 'update_task':
+        return 'Updated Task';
+      case 'complete_task':
+        return 'Completed Task';
+      case 'api_access':
+        return 'API Access';
+      case 'auth_success':
+        return 'Authentication Success';
+      case 'auth_failure':
+        return 'Authentication Failed';
+      case 'token_refresh':
+        return 'Token Refreshed';
+      default:
+        return action.split('_').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+    }
+  }
+
+  /**
+   * Format entity type for display
+   */
+  static formatEntityType(entityType: string): string {
+    switch (entityType?.toLowerCase()) {
+      case 'exchange':
+        return 'Exchange';
+      case 'user':
+        return 'User';
+      case 'message':
+        return 'Message';
+      case 'document':
+        return 'Document';
+      case 'task':
+        return 'Task';
+      case 'contact':
+        return 'Contact';
+      case 'auth':
+        return 'Authentication';
+      case 'endpoint':
+        return 'API Endpoint';
+      case 'system':
+        return 'System';
+      default:
+        return entityType ? entityType.charAt(0).toUpperCase() + entityType.slice(1) : 'Unknown';
+    }
+  }
+
+  /**
+   * Get action color for display
+   */
+  static getActionColor(action: string): string {
+    switch (action.toLowerCase()) {
+      case 'login':
+      case 'auth_success':
+        return 'text-green-600 bg-green-100';
+      case 'logout':
+        return 'text-blue-600 bg-blue-100';
+      case 'create_exchange':
+      case 'create_task':
+      case 'upload_document':
+        return 'text-blue-600 bg-blue-100';
+      case 'update_exchange':
+      case 'update_task':
+        return 'text-yellow-600 bg-yellow-100';
+      case 'complete_task':
+        return 'text-green-600 bg-green-100';
+      case 'auth_failure':
+        return 'text-red-600 bg-red-100';
+      case 'view_profile':
+      case 'view_exchange':
+      case 'view_other_user_profile':
+        return 'text-gray-600 bg-gray-100';
+      case 'send_message':
+        return 'text-purple-600 bg-purple-100';
+      case 'download_document':
+        return 'text-indigo-600 bg-indigo-100';
+      default:
+        return 'text-gray-600 bg-gray-100';
+    }
+  }
+
+  /**
+   * Get browser name from user agent
+   */
+  static getBrowserInfo(userAgent?: string): string {
+    if (!userAgent) return 'Unknown Browser';
+    
+    if (userAgent.includes('Chrome')) return 'Chrome';
+    if (userAgent.includes('Firefox')) return 'Firefox';
+    if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) return 'Safari';
+    if (userAgent.includes('Edge')) return 'Edge';
+    if (userAgent.includes('Opera')) return 'Opera';
+    
+    return 'Unknown Browser';
   }
 }
