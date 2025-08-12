@@ -416,8 +416,9 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
         const taskData = {
           title: manualForm.title.trim(), // Ensure title is trimmed
           description: manualForm.description || '',
-          priority: manualForm.priority || 'medium',
+          priority: (manualForm.priority || 'medium').toUpperCase(), // Backend expects uppercase
           category: manualForm.category || 'general',
+          status: 'PENDING', // Add default status
           exchange_id: targetExchangeId,
           exchangeId: targetExchangeId, // Add both for backend compatibility
           ...(manualForm.assignedTo && { assigned_to: manualForm.assignedTo }),
@@ -440,7 +441,8 @@ export const SmartTaskCreationModal: React.FC<SmartTaskCreationModalProps> = ({
           exchangeIdEmpty: !taskData.exchange_id || taskData.exchange_id.trim() === '',
           exchangeId: taskData.exchangeId,
           exchangeIdPropType: typeof taskData.exchangeId,
-          exchangeIdPropEmpty: !taskData.exchangeId || taskData.exchangeId.trim() === ''
+          exchangeIdPropEmpty: !taskData.exchangeId || taskData.exchangeId.trim() === '',
+          fullData: JSON.stringify(taskData)
         });
         
         createdTask = await createTask(taskData);

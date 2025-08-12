@@ -5,6 +5,10 @@
 
 export class HttpClient {
   private baseURL: string = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+  
+  constructor() {
+    console.log('🌐 HttpClient initialized with base URL:', this.baseURL);
+  }
 
   private getAuthHeaders(isFormData: boolean = false): HeadersInit {
     const token = localStorage.getItem('token');
@@ -17,6 +21,12 @@ export class HttpClient {
   async request<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     
+    console.log('📡 Making request:', {
+      method: options.method || 'GET',
+      url,
+      hasBody: !!options.body,
+      headers: options.headers
+    });
     
     const response = await fetch(url, {
       ...options,
@@ -55,15 +65,30 @@ export class HttpClient {
         throw new Error('Too many requests. Please wait a moment and try again.');
       }
       
-      const errorData = await response.json().catch(() => ({}));
+      const errorText = await response.text();
+      let errorData: any = {};
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        errorData = { message: errorText };
+      }
+      
       console.error('🚨 HTTP Error Details:', {
         status: response.status,
         statusText: response.statusText,
         endpoint,
         errorData,
-        url
+        errorText,
+        url,
+        requestBody: options.body ? JSON.parse(options.body as string) : undefined
       });
-      throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      
+      // If backend provides validation details, include them
+      const errorMessage = errorData.details 
+        ? `Validation failed: ${errorData.details.join(', ')}`
+        : errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+      
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();

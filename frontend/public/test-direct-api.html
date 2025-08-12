@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Direct API Test (No Proxy)</title>
+</head>
+<body>
+    <h1>Direct Backend API Test</h1>
+    <p>This test bypasses the proxy and calls the backend directly.</p>
+    
+    <div id="status">Initializing...</div>
+    <div id="result"></div>
+    
+    <script>
+        async function testDirectAPI() {
+            const statusDiv = document.getElementById('status');
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                statusDiv.textContent = 'Testing direct backend connection...';
+                
+                // Call backend directly (not through proxy)
+                const loginRes = await fetch('http://localhost:5001/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@peak1031.com',
+                        password: 'admin123'
+                    })
+                });
+                
+                if (!loginRes.ok) {
+                    throw new Error('Login failed: ' + loginRes.status);
+                }
+                
+                const { token } = await loginRes.json();
+                statusDiv.textContent = 'Login successful, fetching agencies...';
+                
+                // Call agencies endpoint directly
+                const agenciesRes = await fetch('http://localhost:5001/api/agencies', {
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!agenciesRes.ok) {
+                    throw new Error('Agencies fetch failed: ' + agenciesRes.status);
+                }
+                
+                const data = await agenciesRes.json();
+                
+                statusDiv.textContent = '✅ SUCCESS - Backend API is working!';
+                resultDiv.innerHTML = `
+                    <h2>Results:</h2>
+                    <p><strong>Backend is accessible directly at port 5001</strong></p>
+                    <p>Agencies found: ${data.data ? data.data.length : 0}</p>
+                    <hr>
+                    <h3>The Issue:</h3>
+                    <p style="color: red;">The frontend proxy at port 3001 needs to be restarted to forward /api/* requests properly.</p>
+                    <h3>Solution:</h3>
+                    <ol>
+                        <li>Stop the React dev server (Ctrl+C in the terminal)</li>
+                        <li>Run: cd frontend && npm start</li>
+                        <li>The proxy will then forward requests correctly</li>
+                    </ol>
+                    <hr>
+                    <h3>Agencies Data:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+                
+            } catch (error) {
+                statusDiv.textContent = '❌ Error: ' + error.message;
+                resultDiv.innerHTML = `<pre>${error.stack}</pre>`;
+            }
+        }
+        
+        testDirectAPI();
+    </script>
+</body>
+</html>
