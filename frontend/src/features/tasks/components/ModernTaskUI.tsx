@@ -48,6 +48,7 @@ interface ModernTaskUIProps {
   exchangeId?: string;
   initialView?: 'grid' | 'list' | 'kanban' | 'timeline';
   onTaskSelect?: (task: Task) => void;
+  onCreateClick?: () => void;
 }
 
 // Priority and Status configurations
@@ -127,7 +128,8 @@ const STATUS_CONFIG = {
 export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
   exchangeId,
   initialView = 'kanban',
-  onTaskSelect
+  onTaskSelect,
+  onCreateClick
 }) => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -136,7 +138,6 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [hoveredColumn, setHoveredColumn] = useState<string | null>(null);
   
@@ -263,7 +264,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
   };
 
   const handleTaskDelete = async (taskId: string) => {
-    if (!confirm('Are you sure you want to delete this task?')) return;
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
     try {
       await apiService.deleteTask(taskId);
       setTasks(prev => prev.filter(task => task.id !== taskId));
@@ -283,7 +284,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
         }
         break;
       case 'delete':
-        if (confirm(`Delete ${taskIds.length} tasks?`)) {
+        if (window.confirm(`Delete ${taskIds.length} tasks?`)) {
           for (const id of taskIds) {
             await handleTaskDelete(id);
           }
@@ -623,7 +624,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
 
                 {/* Create Button */}
                 <button
-                  onClick={() => setShowCreateModal(true)}
+                  onClick={() => onCreateClick?.()}
                   className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                 >
                   <PlusIcon className="w-4 h-4" />
