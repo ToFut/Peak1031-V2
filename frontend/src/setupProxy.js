@@ -1,33 +1,23 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 module.exports = function(app) {
-  // Proxy all /api/* requests to backend
-  // IMPORTANT: Keep the /api prefix in the forwarded request
+  // Use the simple proxy configuration to forward all /api requests
   app.use(
-    ['/api', '/api/*'],
+    '/api',
     createProxyMiddleware({
       target: 'http://localhost:5001',
       changeOrigin: true,
-      secure: false,
       logLevel: 'debug',
-      ws: true, // Enable WebSocket proxy
-      // Explicitly preserve the path with /api prefix
-      pathRewrite: {
-        '^/api': '/api' // Keep /api prefix (identity rewrite)
-      },
       onProxyReq: (proxyReq, req, res) => {
-        console.log('🔄 Proxying request:', req.method, req.url, '->', 'http://localhost:5001' + req.url);
-        // Log headers for debugging
-        console.log('   Headers:', req.headers.authorization ? 'Has Auth' : 'No Auth');
+        console.log('🔄 Proxying:', req.method, req.originalUrl, '->', 'http://localhost:5001' + req.originalUrl);
       },
       onProxyRes: (proxyRes, req, res) => {
-        console.log('✅ Proxy response:', proxyRes.statusCode, req.url);
+        console.log('✅ Response:', proxyRes.statusCode, 'for', req.originalUrl);
       },
       onError: (err, req, res) => {
-        console.error('❌ Proxy error:', err.message, req.url);
-        // Send error response
+        console.error('❌ Proxy error:', err.message);
         if (!res.headersSent) {
-          res.status(500).json({ error: 'Proxy error', message: err.message });
+          res.status(502).json({ error: 'Proxy error', message: err.message });
         }
       }
     })
