@@ -755,7 +755,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
                   : 'Create your first task to get started'}
               </p>
               <button
-                onClick={() => setShowCreateModal(true)}
+                onClick={() => onCreateClick?.()}
                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
               >
                 <PlusIcon className="w-4 h-4" />

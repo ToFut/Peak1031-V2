@@ -4,6 +4,7 @@ import { TaskDetailModal } from '../components/TaskDetailModal';
 import { TaskCreateModal } from '../components/TaskCreateModal';
 import { Task } from '../../../types';
 import { apiService } from '../../../services/api';
+import { PlusIcon } from '@heroicons/react/24/outline';
 
 const ModernTasksPage: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -45,10 +46,20 @@ const ModernTasksPage: React.FC = () => {
   };
 
   return (
-    <>
+    <div className="relative h-full">
+      {/* Floating Create Button */}
+      <button
+        onClick={() => setShowCreateModal(true)}
+        className="fixed bottom-8 right-8 z-40 flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 transition-all hover:shadow-xl"
+      >
+        <PlusIcon className="w-5 h-5" />
+        <span className="font-medium">New Task</span>
+      </button>
+
       <ModernTaskUI
         key={refreshKey}
         onTaskSelect={handleTaskSelect}
+        onCreateClick={() => setShowCreateModal(true)}
         initialView="kanban"
       />
 
@@ -67,7 +78,7 @@ const ModernTasksPage: React.FC = () => {
         onClose={() => setShowCreateModal(false)}
         onTaskCreated={handleTaskCreated}
       />
-    </>
+    </div>
   );
 };
 

@@ -12,3 +12,5 @@ VALUES (
     true
 ) ON CONFLICT (email) DO NOTHING;
 
+
+

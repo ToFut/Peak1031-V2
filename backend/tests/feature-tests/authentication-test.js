@@ -390,3 +390,5 @@ if (require.main === module) {
 }
 
 module.exports = AuthenticationTestSuite;
+
+

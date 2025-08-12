@@ -3,7 +3,7 @@
  * Professional admin interface for managing agencies
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAgencies } from '../../hooks/useAgencies';
 import { 
   PlusIcon, 
@@ -26,9 +26,11 @@ const AgencyManagement: React.FC = () => {
 
   if (!isAdmin) {
     return (
-      <div className="p-8 text-center">
-        <h2 className="text-2xl font-bold text-gray-900">Access Denied</h2>
-        <p className="mt-2 text-gray-600">You need admin privileges to access this page.</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
+          <p className="text-gray-600">You don't have permission to access this page.</p>
+        </div>
       </div>
     );
   }
@@ -36,16 +38,17 @@ const AgencyManagement: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="py-6">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Agency Management</h1>
-                <p className="mt-1 text-sm text-gray-600">
-                  Manage agencies, assign third parties, and monitor performance
+                <p className="mt-1 text-sm text-gray-500">
+                  Manage agencies and their third-party assignments
                 </p>
               </div>
+              
               <div className="flex items-center space-x-3">
                 <button
                   className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
@@ -63,7 +66,7 @@ const AgencyManagement: React.FC = () => {
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
                 >
                   <PlusIcon className="h-4 w-4 mr-2" />
-                  New Agency
+                  Add Agency
                 </button>
               </div>
             </div>
@@ -71,6 +74,7 @@ const AgencyManagement: React.FC = () => {
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Search Bar */}
         <div className="bg-white rounded-lg shadow-sm mb-6">

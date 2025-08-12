@@ -65,3 +65,5 @@ fixAgencyLogin()
     console.log('📋 Login credentials: agency@peak1031.com / agency123');
   })
   .catch(console.error);
+
+

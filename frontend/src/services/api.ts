@@ -713,6 +713,18 @@ class ApiService {
     });
   }
 
+  // Notification Settings methods
+  async getNotificationSettings(): Promise<any> {
+    return await this.request('/settings/notifications');
+  }
+
+  async updateNotificationSettings(settings: any): Promise<any> {
+    return await this.request('/settings/notifications', {
+      method: 'PUT',
+      body: JSON.stringify(settings)
+    });
+  }
+
   // User Management - Additional methods
   async activateUser(userId: string): Promise<User> {
     return await this.request(`/users/${userId}/activate`, {

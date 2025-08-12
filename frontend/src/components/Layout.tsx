@@ -7,6 +7,7 @@ import { useDelayedTooltip } from '../hooks/useDelayedTooltip';
 import { useEnhancedNotifications } from '../hooks/useEnhancedNotifications';
 import { apiService } from '../services/api';
 import { NotificationContainer } from './shared/NotificationPopup';
+import NotificationSettings from './NotificationSettings';
 
 // Icons (using heroicons or lucide-react)
 import {
@@ -128,6 +129,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [settings, setSettings] = useState<any>({});
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
 
   // Debug user state
   useEffect(() => {
@@ -813,6 +815,13 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
                             title={soundEnabled ? 'Sound enabled' : 'Sound disabled'}
                           >
                             {soundEnabled ? '🔊' : '🔇'}
+                          </button>
+                          <button
+                            onClick={() => setShowNotificationSettings(true)}
+                            className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            title="Notification settings"
+                          >
+                            ⚙️
                           </button>
                         </div>
                       </div>

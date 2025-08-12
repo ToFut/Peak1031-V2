@@ -995,6 +995,7 @@ class DocumentTemplateService {
       
       let doc;
       try {
+        // Initialize Docxtemplater with options in constructor
         doc = new Docxtemplater(zip, {
           paragraphLoop: true,
           linebreaks: true,
@@ -1004,8 +1005,14 @@ class DocumentTemplateService {
           }
         });
       } catch (docError) {
-        console.error('❌ Error creating Docxtemplater:', docError);
-        throw new Error('Failed to initialize document template processor');
+        console.error('❌ Error creating Docxtemplater:', {
+          message: docError.message,
+          stack: docError.stack,
+          name: docError.name,
+          properties: docError.properties || {},
+          offsets: docError.offsets || []
+        });
+        throw new Error(`Failed to initialize document template processor: ${docError.message || 'Unknown error'}`);
       }
       
       // Prepare data for docxtemplater with intelligent client identification
