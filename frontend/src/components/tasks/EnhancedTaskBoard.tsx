@@ -296,7 +296,9 @@ export const EnhancedTaskBoard: React.FC<EnhancedTaskBoardProps> = ({
 
   // Filter and organize tasks by column
   const organizedTasks = useMemo(() => {
-    let filteredTasks = tasks;
+    // Ensure tasks is an array
+    const tasksArray = Array.isArray(tasks) ? tasks : [];
+    let filteredTasks = tasksArray;
 
     // Apply filters
     if (filterPriority) {
@@ -323,16 +325,19 @@ export const EnhancedTaskBoard: React.FC<EnhancedTaskBoardProps> = ({
 
   // Task statistics
   const taskStats = useMemo(() => {
-    const pending = tasks.filter(t => t.status === 'pending' || t.status === 'PENDING').length;
-    const inProgress = tasks.filter(t => t.status === 'in_progress' || t.status === 'IN_PROGRESS').length;
-    const completed = tasks.filter(t => t.status === 'completed' || t.status === 'COMPLETED').length;
-    const overdue = tasks.filter(t => 
+    // Ensure tasks is an array
+    const tasksArray = Array.isArray(tasks) ? tasks : [];
+    
+    const pending = tasksArray.filter(t => t.status === 'pending' || t.status === 'PENDING').length;
+    const inProgress = tasksArray.filter(t => t.status === 'in_progress' || t.status === 'IN_PROGRESS').length;
+    const completed = tasksArray.filter(t => t.status === 'completed' || t.status === 'COMPLETED').length;
+    const overdue = tasksArray.filter(t => 
       t.due_date && 
       new Date(t.due_date) < new Date() && 
       (t.status === 'pending' || t.status === 'in_progress' || t.status === 'PENDING' || t.status === 'IN_PROGRESS')
     ).length;
 
-    return { pending, inProgress, completed, overdue, total: tasks.length };
+    return { pending, inProgress, completed, overdue, total: tasksArray.length };
   }, [tasks]);
 
   // Handle drag start

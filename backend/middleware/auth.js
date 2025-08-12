@@ -80,6 +80,14 @@ async function authenticateToken(req, res, next) {
     // Attach user to request
     req.user = user;
     req.token = token;
+    
+    // Debug log for RBAC
+    console.log('🔐 AUTH: User authenticated:', {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      contact_id: user.contact_id
+    });
 
     // Update last activity (async, don't wait)
     setImmediate(async () => {

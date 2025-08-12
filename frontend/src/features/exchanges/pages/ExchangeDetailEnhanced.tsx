@@ -32,8 +32,8 @@ import {
 
 // Tab Components
 import { ExchangeOverview } from '../components/ExchangeOverview';
-import { TasksList } from '../components/TasksList';
-import InvitationManager from '../components/InvitationManager';
+import EnhancedTaskManager from '../../tasks/components/EnhancedTaskManager';
+import EnhancedInvitationManager from '../components/EnhancedInvitationManager';
 import { DocumentUploader } from '../../../components/shared';
 
 interface TabProps {
@@ -108,11 +108,34 @@ const KeyMetrics: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
     const diffTime = date.getTime() - today.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
+  
+  // Get the actual exchange value from different possible fields
+  const getExchangeValue = () => {
+    const ex = exchange as any; // Type assertion to handle dynamic properties
+    // Check various fields where the value might be stored
+    if (ex.exchangeValue) return ex.exchangeValue;
+    if (ex.exchange_value) return ex.exchange_value;
+    if (ex.relinquishedPropertyValue) return ex.relinquishedPropertyValue;
+    if (ex.relinquished_property_value) return ex.relinquished_property_value;
+    if (ex.replacementPropertyValue) return ex.replacementPropertyValue;
+    if (ex.replacement_property_value) return ex.replacement_property_value;
+    // If we have both relinquished and replacement values, use the max
+    const relinquished = ex.relinquishedPropertyValue || ex.relinquished_property_value || 0;
+    const replacement = ex.replacementPropertyValue || ex.replacement_property_value || 0;
+    if (relinquished || replacement) return Math.max(relinquished, replacement);
+    return null;
+  };
+  
+  // Helper to get field value with fallbacks
+  const getFieldValue = (field: string) => {
+    const ex = exchange as any;
+    return ex[field] || ex[field.replace(/([A-Z])/g, '_$1').toLowerCase()] || null;
+  };
 
   const metrics = [
     {
       label: '45-Day Deadline',
-      value: getDaysUntil(exchange.identificationDeadline),
+      value: getDaysUntil(exchange.identificationDeadline || getFieldValue('identificationDeadline')),
       type: 'days',
       icon: Target,
       color: 'text-red-600',
@@ -121,7 +144,7 @@ const KeyMetrics: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
     },
     {
       label: '180-Day Deadline',
-      value: getDaysUntil(exchange.completionDeadline),
+      value: getDaysUntil(exchange.completionDeadline || getFieldValue('completionDeadline') || exchange.exchangeDeadline || getFieldValue('exchangeDeadline')),
       type: 'days',
       icon: Clock,
       color: 'text-orange-600',
@@ -130,7 +153,7 @@ const KeyMetrics: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
     },
     {
       label: 'Exchange Value',
-      value: exchange.exchangeValue,
+      value: getExchangeValue(),
       type: 'currency',
       icon: DollarSign,
       color: 'text-green-600',
@@ -139,7 +162,7 @@ const KeyMetrics: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
     },
     {
       label: 'Progress',
-      value: exchange.progress || 0,
+      value: exchange.progress || getFieldValue('completionPercentage') || 0,
       type: 'percentage',
       icon: Gauge,
       color: 'text-blue-600',
@@ -236,21 +259,23 @@ const PropertyCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Sale Price</p>
+              <p className="text-sm text-gray-500">Value</p>
               <p className="font-medium text-gray-900 text-lg">
-                {exchange.relinquishedSalePrice 
-                  ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(exchange.relinquishedSalePrice)
-                  : 'Not specified'
-                }
+                {(() => {
+                  const value = exchange.relinquishedValue || exchange.relinquished_property_value;
+                  return value
+                    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
+                    : 'Not specified';
+                })()}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Closing Date</p>
+              <p className="text-sm text-gray-500">Sale Date</p>
               <p className="font-medium text-gray-900">
-                {exchange.relinquishedClosingDate 
-                  ? new Date(exchange.relinquishedClosingDate).toLocaleDateString()
-                  : 'Not scheduled'
-                }
+                {(() => {
+                  const date = exchange.relinquishedClosingDate;
+                  return date ? new Date(date).toLocaleDateString() : 'Not scheduled';
+                })()}
               </p>
             </div>
           </div>
@@ -300,7 +325,7 @@ const ContactCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
           {exchange.client ? (
             <div className="space-y-2">
               <p className="font-semibold text-gray-900 text-lg">
-                {exchange.client.firstName} {exchange.client.lastName}
+                {exchange.client.firstName || (exchange.client as any).first_name} {exchange.client.lastName || (exchange.client as any).last_name}
               </p>
               <div className="flex items-center text-gray-600">
                 <Mail className="w-4 h-4 mr-2" />
@@ -377,7 +402,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [documents, setDocuments] = useState<any[]>([]);
-  const [tasks, setTasks] = useState<any[]>([]);
+  // Tasks are now managed by EnhancedTaskManager component
   const [showUploadModal, setShowUploadModal] = useState(false);
   
   useEffect(() => {
@@ -392,10 +417,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
       const data = await getExchange(id!);
       setExchange(data);
       // Load associated documents and tasks
-      await Promise.all([
-        loadDocuments(),
-        loadTasks()
-      ]);
+      await loadDocuments();
     } catch (error) {
       console.error('Error loading exchange:', error);
     } finally {
@@ -416,17 +438,6 @@ const ExchangeDetailEnhanced: React.FC = () => {
     }
   };
 
-  const loadTasks = async () => {
-    if (!id) return;
-    try {
-      const tasks = await apiService.get(`/tasks/exchange/${id}`);
-      const tasksList = Array.isArray(tasks) ? tasks : (tasks.tasks || tasks.data || []);
-      setTasks(tasksList);
-    } catch (error) {
-      console.error('Error loading tasks:', error);
-      setTasks([]);
-    }
-  };
 
   const handleDocumentUploadSuccess = async () => {
     await loadDocuments();
@@ -495,54 +506,166 @@ const ExchangeDetailEnhanced: React.FC = () => {
     return diffDays;
   };
 
+  const getDaysUntil = (dateString?: string) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    const today = new Date();
+    const diffTime = date.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
   const daysUntilClosing = getDaysUntilClosing();
   const canManageInvitations = isAdmin() || isCoordinator();
+  
+  // Component to display all exchange fields
+  const AllDetailsView = () => {
+    const ex = exchange as any;
+    
+    // Define field type
+    type FieldItem = {
+      label: string;
+      value: any;
+      type?: string;
+    };
+    
+    // Group fields by category
+    const fieldGroups: Record<string, FieldItem[]> = {
+      'Basic Information': [
+        { label: 'Exchange ID', value: ex.id, type: undefined },
+        { label: 'Exchange Number', value: ex.exchangeNumber || ex.exchange_number, type: undefined },
+        { label: 'Name', value: ex.name, type: undefined },
+        { label: 'Status', value: ex.status, type: undefined },
+        { label: 'Exchange Type', value: ex.exchangeType || ex.exchange_type, type: undefined },
+        { label: 'Priority', value: ex.priority, type: undefined },
+        { label: 'Active', value: ex.isActive || ex.is_active ? 'Yes' : 'No', type: undefined }
+      ],
+      'Financial Information': [
+        { label: 'Relinquished Property Value', value: ex.relinquishedPropertyValue || ex.relinquished_property_value, type: 'currency' },
+        { label: 'Replacement Property Value', value: ex.replacementPropertyValue || ex.replacement_property_value, type: 'currency' },
+        { label: 'Exchange Value', value: ex.relinquished_property_value || ex.relinquishedPropertyValue || 0, type: 'currency' },
+        { label: 'Cash Boot', value: ex.cashBoot || ex.cash_boot, type: 'currency' },
+        { label: 'Financing Amount', value: ex.financingAmount || ex.financing_amount, type: 'currency' },
+        { label: 'Profitability', value: ex.profitability, type: 'currency' }
+      ],
+      'Important Dates': [
+        { label: 'Sale Date', value: ex.saleDate || ex.sale_date, type: 'date' },
+        { label: 'Identification Deadline (45-Day)', value: ex.identificationDeadline || ex.identification_deadline, type: 'date' },
+        { label: 'Exchange Deadline (180-Day)', value: ex.exchangeDeadline || ex.exchange_deadline, type: 'date' },
+        { label: 'Created At', value: ex.createdAt || ex.created_at, type: 'datetime' },
+        { label: 'Updated At', value: ex.updatedAt || ex.updated_at, type: 'datetime' }
+      ],
+      'Compliance & Risk': [
+        { label: 'Compliance Status', value: ex.complianceStatus || ex.compliance_status, type: undefined },
+        { label: 'Risk Level', value: ex.riskLevel || ex.risk_level, type: undefined },
+        { label: 'On Track', value: ex.onTrack || ex.on_track ? 'Yes' : 'No', type: undefined },
+        { label: 'Lifecycle Stage', value: ex.lifecycleStage || ex.lifecycle_stage, type: undefined },
+        { label: 'Workflow Stage', value: ex.workflowStage || ex.workflow_stage, type: undefined },
+        { label: 'Stage Progress', value: ex.stageProgress || ex.stage_progress, type: 'percentage' },
+        { label: 'Days in Current Stage', value: ex.daysInCurrentStage || ex.days_in_current_stage, type: undefined },
+        { label: 'Completion Percentage', value: ex.completionPercentage || ex.completion_percentage, type: 'percentage' }
+      ],
+      'Communication': [
+        { label: 'Chat Enabled', value: ex.chatEnabled || ex.chat_enabled ? 'Yes' : 'No', type: undefined },
+        { label: 'Exchange Chat ID', value: ex.exchangeChatId || ex.exchange_chat_id, type: undefined },
+        { label: 'Notifications Enabled', value: ex.notificationsEnabled || ex.notifications_enabled ? 'Yes' : 'No', type: undefined }
+      ],
+      'Additional Information': [
+        { label: 'Notes', value: ex.notes, type: undefined },
+        { label: 'Tags', value: Array.isArray(ex.tags) ? ex.tags.join(', ') : ex.tags, type: undefined },
+        { label: 'Property Types', value: Array.isArray(ex.propertyTypes || ex.property_types) ? (ex.propertyTypes || ex.property_types).join(', ') : '', type: undefined },
+        { label: 'Client ID', value: ex.clientId || ex.client_id, type: undefined },
+        { label: 'Coordinator ID', value: ex.coordinatorId || ex.coordinator_id, type: undefined }
+      ]
+    };
+    
+    const formatFieldValue = (value: any, type?: string | undefined) => {
+      if (value === null || value === undefined || value === '') return 'Not specified';
+      
+      switch (type) {
+        case 'currency':
+          return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+        case 'date':
+          return new Date(value).toLocaleDateString();
+        case 'datetime':
+          return new Date(value).toLocaleString();
+        case 'percentage':
+          return `${value}%`;
+        default:
+          if (typeof value === 'object') return JSON.stringify(value);
+          return String(value);
+      }
+    };
+    
+    return (
+      <div className="space-y-6">
+        {Object.entries(fieldGroups).map(([groupName, fields]) => (
+          <div key={groupName} className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">{groupName}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {fields.map((field, index) => (
+                <div key={index} className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm font-medium text-gray-600">{field.label}:</span>
+                  <span className="text-sm text-gray-900 text-right">
+                    {formatFieldValue(field.value, field.type)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Building2 },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'tasks', label: 'Tasks', icon: CheckCircle },
     { id: 'documents', label: 'Documents', icon: FileText },
-    ...(canManageInvitations ? [{ id: 'invitations', label: 'Invitations', icon: Users }] : [])
+    ...(canManageInvitations ? [{ id: 'invitations', label: 'Invitations', icon: Users }] : []),
+    { id: 'all-details', label: 'All Details', icon: FileText }
   ];
 
   return (
     <Layout>
-      <div className="space-y-6">
-        {/* Enhanced Header */}
-        <div className="bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-800 rounded-3xl shadow-2xl p-8 text-white relative overflow-hidden">
-          {/* Background Pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full -mr-48 -mt-48"></div>
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-white rounded-full -ml-32 -mb-32"></div>
-          </div>
-          
-          <div className="relative">
-            <button
-              onClick={() => navigate('/exchanges')}
-              className="flex items-center text-blue-100 hover:text-white mb-6 transition-colors group"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform" />
-              Back to Exchanges
-            </button>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          {/* Clean Header */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={() => navigate('/exchanges')}
+                className="inline-flex items-center text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Exchanges
+              </button>
+              
+              <div className="flex items-center gap-2">
+                <StatusIndicator status={exchange.status} daysRemaining={daysUntilClosing || undefined} />
+                <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                  <MoreVertical className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
             
-            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+            <div className="flex items-start justify-between">
               <div className="flex-1">
-                <h1 className="text-4xl font-bold mb-4 leading-tight">
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">
                   {exchange.name || `Exchange #${exchange.exchangeNumber}`}
                 </h1>
                 
-                <div className="flex flex-wrap gap-4 text-blue-100 mb-6">
-                  <span className="flex items-center bg-white/10 rounded-lg px-3 py-1">
-                    <Users className="w-4 h-4 mr-2" />
+                <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-4">
+                  <span className="flex items-center">
+                    <Users className="w-4 h-4 mr-1" />
                     {exchange.client?.firstName} {exchange.client?.lastName}
                   </span>
-                  <span className="flex items-center bg-white/10 rounded-lg px-3 py-1">
-                    <Calendar className="w-4 h-4 mr-2" />
+                  <span className="flex items-center">
+                    <Calendar className="w-4 h-4 mr-1" />
                     {new Date(exchange.createdAt || '').toLocaleDateString()}
                   </span>
-                  <span className="flex items-center bg-white/10 rounded-lg px-3 py-1">
-                    <Banknote className="w-4 h-4 mr-2" />
+                  <span className="flex items-center">
+                    <DollarSign className="w-4 h-4 mr-1" />
                     {exchange.exchangeValue 
                       ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(exchange.exchangeValue)
                       : 'Value TBD'
@@ -550,68 +673,200 @@ const ExchangeDetailEnhanced: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Progress Bar */}
-                <div className="bg-white/10 rounded-2xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-blue-100">Exchange Progress</span>
-                    <span className="text-lg font-bold">{exchange.progress || 0}%</span>
-                  </div>
-                  <div className="w-full bg-white/20 rounded-full h-3">
-                    <div 
-                      className="bg-gradient-to-r from-green-400 to-emerald-500 h-3 rounded-full transition-all duration-1000 ease-out shadow-lg"
-                      style={{ width: `${exchange.progress || 0}%` }}
-                    ></div>
-                  </div>
+                {/* Simple Progress Bar */}
+                <div className="bg-gray-100 rounded-full h-2 mb-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${exchange.progress || 0}%` }}
+                  ></div>
                 </div>
-              </div>
-              
-              <div className="flex flex-col gap-4">
-                <StatusIndicator status={exchange.status} daysRemaining={daysUntilClosing || undefined} />
-                
-                <button className="flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-2xl p-3 transition-all">
-                  <MoreVertical className="w-6 h-6" />
-                </button>
+                <p className="text-sm text-gray-600">{exchange.progress || 0}% complete</p>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Key Metrics */}
-        <KeyMetrics exchange={exchange} />
+          {/* Key Metrics - Simplified */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-600">45-Day Deadline</span>
+                <Target className="w-4 h-4 text-red-600" />
+              </div>
+              <p className="text-lg font-semibold text-gray-900">
+                {(() => {
+                  const days = getDaysUntil(exchange.identificationDeadline);
+                  return days === null ? 'N/A' : days < 0 ? 'Overdue' : `${days} days`;
+                })()}
+              </p>
+            </div>
 
-        {/* Information Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <PropertyCard exchange={exchange} />
-          <ContactCard exchange={exchange} />
-        </div>
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-600">180-Day Deadline</span>
+                <Clock className="w-4 h-4 text-orange-600" />
+              </div>
+              <p className="text-lg font-semibold text-gray-900">
+                {(() => {
+                  const days = getDaysUntil(exchange.completionDeadline);
+                  return days === null ? 'N/A' : days < 0 ? 'Overdue' : `${days} days`;
+                })()}
+              </p>
+            </div>
 
-        {/* Tabs */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-          <div className="border-b border-gray-200 bg-gray-50">
-            <nav className="flex -mb-px">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`
-                    flex-1 py-6 px-6 text-center border-b-3 font-semibold text-sm transition-all
-                    flex items-center justify-center space-x-3
-                    ${activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600 bg-white shadow-sm'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-white/50'
-                    }
-                  `}
-                >
-                  <tab.icon className="w-5 h-5" />
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-            </nav>
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-600">Exchange Value</span>
+                <DollarSign className="w-4 h-4 text-green-600" />
+              </div>
+              <p className="text-lg font-semibold text-gray-900">
+                {exchange.exchangeValue
+                  ? new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0
+                    }).format(exchange.exchangeValue)
+                  : 'N/A'
+                }
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-600">Progress</span>
+                <Gauge className="w-4 h-4 text-blue-600" />
+              </div>
+              <p className="text-lg font-semibold text-gray-900">{exchange.progress || 0}%</p>
+            </div>
           </div>
-          
-          <div className="p-8">
-            {activeTab === 'overview' && <ExchangeOverview exchange={exchange as any} participants={[]} tasks={tasks} documents={documents} />}
-            {activeTab === 'tasks' && <TasksList tasks={tasks} />}
+
+          {/* Simplified Information Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <Home className="w-5 h-5 mr-2 text-blue-600" />
+                Property Information
+              </h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-2">Relinquished Property</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Address:</span>
+                      <span className="text-gray-900">{exchange.relinquishedPropertyAddress || 'Not specified'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Sale Price:</span>
+                      <span className="text-gray-900 font-medium">
+                        {exchange.relinquishedSalePrice 
+                          ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(exchange.relinquishedSalePrice)
+                          : 'Not specified'
+                        }
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Closing Date:</span>
+                      <span className="text-gray-900">
+                        {exchange.relinquishedClosingDate 
+                          ? new Date(exchange.relinquishedClosingDate).toLocaleDateString()
+                          : 'Not scheduled'
+                        }
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <Users className="w-5 h-5 mr-2 text-blue-600" />
+                Key Contacts
+              </h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-2">Client</h4>
+                  {exchange.client ? (
+                    <div className="space-y-1 text-sm">
+                      <p className="font-medium text-gray-900">
+                        {exchange.client.firstName} {exchange.client.lastName}
+                      </p>
+                      <div className="flex items-center text-gray-600">
+                        <Mail className="w-4 h-4 mr-2" />
+                        <a href={`mailto:${exchange.client.email}`} className="hover:text-blue-600">
+                          {exchange.client.email}
+                        </a>
+                      </div>
+                      {exchange.client.phone && (
+                        <div className="flex items-center text-gray-600">
+                          <Phone className="w-4 h-4 mr-2" />
+                          <a href={`tel:${exchange.client.phone}`} className="hover:text-blue-600">
+                            {exchange.client.phone}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-sm italic">No client information available</p>
+                  )}
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-2">Coordinator</h4>
+                  {exchange.coordinator ? (
+                    <div className="space-y-1 text-sm">
+                      <p className="font-medium text-gray-900">
+                        {exchange.coordinator.first_name} {exchange.coordinator.last_name}
+                      </p>
+                      <div className="flex items-center text-gray-600">
+                        <Mail className="w-4 h-4 mr-2" />
+                        <a href={`mailto:${exchange.coordinator.email}`} className="hover:text-blue-600">
+                          {exchange.coordinator.email}
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-sm italic">No coordinator assigned</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Clean Tabs */}
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div className="border-b border-gray-200">
+              <nav className="flex">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`
+                      flex-1 py-3 px-4 text-center font-medium text-sm transition-all
+                      flex items-center justify-center space-x-2
+                      ${activeTab === tab.id
+                        ? 'border-b-2 border-blue-500 text-blue-600'
+                        : 'text-gray-500 hover:text-gray-700'
+                      }
+                    `}
+                  >
+                    <tab.icon className="w-4 h-4" />
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+            
+            <div className="p-6">
+            {activeTab === 'overview' && <ExchangeOverview exchange={exchange as any} participants={[]} tasks={[]} documents={documents} />}
+            {activeTab === 'tasks' && (
+              <EnhancedTaskManager 
+                exchangeId={exchange.id}
+              />
+            )}
+            {activeTab === 'all-details' && <AllDetailsView />}
             {activeTab === 'documents' && (
               <>
                 <ExchangeDocuments 
@@ -644,7 +899,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
             )}
             {activeTab === 'messages' && <MessagesTab exchange={exchange} />}
             {activeTab === 'invitations' && canManageInvitations && (
-              <InvitationManager
+              <EnhancedInvitationManager
                 exchangeId={exchange.id}
                 exchangeName={exchange.name || exchange.exchangeNumber}
                 existingParticipants={[]}
@@ -654,6 +909,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
                 }}
               />
             )}
+            </div>
           </div>
         </div>
       </div>

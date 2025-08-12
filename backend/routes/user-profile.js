@@ -197,16 +197,16 @@ router.get('/:userId/exchanges-summary', authenticateToken, async (req, res) => 
     let exchanges = [];
     
     if (targetUser.role === 'admin' || targetUser.role === 'staff') {
-      exchanges = await databaseService.getExchanges({ limit: 5000 });
+      exchanges = await databaseService.getExchanges({ limit: 100 });
     } else if (targetUser.role === 'client') {
       exchanges = await databaseService.getExchanges({
         where: { client_id: userContactId },
-        limit: 5000
+        limit: 100
       });
     } else if (targetUser.role === 'coordinator') {
       exchanges = await databaseService.getExchanges({
         where: { coordinator_id: userId },
-        limit: 5000
+        limit: 100
       });
     } else {
       const exchangeParticipations = await databaseService.getExchangeParticipants({
@@ -216,7 +216,7 @@ router.get('/:userId/exchanges-summary', authenticateToken, async (req, res) => 
       if (exchangeIds.length > 0) {
         exchanges = await databaseService.getExchanges({
           where: { id: { in: exchangeIds } },
-          limit: 5000
+          limit: 100
         });
       }
     }
@@ -420,7 +420,7 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
       if (targetUser.role === 'admin' || targetUser.role === 'staff') {
         console.log('🔍 Admin/staff role - getting all exchanges');
         // Admin user sees all exchanges
-        exchanges = await databaseService.getExchanges({ limit: 5000 });
+        exchanges = await databaseService.getExchanges({ limit: 100 });
         console.log('✅ Admin exchanges fetched:', exchanges.length);
       } else if (targetUser.role === 'client') {
         console.log('🔍 Client role - getting exchanges for contact_id:', userContactId);
@@ -431,7 +431,7 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
           // Client sees only their exchanges
           exchanges = await databaseService.getExchanges({
             where: { client_id: userContactId },
-            limit: 5000
+            limit: 100
           });
         }
         console.log('✅ Client exchanges fetched:', exchanges.length);
@@ -440,7 +440,7 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
         // Coordinator sees assigned exchanges
         exchanges = await databaseService.getExchanges({
           where: { coordinator_id: userId },
-          limit: 5000
+          limit: 100
         });
         console.log('✅ Coordinator exchanges fetched:', exchanges.length);
       } else {
@@ -455,7 +455,7 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
           if (exchangeIds.length > 0) {
             exchanges = await databaseService.getExchanges({
               where: { id: { in: exchangeIds } },
-              limit: 5000
+              limit: 100
             });
             console.log('✅ Exchanges from participations fetched:', exchanges.length);
           }

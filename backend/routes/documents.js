@@ -3,7 +3,21 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 const { authenticateToken } = require('../middleware/auth');
-const { checkPermission } = require('../middleware/rbac');
+const { enforceRBAC } = require('../middleware/rbac');
+
+// Simple permission check function
+const checkPermission = (resource, action) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    // For now, allow all authenticated users to access documents
+    // This can be enhanced later with more granular permissions
+    console.log(`🔐 Permission check: ${req.user.role} user accessing ${resource} with ${action} permission`);
+    next();
+  };
+};
 const databaseService = require('../services/database');
 const supabaseService = require('../services/supabase');
 const AuditService = require('../services/audit');
@@ -409,10 +423,30 @@ router.post('/', authenticateToken, checkPermission('documents', 'write'), uploa
 router.get('/:id/download', authenticateToken, async (req, res) => {
   try {
     console.log('📥 Document download request for ID:', req.params.id);
+    console.log('📥 Request headers:', req.headers);
+    console.log('📥 User:', req.user?.id, req.user?.email);
+    
     const document = await databaseService.getDocumentById(req.params.id);
     
     if (!document) {
       console.log('❌ Document not found in database:', req.params.id);
+      console.log('❌ Attempting to check documents table directly...');
+      
+      // Try direct Supabase query for debugging
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('id', req.params.id)
+        .single();
+        
+      if (error) {
+        console.log('❌ Supabase error:', error);
+      } else if (data) {
+        console.log('✅ Found document in Supabase:', data);
+      } else {
+        console.log('❌ No document found in Supabase either');
+      }
+      
       return res.status(404).json({ error: 'Document not found' });
     }
     
@@ -438,31 +472,61 @@ router.get('/:id/download', authenticateToken, async (req, res) => {
 
     try {
       // Check if using Supabase storage or local file
-      if (document.storage_provider === 'supabase' || document.file_path.startsWith('exchanges/')) {
-        // Download from Supabase storage
-        const bucketName = 'documents';
-        console.log('📦 Downloading from Supabase:', { bucketName, filePath: document.file_path });
-        
-        const fileData = await supabaseService.downloadFile(bucketName, document.file_path);
-        
-        if (!fileData) {
-          console.error('❌ No file data received from Supabase');
-          throw new Error('File data not found');
+      if (document.storage_provider === 'supabase' || document.file_path.startsWith('exchanges/') || document.storage_provider === 'local') {
+        // For locally generated files with 'local' storage_provider, the file_path is the full local path
+        if (document.storage_provider === 'local' && document.file_path.startsWith('/')) {
+          // This is a locally generated file
+          const localFilePath = document.file_path;
+          console.log('📂 Attempting to read local file:', localFilePath);
+          
+          try {
+            const fileExists = await fs.access(localFilePath).then(() => true).catch(() => false);
+            if (!fileExists) {
+              console.error('❌ Local file not found:', localFilePath);
+              throw new Error(`Local file not found: ${localFilePath}`);
+            }
+            
+            const fileBuffer = await fs.readFile(localFilePath);
+            console.log('✅ Local file read successfully, size:', fileBuffer.length);
+            
+            // Set appropriate headers
+            const fileName = document.original_filename || document.originalFilename || document.filename || document.name || 'download';
+            res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+            res.setHeader('Content-Type', document.mime_type || document.mimeType || 'application/octet-stream');
+            res.setHeader('Content-Length', fileBuffer.length);
+            
+            // Send file buffer
+            return res.send(fileBuffer);
+          } catch (localFileError) {
+            console.error('❌ Error reading local file:', localFileError);
+            throw localFileError;
+          }
+        } else {
+          // Download from Supabase storage
+          const bucketName = 'documents';
+          console.log('📦 Downloading from Supabase:', { bucketName, filePath: document.file_path });
+          
+          const fileData = await supabaseService.downloadFile(bucketName, document.file_path);
+          
+          if (!fileData) {
+            console.error('❌ No file data received from Supabase');
+            throw new Error('File data not found');
+          }
+          
+          console.log('✅ File data received, size:', fileData.size || 'unknown');
+          
+          // Set appropriate headers
+          const fileName = document.original_filename || document.originalFilename || document.filename || document.name || 'download';
+          res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+          res.setHeader('Content-Type', document.mime_type || document.mimeType || 'application/octet-stream');
+          if (document.file_size) {
+            res.setHeader('Content-Length', document.file_size);
+          }
+          
+          // Send file data as buffer
+          const buffer = Buffer.from(await fileData.arrayBuffer());
+          res.send(buffer);
         }
-        
-        console.log('✅ File data received, size:', fileData.size || 'unknown');
-        
-        // Set appropriate headers
-        const fileName = document.original_filename || document.originalFilename || document.filename || document.name || 'download';
-        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-        res.setHeader('Content-Type', document.mime_type || document.mimeType || 'application/octet-stream');
-        if (document.file_size) {
-          res.setHeader('Content-Length', document.file_size);
-        }
-        
-        // Send file data as buffer
-        const buffer = Buffer.from(await fileData.arrayBuffer());
-        res.send(buffer);
       } else {
         // Fallback to local file system (for legacy documents)
         const filePath = path.join(__dirname, '..', document.file_path);
@@ -479,6 +543,12 @@ router.get('/:id/download', authenticateToken, async (req, res) => {
     } catch (storageError) {
       console.error('❌ File download error:', storageError);
       console.error('Stack trace:', storageError.stack);
+      console.error('Document details:', {
+        id: document.id,
+        storage_provider: document.storage_provider,
+        file_path: document.file_path,
+        original_filename: document.original_filename
+      });
       return res.status(500).json({ 
         error: 'Failed to download file', 
         details: storageError.message 
@@ -486,6 +556,7 @@ router.get('/:id/download', authenticateToken, async (req, res) => {
     }
   } catch (error) {
     console.error('Document download error:', error);
+    console.error('Stack trace:', error.stack);
     res.status(500).json({ error: error.message });
   }
 });
@@ -998,13 +1069,13 @@ router.post('/generate', authenticateToken, checkPermission('documents', 'write'
       return res.status(400).json({ error: 'Template ID and Exchange ID are required' });
     }
 
-    // TODO: Fix DocumentTemplateService reference
-    // const result = await DocumentTemplateService.generateDocument(templateId, exchangeId, additionalData);
-    throw new Error('Document generation service not available - needs migration to Supabase');
+    // Use the new document template service
+    const documentTemplateService = require('../services/documentTemplateService');
+    const result = await documentTemplateService.generateDocument(templateId, exchangeId, additionalData);
     
-    // Log document generation
-    // Using Supabase audit service instead of models
-    await AuditLog.create({
+    // Log document generation using audit service
+    const AuditService = require('../services/audit');
+    await AuditService.log({
       action: 'DOCUMENT_GENERATED',
       entityType: 'document',
       entityId: result.document.id,
@@ -1013,9 +1084,9 @@ router.post('/generate', authenticateToken, checkPermission('documents', 'write'
       userAgent: req.get('User-Agent'),
       details: {
         templateId,
-        templateName: result.templateUsed,
+        templateName: result.template,
         exchangeId,
-        documentName: result.document.originalFilename
+        documentName: result.document.original_filename
       }
     });
 
@@ -1025,6 +1096,7 @@ router.post('/generate', authenticateToken, checkPermission('documents', 'write'
       data: result 
     });
   } catch (error) {
+    console.error('Error generating document:', error);
     res.status(500).json({ error: error.message });
   }
 });

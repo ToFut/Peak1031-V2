@@ -489,52 +489,7 @@ class ApiService {
     return response.data || response || [];
   }
 
-  async getAuditLogs(): Promise<AuditLog[]> {
-    return await this.request('/admin/audit-logs'); // This endpoint exists in backend
-  }
 
-  // Audit Social Features
-  async getAuditLogInteractions(auditLogId: string): Promise<any> {
-    return await this.request(`/audit-social/${auditLogId}/interactions`);
-  }
-
-  async likeAuditLog(auditLogId: string, reactionType: string = 'like'): Promise<any> {
-    return await this.request(`/audit-social/${auditLogId}/like`, {
-      method: 'POST',
-      body: JSON.stringify({ reactionType })
-    });
-  }
-
-  async commentOnAuditLog(auditLogId: string, content: string, mentions: string[] = []): Promise<any> {
-    return await this.request(`/audit-social/${auditLogId}/comments`, {
-      method: 'POST',
-      body: JSON.stringify({ content, mentions })
-    });
-  }
-
-  async assignAuditLog(auditLogId: string, assignmentData: {
-    assignedTo: string;
-    assignmentType: string;
-    priority: string;
-    notes?: string;
-  }): Promise<any> {
-    return await this.request(`/audit-social/${auditLogId}/assign`, {
-      method: 'POST',
-      body: JSON.stringify(assignmentData)
-    });
-  }
-
-  async escalateAuditLog(auditLogId: string, escalationData: {
-    escalatedTo: string;
-    reason: string;
-    priority: string;
-    escalationLevel: number;
-  }): Promise<any> {
-    return await this.request(`/audit-social/${auditLogId}/escalate`, {
-      method: 'POST',
-      body: JSON.stringify(escalationData)
-    });
-  }
 
   async updateAssignment(assignmentId: string, updateData: {
     status: string;
@@ -1000,6 +955,106 @@ class ApiService {
   }
 
   // ===========================================
+  // AUDIT LOGS ENDPOINTS
+  // ===========================================
+
+  /**
+   * Get audit logs with filtering and pagination
+   */
+  async getAuditLogs(options: {
+    page?: number;
+    limit?: number;
+    action?: string;
+    user_id?: string;
+    entity_type?: string;
+    date_from?: string;
+    date_to?: string;
+    search?: string;
+    severity?: string;
+  } = {}): Promise<any> {
+    const params = new URLSearchParams();
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value));
+      }
+    });
+    
+    const queryString = params.toString();
+    return this.get(`/audit-logs${queryString ? '?' + queryString : ''}`);
+  }
+
+  /**
+   * Get audit log statistics
+   */
+  async getAuditLogStats(): Promise<any> {
+    return this.get('/audit-logs/stats');
+  }
+
+  /**
+   * Get available audit actions for filtering
+   */
+  async getAuditActions(): Promise<any> {
+    return this.get('/audit-logs/actions');
+  }
+
+  /**
+   * Get audit log by ID
+   */
+  async getAuditLogById(id: string): Promise<any> {
+    return this.get(`/audit-logs/${id}`);
+  }
+
+  /**
+   * Get audit log interactions (social features)
+   */
+  async getAuditLogInteractions(auditLogId: string): Promise<any> {
+    return this.get(`/audit-social/${auditLogId}/interactions`);
+  }
+
+  /**
+   * Add comment to audit log
+   */
+  async commentOnAuditLog(auditLogId: string, content: string, mentions: string[] = []): Promise<any> {
+    return this.post(`/audit-social/${auditLogId}/comments`, {
+      content,
+      mentions
+    });
+  }
+
+  /**
+   * Like/react to audit log
+   */
+  async likeAuditLog(auditLogId: string, reactionType: string = 'like'): Promise<any> {
+    return this.post(`/audit-social/${auditLogId}/like`, {
+      reaction_type: reactionType
+    });
+  }
+
+  /**
+   * Assign audit log to user
+   */
+  async assignAuditLog(auditLogId: string, assignment: {
+    assignedTo: string;
+    assignmentType: string;
+    priority: string;
+    dueDate?: string;
+    notes?: string;
+  }): Promise<any> {
+    return this.post(`/audit-social/${auditLogId}/assign`, assignment);
+  }
+
+  /**
+   * Escalate audit log
+   */
+  async escalateAuditLog(auditLogId: string, escalation: {
+    escalatedTo: string;
+    reason: string;
+    priority: string;
+  }): Promise<any> {
+    return this.post(`/audit-social/${auditLogId}/escalate`, escalation);
+  }
+
+  // ===========================================
   // V2 DASHBOARD ENDPOINTS (High Value!)
   // ===========================================
 
@@ -1312,7 +1367,7 @@ class ApiService {
    * Initiate PracticePanther OAuth flow
    */
   async initiateP3OAuth(): Promise<{ authUrl: string }> {
-    const response = await this.request<{ auth_url: string }>('/admin/pp-token/auth-url', { method: 'GET' });
+    const response = await this.request<{ auth_url: string }>('/pp-token-admin/auth-url', { method: 'GET' });
     return { authUrl: response.auth_url };
   }
 
@@ -1320,7 +1375,7 @@ class ApiService {
    * Complete PracticePanther OAuth with callback code
    */
   async completeP3OAuth(code: string, state: string): Promise<{ success: boolean }> {
-    return await this.request(`/admin/pp-token/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`, {
+    return await this.request(`/pp-token-admin/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`, {
       method: 'GET',
     });
   }
@@ -1332,7 +1387,7 @@ class ApiService {
     const response = await this.request<{
       token_status?: { status: string };
       last_refresh?: { refreshed_at: string };
-    }>('/admin/pp-token/status');
+    }>('/pp-token-admin/status');
     return { 
       authorized: response.token_status?.status === 'valid',
       lastSync: response.last_refresh?.refreshed_at 
@@ -1343,30 +1398,21 @@ class ApiService {
    * Disconnect PracticePanther integration
    */
   async disconnectP3Integration(): Promise<{ success: boolean }> {
-    return await this.request('/admin/pp-token/revoke', { method: 'DELETE' });
+    return await this.request('/pp-token-admin/revoke', { method: 'DELETE' });
   }
 
   /**
    * Sync data from PracticePanther
    */
   async syncFromPracticePanther(): Promise<{ success: boolean; synced: any }> {
-    return await this.request('/practice-panther/sync/exchanges', { method: 'POST' });
+    return await this.request('/pp-token-admin/trigger-sync', { method: 'POST' });
   }
 
   /**
    * Get sync status with PracticePanther
    */
-  async getP3SyncStatus(): Promise<{ 
-    lastSync: string | null; 
-    isRunning: boolean; 
-    error?: string;
-    stats: {
-      total: number;
-      success: number;
-      failed: number;
-    }
-  }> {
-    return await this.request('/practice-panther/sync/status');
+  async getP3SyncStatus(): Promise<any> {
+    return await this.request('/pp-token-admin/sync-status');
   }
 
   /**
@@ -1388,7 +1434,16 @@ class ApiService {
       limit: number;
     };
   }> {
-    return await this.request(`/practice-panther/sync/logs?limit=${limit}`);
+    // For now, return empty logs since there's no dedicated logs endpoint
+    // TODO: Implement proper sync logs endpoint
+    return {
+      logs: [],
+      pagination: {
+        total: 0,
+        page: 1,
+        limit: limit
+      }
+    };
   }
 
   // ===========================================

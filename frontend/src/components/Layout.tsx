@@ -117,6 +117,15 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [settings, setSettings] = useState<any>({});
 
+  // Debug user state
+  useEffect(() => {
+    console.log('👤 Current user state:', {
+      user: user ? { id: user.id, email: user.email, role: user.role, name: `${user.first_name} ${user.last_name}` } : null,
+      isAuthenticated: !!user,
+      loading: false
+    });
+  }, [user]);
+
   // State for desktop sidebar collapse - persist in localStorage
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
@@ -127,6 +136,19 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', JSON.stringify(isDesktopSidebarCollapsed));
   }, [isDesktopSidebarCollapsed]);
+
+  // Handle keyboard events for user menu
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && userMenuOpen) {
+        console.log('🔍 Escape key pressed, closing user menu');
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [userMenuOpen]);
 
   // Load settings for menu experience
   useEffect(() => {
@@ -150,17 +172,19 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   // Navigation configuration based on user role using permissions system
   const getNavigation = (): NavigationItem[] => {
     if (!user?.role) return [];
-
-    // Get role-based sidebar items
-    const sidebarItems = getSidebarItems();
     
-    // Debug: Log sidebar items
+    // Get user's sidebar configuration from settings
+    // For admin users, include additional admin-specific items
+    const defaultItems = user.role === 'admin' 
+      ? ['dashboard', 'exchanges', 'tasks', 'contacts', 'documents', 'messages', 'users', 'reports', 'admin_gpt', 'agencies', 'settings']
+      : ['dashboard', 'exchanges', 'tasks', 'contacts', 'documents', 'messages', 'settings'];
     
+    const sidebarItems = settings?.sidebar?.items || defaultItems;
     
-    // Map sidebar items to navigation configuration
+    // Define navigation map with proper role-based access
     const navigationMap: Record<string, NavigationItem> = {
-      overview: {
-        name: ui.page_titles.overview || 'Overview',
+      dashboard: {
+        name: ui.page_titles.dashboard || 'Dashboard',
         href: '/dashboard',
         icon: HomeIcon,
         iconSolid: HomeIconSolid,
@@ -173,22 +197,8 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
         iconSolid: DocumentTextIconSolid,
         roles: [user.role]
       },
-      my_exchanges: {
-        name: ui.page_titles.exchanges || 'My Exchanges',
-        href: '/exchanges',
-        icon: DocumentTextIcon,
-        iconSolid: DocumentTextIconSolid,
-        roles: [user.role]
-      },
       tasks: {
         name: ui.page_titles.tasks || 'Tasks',
-        href: '/tasks',
-        icon: CheckCircleIcon,
-        iconSolid: CheckCircleIconSolid,
-        roles: [user.role]
-      },
-      my_tasks: {
-        name: ui.page_titles.tasks || 'My Tasks',
         href: '/tasks',
         icon: CheckCircleIcon,
         iconSolid: CheckCircleIconSolid,
@@ -199,7 +209,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
         href: '/admin/users',
         icon: UsersIcon,
         iconSolid: UsersIconSolid,
-        roles: [user.role]
+        roles: ['admin']
       },
       contacts: {
         name: ui.page_titles.contacts || 'Contacts',
@@ -223,53 +233,18 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
         roles: [user.role],
         badge: unreadCount
       },
-      system: {
-        name: ui.page_titles.system || 'System',
-        href: '/admin/system',
-        icon: CogIcon,
-        iconSolid: CogIconSolid,
-        roles: [user.role]
-      },
       reports: {
         name: ui.page_titles.reports || 'Reports',
         href: '/reports',
         icon: ChartBarIcon,
         iconSolid: ChartBarIconSolid,
-        roles: [user.role]
-      },
-      templates: {
-        name: 'Templates',
-        href: '/admin/templates',
-        icon: DocumentDuplicateIcon,
-        iconSolid: DocumentDuplicateIconSolid,
-        roles: [user.role]
-      },
-      audit: {
-        name: 'Audit Logs',
-        href: '/admin/audit',
-        icon: DocumentTextIcon,
-        iconSolid: DocumentTextIconSolid,
-        roles: [user.role]
-      },
-      sync: {
-        name: 'System Sync',
-        href: '/admin/system/sync',
-        icon: ArrowPathIcon,
-        iconSolid: ArrowPathIconSolid,
-        roles: [user.role]
+        roles: ['admin', 'coordinator']
       },
       ai_gpt: {
         name: 'AI GPT',
-        href: '/admin/ai-gpt',
+        href: '/admin/gpt',
         icon: SparklesIcon,
         iconSolid: SparklesIconSolid,
-        roles: ['admin']
-      },
-      pp_management: {
-        name: 'PP Management',
-        href: '/admin/practice-panther',
-        icon: BuildingOfficeIcon,
-        iconSolid: BuildingOfficeIconSolid,
         roles: ['admin']
       },
       settings: {
@@ -281,17 +256,17 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
       }
     };
 
-    // Return only the items that are in the user's sidebar configuration
+    // Return only the items that are in the user's sidebar configuration and user has access to
     const filteredItems = sidebarItems
-      .map(itemKey => navigationMap[itemKey])
-      .filter(item => item !== undefined);
+      .map((itemKey: string) => navigationMap[itemKey])
+      .filter((item: NavigationItem | undefined) => item !== undefined && item.roles.includes(user.role));
     
     // Debug: Log filtered items
-    
+    console.log('🔍 Navigation items for user:', user.role, filteredItems.map((item: NavigationItem) => item.name));
     
     // Fallback: if no items found, show basic navigation
     if (filteredItems.length === 0) {
-      
+      console.log('⚠️ No navigation items found, showing fallback navigation');
       return [
         {
           name: 'Dashboard',
@@ -324,7 +299,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   useEffect(() => {
     if (socket) {
       socket.on('notification', (notification: Notification) => {
-        setNotifications(prev => [notification, ...prev.slice(0, 99)]);
+        setNotifications(prev => [notification, ...(prev || []).slice(0, 99)]);
         if (!notification.read) {
           setUnreadCount(prev => prev + 1);
         }
@@ -366,10 +341,19 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
 
   const handleLogout = async () => {
     try {
+      console.log('🔄 Starting logout process...');
+      setUserMenuOpen(false); // Close menu first
       await logout();
+      console.log('✅ Logout successful, navigating to login');
       navigate('/login');
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error('❌ Logout failed:', error);
+      // Even if logout fails, clear local state and redirect
+      console.log('🧹 Clearing local storage as fallback...');
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      navigate('/login');
     }
   };
 
@@ -787,7 +771,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
                           No notifications
                         </div>
                       ) : (
-                        notifications.slice(0, 10).map((notification) => (
+                        (notifications || []).slice(0, 10).map((notification) => (
                           <div
                             key={notification.id}
                             className={`px-4 py-3 hover:bg-gray-50 cursor-pointer ${
@@ -835,9 +819,15 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
               {/* User menu */}
               <div className="relative">
                 <button
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center space-x-2 sm:space-x-3 p-1.5 sm:p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200 bg-white shadow-sm transition-colors"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('User menu button clicked');
+                    setUserMenuOpen(!userMenuOpen);
+                  }}
+                  className="flex items-center space-x-2 sm:space-x-3 p-1.5 sm:p-2 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200 bg-white shadow-sm transition-colors cursor-pointer"
                   data-testid="user-menu-button"
+                  type="button"
                 >
                   <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 rounded-full flex items-center justify-center">
                     <span className="text-white font-medium text-xs sm:text-sm">
@@ -863,27 +853,41 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
                   >
                     <div className="py-1">
                       <button
-                        onClick={() => {
-                          navigate('/profile');
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('Navigating to profile...');
                           setUserMenuOpen(false);
+                          navigate('/profile');
                         }}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left cursor-pointer"
+                        type="button"
                       >
                         Profile Settings
                       </button>
                       <button
-                        onClick={() => {
-                          navigate('/preferences');
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('Navigating to preferences...');
                           setUserMenuOpen(false);
+                          navigate('/preferences');
                         }}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left cursor-pointer"
+                        type="button"
                       >
                         Preferences
                       </button>
                       <div className="border-t border-gray-100"></div>
                       <button
-                        onClick={handleLogout}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('Logout button clicked');
+                          handleLogout();
+                        }}
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left cursor-pointer"
+                        type="button"
                       >
                         <div className="flex items-center">
                           <ArrowRightOnRectangleIcon className="h-4 w-4 mr-2" />
@@ -906,11 +910,12 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
         </main>
       </div>
 
-      {/* Click outside handlers */}
+      {/* Click outside handlers - positioned before menu to avoid interference */}
       {(userMenuOpen || notificationsOpen) && (
         <div
-          className="fixed inset-0 z-40"
+          className="fixed inset-0 z-30"
           onClick={() => {
+            console.log('Clicking outside menu, closing...');
             setUserMenuOpen(false);
             setNotificationsOpen(false);
           }}

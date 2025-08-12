@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   DocumentIcon, 
   EyeIcon, 
@@ -35,6 +35,52 @@ export const ChatDocumentViewer: React.FC<ChatDocumentViewerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [verifiedPin, setVerifiedPin] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [loadingImage, setLoadingImage] = useState(false);
+
+  // Load image when preview is shown and PIN is verified
+  const loadImageForPreview = async () => {
+    if (!showPreview || !doc.mime_type.includes('image')) return;
+    if (loadingImage || imageUrl) return;
+    if (doc.pin_required && !verifiedPin) return;
+
+    setLoadingImage(true);
+    setError(null);
+
+    try {
+      const blob = await apiService.downloadDocument(doc.id, verifiedPin || undefined);
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        setImageUrl(url);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to load image');
+    } finally {
+      setLoadingImage(false);
+    }
+  };
+
+  // Load image when preview opens
+  useEffect(() => {
+    loadImageForPreview();
+  }, [showPreview, verifiedPin]);
+
+  // Cleanup image URL when component unmounts or preview closes
+  useEffect(() => {
+    return () => {
+      if (imageUrl) {
+        URL.revokeObjectURL(imageUrl);
+      }
+    };
+  }, [imageUrl]);
+
+  // Reset image URL when preview closes
+  useEffect(() => {
+    if (!showPreview && imageUrl) {
+      URL.revokeObjectURL(imageUrl);
+      setImageUrl(null);
+    }
+  }, [showPreview]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -229,12 +275,27 @@ export const ChatDocumentViewer: React.FC<ChatDocumentViewerProps> = ({
                 </button>
               </div>
               <div className="p-4">
-                <img
-                  src={`/api/documents/${doc.id}/download${verifiedPin ? `?pin=${verifiedPin}` : ''}`}
-                  alt={doc.original_filename}
-                  className="max-w-full max-h-96 mx-auto"
-                  onError={() => setError('Failed to load image')}
-                />
+                {loadingImage ? (
+                  <div className="flex items-center justify-center h-96">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="ml-2 text-gray-600">Loading image...</span>
+                  </div>
+                ) : imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt={doc.original_filename}
+                    className="max-w-full max-h-96 mx-auto"
+                    onError={() => setError('Failed to load image')}
+                  />
+                ) : error ? (
+                  <div className="flex items-center justify-center h-96 text-red-600">
+                    <p>{error}</p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-96 text-gray-500">
+                    <p>Image not available</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -210,7 +210,7 @@ class SupabaseService {
       query = query.order(orderBy.column, { ascending: orderBy.ascending });
 
       // Apply limit and offset (reduced default to prevent timeouts)
-      const finalLimit = limit || 1000;
+      const finalLimit = limit || 100; // Reduced from 1000 to 100
       query = query.limit(finalLimit);
       
       if (offset !== undefined) {
@@ -239,31 +239,47 @@ class SupabaseService {
         
         // Fetch all clients in one query
         if (clientIds.length > 0) {
-          const { data: clients } = await this.client
-            .from('contacts')
-            .select('id, first_name, last_name, email, company')
-            .in('id', clientIds);
+          // Filter out invalid UUIDs to prevent database errors
+          const validClientIds = clientIds.filter(id => 
+            typeof id === 'string' && 
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+          );
           
-          if (clients) {
-            clientsMap = clients.reduce((acc, client) => {
-              acc[client.id] = client;
-              return acc;
-            }, {});
+          if (validClientIds.length > 0) {
+            const { data: clients } = await this.client
+              .from('contacts')
+              .select('id, first_name, last_name, email, company')
+              .in('id', validClientIds);
+            
+            if (clients) {
+              clientsMap = clients.reduce((acc, client) => {
+                acc[client.id] = client;
+                return acc;
+              }, {});
+            }
           }
         }
         
         // Fetch all coordinators in one query
         if (coordinatorIds.length > 0) {
-          const { data: coordinators } = await this.client
-            .from('users')
-            .select('id, first_name, last_name, email')
-            .in('id', coordinatorIds);
+          // Filter out invalid UUIDs to prevent database errors
+          const validCoordinatorIds = coordinatorIds.filter(id => 
+            typeof id === 'string' && 
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+          );
           
-          if (coordinators) {
-            coordinatorsMap = coordinators.reduce((acc, coord) => {
-              acc[coord.id] = coord;
-              return acc;
-            }, {});
+          if (validCoordinatorIds.length > 0) {
+            const { data: coordinators } = await this.client
+              .from('users')
+              .select('id, first_name, last_name, email')
+              .in('id', validCoordinatorIds);
+            
+            if (coordinators) {
+              coordinatorsMap = coordinators.reduce((acc, coord) => {
+                acc[coord.id] = coord;
+                return acc;
+              }, {});
+            }
           }
         }
         
@@ -359,14 +375,18 @@ class SupabaseService {
     try {
       const { page = 1, limit = 50, offset = 0, search } = options;
       
+      // Use users table for contacts
       let query = this.client
-        .from('contacts')
+        .from('users')
         .select('*', { count: 'exact' });
 
       // Apply search filter if provided
       if (search) {
-        query = query.or(`firstName.ilike.%${search}%,lastName.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
+        query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,organization_name.ilike.%${search}%`);
       }
+
+      // Filter out admin users for contact selection
+      query = query.neq('role', 'admin');
 
       // Apply pagination
       const start = offset || (page - 1) * limit;
@@ -379,13 +399,29 @@ class SupabaseService {
       const { data, error, count } = await query;
 
       if (error) {
-        console.error('❌ Supabase select error for contacts:', error);
+        console.error('❌ Supabase select error for users/contacts:', error);
         throw new Error(error.message);
       }
 
+      // Transform users data to match contact interface
+      const contacts = (data || []).map(user => ({
+        id: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+        phone: user.phone,
+        company: user.organization_name,
+        role: user.role,
+        isActive: user.is_active,
+        createdAt: user.created_at,
+        // Additional fields for compatibility
+        first_name: user.first_name,
+        last_name: user.last_name
+      }));
+
       // Return with pagination info
       return {
-        data: data || [],
+        data: contacts,
         total: count || 0,
         page: parseInt(page),
         limit: parseInt(limit),
@@ -398,16 +434,48 @@ class SupabaseService {
   }
 
   async getContactById(id) {
-    const contacts = await this.select('contacts', { where: { id } });
-    return contacts[0] || null;
+    const users = await this.select('users', { where: { id } });
+    if (users[0]) {
+      const user = users[0];
+      return {
+        id: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+        phone: user.phone,
+        company: user.organization_name,
+        role: user.role,
+        isActive: user.is_active,
+        createdAt: user.created_at
+      };
+    }
+    return null;
   }
 
   async createContact(contactData) {
-    return await this.insert('contacts', contactData);
+    // Convert contact data to user format
+    const userData = {
+      first_name: contactData.firstName || contactData.first_name,
+      last_name: contactData.lastName || contactData.last_name,
+      email: contactData.email,
+      phone: contactData.phone,
+      organization_name: contactData.company,
+      role: contactData.role || 'client',
+      is_active: true
+    };
+    return await this.insert('users', userData);
   }
 
   async updateContact(id, contactData) {
-    return await this.update('contacts', contactData, { id });
+    // Convert contact data to user format
+    const userData = {
+      first_name: contactData.firstName || contactData.first_name,
+      last_name: contactData.lastName || contactData.last_name,
+      email: contactData.email,
+      phone: contactData.phone,
+      organization_name: contactData.company
+    };
+    return await this.update('users', userData, { id });
   }
 
   async getTasks(options = {}) {

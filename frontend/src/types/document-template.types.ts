@@ -3,7 +3,10 @@ export interface DocumentTemplate {
   name: string;
   description: string;
   category: string;
-  file_template: string;
+  type?: string; // Add missing type property
+  template_type?: string; // Add missing template_type property
+  version?: string; // Add missing version property
+  file_template?: string;
   required_fields: string[];
   is_required: boolean;
   role_access: string[];
@@ -11,6 +14,17 @@ export interface DocumentTemplate {
   stage_triggers?: string[];
   created_by: string;
   is_active: boolean;
+  isActive?: boolean; // Add missing isActive property (camelCase version)
+  is_default?: boolean; // Add missing isDefault property
+  tags?: string[]; // Add missing tags property
+  fields?: any[]; // Add missing fields property
+  url?: string; // Add missing url property
+  settings?: { // Add missing settings property
+    autoFill?: boolean;
+    requireReview?: boolean;
+    allowEditing?: boolean;
+    watermark?: boolean;
+  };
   created_at: string;
   updated_at: string;
 }

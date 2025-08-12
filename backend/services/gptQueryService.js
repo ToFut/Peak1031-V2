@@ -546,27 +546,57 @@ class GPTQueryService {
       // Check if this matches a classic query pattern first
       const lowerQuery = naturalQuery.toLowerCase();
       
-      // Map natural language to classic queries
+      // COUNT QUERIES - Handle "how many" questions first
+      if ((lowerQuery.includes('how many') || lowerQuery.includes('count')) && lowerQuery.includes('exchange')) {
+        console.log('🔢 Detected count query for exchanges');
+        const result = await supabaseService.client
+          .from('exchanges')
+          .select('*', { count: 'exact', head: true });
+        
+        if (result.error) {
+          throw new Error(`Count query failed: ${result.error.message}`);
+        }
+        
+        return {
+          originalQuery: naturalQuery,
+          queryName: 'Total Exchange Count',
+          description: `Total number of exchanges in the system`,
+          data: [{
+            total_exchanges: result.count || 0,
+            query_type: 'count'
+          }],
+          executedAt: new Date().toISOString(),
+          queryType: 'ai_generated',
+          generatedSQL: 'SELECT COUNT(*) as total_exchanges FROM exchanges'
+        };
+      }
+      
+      // VALUE QUERIES
       if (lowerQuery.includes('total') && (lowerQuery.includes('value') || lowerQuery.includes('sum'))) {
         return await this.executeClassicQuery('total_exchange_value');
       }
       
+      // STATUS QUERIES
       if (lowerQuery.includes('status') && (lowerQuery.includes('breakdown') || lowerQuery.includes('group'))) {
         return await this.executeClassicQuery('exchanges_by_status');
       }
       
+      // DEADLINE QUERIES
       if (lowerQuery.includes('deadline') || lowerQuery.includes('upcoming') || lowerQuery.includes('due')) {
         return await this.executeClassicQuery('upcoming_deadlines');
       }
       
+      // HIGH VALUE QUERIES
       if (lowerQuery.includes('high value') || lowerQuery.includes('expensive') || lowerQuery.includes('over')) {
         return await this.executeClassicQuery('high_value_exchanges');
       }
       
+      // COMPLETION RATE QUERIES
       if (lowerQuery.includes('completion') && lowerQuery.includes('rate')) {
         return await this.executeClassicQuery('exchange_completion_rate');
       }
       
+      // PERFORMANCE QUERIES
       if (lowerQuery.includes('monthly') || lowerQuery.includes('performance')) {
         return await this.executeClassicQuery('monthly_performance');
       }
@@ -628,6 +658,16 @@ class GPTQueryService {
    */
   parseNaturalLanguage(query) {
     const lowerQuery = query.toLowerCase();
+
+    // Count patterns - Handle "how many" questions
+    if ((lowerQuery.includes('how many') || lowerQuery.includes('count')) && lowerQuery.includes('exchange')) {
+      return `
+        SELECT 
+          COUNT(*) as total_exchanges,
+          'count' as query_type
+        FROM exchanges
+      `;
+    }
 
     // Total value patterns
     if (lowerQuery.includes('total value') || lowerQuery.includes('sum of values')) {

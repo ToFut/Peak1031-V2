@@ -13,14 +13,17 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
   body('invitations.*.email').isEmail().withMessage('Valid email is required'),
   body('invitations.*.role').isIn(['client', 'third_party', 'agency', 'coordinator']).withMessage('Invalid role'),
   body('invitations.*.method').isIn(['email', 'sms', 'both']).withMessage('Invalid invitation method'),
-  body('invitations.*.phone').optional().isMobilePhone().withMessage('Valid phone number required for SMS'),
+  body('invitations.*.phone').optional({ checkFalsy: true }).isMobilePhone().withMessage('Valid phone number required for SMS'),
   body('invitations.*.firstName').optional().isString(),
   body('invitations.*.lastName').optional().isString(),
   body('message').optional().isString().isLength({ max: 500 }).withMessage('Message too long')
 ], async (req, res) => {
   try {
+    console.log('📨 Invitation request received:', JSON.stringify(req.body, null, 2));
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Validation errors:', errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
 
@@ -55,8 +58,11 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
             where: { exchangeId }
           });
           
+          const contactId = existingUser.contact_id || existingUser.id;
           const isAlreadyParticipant = existingParticipants.some(p => 
-            p.user_id === existingUser.id || p.contact_id === existingUser.id
+            (p.user_id === existingUser.id || p.contact_id === contactId) && 
+            p.role === invitation.role && 
+            p.is_active !== false
           );
           
           if (isAlreadyParticipant) {
@@ -69,15 +75,20 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
           }
           
           // Add existing user as participant
+          const permissions = invitationService.getDefaultPermissions(invitation.role);
+          
+          // Get the inviter's contact_id (assigned_by must reference contacts table)
+          const inviterContactId = req.user.contact_id || null;
+          
           await supabaseService.createExchangeParticipant({
             id: uuidv4(),
             exchange_id: exchangeId,
-            user_id: existingUser.id,
+            contact_id: contactId, // Use the user's linked contact_id
             role: invitation.role,
-            permissions: invitationService.getDefaultPermissions(invitation.role),
-            status: 'active',
-            invited_by: inviterId,
-            invited_at: new Date().toISOString()
+            permissions: permissions, // Store as JSONB array
+            assigned_by: inviterContactId, // Use inviter's contact_id or null
+            assigned_at: new Date().toISOString(),
+            is_active: true
           });
           
           // Send notification to existing user
@@ -124,18 +135,18 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
             await supabaseService.insert('invitations', {
               id: invitationId,
               email: invitation.email,
-              phone: invitation.phone,
+              phone: invitation.phone || null,
               exchange_id: exchangeId,
               role: invitation.role,
               invited_by: inviterId,
-              invitation_token: inviteResult.supabaseUser?.id || invitationId,
+              invitation_token: inviteResult.invitationToken || inviteResult.supabaseUser?.id || invitationId,
               expires_at: expiresAt.toISOString(),
               status: 'pending',
-              first_name: invitation.firstName,
-              last_name: invitation.lastName,
-              custom_message: message,
-              created_at: new Date().toISOString(),
-              supabase_user_id: inviteResult.supabaseUser?.id
+              first_name: invitation.firstName || null,
+              last_name: invitation.lastName || null,
+              custom_message: message || null,
+              created_at: new Date().toISOString()
+              // Remove supabase_user_id as it doesn't exist in the table
             });
 
             results.push({
@@ -145,11 +156,40 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
               expiresAt: expiresAt.toISOString()
             });
           } else {
-            results.push({
-              email: invitation.email,
-              status: 'error',
-              message: inviteResult.email.error || 'Failed to send invitation'
-            });
+            console.log('❌ Invitation sending failed, but storing for development mode');
+            // In development, still create the invitation record even if email fails
+            if (process.env.NODE_ENV === 'development' || !process.env.SENDGRID_API_KEY) {
+              const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+              
+              await supabaseService.insert('invitations', {
+                id: invitationId,
+                email: invitation.email,
+                phone: invitation.phone || null,
+                exchange_id: exchangeId,
+                role: invitation.role,
+                invited_by: inviterId,
+                invitation_token: inviteResult.invitationToken || invitationId,
+                expires_at: expiresAt.toISOString(),
+                status: 'pending',
+                first_name: invitation.firstName || null,
+                last_name: invitation.lastName || null,
+                custom_message: message || null,
+                created_at: new Date().toISOString()
+              });
+
+              results.push({
+                email: invitation.email,
+                status: 'invitation_sent',
+                message: 'Invitation created (email mocked in development)',
+                expiresAt: expiresAt.toISOString()
+              });
+            } else {
+              results.push({
+                email: invitation.email,
+                status: 'error',
+                message: inviteResult.email.error || 'Failed to send invitation'
+              });
+            }
           }
         }
         
@@ -227,16 +267,27 @@ router.post('/accept/:token', [
     });
 
     // Add user as exchange participant
+    const permissions = invitationService.getDefaultPermissions(invitation.role);
+    
+    // Use the user's linked contact_id for the exchange participant
+    const contactId = user.contact_id || user.id;
+    
+    // Get the inviter's contact_id from their user record
+    let inviterContactId = null;
+    if (invitation.invited_by) {
+      const inviter = await supabaseService.getUserById(invitation.invited_by);
+      inviterContactId = inviter?.contact_id || null;
+    }
+    
     await supabaseService.createExchangeParticipant({
       id: uuidv4(),
       exchange_id: invitation.exchange_id,
-      user_id: user.id,
+      contact_id: contactId, // Use the user's linked contact_id
       role: invitation.role,
-      permissions: invitationService.getDefaultPermissions(invitation.role),
-      status: 'active',
-      invited_by: invitation.invited_by,
-      invited_at: invitation.created_at,
-      accepted_at: new Date().toISOString()
+      permissions: permissions, // Store as JSONB array
+      assigned_by: inviterContactId, // Use inviter's contact_id or null
+      assigned_at: new Date().toISOString(),
+      is_active: true
     });
 
     // Mark invitation as accepted

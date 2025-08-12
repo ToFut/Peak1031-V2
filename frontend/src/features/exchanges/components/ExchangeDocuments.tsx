@@ -17,8 +17,10 @@ import {
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
 import { usePermissions } from '../../../hooks/usePermissions';
+import { useTemplates } from '../../../hooks/useTemplates';
 import { formatDate } from '../../../utils/date.utils';
 import { Document } from '../../../types';
+import { DocumentTemplate } from '../../../services/templateService';
 
 interface ExchangeDocumentsProps {
   exchangeId: string;
@@ -28,13 +30,6 @@ interface ExchangeDocumentsProps {
   onRefresh: () => void;
 }
 
-interface DocumentTemplate {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  required_fields: string[];
-}
 
 interface ExchangeUser {
   id: string;
@@ -53,10 +48,10 @@ export const ExchangeDocuments: React.FC<ExchangeDocumentsProps> = ({
 }) => {
   const { user } = useAuth();
   const { isAdmin, isCoordinator } = usePermissions();
+  const { templates, fetchTemplates, generateDocument } = useTemplates();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [exchangeUsers, setExchangeUsers] = useState<ExchangeUser[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -75,16 +70,7 @@ export const ExchangeDocuments: React.FC<ExchangeDocumentsProps> = ({
       fetchTemplates();
       fetchExchangeUsers();
     }
-  }, [exchangeId]);
-
-  const fetchTemplates = async () => {
-    try {
-      const response = await apiService.get('/documents/templates/active');
-      setTemplates(response.data || []);
-    } catch (error) {
-      console.error('Error fetching templates:', error);
-    }
-  };
+  }, [exchangeId, fetchTemplates]);
 
   const fetchExchangeUsers = async () => {
     try {
@@ -100,11 +86,12 @@ export const ExchangeDocuments: React.FC<ExchangeDocumentsProps> = ({
 
     setIsGenerating(true);
     try {
-      await apiService.post('/documents/generate', {
-        templateId: selectedTemplate,
-        exchangeId: exchangeId,
-        additionalData: {}
-      });
+      const result = await generateDocument(selectedTemplate, exchangeId, {});
+      console.log('Generated document result:', result);
+      
+      if (result && result.data && result.data.document) {
+        console.log('Generated document ID:', result.data.document.id);
+      }
       
       setShowGenerateModal(false);
       setSelectedTemplate('');
@@ -185,7 +172,11 @@ export const ExchangeDocuments: React.FC<ExchangeDocumentsProps> = ({
           <div className="flex gap-2">
             {canGenerateDocuments && (
               <button
-                onClick={() => setShowGenerateModal(true)}
+                onClick={() => {
+                  console.log('Generate from Template clicked');
+                  console.log('Current templates:', templates);
+                  setShowGenerateModal(true);
+                }}
                 className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
               >
                 <Sparkles className="w-4 h-4" />
@@ -273,7 +264,7 @@ export const ExchangeDocuments: React.FC<ExchangeDocumentsProps> = ({
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Template
+                  Select Template {templates.length > 0 && `(${templates.length} available)`}
                 </label>
                 <select
                   value={selectedTemplate}
@@ -281,17 +272,21 @@ export const ExchangeDocuments: React.FC<ExchangeDocumentsProps> = ({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Choose a template...</option>
-                  {templates.map(template => (
-                    <option key={template.id} value={template.id}>
-                      {template.name} - {template.category}
-                    </option>
-                  ))}
+                  {templates.length === 0 ? (
+                    <option value="" disabled>No templates available</option>
+                  ) : (
+                    templates.map((template: DocumentTemplate) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name} - {template.category}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
               
               {selectedTemplate && (
                 <div className="text-sm text-gray-600">
-                  {templates.find(t => t.id === selectedTemplate)?.description}
+                  {templates.find((t: DocumentTemplate) => t.id === selectedTemplate)?.description}
                 </div>
               )}
             </div>

@@ -55,8 +55,10 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/contacts', require('./routes/contacts'));
 app.use('/api/exchanges', require('./routes/exchanges'));
+app.use('/api/exchange-participants', require('./routes/exchange-participants'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/documents', require('./routes/documents'));
+app.use('/api/templates', require('./routes/template-management'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/sync', require('./routes/sync'));
 app.use('/api/oauth', require('./routes/oauth'));

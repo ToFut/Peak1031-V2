@@ -162,6 +162,52 @@ router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
   }
 });
 
+// Get task templates
+router.get('/templates', authenticateToken, async (req, res) => {
+  try {
+    const templates = enhancedTaskService.getTaskTemplates();
+    
+    res.json({
+      success: true,
+      data: templates
+    });
+
+  } catch (error) {
+    console.error('Error getting task templates:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to get task templates',
+      details: error.message 
+    });
+  }
+});
+
+// Get task suggestions
+router.get('/suggestions', authenticateToken, async (req, res) => {
+  try {
+    const { exchangeId, userId } = req.query;
+    
+    const suggestions = await enhancedTaskService.generateTaskSuggestions({
+      exchangeId,
+      userId: userId || req.user.id,
+      userRole: req.user.role
+    });
+
+    res.json({
+      success: true,
+      data: suggestions || []
+    });
+
+  } catch (error) {
+    console.error('Error getting task suggestions:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to get task suggestions',
+      details: error.message 
+    });
+  }
+});
+
 // Get single task
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
@@ -461,52 +507,6 @@ router.post('/from-chat', authenticateToken, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Failed to extract tasks from chat',
-      details: error.message 
-    });
-  }
-});
-
-// Get task templates
-router.get('/templates', authenticateToken, async (req, res) => {
-  try {
-    const templates = enhancedTaskService.getTaskTemplates();
-    
-    res.json({
-      success: true,
-      data: templates
-    });
-
-  } catch (error) {
-    console.error('Error getting task templates:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to get task templates',
-      details: error.message 
-    });
-  }
-});
-
-// Get task suggestions
-router.get('/suggestions', authenticateToken, async (req, res) => {
-  try {
-    const { exchangeId, userId } = req.query;
-    
-    const suggestions = await enhancedTaskService.generateTaskSuggestions({
-      exchangeId,
-      userId: userId || req.user.id,
-      userRole: req.user.role
-    });
-
-    res.json({
-      success: true,
-      data: suggestions || []
-    });
-
-  } catch (error) {
-    console.error('Error getting task suggestions:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to get task suggestions',
       details: error.message 
     });
   }

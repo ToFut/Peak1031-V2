@@ -157,7 +157,7 @@ const UserProfile: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-900">Recent Exchanges</h3>
           </div>
           <div className="space-y-3">
-            {profile.recentExchanges.slice(0, 5).map((exchange) => (
+            {(profile.recentExchanges || []).slice(0, 5).map((exchange) => (
               <div key={exchange.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">
@@ -174,7 +174,7 @@ const UserProfile: React.FC = () => {
                 </div>
               </div>
             ))}
-            {profile.recentExchanges.length === 0 && (
+            {(profile.recentExchanges || []).length === 0 && (
               <p className="text-sm text-gray-500 text-center py-4">No recent exchanges</p>
             )}
           </div>
@@ -187,7 +187,7 @@ const UserProfile: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-900">Monthly Activity</h3>
           </div>
           <div className="space-y-2">
-            {profile.monthlyActivity.slice(-6).map((month) => (
+            {(profile.monthlyActivity || []).slice(-6).map((month) => (
               <div key={month.month} className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">{month.month}</span>
                 <div className="flex items-center">

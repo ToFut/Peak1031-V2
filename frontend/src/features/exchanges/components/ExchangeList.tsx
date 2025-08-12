@@ -53,11 +53,11 @@ const FilterChip: React.FC<{
   onRemove: () => void;
   className?: string;
 }> = ({ label, value, onRemove, className = '' }) => (
-  <div className={`inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium ${className}`}>
+  <div className={`inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs font-medium border border-blue-200 ${className}`}>
     <span>{label}: {value}</span>
     <button
       onClick={onRemove}
-      className="text-blue-600 hover:text-blue-800 transition-colors"
+      className="text-blue-500 hover:text-blue-700 transition-colors ml-1 hover:bg-blue-200 rounded-sm px-1"
     >
       ×
     </button>
@@ -161,48 +161,15 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
   const { isAdmin, isCoordinator } = usePermissions();
   const navigate = useNavigate();
   
-  // Optimize hook usage - only use smart mode when explicitly enabled
+  // Always use smart mode for better performance and features
   const smartExchanges = useSmartExchanges({
     initialLimit: 30,
-    enableAutoRefresh: enableSmartMode, // Only enable when smart mode is on
+    enableAutoRefresh: false, // Disable auto-refresh by default
     refreshInterval: 300000 // 5 minutes
   });
 
-  // Only use analytics when AI analysis is enabled
-  const analytics = useAnalytics({
-    enableAutoRefresh: showAIAnalysis, // Only enable when AI analysis is on
-    refreshInterval: 300000
-  });
-  
-  // Legacy mode for backward compatibility
-  const legacyExchanges = useExchanges(filters);
-
-  // Memoize data source selection
-  const dataSource = useMemo(() => {
-    if (enableSmartMode) {
-      return smartExchanges;
-    } else {
-      return {
-        ...legacyExchanges,
-        exchanges: legacyExchanges.exchanges || [],
-        summary: null,
-        pagination: { 
-          currentPage: 1, 
-          limit: 50, 
-          total: legacyExchanges.exchanges?.length || 0, 
-          totalPages: 1, 
-          hasNext: false, 
-          hasPrevious: false 
-        },
-        hasNext: false,
-        hasPrevious: false,
-        loadMore: async () => {},
-        setFilters: () => {},
-        clearFilters: () => {},
-        setSortBy: async () => {}
-      };
-    }
-  }, [enableSmartMode, smartExchanges, legacyExchanges]);
+  // Use data from smart exchanges
+  const dataSource = smartExchanges;
 
   // Extract data with defaults
   const {
@@ -372,69 +339,86 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
     <div className="space-y-6">
       {/* Cached data warning */}
       {error && error.includes('cached') && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center justify-between">
           <div className="flex items-center">
-            <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2" />
-            <p className="text-yellow-800">{error}</p>
+            <AlertTriangle className="h-4 w-4 text-yellow-600 mr-2" />
+            <p className="text-yellow-800 text-sm">{error}</p>
           </div>
           <button
             onClick={refreshExchanges}
-            className="bg-yellow-600 text-white px-3 py-1 rounded-md hover:bg-yellow-700 text-sm"
+            className="bg-yellow-600 text-white px-3 py-1.5 rounded-md hover:bg-yellow-700 text-sm transition-colors"
           >
             Refresh
           </button>
         </div>
       )}
       
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
-          <p className="text-gray-600 mt-1">
-            {filteredExchanges.length} of {exchanges.length} exchanges
-            {user?.role === 'admin' && exchanges.length >= 100 && (
-              <span className="ml-2 text-green-600 font-semibold">
-                (Admin View - All System Exchanges)
-              </span>
-            )}
-          </p>
+      {/* Clean Header */}
+      {title && (
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+            <p className="text-gray-600 text-sm mt-1">
+              {filteredExchanges.length} of {exchanges.length} exchanges
+              {user?.role === 'admin' && exchanges.length >= 100 && (
+                <span className="ml-2 text-green-600 text-xs font-medium bg-green-100 px-2 py-1 rounded-full">
+                  Admin View
+                </span>
+              )}
+            </p>
+          </div>
+          
+          {showCreateButton && (isAdmin() || isCoordinator()) && (
+            <button
+              onClick={handleCreateExchange}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              New Exchange
+            </button>
+          )}
         </div>
-        
-        {showCreateButton && (isAdmin() || isCoordinator()) && (
-          <button
-            onClick={handleCreateExchange}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            New Exchange
-          </button>
-        )}
-      </div>
-
-      {/* Stats */}
-      {showStats && (
-        <ExchangeStats exchanges={exchanges} />
       )}
 
-      {/* Filters */}
-      {showFilters && (
-        <div className="bg-white rounded-lg shadow border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
-            <button
-              onClick={() => setShowFilterChips(!showFilterChips)}
-              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800"
-            >
-              {showFilterChips ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              {showFilterChips ? 'Hide' : 'Show'} Active Filters
-            </button>
+      {/* Compact Stats */}
+      {showStats && (
+        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-900">{exchanges.filter(e => e.status === '45D' || e.status === '180D' || e.status === 'In Progress').length}</div>
+              <div className="text-xs text-gray-600">Active</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-900">{exchanges.filter(e => e.status === 'COMPLETED' || e.status === 'Completed').length}</div>
+              <div className="text-xs text-gray-600">Complete</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-900">{exchanges.filter(e => e.status === 'PENDING' || e.status === 'Draft').length}</div>
+              <div className="text-xs text-gray-600">Pending</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-gray-900">${(exchanges.reduce((sum, e) => sum + (e.exchangeValue || 0), 0) / 1000000).toFixed(1)}M</div>
+              <div className="text-xs text-gray-600">Total Value</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-900">{Math.round(exchanges.length > 0 ? exchanges.reduce((sum, e) => sum + (e.progress || 0), 0) / exchanges.length : 0)}%</div>
+              <div className="text-xs text-gray-600">Avg Progress</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-900">{exchanges.length}</div>
+              <div className="text-xs text-gray-600">Total</div>
+            </div>
           </div>
+        </div>
+      )}
 
-          {/* Filter Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      {/* Streamlined Filters Bar */}
+      {showFilters && (
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          {/* Primary Filter Controls */}
+          <div className="flex items-center gap-4 flex-wrap mb-4">
             {showSearch && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+              <div className="flex-1 min-w-64">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
@@ -442,81 +426,79 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Search exchanges..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                   />
                 </div>
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <ModernDropdown
-                options={statusOptions}
-                value={statusFilter}
-                onChange={setStatusFilter}
-                className="w-full"
-              />
-            </div>
+            <ModernDropdown
+              options={statusOptions}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              className="min-w-32"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-              <ModernDropdown
-                options={typeOptions}
-                value={typeFilter}
-                onChange={setTypeFilter}
-                className="w-full"
-              />
-            </div>
+            <button
+              onClick={() => setViewMode(prev => prev === 'grid' ? 'table' : 'grid')}
+              className="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+            >
+              {viewMode === 'grid' ? <Grid3X3 className="w-4 h-4" /> : <Table className="w-4 h-4" />}
+            </button>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
-              <ModernDropdown
-                options={dateOptions}
-                value={dateFilter}
-                onChange={setDateFilter}
-                className="w-full"
-              />
-            </div>
+            <button
+              onClick={() => setShowFilterChips(!showFilterChips)}
+              className="inline-flex items-center gap-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+            >
+              <Filter className="w-4 h-4" />
+              More Filters
+            </button>
           </div>
 
-          {/* Value Range Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Min Value ($)</label>
-              <input
-                type="number"
-                value={valueMinFilter}
-                onChange={(e) => setValueMinFilter(e.target.value)}
-                placeholder="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+          {/* Collapsible Advanced Filters */}
+          {showFilterChips && (
+            <div className="border-t border-gray-200 pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <ModernDropdown
+                  options={typeOptions}
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                  className="w-full"
+                />
+                <ModernDropdown
+                  options={dateOptions}
+                  value={dateFilter}
+                  onChange={setDateFilter}
+                  className="w-full"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={valueMinFilter}
+                    onChange={(e) => setValueMinFilter(e.target.value)}
+                    placeholder="Min ($)"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={valueMaxFilter}
+                    onChange={(e) => setValueMaxFilter(e.target.value)}
+                    placeholder="Max ($)"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  />
+                </div>
+              </div>
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Max Value ($)</label>
-              <input
-                type="number"
-                value={valueMaxFilter}
-                onChange={(e) => setValueMaxFilter(e.target.value)}
-                placeholder="1000000"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Active Filter Chips */}
-          {showFilterChips && hasActiveFilters && (
-            <div className="flex items-center gap-2 flex-wrap pt-4 border-t border-gray-200">
-              <span className="text-sm font-medium text-gray-700">Active Filters:</span>
+          {/* Active Filter Pills */}
+          {hasActiveFilters && (
+            <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-gray-200">
+              <span className="text-xs font-medium text-gray-600">Active:</span>
               
               {searchTerm && (
-                <FilterChip
-                  label="Search"
-                  value={searchTerm}
-                  onRemove={() => setSearchTerm('')}
-                />
+                <FilterChip label="Search" value={searchTerm} onRemove={() => setSearchTerm('')} />
               )}
-              
               {statusFilter && (
                 <FilterChip
                   label="Status"
@@ -524,7 +506,6 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
                   onRemove={() => setStatusFilter('')}
                 />
               )}
-              
               {typeFilter && (
                 <FilterChip
                   label="Type"
@@ -532,23 +513,16 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
                   onRemove={() => setTypeFilter('')}
                 />
               )}
-              
-              {valueMinFilter && (
+              {(valueMinFilter || valueMaxFilter) && (
                 <FilterChip
-                  label="Min Value"
-                  value={`$${parseInt(valueMinFilter).toLocaleString()}`}
-                  onRemove={() => setValueMinFilter('')}
+                  label="Value Range"
+                  value={`$${valueMinFilter || '0'} - $${valueMaxFilter || '∞'}`}
+                  onRemove={() => {
+                    setValueMinFilter('');
+                    setValueMaxFilter('');
+                  }}
                 />
               )}
-              
-              {valueMaxFilter && (
-                <FilterChip
-                  label="Max Value"
-                  value={`$${parseInt(valueMaxFilter).toLocaleString()}`}
-                  onRemove={() => setValueMaxFilter('')}
-                />
-              )}
-              
               {dateFilter && (
                 <FilterChip
                   label="Date"
@@ -559,7 +533,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
               
               <button
                 onClick={clearAllFilters}
-                className="text-sm text-red-600 hover:text-red-800 font-medium"
+                className="text-xs text-red-600 hover:text-red-800 font-medium ml-2"
               >
                 Clear All
               </button>
@@ -568,16 +542,6 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
         </div>
       )}
 
-      {/* View Toggle */}
-      <div className="flex justify-end mb-4">
-        <button
-          onClick={() => setViewMode(prev => prev === 'grid' ? 'table' : 'grid')}
-          className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200 transition-colors"
-        >
-          {viewMode === 'grid' ? <Grid3X3 className="w-4 h-4" /> : <Table className="w-4 h-4" />}
-          {viewMode === 'grid' ? 'Grid View' : 'Table View'}
-        </button>
-      </div>
 
       {/* Exchange Grid/Table */}
       {viewMode === 'grid' ? (

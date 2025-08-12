@@ -7,6 +7,9 @@ import ConnectionStatus from './components/ConnectionStatus';
 import DebugPanel from './components/DebugPanel';
 import { ErrorBoundary, RouteErrorBoundary } from './components/ErrorBoundary';
 
+// Initialize template service for backward compatibility
+import './services/templateService';
+
 // Feature imports
 import Messages from './features/messages/pages/Messages';
 import Exchanges from './features/exchanges/pages/Exchanges';
@@ -21,11 +24,9 @@ import Profile from './features/settings/pages/Profile';
 import UserProfile from './features/users/pages/UserProfile';
 import Preferences from './features/settings/pages/Preferences';
 import AuthTest from './features/auth/pages/AuthTest';
-import TemplateManager from './features/documents/components/TemplateManager';
 import TemplateDocumentManager from './pages/TemplateDocumentManager';
 import { AdminGPT, PracticePantherManager } from './features/admin/components';
-import AuditLogSystem from './features/admin/components/AuditLogSystem';
-import { AgencyManagement } from './features/agency/components';
+import AuditLogFeed from './features/admin/components/AuditLogFeed';
 
 // Lazy load heavy components for better performance
 const Login = lazy(() => import('./features/auth/pages/Login'));
@@ -246,11 +247,81 @@ const App: React.FC = () => {
                 } 
               />
 
-              {/* Template Document Manager - Admin only */}
+              {/* Reports - Available to admin and coordinators */}
+              <Route 
+                path="/reports" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
+                    <Layout>
+                      <RouteErrorBoundary routeName="Reports">
+                        <Reports />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Settings - Available to all authenticated users */}
+              <Route 
+                path="/settings" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <RouteErrorBoundary routeName="Settings">
+                        <Settings />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Profile - Available to all authenticated users */}
+              <Route 
+                path="/profile" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <RouteErrorBoundary routeName="Profile">
+                        <Profile />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* User Profile - Admin only */}
+              <Route 
+                path="/users/:id" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <RouteErrorBoundary routeName="UserProfile">
+                        <UserProfile />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Preferences - Available to all authenticated users */}
+              <Route 
+                path="/preferences" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <RouteErrorBoundary routeName="Preferences">
+                        <Preferences />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Template Document Manager - Available to admin and coordinators */}
               <Route 
                 path="/templates" 
                 element={
-                  <ProtectedRoute allowedRoles={['admin']}>
+                  <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
                     <Layout>
                       <RouteErrorBoundary routeName="TemplateDocumentManager">
                         <TemplateDocumentManager />
@@ -267,7 +338,7 @@ const App: React.FC = () => {
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
                       <RouteErrorBoundary routeName="TemplateManager">
-                        <TemplateManager />
+                        <TemplateDocumentManager />
                       </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
@@ -279,8 +350,8 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
-                      <RouteErrorBoundary routeName="AuditLogSystem">
-                        <AuditLogSystem />
+                      <RouteErrorBoundary routeName="AuditLogFeed">
+                        <AuditLogFeed />
                       </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
@@ -327,19 +398,6 @@ const App: React.FC = () => {
               />
 
               <Route 
-                path="/admin/agencies" 
-                element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <Layout>
-                      <RouteErrorBoundary routeName="AgencyManagement">
-                        <AgencyManagement />
-                      </RouteErrorBoundary>
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-
-              <Route 
                 path="/admin/system" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
@@ -353,123 +411,50 @@ const App: React.FC = () => {
                 } 
               />
 
-              <Route 
-                path="/admin/system/sync" 
-                element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <Layout>
-                      <div className="p-8">
-                        <h1 className="text-2xl font-bold mb-4">Sync Status</h1>
-                        <p className="text-gray-600">Sync status management coming soon...</p>
-                      </div>
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-
-              <Route 
-                path="/admin/system/settings" 
-                element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <Layout>
-                      <div className="p-8">
-                        <h1 className="text-2xl font-bold mb-4">System Settings</h1>
-                        <p className="text-gray-600">System settings management coming soon...</p>
-                      </div>
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-
-              {/* Reports - Admin and Coordinator */}
-              <Route 
-                path="/reports" 
-                element={
-                  <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
-                    <Reports />
-                  </ProtectedRoute>
-                } 
-              />
-
-              {/* Settings - Available to all authenticated users */}
-              <Route 
-                path="/settings" 
-                element={
-                  <ProtectedRoute>
-                    <Settings />
-                  </ProtectedRoute>
-                } 
-              />
-
-              {/* Profile - Available to all authenticated users */}
-              <Route 
-                path="/profile" 
-                element={
-                  <ProtectedRoute>
-                    <Profile />
-                  </ProtectedRoute>
-                } 
-              />
-
-              {/* User Profile with Analytics - Available to all authenticated users */}
-              <Route 
-                path="/user-profile" 
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <RouteErrorBoundary routeName="UserProfile">
-                        <UserProfile />
-                      </RouteErrorBoundary>
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-              
-              {/* Specific User Profile - Admin only */}
-              <Route 
-                path="/users/user-profile/:userId" 
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <RouteErrorBoundary routeName="UserProfile">
-                        <UserProfile />
-                      </RouteErrorBoundary>
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-
-              {/* Preferences - Available to all authenticated users */}
-              <Route 
-                path="/preferences" 
-                element={
-                  <ProtectedRoute>
-                    <Preferences />
-                  </ProtectedRoute>
-                } 
-              />
-              
               {/* Auth Test - Development only */}
-              <Route 
-                path="/auth-test" 
-                element={<AuthTest />}
-              />
+              {process.env.NODE_ENV === 'development' && (
+                <Route 
+                  path="/auth-test" 
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <RouteErrorBoundary routeName="AuthTest">
+                          <AuthTest />
+                        </RouteErrorBoundary>
+                      </Layout>
+                    </ProtectedRoute>
+                  } 
+                />
+              )}
 
-              {/* Catch all - redirect to dashboard */}
+              {/* Catch-all route */}
               <Route 
                 path="*" 
                 element={
                   <ProtectedRoute>
-                    <Navigate to="/dashboard" replace />
+                    <Layout>
+                      <div className="flex items-center justify-center min-h-screen">
+                        <div className="text-center">
+                          <h1 className="text-2xl font-bold text-gray-900">Page Not Found</h1>
+                          <p className="mt-2 text-gray-600">The page you're looking for doesn't exist.</p>
+                          <button 
+                            onClick={() => window.history.back()}
+                            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                          >
+                            Go Back
+                          </button>
+                        </div>
+                      </div>
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
-            </Routes>
-            </Suspense>
-          </div>
-        </Router>
-      </SocketProvider>
-    </AuthProvider>
+              </Routes>
+              </Suspense>
+            </div>
+          </Router>
+        </SocketProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 };

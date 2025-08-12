@@ -857,13 +857,29 @@ const DocumentGeneration: React.FC<{
 
   const isAdmin = user?.role === 'admin' || user?.role === 'coordinator';
 
-  const documentTemplates = [
-    { id: 'exchange_agreement', name: 'Exchange Agreement', description: 'Standard 1031 exchange agreement' },
-    { id: 'identification_letter', name: 'Identification Letter', description: '45-day identification notice' },
-    { id: 'escrow_instructions', name: 'Escrow Instructions', description: 'Instructions for escrow company' },
-    { id: 'assignment_agreement', name: 'Assignment Agreement', description: 'Rights assignment document' },
-    { id: 'tax_deferral_notice', name: 'Tax Deferral Notice', description: 'IRS compliance notice' }
-  ];
+  const [documentTemplates, setDocumentTemplates] = useState<any[]>([]);
+
+  // Load templates from API
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const templates = await apiService.getDocumentTemplates();
+        setDocumentTemplates(Array.isArray(templates) ? templates : []);
+      } catch (error) {
+        console.error('Failed to load templates:', error);
+        // Fallback to basic templates if API fails
+        setDocumentTemplates([
+          { id: 'exchange_agreement', name: 'Exchange Agreement', description: 'Standard 1031 exchange agreement' },
+          { id: 'identification_letter', name: 'Identification Letter', description: '45-day identification notice' },
+          { id: 'escrow_instructions', name: 'Escrow Instructions', description: 'Instructions for escrow company' },
+          { id: 'assignment_agreement', name: 'Assignment Agreement', description: 'Rights assignment document' },
+          { id: 'tax_deferral_notice', name: 'Tax Deferral Notice', description: 'IRS compliance notice' }
+        ]);
+      }
+    };
+    
+    loadTemplates();
+  }, []);
 
   const handleGenerateDocument = async () => {
     if (!selectedTemplate) return;

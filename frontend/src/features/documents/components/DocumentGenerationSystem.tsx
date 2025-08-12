@@ -66,77 +66,7 @@ const DocumentGenerationSystem: React.FC = () => {
     buyerName: ''
   });
 
-  // Document templates from the reference
-  const documentTemplates: DocumentTemplate[] = [
-    {
-      id: 'like-kind-assignment',
-      name: 'Like-Kind Assignment',
-      category: 'core',
-      description: 'Assignment of purchase and sale agreement for like-kind exchange',
-      requiredFields: ['clientName', 'propertyAddress', 'qiName', 'sellerName'],
-      signatureRequired: true,
-      signatories: ['QI', 'Seller', 'Buyer']
-    },
-    {
-      id: 'exchange-agreement',
-      name: 'Exchange Agreement',
-      category: 'core',
-      description: 'Master exchange agreement between client and QI',
-      requiredFields: ['clientName', 'qiName', 'propertyValue'],
-      signatureRequired: true,
-      signatories: ['QI', 'Client']
-    },
-    {
-      id: 'authorization-form',
-      name: 'Authorization Form',
-      category: 'core',
-      description: 'Authorization for QI to act on behalf of client',
-      requiredFields: ['clientName', 'qiName'],
-      signatureRequired: true,
-      signatories: ['Client']
-    },
-    {
-      id: 'introduction-letter',
-      name: 'Introduction Letter',
-      category: 'core',
-      description: 'Introduction letter for exchange parties',
-      requiredFields: ['clientName', 'qiName', 'sellerName', 'buyerName'],
-      signatureRequired: false
-    },
-    {
-      id: 'w9-form',
-      name: 'W9 Form',
-      category: 'core',
-      description: 'Tax identification form for exchange',
-      requiredFields: ['clientName'],
-      signatureRequired: true,
-      signatories: ['Client']
-    },
-    {
-      id: '3-property-rule',
-      name: '3-Property Rule Analysis',
-      category: 'rules',
-      description: 'Analysis of 3-property identification rule compliance',
-      requiredFields: ['clientName', 'propertyAddress', 'propertyValue'],
-      signatureRequired: false
-    },
-    {
-      id: '200-percent-rule',
-      name: '200% Rule Analysis',
-      category: 'rules',
-      description: 'Analysis of 200% rule compliance for property identification',
-      requiredFields: ['clientName', 'propertyValue'],
-      signatureRequired: false
-    },
-    {
-      id: '95-percent-rule',
-      name: '95% Rule Analysis',
-      category: 'rules',
-      description: 'Analysis of 95% rule compliance for property acquisition',
-      requiredFields: ['clientName', 'propertyValue', 'ownershipPercentage'],
-      signatureRequired: false
-    }
-  ];
+  const [documentTemplates, setDocumentTemplates] = useState<DocumentTemplate[]>([]);
 
   useEffect(() => {
     loadData();
@@ -144,13 +74,28 @@ const DocumentGenerationSystem: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [exchangesData, documentsData] = await Promise.all([
+      const [exchangesData, documentsData, templatesData] = await Promise.all([
         apiService.getExchanges(),
-        apiService.getDocuments()
+        apiService.getDocuments(),
+        apiService.getDocumentTemplates()
       ]);
 
       setExchanges(Array.isArray(exchangesData) ? exchangesData : []);
       setDocuments(Array.isArray(documentsData) ? documentsData : []);
+      
+      // Transform API templates to match the component's interface
+      const transformedTemplates: DocumentTemplate[] = (Array.isArray(templatesData) ? templatesData : []).map(template => ({
+        id: template.id,
+        name: template.name,
+        category: template.category || 'core',
+        description: template.description || '',
+        requiredFields: template.fields?.map((field: any) => field.name) || [],
+        signatureRequired: template.settings?.requireReview || false,
+        signatories: template.settings?.signatories || []
+      }));
+      
+      setDocumentTemplates(transformedTemplates);
+      console.log('Loaded templates:', transformedTemplates.length);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -183,21 +128,13 @@ const DocumentGenerationSystem: React.FC = () => {
     if (!selectedTemplate || !selectedExchange) return;
 
     try {
-      // Simulate AI document generation
-      const generatedDoc = {
-        id: Date.now().toString(),
-        templateId: selectedTemplate.id,
-        templateName: selectedTemplate.name,
-        exchangeId: selectedExchange.id,
-        clientName: generationData.clientName,
-        generatedAt: new Date().toISOString(),
-        status: 'generated',
-        signatureRequired: selectedTemplate.signatureRequired,
-        signatories: selectedTemplate.signatories || []
-      };
-
-      // In real implementation, this would call the API
-      // await apiService.generateDocument(generatedDoc);
+      // Call the actual API to generate document
+      const generatedDoc = await apiService.generateDocumentFromTemplate({
+        template_id: selectedTemplate.id,
+        exchange_id: selectedExchange.id,
+        generation_data: generationData,
+        generated_by: user?.id || 'unknown'
+      });
 
       alert(`Document "${selectedTemplate.name}" generated successfully for ${generationData.clientName}!`);
       setShowGenerationModal(false);

@@ -319,4 +319,35 @@ router.get('/statistics/overview', authenticateToken, checkPermission(['admin'])
   }
 });
 
+// Get user activities
+router.get('/:userId/activities', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { limit = 10 } = req.query;
+    
+    // Fetch recent activities from audit logs
+    const activities = await databaseService.getAuditLogs({
+      where: { userId },
+      limit: parseInt(limit),
+      orderBy: { column: 'created_at', ascending: false }
+    });
+    
+    // Transform activities
+    const formattedActivities = activities.map(activity => ({
+      id: activity.id,
+      action: activity.action,
+      entity: activity.entity_type,
+      entityId: activity.entity_id,
+      details: activity.details,
+      timestamp: activity.created_at,
+      ipAddress: activity.ip_address
+    }));
+    
+    res.json({ data: formattedActivities });
+  } catch (error) {
+    console.error('Error fetching user activities:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router; 

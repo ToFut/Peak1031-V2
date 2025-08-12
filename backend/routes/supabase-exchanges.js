@@ -1,6 +1,9 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { transformToCamelCase, transformApiResponse } = require('../utils/caseTransform');
+const { enforceRBAC } = require('../middleware/rbac');
+const { authenticateToken } = require('../middleware/auth');
+const rbacService = require('../services/rbacService');
 const router = express.Router();
 
 // Initialize Supabase client with error handling
@@ -64,12 +67,50 @@ router.get('/test', async (req, res) => {
  * GET /api/exchanges
  * Get exchanges with proper joins and field transformation
  */
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
+  console.log('🚨 SUPABASE-EXCHANGES ROUTE HIT! User:', req.user?.email, 'Role:', req.user?.role);
+  
+  try {
+    // Use RBAC service to get authorized exchanges
+    const result = await rbacService.getExchangesForUser(req.user, {
+      status: req.query.status,
+      limit: parseInt(req.query.limit) || 50,
+      orderBy: {
+        column: req.query.sortBy || 'created_at',
+        ascending: req.query.sortOrder !== 'desc'
+      }
+    });
+    
+    // Transform the response
+    const transformedExchanges = result.data.map(exchange => 
+      transformApiResponse(exchange, { includeComputed: true })
+    );
+    
+    res.json({
+      success: true,
+      exchanges: transformedExchanges,
+      total: result.count,
+      page: parseInt(req.query.page) || 1,
+      limit: parseInt(req.query.limit) || 50
+    });
+    
+    return; // Exit early - skip the old implementation
+  } catch (error) {
+    console.error('RBAC exchanges error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch exchanges',
+      message: error.message
+    });
+    return;
+  }
+  
+  // OLD IMPLEMENTATION BELOW - WILL BE REMOVED
   try {
     const { 
       status, 
       coordinator_id, 
-      client_id, 
+      client_id,
+      userId, 
       search, 
       page = 1, 
       limit = 20 
@@ -111,14 +152,8 @@ router.get('/', async (req, res) => {
         `)
       ;
 
-      // Role-based filtering
-      if (req.user?.role === 'client') {
-        // Clients see only their exchanges
-        query = query.eq('client_id', req.user.contact_id);
-      } else if (req.user?.role === 'coordinator') {
-        // Coordinators see assigned exchanges
-        query = query.eq('coordinator_id', req.user.id);
-      }
+      // Apply RBAC filtering
+      query = await req.applyRBACFilter(query);
 
       // Apply filters
       if (status) {
@@ -129,6 +164,10 @@ router.get('/', async (req, res) => {
       }
       if (client_id) {
         query = query.eq('client_id', client_id);
+      }
+      if (userId) {
+        // Filter exchanges where user is either coordinator or participant
+        query = query.or(`coordinator_id.eq.${userId},client_id.eq.${userId}`);
       }
       if (search) {
         query = query.or(`name.ilike.%${search}%,notes.ilike.%${search}%`);

@@ -29,11 +29,16 @@ class AuthService {
       // since the password hash might be stored differently
       let isValidPassword = false;
       
-      if (user.password_hash) {
+      // Check for password in different possible field names
+      const passwordHash = user.password_hash || user.password || user.passwordHash;
+      
+      if (passwordHash) {
+        console.log('🔐 AUTH SERVICE: Found password hash, comparing...');
         // Standard bcrypt validation
-        isValidPassword = await bcrypt.compare(password, user.password_hash);
+        isValidPassword = await bcrypt.compare(password, passwordHash);
       } else {
-        // No hardcoded passwords allowed
+        console.log('❌ AUTH SERVICE: No password hash found for user');
+        console.log('🔍 AUTH SERVICE: User object keys:', Object.keys(user));
       }
       
       if (!isValidPassword) {

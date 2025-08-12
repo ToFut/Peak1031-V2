@@ -375,7 +375,7 @@ export function useAnalytics(options: UseAnalyticsOptions = {}): UseAnalyticsRet
       }
 
       const queryResult = result.data;
-      setQueryResults(prev => [queryResult, ...prev.slice(0, 9)]); // Keep last 10 results
+      setQueryResults(prev => [queryResult, ...(prev || []).slice(0, 9)]); // Keep last 10 results
 
       return queryResult;
 
@@ -416,7 +416,7 @@ export function useAnalytics(options: UseAnalyticsOptions = {}): UseAnalyticsRet
       }
 
       const queryResult = result.data;
-      setQueryResults(prev => [queryResult, ...prev.slice(0, 9)]); // Keep last 10 results
+      setQueryResults(prev => [queryResult, ...(prev || []).slice(0, 9)]); // Keep last 10 results
 
       return queryResult;
 

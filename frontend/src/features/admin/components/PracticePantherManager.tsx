@@ -67,10 +67,31 @@ const PracticePantherManager: React.FC = () => {
       ]);
       
       setAuthStatus(authData);
-      setSyncStatus(syncData);
-      setSyncLogs(logsData.logs);
+      
+      // Transform the sync data to match the expected structure
+      const transformedSyncStatus: SyncStatus = {
+        lastSync: syncData?.last_sync?.last_sync_at || null,
+        isRunning: false, // The API doesn't provide this info yet
+        error: syncData?.last_sync?.error_message || undefined,
+        stats: {
+          total: syncData?.last_sync?.recent_syncs || 0,
+          success: syncData?.last_sync?.recent_syncs || 0, // Simplified for now
+          failed: syncData?.last_sync?.error_message ? 1 : 0
+        }
+      };
+      
+      setSyncStatus(transformedSyncStatus);
+      setSyncLogs(logsData.logs || []);
     } catch (error) {
       console.error('Failed to load PracticePanther data:', error);
+      // Set default values to prevent crashes
+      setAuthStatus({ authorized: false });
+      setSyncStatus({
+        lastSync: null,
+        isRunning: false,
+        stats: { total: 0, success: 0, failed: 0 }
+      });
+      setSyncLogs([]);
     } finally {
       setIsLoading(false);
     }
@@ -268,13 +289,13 @@ const PracticePantherManager: React.FC = () => {
                   <DocumentTextIcon className="h-6 w-6 text-purple-600" />
                 </div>
                 <p className="mt-2 text-sm font-medium text-gray-900">Total Records</p>
-                <p className="text-xs text-gray-500">{syncStatus?.stats.total || 0}</p>
+                <p className="text-xs text-gray-500">{syncStatus?.stats?.total || 0}</p>
               </div>
             </div>
           </div>
 
           {/* Sync Statistics */}
-          {syncStatus && syncStatus.stats.total > 0 && (
+          {syncStatus && syncStatus.stats && syncStatus.stats.total > 0 && (
             <div className="bg-white rounded-lg shadow border p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Sync Statistics</h3>
               <div className="grid grid-cols-3 gap-6">

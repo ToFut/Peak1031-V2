@@ -135,17 +135,17 @@ export const ExchangeCard: React.FC<ExchangeCardProps> = ({
         relative group cursor-pointer transition-all duration-300
         ${selected 
           ? 'scale-[1.02] ring-2 ring-blue-500 ring-offset-2' 
-          : 'hover:scale-[1.02] hover:shadow-2xl'
+          : 'hover:scale-[1.02] hover:shadow-xl'
         }
       `}
     >
-      {/* Card Container */}
-      <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+      {/* Rich Card Container */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
         {/* Status Bar */}
-        <div className={`h-2 bg-gradient-to-r ${statusConfig.color}`}></div>
+        <div className={`h-1.5 bg-gradient-to-r ${statusConfig.color}`}></div>
         
         {/* Card Header */}
-        <div className="p-6 pb-0">
+        <div className="p-5 pb-0">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1 min-w-0">
               {/* Exchange Number and Type */}
@@ -186,14 +186,14 @@ export const ExchangeCard: React.FC<ExchangeCardProps> = ({
                 }}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <MoreVertical className="w-5 h-5 text-gray-400" />
+                <MoreVertical className="w-4 h-4 text-gray-400" />
               </button>
               
               {showMenu && (
                 <div className="absolute right-0 top-10 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                   <button
                     onClick={(e) => handleQuickAction(e, 'view')}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center"
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center rounded-t-lg"
                   >
                     <Building2 className="w-4 h-4 mr-2 text-gray-400" />
                     View Details
@@ -207,7 +207,7 @@ export const ExchangeCard: React.FC<ExchangeCardProps> = ({
                   </button>
                   <button
                     onClick={(e) => handleQuickAction(e, 'documents')}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center"
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center rounded-b-lg"
                   >
                     <FileText className="w-4 h-4 mr-2 text-gray-400" />
                     View Documents
@@ -239,18 +239,18 @@ export const ExchangeCard: React.FC<ExchangeCardProps> = ({
                   : 'bg-blue-100 text-blue-700'
                 }
               `}>
-                <Zap className="w-3 h-3 mr-1" />
+                <Clock className="w-3 h-3 mr-1" />
                 {daysUntilClosing}d left
               </div>
             )}
           </div>
         </div>
         
-        {/* Key Metrics */}
-        <div className="px-6 pb-4">
+        {/* Key Metrics Snapshot */}
+        <div className="px-5 pb-4">
           <div className="grid grid-cols-3 gap-3">
             {/* Exchange Value */}
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs text-gray-600">Value</span>
                 <DollarSign className="w-4 h-4 text-green-600" />
@@ -261,7 +261,7 @@ export const ExchangeCard: React.FC<ExchangeCardProps> = ({
             </div>
             
             {/* Progress */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-3">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs text-gray-600">Progress</span>
                 <TrendingUp className="w-4 h-4 text-blue-600" />
@@ -272,7 +272,7 @@ export const ExchangeCard: React.FC<ExchangeCardProps> = ({
             </div>
             
             {/* Deadline */}
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-3">
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs text-gray-600">Deadline</span>
                 <Calendar className="w-4 h-4 text-purple-600" />
@@ -291,7 +291,7 @@ export const ExchangeCard: React.FC<ExchangeCardProps> = ({
         </div>
         
         {/* Progress Bar */}
-        <div className="px-6 pb-4">
+        <div className="px-5 pb-4">
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
               className={`h-2 rounded-full transition-all duration-500 bg-gradient-to-r ${statusConfig.color}`}
@@ -300,13 +300,16 @@ export const ExchangeCard: React.FC<ExchangeCardProps> = ({
           </div>
         </div>
         
-        {/* Footer Actions */}
-        <div className="px-6 pb-4">
+        {/* Footer Info */}
+        <div className="px-5 pb-4">
           <div className="flex items-center justify-between text-xs text-gray-500">
-            <div className="flex items-center space-x-4">
-              {/* Task count removed - not available in Exchange type */}
-              {/* Document count removed - not available in Exchange type */}
-            </div>
+            <span className="flex items-center">
+              <MapPin className="w-3 h-3 mr-1" />
+              {exchange.relinquishedPropertyAddress ? 
+                exchange.relinquishedPropertyAddress.substring(0, 30) + '...' : 
+                'Property TBD'
+              }
+            </span>
             
             <span className="flex items-center">
               <Clock className="w-3 h-3 mr-1" />
@@ -315,8 +318,8 @@ export const ExchangeCard: React.FC<ExchangeCardProps> = ({
           </div>
         </div>
         
-        {/* Hover Effect Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/0 to-indigo-600/0 opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none"></div>
+        {/* Hover Effect */}
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/0 to-indigo-600/0 opacity-0 group-hover:opacity-5 transition-opacity pointer-events-none"></div>
       </div>
       
       {/* Click anywhere outside to close menu */}

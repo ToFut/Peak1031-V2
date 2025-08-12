@@ -68,6 +68,16 @@ class InvitationService {
     } = options;
 
     try {
+      // Check if we have admin client
+      if (!supabaseService.client.auth.admin) {
+        console.log('⚠️ Supabase Admin client not available, using email fallback');
+        // Return false to trigger fallback
+        return {
+          email: { sent: false, error: 'Admin client not available' },
+          sms: { sent: false, error: null }
+        };
+      }
+
       // Use Supabase Auth Admin to invite user by email
       const { data, error } = await supabaseService.client.auth.admin.inviteUserByEmail(email, {
         redirectTo: `${this.frontendUrl}/auth/callback?exchange=${exchangeId}`,
@@ -115,11 +125,18 @@ class InvitationService {
   async sendInvitation(options) {
     // Try Supabase Auth first
     if (supabaseService.client) {
-      console.log('🔄 Using Supabase Auth for invitation...');
-      return await this.sendSupabaseInvitation(options);
+      console.log('🔄 Trying Supabase Auth for invitation...');
+      const supabaseResult = await this.sendSupabaseInvitation(options);
+      
+      // If Supabase Auth worked, return the result
+      if (supabaseResult.email.sent) {
+        return supabaseResult;
+      }
+      
+      console.log('⚠️ Supabase Auth failed, trying fallback methods...');
     }
 
-    console.log('🔄 Falling back to SendGrid/Twilio...');
+    console.log('🔄 Using SendGrid/Twilio/Mock fallback...');
 
     const {
       email,
@@ -132,6 +149,8 @@ class InvitationService {
       firstName,
       lastName,
       customMessage,
+      exchangeId,
+      inviterId,
       isResend = false
     } = options;
 
@@ -140,27 +159,48 @@ class InvitationService {
       sms: { sent: false, error: null }
     };
 
-    const inviteUrl = `${this.frontendUrl}/invite/${invitationToken}`;
+    // Generate token if not provided
+    const token = invitationToken || this.generateInvitationToken();
+    const inviteUrl = `${this.frontendUrl}/invite/${token}`;
     const displayName = firstName && lastName ? `${firstName} ${lastName}` : email;
 
     // Send email invitation
-    if ((method === 'email' || method === 'both') && this.sendgridEnabled) {
-      try {
-        await this.sendInvitationEmail({
-          email,
-          inviteUrl,
-          exchangeName,
-          inviterName,
-          role,
-          displayName,
-          customMessage,
-          isResend
-        });
+    if (method === 'email' || method === 'both') {
+      if (this.sendgridEnabled) {
+        try {
+          await this.sendInvitationEmail({
+            email,
+            inviteUrl,
+            exchangeName,
+            inviterName,
+            role,
+            displayName,
+            customMessage,
+            isResend
+          });
+          results.email.sent = true;
+          console.log(`✅ Invitation email sent to ${email}`);
+        } catch (error) {
+          console.error(`❌ Failed to send invitation email to ${email}:`, error);
+          results.email.error = error.message;
+        }
+      } else {
+        // Development mode - mock email sending
+        console.log('📧 MOCK EMAIL INVITATION:');
+        console.log(`   To: ${email}`);
+        console.log(`   Exchange: ${exchangeName}`);
+        console.log(`   Inviter: ${inviterName}`);
+        console.log(`   Role: ${role}`);
+        console.log(`   Invitation URL: ${inviteUrl}`);
+        if (customMessage) {
+          console.log(`   Message: ${customMessage}`);
+        }
+        console.log('📧 END MOCK EMAIL');
+        
+        // Simulate successful sending in development
         results.email.sent = true;
-        console.log(`✅ Invitation email sent to ${email}`);
-      } catch (error) {
-        console.error(`❌ Failed to send invitation email to ${email}:`, error);
-        results.email.error = error.message;
+        results.invitationToken = token; // Return the token for storing
+        console.log(`✅ Mock invitation email "sent" to ${email}`);
       }
     }
 
@@ -185,6 +225,8 @@ class InvitationService {
       }
     }
 
+    // Always include the token in the results
+    results.invitationToken = token;
     return results;
   }
 

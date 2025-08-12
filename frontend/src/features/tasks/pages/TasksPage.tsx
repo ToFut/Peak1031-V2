@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Task } from '../../../types';
 import { TaskBoard } from '../components/TaskBoard';
-import { EnhancedTaskManager } from '../components';
+import EnhancedTaskManager from '../components/EnhancedTaskManager';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
 import { Cog6ToothIcon, XMarkIcon } from '@heroicons/react/24/outline';

@@ -5,6 +5,7 @@ const fs = require('fs').promises;
 const { createClient } = require('@supabase/supabase-js');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
+const { authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 
 // Document parsing utilities
@@ -177,10 +178,10 @@ const upload = multer({
 });
 
 /**
- * GET /api/documents/templates
+ * GET /api/templates
  * Get all template documents
  */
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     console.log('🔍 Fetching template documents...');
     
@@ -242,6 +243,43 @@ router.get('/', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/templates/active
+ * Get only active template documents
+ */
+router.get('/active', authenticateToken, async (req, res) => {
+  try {
+    console.log('🔍 Fetching active template documents...');
+    
+    const { data: templates, error } = await supabase
+      .from('document_templates')
+      .select('*')
+      .eq('is_active', true)
+      .order('category', { ascending: true })
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('❌ Error fetching active templates:', error);
+      throw error;
+    }
+
+    console.log(`✅ Found ${templates?.length || 0} active templates`);
+    
+    res.json({
+      success: true,
+      data: templates || [],
+      count: templates?.length || 0
+    });
+  } catch (error) {
+    console.error('❌ Error fetching active templates:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch active templates',
       error: error.message
     });
   }

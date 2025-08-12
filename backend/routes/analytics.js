@@ -45,7 +45,12 @@ router.get('/financial-overview', authenticateToken, async (req, res) => {
  * GET /api/analytics/exchanges
  * Get paginated exchanges with smart filtering and enriched data
  */
-router.get('/exchanges', authenticateToken, async (req, res) => {
+// SECURITY ISSUE: This route bypasses RBAC - DISABLED
+// TODO: Implement proper role-based filtering before re-enabling
+router.get('/exchanges-disabled', authenticateToken, async (req, res) => {
+  return res.status(403).json({ error: 'This endpoint is disabled for security reasons' });
+  /*
+  console.log('🟡 ANALYTICS EXCHANGES ROUTE HIT!');
   try {
     const options = {
       page: parseInt(req.query.page) || 1,

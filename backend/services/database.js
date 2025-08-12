@@ -344,7 +344,7 @@ class DatabaseService {
     } else {
       return await Document.findByPk(id, {
         include: [
-          { model: User, as: 'uploader' },
+          { model: User, as: 'uploadedByUser' },
           { model: Exchange, as: 'exchange' }
         ]
       });

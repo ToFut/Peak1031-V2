@@ -35,8 +35,8 @@ const adminRoutes = require('./routes/admin');
 const notificationRoutes = require('./routes/notifications');
 const oauthRoutes = require('./routes/oauth');
 const exportRoutes = require('./routes/exports');
-const { router: exchangeParticipantsRoutes } = require('./routes/exchange-participants');
-const templateRoutes = require('./routes/templates');
+const exchangeParticipantsRoutes = require('./routes/exchange-participants');
+const templateManagementRoutes = require('./routes/template-management');
 const adminGPTRoutes = require('./routes/admin-gpt');
 const reportsRoutes = require('./routes/reports');
 const enhancedQueryRoutes = require('./routes/enhanced-query');
@@ -59,6 +59,7 @@ const accountManagementRoutes = require('./routes/account-management');
 
 // Audit social features routes
 const auditSocialRoutes = require('./routes/audit-social');
+const auditLogsRoutes = require('./routes/audit-logs');
 
 // Import services
 const MessageService = require('./services/messages');
@@ -313,7 +314,7 @@ class PeakServer {
     this.app.use('/api/oauth', oauthRoutes);
     this.app.use('/api/exports', exportRoutes);
     this.app.use('/api/exchange-participants', exchangeParticipantsRoutes);
-    this.app.use('/api/templates', templateRoutes);
+    this.app.use('/api/templates', templateManagementRoutes);
     this.app.use('/api/admin-gpt', adminGPTRoutes);
     this.app.use('/api/reports', reportsRoutes);
     this.app.use('/api/enhanced-query', enhancedQueryRoutes);
@@ -331,6 +332,9 @@ class PeakServer {
     
     // Audit social features routes
     this.app.use('/api/audit-social', auditSocialRoutes);
+    
+    // Audit logs routes
+    this.app.use('/api/audit-logs', auditLogsRoutes);
     
     // Performance monitoring routes (admin only)
     this.app.use('/api/performance', performanceRoutes);
@@ -641,6 +645,16 @@ class PeakServer {
       // Using Supabase - no need for Sequelize connection
       // await sequelize.authenticate(); // Removed - using Supabase
       console.log('✅ Using Supabase for database operations');
+
+      // Initialize OSS LLM Query Service for AI features
+      try {
+        const ossLLMQueryService = require('./services/oss-llm-query');
+        await ossLLMQueryService.initialize();
+        console.log('✅ OSS LLM Query Service initialized for AI features');
+      } catch (error) {
+        console.error('⚠️ Failed to initialize OSS LLM service:', error.message);
+        console.log('⚠️ AI features will be limited');
+      }
 
       // Database models are for reference only
       console.log('✅ Server ready (Supabase mode)');

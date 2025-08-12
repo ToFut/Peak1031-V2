@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const practicePartnerService = require('./practicePartnerService');
-const ppTokenManager = require('./ppTokenManager');
+const PPTokenManager = require('./ppTokenManager');
+const ppTokenManager = new PPTokenManager();
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });

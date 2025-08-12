@@ -1,54 +1,54 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
 const databaseService = require('../services/database');
+const supabaseService = require('../services/supabase');
 
 const router = express.Router();
 
 // Get user settings
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    console.log('📋 Getting settings for user:', req.user.id);
-    
-    // For now, return user profile data as settings
-    // In the future, you might want a separate settings table
-    const userSettings = {
-      profile: {
-        firstName: req.user.first_name || req.user.firstName,
-        lastName: req.user.last_name || req.user.lastName,
-        email: req.user.email,
-        role: req.user.role,
-        phone: req.user.phone,
-        company: req.user.company
+    // Return default settings since user_settings table doesn't exist yet
+    // TODO: Implement proper user_settings table and query it here
+    const settings = {
+      user_id: req.user.id,
+      theme: 'light',
+      notifications: {
+        email: true,
+        push: true,
+        sms: false,
+        deadlineAlerts: true,
+        taskAssignments: true,
+        exchangeUpdates: true
+      },
+      dashboard: {
+        layout: 'default',
+        widgets: ['recent_exchanges', 'pending_tasks', 'notifications'],
+        compactView: false
       },
       preferences: {
-        notifications: {
-          email: true,
-          sms: false,
-          deadlineAlerts: true,
-          taskAssignments: true,
-          exchangeUpdates: true
-        },
-        dashboard: {
-          theme: 'light',
-          language: 'en',
-          timezone: 'America/Los_Angeles'
-        }
-      },
-      security: {
-        twoFaEnabled: req.user.two_fa_enabled || false,
-        emailVerified: req.user.email_verified || false,
-        lastLogin: req.user.last_login,
-        sessionTimeout: 3600 // 1 hour
+        language: 'en',
+        timezone: 'UTC',
+        date_format: 'MM/DD/YYYY'
       }
     };
 
-    console.log('✅ Returning settings for user:', req.user.email);
-    res.json(userSettings);
+    // Only log in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Returning default settings for user:', req.user.email);
+    }
+
+    res.json({
+      success: true,
+      data: settings
+    });
+
   } catch (error) {
-    console.error('❌ Error getting settings:', error);
-    res.status(500).json({
-      error: 'Failed to get settings',
-      message: error.message
+    console.error('Error in GET /settings:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      details: error.message 
     });
   }
 });

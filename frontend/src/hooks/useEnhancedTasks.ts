@@ -374,26 +374,32 @@ export const useEnhancedTasks = (exchangeId?: string) => {
 
   // Computed values
   const taskStats = useMemo(() => {
-    const pending = tasks.filter(t => t.status === 'PENDING' || t.status === 'pending').length;
-    const inProgress = tasks.filter(t => t.status === 'IN_PROGRESS' || t.status === 'in_progress').length;
-    const completed = tasks.filter(t => t.status === 'COMPLETED' || t.status === 'completed').length;
-    const overdue = tasks.filter(t => {
+    // Ensure tasks is an array
+    const tasksArray = Array.isArray(tasks) ? tasks : [];
+    
+    const pending = tasksArray.filter(t => t.status === 'PENDING' || t.status === 'pending').length;
+    const inProgress = tasksArray.filter(t => t.status === 'IN_PROGRESS' || t.status === 'in_progress').length;
+    const completed = tasksArray.filter(t => t.status === 'COMPLETED' || t.status === 'completed').length;
+    const overdue = tasksArray.filter(t => {
       if (!t.due_date) return false;
       return new Date(t.due_date) < new Date() && (t.status === 'PENDING' || t.status === 'IN_PROGRESS');
     }).length;
 
     return {
-      total: tasks.length,
+      total: tasksArray.length,
       pending,
       inProgress,
       completed,
       overdue,
-      completionRate: tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0
+      completionRate: tasksArray.length > 0 ? Math.round((completed / tasksArray.length) * 100) : 0
     };
   }, [tasks]);
 
   const tasksByPriority = useMemo(() => {
-    return tasks.reduce((acc, task) => {
+    // Ensure tasks is an array
+    const tasksArray = Array.isArray(tasks) ? tasks : [];
+    
+    return tasksArray.reduce((acc, task) => {
       const priority = task.priority || 'medium';
       acc[priority] = (acc[priority] || 0) + 1;
       return acc;

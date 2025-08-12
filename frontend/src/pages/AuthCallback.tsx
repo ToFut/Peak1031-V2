@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { CheckCircleIcon, ExclamationTriangleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, ExclamationCircleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -20,14 +20,14 @@ const AuthCallback: React.FC = () => {
         const params = new URLSearchParams(fragment.replace('#', '?'));
         
         const accessToken = params.get('access_token');
-        const refreshTokenValue = params.get('refresh_token');
+        const refreshToken = params.get('refresh_token');
         const exchangeId = searchParams.get('exchange');
 
         if (accessToken) {
           // Store tokens and refresh auth state
           localStorage.setItem('supabase.auth.token', accessToken);
-          if (refreshTokenValue) {
-            localStorage.setItem('supabase.auth.refresh_token', refreshTokenValue);
+          if (refreshToken) {
+            localStorage.setItem('supabase.auth.refresh_token', refreshToken);
           }
 
           // Refresh auth state to get user info
@@ -114,7 +114,7 @@ const AuthCallback: React.FC = () => {
 
             {status === 'error' && (
               <div className="space-y-4">
-                <ExclamationTriangleIcon className="mx-auto h-12 w-12 text-red-500" />
+                <ExclamationCircleIcon className="mx-auto h-12 w-12 text-red-500" />
                 <h2 className="text-xl font-medium text-gray-900">Setup Failed</h2>
                 <p className="text-gray-600">{message}</p>
                 

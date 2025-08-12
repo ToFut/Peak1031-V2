@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
-import { apiService } from '../../../services/api';
+import { useTemplates } from '../../../hooks/useTemplates';
 import { Exchange } from '../../../types';
+import { DocumentTemplate } from '../../../types/document-template.types';
+import { apiService } from '../../../services/api';
+import { templateService } from '../../../services/templateService';
+import TemplateSettingsModal from '../../../components/templates/TemplateSettingsModal';
+import TemplatePreview from '../../../components/templates/TemplatePreview';
 import {
   DocumentTextIcon,
   ClipboardDocumentListIcon,
@@ -35,39 +40,6 @@ import {
   ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
 
-interface DocumentTemplate {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  type: 'pdf' | 'docx' | 'html' | 'form';
-  version: string;
-  isActive: boolean;
-  isDefault: boolean;
-  tags: string[];
-  fields: TemplateField[];
-  metadata: {
-    author: string;
-    createdAt: string;
-    updatedAt: string;
-    lastUsed?: string;
-    usageCount: number;
-    fileSize?: number;
-    previewUrl?: string;
-  };
-  compatibility: {
-    exchanges: string[];
-    roles: string[];
-    requirements: string[];
-  };
-  settings: {
-    autoFill: boolean;
-    requireReview: boolean;
-    allowEditing: boolean;
-    expiresAfterDays?: number;
-    watermark?: boolean;
-  };
-}
 
 interface TemplateField {
   id: string;
@@ -115,11 +87,24 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
   onTemplateChange
 }) => {
   const { user } = useAuth();
-  const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
+  const { 
+    templates, 
+    loading, 
+    error: templateError, 
+    fetchTemplates, 
+    generateDocument,
+    updateTemplate,
+    createTemplate,
+    deleteTemplate 
+  } = useTemplates();
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Modal states
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [selectedTemplateForModal, setSelectedTemplateForModal] = useState<DocumentTemplate | null>(null);
   
   // State management
   const [activeTab, setActiveTab] = useState<'templates' | 'create' | 'preview' | 'analytics' | 'settings'>('templates');
@@ -128,13 +113,14 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
   const [filters, setFilters] = useState({
     category: initialCategory || '',
     type: '',
-    isActive: '',
+    is_active: '',
     tags: [] as string[]
   });
   const [sortBy, setSortBy] = useState<'name' | 'category' | 'usage' | 'updated'>('updated');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedTemplate, setSelectedTemplate] = useState<DocumentTemplate | null>(null);
   const [previewData, setPreviewData] = useState<Record<string, any> | null>(null);
+  const [selectedExchange, setSelectedExchange] = useState<string>('');
 
   // Form states
   const [templateForm, setTemplateForm] = useState<Partial<DocumentTemplate>>({
@@ -143,8 +129,8 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
     category: '1031_exchange',
     type: 'pdf',
     version: '1.0.0',
-    isActive: true,
-    isDefault: false,
+    is_active: true,
+    is_default: false,
     tags: [],
     fields: [],
     settings: {
@@ -236,13 +222,18 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
     templates.forEach(template => {
-      if (template.isActive) stats.active++;
+      if (template.is_active) stats.active++;
       
       stats.byCategory[template.category] = (stats.byCategory[template.category] || 0) + 1;
-      stats.byType[template.type] = (stats.byType[template.type] || 0) + 1;
-      stats.totalUsage += template.metadata.usageCount || 0;
+      // For type, we'll use a default since the real template doesn't have a type field
+      const templateType = 'pdf'; // Default type
+      stats.byType[templateType] = (stats.byType[templateType] || 0) + 1;
       
-      if (template.metadata.lastUsed && new Date(template.metadata.lastUsed) > sevenDaysAgo) {
+      // Real templates don't have usage count, so we'll use 0
+      stats.totalUsage += 0;
+      
+      // Check recent usage based on updated_at
+      if (template.updated_at && new Date(template.updated_at) > sevenDaysAgo) {
         stats.recentUsage++;
       }
     });
@@ -257,8 +248,7 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         if (!(template.name || '').toLowerCase().includes(search) &&
-            !(template.description || '').toLowerCase().includes(search) &&
-            !(template.tags || []).some(tag => (tag || '').toLowerCase().includes(search))) {
+            !(template.description || '').toLowerCase().includes(search)) {
           return false;
         }
       }
@@ -266,11 +256,11 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
       // Category filter
       if (filters.category && template.category !== filters.category) return false;
       
-      // Type filter
-      if (filters.type && template.type !== filters.type) return false;
+      // Type filter - skip for now since real templates don't have type
+      // if (filters.type && template.type !== filters.type) return false;
       
       // Active filter
-      if (filters.isActive !== '' && template.isActive !== (filters.isActive === 'true')) return false;
+      if (filters.is_active !== '' && template.is_active !== (filters.is_active === 'true')) return false;
 
       return true;
     }).sort((a, b) => {
@@ -283,211 +273,17 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
           comparison = a.category.localeCompare(b.category);
           break;
         case 'usage':
-          comparison = (a.metadata.usageCount || 0) - (b.metadata.usageCount || 0);
+          // Skip usage sorting since real templates don't have usage count
+          comparison = 0;
           break;
         case 'updated':
-          comparison = new Date(a.metadata.updatedAt).getTime() - new Date(b.metadata.updatedAt).getTime();
+          comparison = new Date(a.updated_at || a.created_at || 0).getTime() - new Date(b.updated_at || b.created_at || 0).getTime();
           break;
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
   }, [templates, searchTerm, filters, sortBy, sortOrder]);
 
-  // Load templates
-  const loadTemplates = useCallback(async () => {
-    try {
-      setLoading(true);
-      console.log('Loading document templates...');
-      const response = await apiService.getDocumentTemplates();
-      console.log('Raw API response:', response);
-      
-      // Transform mock data for 1031 templates
-      const mockTemplates: DocumentTemplate[] = [
-        {
-          id: '1',
-          name: '1031 Exchange Agreement',
-          description: 'Comprehensive 1031 like-kind exchange agreement template with all required IRS compliance elements',
-          category: '1031_exchange',
-          type: 'pdf',
-          version: '2.1.0',
-          isActive: true,
-          isDefault: true,
-          tags: ['1031', 'exchange', 'agreement', 'irs', 'compliance'],
-          fields: [
-            {
-              id: 'exchanger_name',
-              name: 'exchanger_name',
-              type: 'text',
-              label: 'Exchanger Name',
-              required: true,
-              defaultValue: '',
-              metadata: { section: 'Parties', order: 1, dataSource: 'client' }
-            },
-            {
-              id: 'relinquished_property_address',
-              name: 'relinquished_property_address',
-              type: 'multiline',
-              label: 'Relinquished Property Address',
-              required: true,
-              defaultValue: '',
-              metadata: { section: 'Properties', order: 2, dataSource: 'property' }
-            },
-            {
-              id: 'sale_price',
-              name: 'sale_price',
-              type: 'currency',
-              label: 'Sale Price',
-              required: true,
-              defaultValue: 0,
-              metadata: { section: 'Financial', order: 3, dataSource: 'exchange' }
-            }
-          ],
-          metadata: {
-            author: 'Admin User',
-            createdAt: '2024-01-15T10:00:00Z',
-            updatedAt: '2024-01-20T14:30:00Z',
-            lastUsed: '2024-01-25T09:15:00Z',
-            usageCount: 45,
-            fileSize: 2048000
-          },
-          compatibility: {
-            exchanges: ['simultaneous', 'delayed', 'reverse', 'build-to-suit'],
-            roles: ['admin', 'coordinator'],
-            requirements: ['qualified_intermediary', 'exchange_period']
-          },
-          settings: {
-            autoFill: true,
-            requireReview: true,
-            allowEditing: false,
-            expiresAfterDays: 180,
-            watermark: true
-          }
-        },
-        {
-          id: '2',
-          name: '45-Day Identification Notice',
-          description: 'Official notice for 45-day identification period compliance with replacement property details',
-          category: 'identification',
-          type: 'pdf',
-          version: '1.5.0',
-          isActive: true,
-          isDefault: false,
-          tags: ['45-day', 'identification', 'notice', 'replacement', 'property'],
-          fields: [
-            {
-              id: 'identification_deadline',
-              name: 'identification_deadline',
-              type: 'date',
-              label: 'Identification Deadline',
-              required: true,
-              defaultValue: '',
-              metadata: { section: 'Timeline', order: 1, dataSource: 'exchange' }
-            },
-            {
-              id: 'identified_properties',
-              name: 'identified_properties',
-              type: 'multiline',
-              label: 'Identified Properties List',
-              required: true,
-              defaultValue: '',
-              metadata: { section: 'Properties', order: 2, dataSource: 'manual' }
-            }
-          ],
-          metadata: {
-            author: 'Legal Team',
-            createdAt: '2024-01-10T08:00:00Z',
-            updatedAt: '2024-01-18T16:45:00Z',
-            lastUsed: '2024-01-24T11:20:00Z',
-            usageCount: 32
-          },
-          compatibility: {
-            exchanges: ['delayed', 'reverse'],
-            roles: ['admin', 'coordinator', 'client'],
-            requirements: ['identification_period']
-          },
-          settings: {
-            autoFill: true,
-            requireReview: false,
-            allowEditing: true,
-            expiresAfterDays: 45,
-            watermark: false
-          }
-        },
-        {
-          id: '3',
-          name: 'Settlement Statement (Form HUD-1)',
-          description: 'Detailed settlement statement for 1031 exchange transactions with boot calculations',
-          category: 'financial',
-          type: 'pdf',
-          version: '3.0.0',
-          isActive: true,
-          isDefault: false,
-          tags: ['settlement', 'hud-1', 'financial', 'closing', 'boot'],
-          fields: [
-            {
-              id: 'gross_sales_price',
-              name: 'gross_sales_price',
-              type: 'currency',
-              label: 'Gross Sales Price',
-              required: true,
-              defaultValue: 0,
-              metadata: { section: 'Financial', order: 1, dataSource: 'exchange' }
-            },
-            {
-              id: 'closing_costs',
-              name: 'closing_costs',
-              type: 'currency',
-              label: 'Total Closing Costs',
-              required: true,
-              defaultValue: 0,
-              metadata: { section: 'Financial', order: 2, dataSource: 'exchange' }
-            },
-            {
-              id: 'boot_amount',
-              name: 'boot_amount',
-              type: 'currency',
-              label: 'Boot Amount (if any)',
-              required: false,
-              defaultValue: 0,
-              metadata: { section: 'Financial', order: 3, dataSource: 'manual' }
-            }
-          ],
-          metadata: {
-            author: 'Finance Department',
-            createdAt: '2024-01-05T12:00:00Z',
-            updatedAt: '2024-01-22T10:15:00Z',
-            lastUsed: '2024-01-23T15:30:00Z',
-            usageCount: 28
-          },
-          compatibility: {
-            exchanges: ['simultaneous', 'delayed', 'reverse', 'build-to-suit'],
-            roles: ['admin', 'coordinator'],
-            requirements: ['closing_process']
-          },
-          settings: {
-            autoFill: true,
-            requireReview: true,
-            allowEditing: true,
-            expiresAfterDays: 30,
-            watermark: true
-          }
-        }
-      ];
-
-      // Handle both array response and object with data property
-      const templatesData = Array.isArray(response) ? response : ((response as any).data || []);
-      console.log('Templates loaded from API:', templatesData);
-      
-      // If no templates from API, don't use mock templates - let user know there are no templates
-      setTemplates(templatesData);
-      setError(null); // Clear any previous errors
-    } catch (error: any) {
-      console.error('Failed to load templates:', error);
-      setError('Failed to load document templates');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   // Load exchanges
   const loadExchanges = useCallback(async () => {
@@ -501,10 +297,10 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
 
   useEffect(() => {
     if (isOpen) {
-      loadTemplates();
+      fetchTemplates();
       loadExchanges();
     }
-  }, [isOpen, loadTemplates, loadExchanges]);
+  }, [isOpen, fetchTemplates, loadExchanges]);
 
   // Template actions
   const handlePreview = async (template: DocumentTemplate) => {
@@ -531,19 +327,40 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
 
   const handleGenerate = async (template: DocumentTemplate, exchangeId: string) => {
     try {
-      setLoading(true);
-      const response = await apiService.post('/documents/generate', {
-        templateId: template.id,
-        exchangeId: exchangeId,
-        additionalData: previewData
-      });
+      if (!exchangeId) {
+        setError('Please select an exchange first');
+        return;
+      }
       
-      setSuccess(`Document generated successfully: ${response.data.filename}`);
+      setError(null); // Clear any previous errors
+      setSuccess(null); // Clear any previous success messages
+      
+      console.log('🔄 Generating document...', { templateId: template.id, exchangeId });
+      
+      const result = await generateDocument(template.id, exchangeId, previewData || undefined);
+      
+      // Check if the result indicates fallback values were used
+      if (result.warnings && result.warnings.length > 0) {
+        setSuccess(`Document generated successfully! Note: Some fields used fallback values due to missing data.`);
+        console.log('⚠️ Fallback values used:', result.warnings);
+      } else {
+        setSuccess(`Document generated successfully!`);
+      }
+      
       onTemplateChange?.();
     } catch (error: any) {
-      setError(`Failed to generate document: ${error.message}`);
-    } finally {
-      setLoading(false);
+      console.error('Generate document error:', error);
+      
+      // Provide more specific error messages
+      if (error.message?.includes('Missing required fields')) {
+        setError('Some required data is missing from the exchange. The system will use fallback values where possible.');
+      } else if (error.message?.includes('Template not found')) {
+        setError('The selected template could not be found. Please try selecting a different template.');
+      } else if (error.message?.includes('Exchange not found')) {
+        setError('The selected exchange could not be found. Please try selecting a different exchange.');
+      } else {
+        setError(error.message || 'Failed to generate document. Please try again.');
+      }
     }
   };
 
@@ -770,17 +587,14 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
                               </div>
                               <div>
                                 <h3 className="font-semibold text-gray-900 text-lg">{template.name}</h3>
-                                <p className="text-sm text-gray-500">v{template.version}</p>
+                                <p className="text-sm text-gray-500">Template ID: {template.id}</p>
                               </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                              {template.isDefault && (
-                                <StarIcon className="w-4 h-4 text-yellow-500 fill-current" />
-                              )}
                               <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                template.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                template.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                               }`}>
-                                {template.isActive ? 'Active' : 'Inactive'}
+                                {template.is_active ? 'Active' : 'Inactive'}
                               </span>
                             </div>
                           </div>
@@ -794,17 +608,17 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
                           </div>
 
                           {/* Tags */}
-                          {template.tags.length > 0 && (
+                          {template.tags && template.tags.length > 0 && (
                             <div className="mb-4">
                               <div className="flex flex-wrap gap-1">
-                                {template.tags.slice(0, 3).map(tag => (
+                                {(template.tags || []).slice(0, 3).map((tag: string) => (
                                   <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700">
                                     <TagIcon className="w-3 h-3 mr-1" />
                                     {tag}
                                   </span>
                                 ))}
-                                {template.tags.length > 3 && (
-                                  <span className="text-xs text-gray-500">+{template.tags.length - 3}</span>
+                                {(template.tags || []).length > 3 && (
+                                  <span className="text-xs text-gray-500">+{(template.tags || []).length - 3}</span>
                                 )}
                               </div>
                             </div>
@@ -813,11 +627,11 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
                           {/* Stats */}
                           <div className="grid grid-cols-2 gap-4 mb-4 py-3 border-t border-gray-100">
                             <div className="text-center">
-                              <div className="text-sm font-medium text-gray-900">{template.metadata.usageCount || 0}</div>
-                              <div className="text-xs text-gray-500">Uses</div>
+                              <div className="text-sm font-medium text-gray-900">{template.is_required ? 'Yes' : 'No'}</div>
+                              <div className="text-xs text-gray-500">Required</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-sm font-medium text-gray-900">{template.fields.length}</div>
+                              <div className="text-sm font-medium text-gray-900">{template.required_fields.length}</div>
                               <div className="text-xs text-gray-500">Fields</div>
                             </div>
                           </div>
@@ -826,21 +640,37 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
                               <button
-                                onClick={() => handlePreview(template)}
+                                onClick={() => {
+                                  setSelectedTemplateForModal(template);
+                                  setIsPreviewModalOpen(true);
+                                }}
                                 className="flex items-center space-x-1 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
                               >
                                 <EyeIcon className="w-4 h-4" />
                                 <span>Preview</span>
                               </button>
+                              <button
+                                onClick={() => handlePreview(template)}
+                                className="flex items-center space-x-1 px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                              >
+                                <RocketLaunchIcon className="w-4 h-4" />
+                                <span>Generate</span>
+                              </button>
                               {canManage && (
-                                <button className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg">
+                                <button 
+                                  onClick={() => {
+                                    setSelectedTemplateForModal(template);
+                                    setIsSettingsModalOpen(true);
+                                  }}
+                                  className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
+                                >
                                   <PencilIcon className="w-4 h-4" />
                                   <span>Edit</span>
                                 </button>
                               )}
                             </div>
                             <div className="text-xs text-gray-500">
-                              Updated {new Date(template.metadata.updatedAt).toLocaleDateString()}
+                              Updated {new Date(template.updated_at || template.created_at || new Date()).toLocaleDateString()}
                             </div>
                           </div>
                         </div>
@@ -862,15 +692,20 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
                     <p className="text-gray-600">{selectedTemplate.description}</p>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <select className="px-3 py-2 border border-gray-300 rounded-lg">
+                    <select 
+                      value={selectedExchange}
+                      onChange={(e) => setSelectedExchange(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg"
+                    >
                       <option value="">Select Exchange...</option>
                       {exchanges.map(exchange => (
                         <option key={exchange.id} value={exchange.id}>{exchange.name}</option>
                       ))}
                     </select>
                     <button
-                      onClick={() => selectedTemplate && handleGenerate(selectedTemplate, 'test-exchange')}
-                      className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                      onClick={() => selectedTemplate && selectedExchange && handleGenerate(selectedTemplate, selectedExchange)}
+                      disabled={!selectedExchange}
+                      className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <RocketLaunchIcon className="w-4 h-4" />
                       <span>Generate Document</span>
@@ -883,47 +718,19 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
                   <div>
                     <h4 className="font-medium text-gray-900 mb-4">Template Fields</h4>
                     <div className="space-y-3">
-                      {selectedTemplate.fields.map((field) => (
-                        <div key={field.id} className="p-3 border border-gray-200 rounded-lg">
+                      {selectedTemplate.required_fields.map((fieldName, index) => (
+                        <div key={`${fieldName}-${index}`} className="p-3 border border-gray-200 rounded-lg">
                           <div className="flex items-center justify-between mb-2">
-                            <label className="text-sm font-medium text-gray-700">{field.label}</label>
-                            <span className="text-xs text-gray-500">{field.type}</span>
+                            <label className="text-sm font-medium text-gray-700">{fieldName}</label>
+                            <span className="text-xs text-gray-500">text</span>
                           </div>
-                          {field.type === 'text' && (
-                            <input
-                              type="text"
-                              placeholder={field.placeholder}
-                              value={previewData?.[field.name] || ''}
-                              onChange={(e) => setPreviewData(prev => ({ ...(prev || {}), [field.name]: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                            />
-                          )}
-                          {field.type === 'currency' && (
-                            <input
-                              type="number"
-                              placeholder="0.00"
-                              value={previewData?.[field.name] || ''}
-                              onChange={(e) => setPreviewData(prev => ({ ...(prev || {}), [field.name]: parseFloat(e.target.value) || 0 }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                            />
-                          )}
-                          {field.type === 'multiline' && (
-                            <textarea
-                              rows={3}
-                              placeholder={field.placeholder}
-                              value={previewData?.[field.name] || ''}
-                              onChange={(e) => setPreviewData(prev => ({ ...(prev || {}), [field.name]: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                            />
-                          )}
-                          {field.type === 'date' && (
-                            <input
-                              type="date"
-                              value={previewData?.[field.name] || ''}
-                              onChange={(e) => setPreviewData(prev => ({ ...(prev || {}), [field.name]: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                            />
-                          )}
+                          <input
+                            type="text"
+                            placeholder={`Enter ${fieldName}`}
+                            value={previewData?.[fieldName] || ''}
+                            onChange={(e) => setPreviewData(prev => ({ ...(prev || {}), [fieldName]: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                          />
                         </div>
                       ))}
                     </div>
@@ -939,6 +746,28 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Preview Tab - No Template Selected */}
+          {activeTab === 'preview' && !selectedTemplate && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl border p-6">
+                <div className="text-center py-12">
+                  <RocketLaunchIcon className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No Template Selected</h3>
+                  <p className="text-gray-600 mb-6">
+                    Select a template from the Templates tab to preview and generate documents.
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('templates')}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 mx-auto"
+                  >
+                    <DocumentTextIcon className="w-4 h-4" />
+                    <span>Browse Templates</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1021,6 +850,226 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
               </div>
             </div>
           )}
+
+          {/* Create Template Tab */}
+          {activeTab === 'create' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl border p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900">Create New Template</h3>
+                    <p className="text-gray-600">Design and configure a new document template</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedTemplateForModal({
+                        id: '',
+                        name: '',
+                        description: '',
+                        category: 'template',
+                        template_type: 'document',
+                        version: '1.0',
+                        file_template: '',
+                        required_fields: [],
+                        is_required: false,
+                        role_access: ['admin', 'coordinator'],
+                        auto_generate: false,
+                        stage_triggers: [],
+                        created_by: user?.id || '',
+                        is_active: true,
+                        settings: {
+                          autoFill: true,
+                          requireReview: false,
+                          allowEditing: true,
+                          watermark: false
+                        },
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                      });
+                      setIsSettingsModalOpen(true);
+                    }}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    <PlusIcon className="w-4 h-4" />
+                    <span>Create Template</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 rounded-lg p-4">
+                      <h4 className="font-medium text-blue-900 mb-2">Quick Start Guide</h4>
+                      <ul className="text-sm text-blue-800 space-y-1">
+                        <li>• Choose a template category and type</li>
+                        <li>• Define required fields and placeholders</li>
+                        <li>• Configure access permissions and triggers</li>
+                        <li>• Set up auto-generation rules</li>
+                        <li>• Test with preview functionality</li>
+                      </ul>
+                    </div>
+
+                    <div className="bg-green-50 rounded-lg p-4">
+                      <h4 className="font-medium text-green-900 mb-2">Available Placeholders</h4>
+                      <div className="text-sm text-green-800 space-y-1">
+                        <p>Use these placeholders in your template:</p>
+                        <div className="grid grid-cols-2 gap-1 mt-2">
+                          <span>#Client.Name#</span>
+                          <span>#Exchange.ID#</span>
+                          <span>#Property.Address#</span>
+                          <span>#Date.Current#</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-2">Template Categories</h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                          <span>Legal Documents</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                          <span>Financial Reports</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                          <span>Compliance Forms</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                          <span>Agreements</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-yellow-50 rounded-lg p-4">
+                      <h4 className="font-medium text-yellow-900 mb-2">Best Practices</h4>
+                      <ul className="text-sm text-yellow-800 space-y-1">
+                        <li>• Use clear, descriptive names</li>
+                        <li>• Include all required fields</li>
+                        <li>• Test with sample data</li>
+                        <li>• Set appropriate permissions</li>
+                        <li>• Enable auto-generation when needed</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Settings Tab */}
+          {activeTab === 'settings' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl border p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900">Template Settings</h3>
+                    <p className="text-gray-600">Configure global template settings and preferences</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedTemplateForModal(templates[0] || null);
+                      setIsSettingsModalOpen(true);
+                    }}
+                    className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                  >
+                    <Cog6ToothIcon className="w-4 h-4" />
+                    <span>Edit Settings</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-4">Global Settings</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700">Auto-fill Fields</span>
+                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Enabled</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700">Require Review</span>
+                          <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">Disabled</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700">Allow Editing</span>
+                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Enabled</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700">Add Watermark</span>
+                          <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">Disabled</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50 rounded-lg p-4">
+                      <h4 className="font-medium text-blue-900 mb-4">Access Control</h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <input type="checkbox" checked readOnly className="rounded border-gray-300 text-blue-600" />
+                          <span className="text-sm text-blue-800">Admin users</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input type="checkbox" checked readOnly className="rounded border-gray-300 text-blue-600" />
+                          <span className="text-sm text-blue-800">Coordinators</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input type="checkbox" readOnly className="rounded border-gray-300 text-blue-600" />
+                          <span className="text-sm text-blue-800">Client users</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="bg-purple-50 rounded-lg p-4">
+                      <h4 className="font-medium text-purple-900 mb-4">Auto-Generation Rules</h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <input type="checkbox" checked readOnly className="rounded border-gray-300 text-purple-600" />
+                          <span className="text-sm text-purple-800">On exchange creation</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input type="checkbox" readOnly className="rounded border-gray-300 text-purple-600" />
+                          <span className="text-sm text-purple-800">On identification deadline</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input type="checkbox" readOnly className="rounded border-gray-300 text-purple-600" />
+                          <span className="text-sm text-purple-800">On completion deadline</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input type="checkbox" readOnly className="rounded border-gray-300 text-purple-600" />
+                          <span className="text-sm text-purple-800">On status change</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-green-50 rounded-lg p-4">
+                      <h4 className="font-medium text-green-900 mb-4">Notification Settings</h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <input type="checkbox" checked readOnly className="rounded border-gray-300 text-green-600" />
+                          <span className="text-sm text-green-800">Email notifications</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input type="checkbox" readOnly className="rounded border-gray-300 text-green-600" />
+                          <span className="text-sm text-green-800">In-app notifications</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input type="checkbox" readOnly className="rounded border-gray-300 text-green-600" />
+                          <span className="text-sm text-green-800">SMS notifications</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -1045,6 +1094,52 @@ const EnterpriseDocumentTemplateManager: React.FC<EnterpriseDocumentTemplateMana
           </div>
         </div>
       </div>
+
+      {/* Template Settings Modal */}
+      <TemplateSettingsModal
+        template={selectedTemplateForModal}
+        isOpen={isSettingsModalOpen}
+        onClose={() => {
+          setIsSettingsModalOpen(false);
+          setSelectedTemplateForModal(null);
+        }}
+        onSave={async (updatedTemplate) => {
+          try {
+            if (updatedTemplate.id) {
+              // Update existing template
+              await updateTemplate(updatedTemplate);
+              setSuccess('Template updated successfully');
+            } else {
+              // Create new template
+              await createTemplate(updatedTemplate);
+              setSuccess('Template created successfully');
+            }
+            await fetchTemplates();
+          } catch (error: any) {
+            setError(error.message || 'Failed to save template');
+          }
+        }}
+      />
+
+      {/* Template Preview Modal */}
+      <TemplatePreview
+        template={selectedTemplateForModal}
+        isOpen={isPreviewModalOpen}
+        onClose={() => {
+          setIsPreviewModalOpen(false);
+          setSelectedTemplateForModal(null);
+        }}
+        onGenerate={async (templateId, sampleData) => {
+          try {
+            // For now, use a test exchange ID - this should be enhanced to allow exchange selection
+            const result = await generateDocument(templateId, 'test-exchange-id', sampleData);
+            setSuccess('Document generated successfully');
+            return result;
+          } catch (error: any) {
+            setError(error.message || 'Failed to generate document');
+          }
+        }}
+      />
     </div>
   );
 };
