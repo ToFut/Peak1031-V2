@@ -12,6 +12,10 @@ export class HttpClient {
 
   private getAuthHeaders(isFormData: boolean = false): HeadersInit {
     const token = localStorage.getItem('token');
+    console.log('🔐 Auth headers:', {
+      hasToken: !!token,
+      tokenPreview: token ? token.substring(0, 20) + '...' : 'none'
+    });
     return {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token && { 'Authorization': `Bearer ${token}` })

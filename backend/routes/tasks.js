@@ -412,7 +412,13 @@ router.post('/', authenticateToken, async (req, res) => {
   try {
     console.log('📋 TASK CREATION: Creating task for user', req.user?.email);
     console.log('📋 TASK DATA:', JSON.stringify(req.body, null, 2));
-    console.log('📋 USER INFO:', { id: req.user?.id, email: req.user?.email, role: req.user?.role });
+    console.log('📋 USER INFO:', { 
+      id: req.user?.id, 
+      email: req.user?.email, 
+      role: req.user?.role,
+      hasUser: !!req.user,
+      userId: req.user?.id || 'NO USER ID'
+    });
 
     // Enhanced validation with detailed logging
     const validationErrors = [];
