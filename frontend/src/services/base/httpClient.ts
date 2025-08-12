@@ -77,6 +77,17 @@ export class HttpClient {
         errorData = { message: errorText };
       }
       
+      let requestBody: any = undefined;
+      if (options.body) {
+        try {
+          requestBody = typeof options.body === 'string' 
+            ? JSON.parse(options.body) 
+            : options.body;
+        } catch (e) {
+          requestBody = options.body;
+        }
+      }
+      
       console.error('🚨 HTTP Error Details:', {
         status: response.status,
         statusText: response.statusText,
@@ -84,13 +95,21 @@ export class HttpClient {
         errorData,
         errorText,
         url,
-        requestBody: options.body ? JSON.parse(options.body as string) : undefined
+        requestBody
       });
       
       // If backend provides validation details, include them
-      const errorMessage = errorData.details 
-        ? `Validation failed: ${errorData.details.join(', ')}`
-        : errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+      let errorMessage = errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+      
+      if (errorData.details) {
+        if (Array.isArray(errorData.details)) {
+          errorMessage = `Validation failed: ${errorData.details.join(', ')}`;
+        } else if (typeof errorData.details === 'string') {
+          errorMessage = `Validation failed: ${errorData.details}`;
+        } else if (typeof errorData.details === 'object') {
+          errorMessage = `Validation failed: ${JSON.stringify(errorData.details)}`;
+        }
+      }
       
       throw new Error(errorMessage);
     }

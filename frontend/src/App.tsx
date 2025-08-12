@@ -15,6 +15,7 @@ import Messages from './features/messages/pages/Messages';
 import Exchanges from './features/exchanges/pages/Exchanges';
 import ExchangeDetailEnhanced from './features/exchanges/pages/ExchangeDetailEnhanced';
 import Tasks from './features/tasks/pages/Tasks';
+import ModernTasksPage from './features/tasks/pages/ModernTasksPage';
 import Contacts from './features/contacts/pages/Contacts';
 import Documents from './features/documents/pages/Documents';
 import Users from './features/users/pages/Users';
@@ -220,7 +221,7 @@ const App: React.FC = () => {
                   <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client']}>
                     <Layout>
                       <RouteErrorBoundary routeName="Tasks">
-                        <Tasks />
+                        <ModernTasksPage />
                       </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>

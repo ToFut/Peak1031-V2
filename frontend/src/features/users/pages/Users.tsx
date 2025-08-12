@@ -56,11 +56,13 @@ const Users: React.FC = () => {
   // Check if user has admin access
   useEffect(() => {
     if (!isAdmin()) {
-    
-    navigate('/dashboard');
-    return;
+      navigate('/dashboard');
+      return;
     }
   }, [isAdmin, navigate]);
+
+  // Create user modal state
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
 
   const loadUsers = useCallback(async () => {
     try {
