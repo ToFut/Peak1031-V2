@@ -15,7 +15,7 @@ import {
   StarIcon,
   PencilIcon,
   TrashIcon,
-  DuplicateIcon,
+  DocumentDuplicateIcon,
   ArchiveBoxIcon,
   ShareIcon,
   BellIcon,
@@ -73,10 +73,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     priority: task.priority,
     dueDate: task.dueDate || '',
     assignedTo: task.assignedTo || '',
-    tags: task.tags || [],
-    estimatedHours: task.estimatedHours || 0,
-    actualHours: task.actualHours || 0,
-    starred: task.starred || false
+    tags: (task as any).tags || [],
+    estimatedHours: (task as any).estimatedHours || 0,
+    actualHours: (task as any).actualHours || 0,
+    starred: (task as any).starred || false
   });
 
   const [comments, setComments] = useState<any[]>([]);
@@ -129,7 +129,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       setComments([...comments, {
         id: Date.now().toString(),
         text: newComment,
-        author: user?.name || 'You',
+        author: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || 'You',
         createdAt: new Date().toISOString()
       }]);
       setNewComment('');
@@ -150,7 +150,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   const handleStarToggle = async () => {
     const newStarred = !formData.starred;
-    await onUpdate(task.id, { starred: newStarred });
+    await onUpdate(task.id, { starred: newStarred } as any);
     setFormData(prev => ({ ...prev, starred: newStarred }));
   };
 
@@ -229,7 +229,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     onClick={() => {}}
                     className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
                   >
-                    <DuplicateIcon className="w-5 h-5" />
+                    <DocumentDuplicateIcon className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => {}}
@@ -497,7 +497,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   Tags
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {formData.tags.map(tag => (
+                  {formData.tags.map((tag: string) => (
                     <span
                       key={tag}
                       className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm"
@@ -507,7 +507,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         <button
                           onClick={() => setFormData(prev => ({
                             ...prev,
-                            tags: prev.tags.filter(t => t !== tag)
+                            tags: prev.tags.filter((t: string) => t !== tag)
                           }))}
                           className="ml-2 text-purple-500 hover:text-purple-700"
                         >

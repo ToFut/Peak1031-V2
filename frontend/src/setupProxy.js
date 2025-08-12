@@ -2,16 +2,19 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 
 module.exports = function(app) {
   // Proxy all /api/* requests to backend
-  // IMPORTANT: Do NOT rewrite the path - keep /api prefix
+  // IMPORTANT: Keep the /api prefix in the forwarded request
   app.use(
-    '/api',
+    ['/api', '/api/*'],
     createProxyMiddleware({
       target: 'http://localhost:5001',
       changeOrigin: true,
       secure: false,
       logLevel: 'debug',
       ws: true, // Enable WebSocket proxy
-      // DO NOT USE pathRewrite - we want to keep the /api prefix
+      // Explicitly preserve the path with /api prefix
+      pathRewrite: {
+        '^/api': '/api' // Keep /api prefix (identity rewrite)
+      },
       onProxyReq: (proxyReq, req, res) => {
         console.log('🔄 Proxying request:', req.method, req.url, '->', 'http://localhost:5001' + req.url);
         // Log headers for debugging
