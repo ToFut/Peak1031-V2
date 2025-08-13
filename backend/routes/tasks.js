@@ -1,20 +1,7 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
 const { enforceRBAC } = require('../middleware/rbac');
-
-// Simple permission check function
-const checkPermission = (resource, action) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    
-    // For now, allow all authenticated users to access tasks
-    // This can be enhanced later with more granular permissions
-    console.log(`🔐 Permission check: ${req.user.role} user accessing ${resource} with ${action} permission`);
-    next();
-  };
-};
+const { requireExchangePermission } = require('../middleware/permissions');
 
 // Import services with error handling
 let supabaseService, enhancedTaskService, rbacService, AuditService;
@@ -253,7 +240,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Get tasks for a specific exchange
-router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
+router.get('/exchange/:exchangeId', authenticateToken, requireExchangePermission('view_tasks'), async (req, res) => {
   try {
     const { exchangeId } = req.params;
     const { status, priority, assignedTo, limit = '50' } = req.query;
@@ -408,7 +395,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Create task
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, requireExchangePermission('create_tasks'), async (req, res) => {
   try {
     console.log('📋 TASK CREATION: Creating task for user', req.user?.email);
     console.log('📋 TASK DATA:', JSON.stringify(req.body, null, 2));
@@ -697,6 +684,36 @@ router.post('/', authenticateToken, async (req, res) => {
 
 // Update task
 router.put('/:id', authenticateToken, async (req, res) => {
+  // Check task permissions before updating
+  try {
+    const { data: task, error } = await supabaseService.client
+      .from('tasks')
+      .select('exchange_id, assigned_to, created_by')
+      .eq('id', req.params.id)
+      .single();
+
+    if (error || !task) {
+      return res.status(404).json({ success: false, error: 'Task not found' });
+    }
+
+    // Check if user has edit permissions for this exchange
+    const permissionService = require('../services/permissionService');
+    const hasEditPermission = await permissionService.checkPermission(req.user.id, task.exchange_id, 'edit_tasks');
+    
+    // Allow if user has edit permission, is assigned to the task, or created the task
+    if (!hasEditPermission && task.assigned_to !== req.user.id && task.created_by !== req.user.id) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'You do not have permission to edit this task' 
+      });
+    }
+  } catch (permissionError) {
+    console.error('Error checking task permissions:', permissionError);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Failed to check permissions' 
+    });
+  }
   try {
     console.log('📋 TASK UPDATE: Updating task', req.params.id, 'for user', req.user?.email);
     console.log('📋 UPDATE DATA:', req.body);
@@ -821,6 +838,36 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
 // Delete task
 router.delete('/:id', authenticateToken, async (req, res) => {
+  // Check task permissions before deleting
+  try {
+    const { data: task, error } = await supabaseService.client
+      .from('tasks')
+      .select('exchange_id, assigned_to, created_by')
+      .eq('id', req.params.id)
+      .single();
+
+    if (error || !task) {
+      return res.status(404).json({ success: false, error: 'Task not found' });
+    }
+
+    // Check if user has edit permissions for this exchange or is admin
+    const permissionService = require('../services/permissionService');
+    const hasEditPermission = await permissionService.checkPermission(req.user.id, task.exchange_id, 'edit_tasks');
+    
+    // Allow if user has edit permission, created the task, or is admin
+    if (!hasEditPermission && task.created_by !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'You do not have permission to delete this task' 
+      });
+    }
+  } catch (permissionError) {
+    console.error('Error checking task permissions:', permissionError);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Failed to check permissions' 
+    });
+  }
   try {
     // First fetch the task to get exchange_id for real-time notification
     const { data: taskToDelete, error: fetchError } = await supabaseService.client
@@ -935,7 +982,7 @@ router.post('/parse-natural', authenticateToken, async (req, res) => {
 });
 
 // Create task from natural language
-router.post('/natural-language', authenticateToken, async (req, res) => {
+router.post('/natural-language', authenticateToken, requireExchangePermission('create_tasks'), async (req, res) => {
   try {
     const { text, exchangeId, ...context } = req.body;
     
@@ -1012,7 +1059,7 @@ router.post('/bulk-natural', authenticateToken, async (req, res) => {
 });
 
 // Extract tasks from chat message
-router.post('/from-chat', authenticateToken, async (req, res) => {
+router.post('/from-chat', authenticateToken, requireExchangePermission('create_tasks'), async (req, res) => {
   try {
     const { message, exchangeId, senderId, messageId, ...context } = req.body;
     

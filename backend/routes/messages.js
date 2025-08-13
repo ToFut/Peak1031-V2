@@ -1,20 +1,7 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
 const { enforceRBAC } = require('../middleware/rbac');
-
-// Simple permission check function
-const checkPermission = (resource, action) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    
-    // For now, allow all authenticated users to access messages
-    // This can be enhanced later with more granular permissions
-    console.log(`🔐 Permission check: ${req.user.role} user accessing ${resource} with ${action} permission`);
-    next();
-  };
-};
+const { requireExchangePermission } = require('../middleware/permissions');
 const databaseService = require('../services/database');
 const AuditService = require('../services/audit');
 const messageAgentService = require('../services/messageAgentService');
@@ -25,7 +12,7 @@ const { Message, User, Document } = require('../models');
 const router = express.Router();
 
 // Test endpoint for debugging RBAC
-router.get('/test-rbac', authenticateToken, checkPermission('messages', 'read'), async (req, res) => {
+router.get('/test-rbac', authenticateToken, async (req, res) => {
   console.log('🧪 RBAC test endpoint reached with user:', {
     id: req.user.id,
     email: req.user.email,
@@ -135,7 +122,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Get messages for exchange
-router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
+router.get('/exchange/:exchangeId', authenticateToken, requireExchangePermission('view_messages'), async (req, res) => {
   try {
     console.log('📥 GET /messages/exchange/' + req.params.exchangeId);
     const { page = 1, limit = 50, before } = req.query;
@@ -236,7 +223,7 @@ router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
 });
 
 // Send message
-router.post('/', authenticateToken, checkPermission('messages', 'write'), async (req, res) => {
+router.post('/', authenticateToken, requireExchangePermission('send_messages'), async (req, res) => {
   try {
     console.log('📨 Message POST request reached main handler:', {
       body: req.body,

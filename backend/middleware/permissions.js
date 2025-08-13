@@ -11,6 +11,7 @@ const requireExchangePermission = (permissionType) => {
   return async (req, res, next) => {
     try {
       const userId = req.user?.id;
+      const userRole = req.user?.role;
       const exchangeId = req.params.exchangeId || req.body.exchangeId || req.query.exchangeId;
 
       if (!userId) {
@@ -27,10 +28,33 @@ const requireExchangePermission = (permissionType) => {
         });
       }
 
-      // Check permission
+      // Admin users bypass all permission checks
+      if (userRole === 'admin') {
+        console.log(`✅ Admin user ${req.user.email} granted access to exchange ${exchangeId}`);
+        req.exchangeId = exchangeId;
+        req.isSystemAdmin = true;
+        return next();
+      }
+
+      // Check permission using RBAC service for consistency
+      const rbacService = require('../services/rbacService');
+      const hasAccess = await rbacService.canUserAccessExchange(req.user, exchangeId);
+
+      if (!hasAccess) {
+        console.log(`❌ Access denied for ${req.user.role} user ${req.user.email} to exchange ${exchangeId}`);
+        return res.status(403).json({
+          error: 'Insufficient permissions',
+          code: 'PERMISSION_DENIED',
+          required: permissionType,
+          exchangeId
+        });
+      }
+
+      // For non-admin users, also check specific permission if needed
       const hasPermission = await permissionService.checkPermission(userId, exchangeId, permissionType);
 
       if (!hasPermission) {
+        console.log(`❌ Permission '${permissionType}' denied for ${req.user.role} user ${req.user.email} on exchange ${exchangeId}`);
         return res.status(403).json({
           error: 'Insufficient permissions',
           code: 'PERMISSION_DENIED',

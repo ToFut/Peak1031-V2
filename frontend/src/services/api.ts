@@ -1503,7 +1503,7 @@ class ApiService {
       thirdParties: number;
     }>;
   }> {
-    return await this.request('/agency/agencies');
+    return await this.request('/api/agencies');
   }
 
   /**
@@ -1514,7 +1514,7 @@ class ApiService {
     contactInfo: any;
     description?: string;
   }): Promise<{ agency: any }> {
-    return await this.request('/agency/agencies', {
+    return await this.request('/api/agencies', {
       method: 'POST',
       body: JSON.stringify(agencyData)
     });
@@ -1524,7 +1524,7 @@ class ApiService {
    * Update an agency
    */
   async updateAgency(agencyId: string, agencyData: any): Promise<{ agency: any }> {
-    return await this.request(`/agency/agencies/${agencyId}`, {
+    return await this.request(`/api/agencies/${agencyId}`, {
       method: 'PUT',
       body: JSON.stringify(agencyData)
     });
@@ -1534,7 +1534,7 @@ class ApiService {
    * Delete an agency
    */
   async deleteAgency(agencyId: string): Promise<{ success: boolean }> {
-    return await this.request(`/agency/agencies/${agencyId}`, { method: 'DELETE' });
+    return await this.request(`/api/agencies/${agencyId}`, { method: 'DELETE' });
   }
 
   /**
@@ -1555,7 +1555,7 @@ class ApiService {
       };
     }>;
   }> {
-    return await this.request(`/agency/agencies/${agencyId}/third-parties`);
+    return await this.request(`/api/agencies/${agencyId}/third-parties`);
   }
 
   /**
@@ -1566,7 +1566,7 @@ class ApiService {
     role: string;
     permissions: string[];
   }): Promise<{ thirdParty: any }> {
-    return await this.request(`/agency/agencies/${agencyId}/third-parties`, {
+    return await this.request(`/api/agencies/${agencyId}/third-parties`, {
       method: 'POST',
       body: JSON.stringify(thirdPartyData)
     });
@@ -1576,7 +1576,7 @@ class ApiService {
    * Remove third party from agency
    */
   async removeThirdPartyFromAgency(agencyId: string, thirdPartyId: string): Promise<{ success: boolean }> {
-    return await this.request(`/agency/agencies/${agencyId}/third-parties/${thirdPartyId}`, { 
+    return await this.request(`/api/agencies/${agencyId}/third-parties/${thirdPartyId}`, { 
       method: 'DELETE' 
     });
   }
