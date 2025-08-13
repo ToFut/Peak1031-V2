@@ -52,7 +52,7 @@ const analyticsRoutes = require('./routes/analytics');
 const settingsRoutes = require('./routes/settings');
 const userProfileRoutes = require('./routes/user-profile');
 const performanceRoutes = require('./routes/performance');
-const agencyRoutes = require('./routes/agencyManagement');
+const agencyRoutes = require('./routes/agencies');
 
 // Enterprise routes
 const enterpriseExchangesRoutes = require('./routes/enterprise-exchanges');
@@ -169,7 +169,8 @@ class PeakServer {
     this.app.use(userActivityTracking());
     this.app.use(securityEventTracking());
       console.log('🔍 Performance monitoring enabled');
-      this.app.use(performanceMiddleware());
+      // Temporarily disabled to fix React rendering issue
+      // this.app.use(performanceMiddleware());
     }
 
     // Health check endpoint
@@ -314,22 +315,11 @@ class PeakServer {
     this.app.use('/api/unified-data', unifiedDataRoutes);
     this.app.use('/api/invitations', invitationRoutes);
     this.app.use('/api/users', userRoutes);
-    this.app.use('/api/dashboard', dashboardRoutes);
-    this.app.use('/api/analytics', analyticsRoutes);
-    this.app.use('/api/settings', settingsRoutes);
-    this.app.use('/api/user-profile', userProfileRoutes);
-    // this.app.use('/api', agencyRoutes);
     
-    // Test route to verify route mounting
-    this.app.get('/api/test', (req, res) => {
-      console.log('[/api/test] GET request received');
-      res.json({ success: true, message: 'Test route working' });
-    });
-    
-    // Agencies route - returns empty data to prevent frontend 404 errors
+    // Agencies route - direct implementation
     this.app.get('/api/agencies', (req, res) => {
       console.log('[/api/agencies] GET request received');
-      console.log('[/api/agencies] User:', req.user?.email, 'Role:', req.user?.role);
+      console.log('[/api/agencies] Query params:', req.query);
       
       res.json({
         success: true,
@@ -342,6 +332,12 @@ class PeakServer {
         }
       });
     });
+    
+    this.app.use('/api/dashboard', dashboardRoutes);
+    this.app.use('/api/analytics', analyticsRoutes);
+    this.app.use('/api/settings', settingsRoutes);
+    this.app.use('/api/user-profile', userProfileRoutes);
+    this.app.use('/api/agencies', agencyRoutes);
 
     this.app.use('/api/enterprise-exchanges', enterpriseExchangesRoutes);
     this.app.use('/api/account-management', accountManagementRoutes);

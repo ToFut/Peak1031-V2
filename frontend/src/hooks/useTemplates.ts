@@ -27,16 +27,27 @@ export const useTemplates = (): UseTemplatesReturn => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchTemplates = useCallback(async () => {
+    console.log('🔍 useTemplates: Starting fetchTemplates...');
     setLoading(true);
     setError(null);
     try {
+      console.log('🔍 useTemplates: Calling templateService.getTemplates()...');
       const data = await templateService.getTemplates();
+      console.log('✅ useTemplates: Received data:', { 
+        type: typeof data, 
+        isArray: Array.isArray(data), 
+        length: data?.length || 0 
+      });
       setTemplates(data);
+      console.log('✅ useTemplates: Templates state updated with', data?.length || 0, 'templates');
     } catch (err: any) {
+      console.error('❌ useTemplates: Error fetching templates:', err);
+      console.error('❌ useTemplates: Error message:', err.message);
+      console.error('❌ useTemplates: Error stack:', err.stack);
       setError(err.message || 'Failed to fetch templates');
-      console.error('Error fetching templates:', err);
     } finally {
       setLoading(false);
+      console.log('🔍 useTemplates: fetchTemplates completed');
     }
   }, []);
 

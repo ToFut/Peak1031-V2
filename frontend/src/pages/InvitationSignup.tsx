@@ -50,12 +50,14 @@ const InvitationSignup: React.FC = () => {
       const details = await getInvitationDetails(token);
       setInvitationDetails(details);
       
-      // Pre-fill form with invitation details
-      setFormData(prev => ({
-        ...prev,
-        firstName: details.firstName || '',
-        lastName: details.lastName || ''
-      }));
+      // Pre-fill form with invitation details (only if details exists)
+      if (details) {
+        setFormData(prev => ({
+          ...prev,
+          firstName: details.firstName || '',
+          lastName: details.lastName || ''
+        }));
+      }
     } catch (err) {
       console.error('Failed to load invitation details:', err);
     }
@@ -138,7 +140,7 @@ const InvitationSignup: React.FC = () => {
     }
   };
 
-  const isExpired = invitationDetails && new Date(invitationDetails.expiresAt) < new Date();
+  const isExpired = invitationDetails?.expiresAt && new Date(invitationDetails.expiresAt) < new Date();
 
   if (loading && !invitationDetails) {
     return (
@@ -181,7 +183,7 @@ const InvitationSignup: React.FC = () => {
             <ClockIcon className="h-12 w-12 text-orange-500 mx-auto mb-4" />
             <h1 className="text-xl font-semibold text-gray-900 mb-2">Invitation Expired</h1>
             <p className="text-gray-600 mb-6">
-              This invitation expired on {new Date(invitationDetails.expiresAt).toLocaleDateString()}.
+              This invitation expired on {invitationDetails?.expiresAt ? new Date(invitationDetails.expiresAt).toLocaleDateString() : 'unknown date'}.
               Please contact the person who invited you to request a new invitation.
             </p>
             <button
@@ -191,6 +193,18 @@ const InvitationSignup: React.FC = () => {
               Go to Login
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render the form if we don't have invitation details
+  if (!invitationDetails) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading invitation details...</p>
         </div>
       </div>
     );
@@ -221,10 +235,10 @@ const InvitationSignup: React.FC = () => {
               <div className="ml-3 flex-1">
                 <h3 className="text-sm font-medium text-blue-900">You're Invited!</h3>
                 <div className="mt-1 text-sm text-blue-800">
-                  <p><strong>{invitationDetails.inviter.name}</strong> has invited you to join:</p>
-                  <p className="font-medium">{invitationDetails.exchange.name}</p>
+                  <p><strong>{invitationDetails.inviter?.name || 'Unknown'}</strong> has invited you to join:</p>
+                  <p className="font-medium">{invitationDetails.exchange?.name || 'Unknown Exchange'}</p>
                   <p className="text-xs text-blue-600">
-                    Role: {invitationDetails.role.charAt(0).toUpperCase() + invitationDetails.role.slice(1)}
+                    Role: {invitationDetails.role ? invitationDetails.role.charAt(0).toUpperCase() + invitationDetails.role.slice(1) : 'Unknown'}
                   </p>
                 </div>
                 {invitationDetails.customMessage && (

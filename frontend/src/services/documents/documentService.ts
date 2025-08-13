@@ -73,7 +73,13 @@ export class DocumentService {
 
   // Template Management
   async getDocumentTemplates(): Promise<any[]> {
-    return httpClient.get<any[]>('/documents/templates');
+    const response = await httpClient.get<any>('/templates');
+    // Handle response format from new templates endpoint
+    if (response && response.success && response.data) {
+      return response.data || [];
+    }
+    // Fallback to direct array if response format is different
+    return Array.isArray(response) ? response : [];
   }
 
   async uploadDocumentTemplate(formData: FormData): Promise<any> {

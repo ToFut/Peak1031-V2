@@ -251,19 +251,23 @@ class ApiService {
   // Authentication methods
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
-      
-      
-      
-      
-      const response = await this.request<LoginResponse>('/auth/login', {
+      // For login, we don't want to include auth headers
+      const url = `${this.baseURL}/auth/login`;
+      const response = await fetch(url, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(credentials)
       });
 
-      
-      
-      
-      return response;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data;
     } catch (error: any) {
       console.error('❌ API Service login error:', error);
       console.error('🔍 Error details:', {
@@ -763,7 +767,13 @@ class ApiService {
 
   // Document Template Management
   async getDocumentTemplates(): Promise<any[]> {
-    return this.request<any[]>('/documents/templates');
+    const response = await this.request<any>('/templates');
+    // Handle response format from new templates endpoint
+    if (response && response.success && response.data) {
+      return response.data || [];
+    }
+    // Fallback to direct array if response format is different
+    return Array.isArray(response) ? response : [];
   }
 
   async createDocumentTemplate(templateData: any): Promise<any> {

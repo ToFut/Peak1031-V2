@@ -79,14 +79,31 @@ class TemplateService {
    */
   async getTemplates(): Promise<DocumentTemplate[]> {
     try {
+      console.log('🔍 templateService: Calling API with URL:', this.baseUrl);
       const response = await apiService.get<any>(this.baseUrl);
+      console.log('🔍 templateService: API response:', { 
+        type: typeof response, 
+        hasSuccess: 'success' in response, 
+        hasData: 'data' in response,
+        successValue: response?.success,
+        dataType: typeof response?.data,
+        dataLength: response?.data?.length
+      });
+      
       // Handle both response formats (wrapped in { success, data } or direct array)
       if (response && response.success && response.data) {
+        console.log('✅ templateService: Using success.data format, returning', response.data.length, 'templates');
         return response.data || [];
       }
+      console.log('✅ templateService: Using direct array format, returning', response?.length || 0, 'templates');
       return response || [];
-    } catch (error) {
-      console.error('Failed to fetch templates:', error);
+    } catch (error: any) {
+      console.error('❌ templateService: Failed to fetch templates:', error);
+      console.error('❌ templateService: Error details:', {
+        message: error?.message || 'Unknown error',
+        status: error?.status || 'No status',
+        stack: error?.stack || 'No stack trace'
+      });
       return [];
     }
   }

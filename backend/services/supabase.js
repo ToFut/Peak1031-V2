@@ -267,7 +267,7 @@ class SupabaseService {
         let clientsMap = {};
         let coordinatorsMap = {};
         
-        // Fetch all clients in one query
+        // Fetch all clients in one query - use explicit select to avoid relationship issues
         if (clientIds.length > 0) {
           // Filter out invalid UUIDs to prevent database errors
           const validClientIds = clientIds.filter(id => 
@@ -276,21 +276,27 @@ class SupabaseService {
           );
           
           if (validClientIds.length > 0) {
-            const { data: clients } = await this.client
-              .from('contacts')
-              .select('id, first_name, last_name, email, company')
-              .in('id', validClientIds);
-            
-            if (clients) {
-              clientsMap = clients.reduce((acc, client) => {
-                acc[client.id] = client;
-                return acc;
-              }, {});
+            try {
+              const { data: clients, error: clientError } = await this.client
+                .from('contacts')
+                .select('id, first_name, last_name, email, company')
+                .in('id', validClientIds);
+              
+              if (clientError) {
+                console.warn('⚠️ Error fetching clients:', clientError.message);
+              } else if (clients) {
+                clientsMap = clients.reduce((acc, client) => {
+                  acc[client.id] = client;
+                  return acc;
+                }, {});
+              }
+            } catch (clientErr) {
+              console.warn('⚠️ Exception fetching clients:', clientErr.message);
             }
           }
         }
         
-        // Fetch all coordinators in one query
+        // Fetch all coordinators in one query - use explicit select to avoid relationship issues
         if (coordinatorIds.length > 0) {
           // Filter out invalid UUIDs to prevent database errors
           const validCoordinatorIds = coordinatorIds.filter(id => 
@@ -299,16 +305,22 @@ class SupabaseService {
           );
           
           if (validCoordinatorIds.length > 0) {
-            const { data: coordinators } = await this.client
-              .from('users')
-              .select('id, first_name, last_name, email')
-              .in('id', validCoordinatorIds);
-            
-            if (coordinators) {
-              coordinatorsMap = coordinators.reduce((acc, coord) => {
-                acc[coord.id] = coord;
-                return acc;
-              }, {});
+            try {
+              const { data: coordinators, error: coordinatorError } = await this.client
+                .from('users')
+                .select('id, first_name, last_name, email')
+                .in('id', validCoordinatorIds);
+              
+              if (coordinatorError) {
+                console.warn('⚠️ Error fetching coordinators:', coordinatorError.message);
+              } else if (coordinators) {
+                coordinatorsMap = coordinators.reduce((acc, coord) => {
+                  acc[coord.id] = coord;
+                  return acc;
+                }, {});
+              }
+            } catch (coordinatorErr) {
+              console.warn('⚠️ Exception fetching coordinators:', coordinatorErr.message);
             }
           }
         }
@@ -519,34 +531,11 @@ class SupabaseService {
       
       let query = this.client
         .from('tasks')
-        .select(`
-          *,
-          assignedUser:assigned_to (
-            id,
-            first_name,
-            last_name,
-            email
-          ),
-          createdByUser:created_by (
-            id,
-            first_name,
-            last_name,
-            email
-          ),
-          exchange:exchange_id (
-            id,
-            exchange_number,
-            status,
-            name
-          )
-        `);
+        .select('*');
 
       // Apply where conditions
       if (where.exchangeId) {
         query = query.eq('exchange_id', where.exchangeId);
-      }
-      if (where.exchange_id) {
-        query = query.eq('exchange_id', where.exchange_id);
       }
       if (where.status) {
         query = query.eq('status', where.status);
@@ -603,20 +592,11 @@ class SupabaseService {
       if (where.exchangeId) {
         query = query.eq('exchange_id', where.exchangeId);
       }
-      if (where.exchange_id) {
-        query = query.eq('exchange_id', where.exchange_id);
-      }
       if (where.senderId) {
         query = query.eq('sender_id', where.senderId);
       }
-      if (where.sender_id) {
-        query = query.eq('sender_id', where.sender_id);
-      }
       if (where.content) {
         query = query.ilike('content', `%${where.content}%`);
-      }
-      if (where.created_at && where.created_at.lt) {
-        query = query.lt('created_at', where.created_at.lt.toISOString());
       }
 
       // Apply ordering
@@ -649,33 +629,9 @@ class SupabaseService {
       
       // Transform messages and fetch attachments
       if (messages.length > 0) {
-        // First, get all unique sender IDs
-        const senderIds = [...new Set(messages.map(m => m.sender_id).filter(Boolean))];
-        
-        // Fetch sender information from people table
-        let senderMap = {};
-        if (senderIds.length > 0) {
-          const { data: senders, error: senderError } = await this.client
-            .from('people')
-            .select('id, first_name, last_name, email, role')
-            .in('id', senderIds);
-          
-          if (!senderError && senders) {
-            senderMap = senders.reduce((acc, sender) => {
-              acc[sender.id] = sender;
-              return acc;
-            }, {});
-            console.log(`✅ Loaded sender information for ${Object.keys(senderMap).length} users`);
-          } else {
-            console.warn('⚠️ Could not load sender information:', senderError?.message);
-          }
-        }
-        
         const enrichedMessages = await Promise.all(messages.map(async (message) => {
-          // Add sender information
-          if (message.sender_id && senderMap[message.sender_id]) {
-            message.sender = senderMap[message.sender_id];
-            // Add users property for backward compatibility
+          // Add users property for backward compatibility
+          if (message.sender) {
             message.users = message.sender;
           }
           
@@ -1200,58 +1156,14 @@ class SupabaseService {
     try {
       const { where = {}, orderBy = { column: 'created_at', ascending: false } } = options;
       
-      // Check if we have an Op.or condition (from Sequelize-style query)
-      const Op = require('sequelize').Op;
-      if (where[Op.or]) {
-        // Handle OR conditions
-        const orConditions = where[Op.or];
-        const results = [];
-        
-        // Execute each OR condition separately and combine results
-        for (const condition of orConditions) {
-          let query = this.client
-            .from('exchange_participants')
-            .select('*');
-          
-          // Apply the condition
-          if (condition.user_id) {
-            query = query.eq('user_id', condition.user_id);
-          }
-          if (condition.contact_id) {
-            query = query.eq('contact_id', condition.contact_id);
-          }
-          if (condition.exchange_id) {
-            query = query.eq('exchange_id', condition.exchange_id);
-          }
-          
-          const { data, error } = await query;
-          if (!error && data) {
-            results.push(...data);
-          }
-        }
-        
-        // Deduplicate results by ID
-        const uniqueResults = Array.from(
-          new Map(results.map(item => [item.id, item])).values()
-        );
-        
-        return uniqueResults;
-      }
-      
-      // Original simple query logic
+      // Simplified query to avoid relationship errors
       let query = this.client
         .from('exchange_participants')
         .select('*');
 
       // Apply where conditions
-      if (where.exchangeId || where.exchange_id) {
-        query = query.eq('exchange_id', where.exchangeId || where.exchange_id);
-      }
-      if (where.user_id) {
-        query = query.eq('user_id', where.user_id);
-      }
-      if (where.contact_id) {
-        query = query.eq('contact_id', where.contact_id);
+      if (where.exchangeId) {
+        query = query.eq('exchange_id', where.exchangeId);
       }
 
       // Apply ordering

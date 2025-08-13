@@ -788,12 +788,13 @@ router.put('/:id', async (req, res) => {
 /**
  * POST /api/documents/templates/generate
  * Generate a document from a template with exchange data replacement
+ * Now using the new DocumentTemplateService
  */
 router.post('/generate', async (req, res) => {
   try {
     const { template_id, exchange_id, generation_data, generated_by } = req.body;
 
-    console.log('🔄 Generating document from template:', {
+    console.log('🔄 Generating document from template (NEW FLOW):', {
       template_id,
       exchange_id,
       generated_by,
@@ -808,165 +809,73 @@ router.post('/generate', async (req, res) => {
       });
     }
 
-    // Get template info
-    const { data: template, error: templateError } = await supabase
-      .from('document_templates')
-      .select('*')
-      .eq('id', template_id)
-      .single();
-
-    if (templateError || !template) {
-      console.error('❌ Template not found:', templateError);
-      return res.status(404).json({
-        success: false,
-        message: 'Template not found'
-      });
-    }
-
-    // Get exchange info - simplified query without joins
-    const { data: exchange, error: exchangeError } = await supabase
-      .from('exchanges')
-      .select('*')
-      .eq('id', exchange_id)
-      .single();
-
-    if (exchangeError || !exchange) {
-      console.error('❌ Exchange not found:', exchangeError);
-      return res.status(404).json({
-        success: false,
-        message: 'Exchange not found'
-      });
-    }
-
-    // Extract comprehensive exchange data for replacements
-    const replacementData = buildReplacementData(exchange, generation_data);
+    // Use the new DocumentTemplateService
+    const DocumentTemplateService = require('../services/documentTemplateService');
+    const templateService = new DocumentTemplateService();
     
-    console.log('📋 Available replacement fields:', Object.keys(replacementData));
-
-    // Get the original file from storage
-    const urlParts = template.file_template.split('/storage/v1/object/public/documents/');
-    if (urlParts.length < 2) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid template file URL'
+    try {
+      // Generate document using the new service
+      const result = await templateService.generateDocument(
+        template_id, 
+        exchange_id, 
+        generation_data || {}
+      );
+      
+      console.log('✅ Document generated successfully:', {
+        documentId: result.document.id,
+        filename: result.document.original_filename
       });
-    }
-    
-    const originalFilePath = urlParts[1];
-    
-    // Download original template file
-    const { data: templateFile, error: downloadError } = await supabase.storage
-      .from('documents')
-      .download(originalFilePath);
-
-    if (downloadError) {
-      console.error('❌ Template download error:', downloadError);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to download template file',
-        error: downloadError.message
-      });
-    }
-
-    let processedBuffer;
-    const originalBuffer = Buffer.from(await templateFile.arrayBuffer());
-
-    // Process the document based on file type
-    const fileExtension = path.extname(originalFilePath).toLowerCase();
-    
-    if (fileExtension === '.pdf') {
-      // For PDF files, we'll create a simple text replacement in metadata
-      // In a production system, you'd use PDF libraries like pdf-lib
-      processedBuffer = await processPdfTemplate(originalBuffer, replacementData);
-    } else if (fileExtension === '.docx') {
-      // For Word documents, use mammoth or docx libraries for replacement
-      processedBuffer = await processDocxTemplate(originalBuffer, replacementData);
-    } else {
-      // For other file types, use the original buffer
-      processedBuffer = originalBuffer;
-    }
-    
-    // Generate new filename for the generated document
-    const timestamp = Date.now();
-    const sanitizedExchangeName = exchange.exchangeName?.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-') || exchange.id;
-    const sanitizedTemplateName = template.name.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-');
-    // For DOCX files processed to text, change extension to .txt
-    const outputExtension = fileExtension === '.docx' ? '.txt' : fileExtension;
-    const generatedFileName = `generated/${sanitizedExchangeName}-${sanitizedTemplateName}-${timestamp}${outputExtension}`;
-
-    // Upload processed document to storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('documents')
-      .upload(generatedFileName, processedBuffer, {
-        contentType: getContentType(outputExtension)
-      });
-
-    if (uploadError) {
-      console.error('❌ Generated document upload error:', uploadError);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to upload generated document',
-        error: uploadError.message
-      });
-    }
-
-    // Get public URL for the generated document
-    const { data: { publicUrl } } = supabase.storage
-      .from('documents')
-      .getPublicUrl(generatedFileName);
-
-    // Use the generated_by user ID directly
-    const validGeneratedBy = generated_by || null;
-
-    // Save generated document record
-    const { data: generatedDoc, error: saveError } = await supabase
-      .from('generated_documents')
-      .insert([
-        {
-          template_id,
-          exchange_id,
-          name: `${template.name} - ${exchange.exchangeName || exchange.id}`,
-          file_path: generatedFileName,
-          file_url: publicUrl,
-          generation_data: replacementData,
-          generated_by: validGeneratedBy, // Use validated ID or null
-          status: 'completed',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ])
-      .select()
-      .single();
-
-    if (saveError) {
-      console.error('❌ Save generated document error:', saveError);
-      // Clean up uploaded file
-      await supabase.storage.from('documents').remove([generatedFileName]);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to save generated document record',
-        error: saveError.message
-      });
-    }
-
-    console.log('✅ Document generated successfully:', generatedDoc.id);
-
-    res.json({
-      success: true,
-      message: 'Document generated successfully',
-      data: {
-        document_id: generatedDoc.id,
-        download_url: publicUrl,
-        generated_document: generatedDoc,
-        replacements_applied: Object.keys(replacementData).length
+      
+      // Save to generated_documents table for compatibility
+      const { data: generatedDoc, error: saveError } = await supabase
+        .from('generated_documents')
+        .insert([
+          {
+            template_id,
+            exchange_id,
+            name: result.document.original_filename,
+            file_path: result.document.file_path,
+            file_url: result.document.file_url,
+            generation_data: generation_data || {},
+            generated_by: generated_by,
+            status: 'completed',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ])
+        .select()
+        .single();
+      
+      if (saveError) {
+        console.error('⚠️ Warning: Could not save to generated_documents table:', saveError);
       }
-    });
-
+      
+      // Return response in the expected format
+      return res.json({
+        success: true,
+        message: 'Document generated successfully',
+        document_id: result.document.id,
+        download_url: result.document.file_url,
+        data: {
+          ...result.document,
+          template_name: result.template,
+          warnings: result.warnings
+        }
+      });
+      
+    } catch (serviceError) {
+      console.error('❌ Document generation failed:', serviceError);
+      return res.status(500).json({
+        success: false,
+        message: serviceError.message || 'Failed to generate document',
+        error: serviceError.message
+      });
+    }
   } catch (error) {
-    console.error('❌ Error generating document:', error);
-    res.status(500).json({
+    console.error('❌ Unexpected error in template generation:', error);
+    return res.status(500).json({
       success: false,
-      message: 'Internal server error',
+      message: 'An unexpected error occurred',
       error: error.message
     });
   }

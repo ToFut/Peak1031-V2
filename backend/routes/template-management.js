@@ -3,8 +3,11 @@ const multer = require('multer');
 const path = require('path');
 const { authenticateToken } = require('../middleware/auth');
 const { enforceRBAC } = require('../middleware/rbac');
-const documentTemplateService = require('../services/documentTemplateService');
+const DocumentTemplateService = require('../services/documentTemplateService');
 const AuditService = require('../services/audit');
+
+// Initialize the document template service
+const documentTemplateService = new DocumentTemplateService();
 const { createClient } = require('@supabase/supabase-js');
 const router = express.Router();
 
