@@ -1,4 +1,5 @@
 const { sequelize, useSupabase } = require('../config/database');
+const { Op } = require('sequelize');
 const supabaseService = require('./supabase');
 const { User, Exchange, Contact, Task, Message, Document, AuditLog, Notification, ExchangeParticipant, Folder } = require('../models');
 
@@ -849,6 +850,327 @@ class DatabaseService {
         assignments: 0,
         escalations: 0
       };
+    }
+  }
+
+  // Enhanced Notification operations
+  async createNotification(notificationData) {
+    if (this.useSupabase) {
+      return await supabaseService.createNotification(notificationData);
+    } else {
+      return await Notification.create(notificationData);
+    }
+  }
+
+  async getNotificationHistory(userId, options = {}) {
+    if (this.useSupabase) {
+      const { limit = 50, offset = 0, category, status = 'all', startDate, endDate } = options;
+      
+      let query = supabaseService.client
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (category) {
+        query = query.eq('category', category);
+      }
+
+      if (status !== 'all') {
+        query = query.eq('status', status);
+      }
+
+      if (startDate) {
+        query = query.gte('created_at', startDate);
+      }
+
+      if (endDate) {
+        query = query.lte('created_at', endDate);
+      }
+
+      // Get total count
+      const { count } = await supabaseService.client
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      // Get paginated data
+      const { data, error } = await query
+        .range(offset, offset + limit - 1);
+
+      if (error) throw error;
+
+      return {
+        notifications: data || [],
+        total: count || 0
+      };
+    } else {
+      const { limit = 50, offset = 0, category, status = 'all', startDate, endDate } = options;
+      
+      const where = { user_id: userId };
+      
+      if (category) where.category = category;
+      if (status !== 'all') where.status = status;
+      if (startDate) where.created_at = { [Op.gte]: startDate };
+      if (endDate) where.created_at = { ...where.created_at, [Op.lte]: endDate };
+
+      const { count, rows } = await Notification.findAndCountAll({
+        where,
+        limit,
+        offset,
+        order: [['created_at', 'DESC']]
+      });
+
+      return {
+        notifications: rows,
+        total: count
+      };
+    }
+  }
+
+  async getUnreadNotificationCount(userId) {
+    if (this.useSupabase) {
+      const { count, error } = await supabaseService.client
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('status', 'unread');
+
+      if (error) throw error;
+      return count || 0;
+    } else {
+      return await Notification.count({
+        where: {
+          user_id: userId,
+          status: 'unread'
+        }
+      });
+    }
+  }
+
+  async getNotificationCounts(userId) {
+    if (this.useSupabase) {
+      const { data, error } = await supabaseService.client
+        .rpc('get_notification_counts', { user_uuid: userId });
+
+      if (error) throw error;
+      return data?.[0] || { unread_count: 0, total_count: 0, urgent_count: 0 };
+    } else {
+      const unread = await Notification.count({
+        where: { user_id: userId, status: 'unread' }
+      });
+      const total = await Notification.count({
+        where: { user_id: userId }
+      });
+      const urgent = await Notification.count({
+        where: { user_id: userId, status: 'unread', priority: 'urgent' }
+      });
+
+      return {
+        unread_count: unread,
+        total_count: total,
+        urgent_count: urgent
+      };
+    }
+  }
+
+  async markNotificationAsRead(notificationId, userId) {
+    if (this.useSupabase) {
+      const { data, error } = await supabaseService.client
+        .rpc('mark_notification_read', { 
+          notification_uuid: notificationId, 
+          user_uuid: userId 
+        });
+
+      if (error) throw error;
+      return data;
+    } else {
+      const result = await Notification.update(
+        { 
+          status: 'read',
+          is_read: true,
+          read_at: new Date()
+        },
+        { 
+          where: { 
+            id: notificationId, 
+            user_id: userId,
+            status: 'unread'
+          }
+        }
+      );
+      return result[0] > 0;
+    }
+  }
+
+  async markAllNotificationsAsRead(userId) {
+    if (this.useSupabase) {
+      const { data, error } = await supabaseService.client
+        .from('notifications')
+        .update({ 
+          status: 'read',
+          is_read: true,
+          read_at: new Date().toISOString()
+        })
+        .eq('user_id', userId)
+        .eq('status', 'unread')
+        .select();
+
+      if (error) throw error;
+      return data?.length || 0;
+    } else {
+      const result = await Notification.update(
+        { 
+          status: 'read',
+          is_read: true,
+          read_at: new Date()
+        },
+        { 
+          where: { 
+            user_id: userId,
+            status: 'unread'
+          }
+        }
+      );
+      return result[0];
+    }
+  }
+
+  async archiveNotification(notificationId, userId) {
+    if (this.useSupabase) {
+      const { data, error } = await supabaseService.client
+        .from('notifications')
+        .update({ 
+          status: 'archived',
+          archived_at: new Date().toISOString()
+        })
+        .eq('id', notificationId)
+        .eq('user_id', userId)
+        .select();
+
+      if (error) throw error;
+      return data?.length > 0;
+    } else {
+      const result = await Notification.update(
+        { 
+          status: 'archived',
+          archived_at: new Date()
+        },
+        { 
+          where: { 
+            id: notificationId, 
+            user_id: userId
+          }
+        }
+      );
+      return result[0] > 0;
+    }
+  }
+
+  async deleteNotification(notificationId, userId) {
+    if (this.useSupabase) {
+      const { data, error } = await supabaseService.client
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId)
+        .eq('user_id', userId)
+        .select();
+
+      if (error) throw error;
+      return data?.length > 0;
+    } else {
+      const result = await Notification.destroy({
+        where: { 
+          id: notificationId, 
+          user_id: userId
+        }
+      });
+      return result > 0;
+    }
+  }
+
+  async createNotificationActivity(activityData) {
+    if (this.useSupabase) {
+      const { data, error } = await supabaseService.client
+        .from('notification_activity')
+        .insert(activityData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } else {
+      // For local database, you'd create a NotificationActivity model
+      return activityData; // Simplified for now
+    }
+  }
+
+  async getNotificationTemplate(templateName) {
+    if (this.useSupabase) {
+      const { data, error } = await supabaseService.client
+        .from('notification_templates')
+        .select('*')
+        .eq('name', templateName)
+        .eq('is_active', true)
+        .single();
+
+      if (error) return null;
+      return data;
+    } else {
+      // For local database, you'd create a NotificationTemplate model
+      return null; // Simplified for now
+    }
+  }
+
+  async getUserNotificationPreferences(userId, category) {
+    if (this.useSupabase) {
+      const { data, error } = await supabaseService.client
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('category', category)
+        .single();
+
+      if (error) return null;
+      return data;
+    } else {
+      // For local database, you'd create a NotificationPreferences model
+      return null; // Simplified for now
+    }
+  }
+
+  async getAllNotificationPreferences(userId) {
+    if (this.useSupabase) {
+      const { data, error } = await supabaseService.client
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      return data || [];
+    } else {
+      // For local database, you'd create a NotificationPreferences model
+      return []; // Simplified for now
+    }
+  }
+
+  async updateNotificationPreferences(userId, category, preferences) {
+    if (this.useSupabase) {
+      const { data, error } = await supabaseService.client
+        .from('notification_preferences')
+        .upsert({
+          user_id: userId,
+          category,
+          ...preferences,
+          updated_at: new Date().toISOString()
+        })
+        .select();
+
+      if (error) throw error;
+      return data?.length > 0;
+    } else {
+      // For local database, you'd create a NotificationPreferences model
+      return true; // Simplified for now
     }
   }
 }

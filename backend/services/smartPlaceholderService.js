@@ -6,7 +6,7 @@ class SmartPlaceholderService {
   constructor() {
     this.supabase = createClient(
       process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY
+      process.env.SUPABASE_SERVICE_KEY  // Use SERVICE_KEY for full database access
     );
   }
 
@@ -46,20 +46,20 @@ class SmartPlaceholderService {
    */
   extractPlaceholderPatterns(content, placeholders) {
     // Pattern 1: #Placeholder# format
-    const hashPattern = /#([A-Za-z0-9_.\\s]+)#/g;
+    const hashPattern = /#([A-Za-z0-9_.\s]+)#/g;
     let match;
     while ((match = hashPattern.exec(content)) !== null) {
       placeholders.add(match[1].trim());
     }
     
     // Pattern 2: {Placeholder} format  
-    const bracePattern = /\\{([A-Za-z0-9_.\\s]+)\\}/g;
+    const bracePattern = /\{([A-Za-z0-9_.\s]+)\}/g;
     while ((match = bracePattern.exec(content)) !== null) {
       placeholders.add(match[1].trim());
     }
     
     // Pattern 3: Detect broken placeholders (like "Matter.Client Vesting" without delimiters)
-    const brokenPattern = /(?:Matter|Contact|Exchange|Client)\\.[A-Za-z0-9_.\\s]+(?=[\\s<])/g;
+    const brokenPattern = /(?:Matter|Contact|Exchange|Client|User|QI|System|Financial|Property|Date|Coordinator)\.[A-Za-z0-9_.\s]+/g;
     while ((match = brokenPattern.exec(content)) !== null) {
       placeholders.add(match[0].trim());
     }
@@ -171,7 +171,9 @@ class SmartPlaceholderService {
     
     // Exchange/Matter mappings
     if (lowerPlaceholder.includes('matter.number') || lowerPlaceholder.includes('exchange.number')) {
-      return exchange?.number || exchange?.pp_matter_id || 'N/A';
+      const result = exchange?.number || exchange?.exchange_number || exchange?.pp_matter_id || 'N/A';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
     }
     
     if (lowerPlaceholder.includes('matter.name') || lowerPlaceholder.includes('exchange.name')) {
@@ -184,19 +186,33 @@ class SmartPlaceholderService {
     
     // Client/Contact mappings
     if (lowerPlaceholder.includes('contact.firstname') || lowerPlaceholder.includes('client.firstname')) {
-      return client?.first_name || '';
+      const result = client?.first_name || 'N/A';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
     }
     
     if (lowerPlaceholder.includes('contact.lastname') || lowerPlaceholder.includes('client.lastname')) {
-      return client?.last_name || '';
+      const result = client?.last_name || 'N/A';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
     }
     
     if (lowerPlaceholder.includes('contact.email') || lowerPlaceholder.includes('client.email')) {
-      return client?.email || '';
+      const result = client?.email || 'N/A';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
     }
     
     if (lowerPlaceholder.includes('contact.phone') || lowerPlaceholder.includes('client.phone')) {
-      return client?.phone_mobile || client?.phone_work || client?.phone || '';
+      const result = client?.phone_mobile || client?.phone_work || client?.phone || 'N/A';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
+    }
+    
+    if (lowerPlaceholder.includes('contact.fee')) {
+      const result = this.formatCurrency(exchange?.fee || 0);
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
     }
     
     if (lowerPlaceholder.includes('contact.street') || lowerPlaceholder.includes('contact.address')) {
@@ -240,8 +256,33 @@ class SmartPlaceholderService {
       return replacementProperty?.address || 'Not specified';
     }
     
-    // Coordinator
-    if (lowerPlaceholder.includes('coordinator')) {
+    // User/Coordinator mappings (User often refers to coordinator in templates)
+    if (lowerPlaceholder.includes('user.firstname') || lowerPlaceholder.includes('coordinator.firstname')) {
+      const result = coordinator?.first_name || 'N/A';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
+    }
+    
+    if (lowerPlaceholder.includes('user.lastname') || lowerPlaceholder.includes('coordinator.lastname')) {
+      const result = coordinator?.last_name || 'N/A';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
+    }
+    
+    if (lowerPlaceholder.includes('user.title') || lowerPlaceholder.includes('coordinator.title')) {
+      const result = coordinator?.title || 'Exchange Coordinator';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
+    }
+    
+    if (lowerPlaceholder.includes('user.email') || lowerPlaceholder.includes('coordinator.email')) {
+      const result = coordinator?.email || 'N/A';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
+    }
+    
+    // Coordinator (general)
+    if (lowerPlaceholder.includes('coordinator') && !lowerPlaceholder.includes('.')) {
       return coordinator?.name || coordinator?.email || 'Not assigned';
     }
     

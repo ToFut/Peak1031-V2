@@ -33,6 +33,7 @@ const testMessageRoutes = require('./routes/test-message');
 const syncRoutes = require('./routes/sync');
 const adminRoutes = require('./routes/admin');
 const notificationRoutes = require('./routes/notifications');
+const enhancedNotificationRoutes = require('./routes/notifications-enhanced');
 const oauthRoutes = require('./routes/oauth');
 const exportRoutes = require('./routes/exports');
 const exchangeParticipantsRoutes = require('./routes/exchange-participants');
@@ -222,6 +223,7 @@ class PeakServer {
           documents: '/api/documents',
           messages: '/api/messages',
           notifications: '/api/notifications',
+          'notifications-enhanced': '/api/notifications-enhanced',
           exports: '/api/exports',
           sync: '/api/sync',
           admin: '/api/admin'
@@ -303,6 +305,7 @@ class PeakServer {
     this.app.use('/api/sync', syncRoutes);
     this.app.use('/api/admin', adminRoutes);
     this.app.use('/api/notifications', notificationRoutes);
+    this.app.use('/api/notifications-enhanced', enhancedNotificationRoutes);
     this.app.use('/api/oauth', oauthRoutes);
     this.app.use('/api/exports', exportRoutes);
     this.app.use('/api/exchange-participants', exchangeParticipantsRoutes);

@@ -35,56 +35,85 @@ class NotificationService {
   }
 
   /**
-   * Create a notification with filtering based on user preferences
+   * Create a notification with modern features and history tracking
    */
   async createNotification(notificationData) {
     try {
       const {
         userId,
-        type,
+        type = 'system',
+        category = 'system',
         title,
         message,
-        data = {},
         priority = 'medium',
-        action = 'SYSTEM_UPDATE' // Default action for mapping
+        actionUrl,
+        actionLabel,
+        metadata = {},
+        expiresAt,
+        exchangeId,
+        sourceUserId,
+        organizationId,
+        templateName
       } = notificationData;
 
-      // Get user settings (you would typically fetch this from database)
-      const userSettings = await this.getUserNotificationSettings(userId);
+      // If template is provided, use it to generate notification content
+      let finalTitle = title;
+      let finalMessage = message;
+      let finalActionUrl = actionUrl;
+      let finalActionLabel = actionLabel;
+
+      if (templateName) {
+        const template = await this.getNotificationTemplate(templateName);
+        if (template) {
+          finalTitle = this.processTemplate(template.title_template, metadata);
+          finalMessage = this.processTemplate(template.message_template, metadata);
+          finalActionUrl = template.action_url_template ? this.processTemplate(template.action_url_template, metadata) : actionUrl;
+          finalActionLabel = template.action_label || actionLabel;
+        }
+      }
+
+      // Get user notification preferences
+      const userPreferences = await this.getUserNotificationPreferences(userId, category);
       
       // Check if notification should be sent based on user preferences
-      const shouldSend = notificationFilterService.shouldSendNotification(userSettings, action);
-      
-      if (!shouldSend) {
-        console.log(`🔕 Notification filtered out for user ${userId} - action: ${action}`);
+      if (!userPreferences || !userPreferences.in_app_enabled) {
+        console.log(`🔕 In-app notifications disabled for user ${userId} - category: ${category}`);
         return { success: true, filtered: true };
       }
 
-      // Get enabled channels for this notification
-      const enabledChannels = notificationFilterService.getEnabledChannels(userSettings, action);
-      
-      console.log(`🔔 Creating notification for user ${userId} - channels: ${enabledChannels.join(', ')}`);
-
-      // Create database notification
+      // Create database notification with enhanced structure
       const databaseService = require('./database');
       const notification = await databaseService.createNotification({
         user_id: userId,
-        type: type || 'system',
-        title,
-        message,
-        data: JSON.stringify(data),
-        priority: priority || notificationFilterService.getNotificationPriority(action),
-        read: false,
+        type,
+        category,
+        title: finalTitle,
+        message: finalMessage,
+        priority,
+        status: 'unread',
+        action_url: finalActionUrl,
+        action_label: finalActionLabel,
+        metadata: JSON.stringify(metadata),
+        expires_at: expiresAt,
+        related_exchange_id: exchangeId,
+        source_user_id: sourceUserId,
+        organization_id: organizationId,
+        is_read: false,
         created_at: new Date().toISOString()
       });
 
-      // Send notifications through enabled channels
+      // Log notification creation activity
+      await this.logNotificationActivity(notification.id, userId, 'sent', metadata);
+
+      // Send notifications through enabled channels based on preferences
       const results = await this.sendNotificationThroughChannels(
         userId,
         notification,
-        enabledChannels,
-        userSettings
+        userPreferences
       );
+
+      // Emit real-time notification via Socket.IO
+      await this.emitRealTimeNotification(userId, notification);
 
       return {
         success: true,
@@ -99,47 +128,79 @@ class NotificationService {
   }
 
   /**
-   * Send notification through multiple channels
+   * Send notification through multiple channels based on user preferences
    */
-  async sendNotificationThroughChannels(userId, notification, channels, userSettings) {
+  async sendNotificationThroughChannels(userId, notification, userPreferences) {
     const results = {};
 
-    for (const channel of channels) {
+    // Check each channel preference and send accordingly
+    if (userPreferences.email_enabled) {
       try {
-        switch (channel) {
-          case 'email':
-            results.email = await this.sendEmailNotification(userId, notification, userSettings);
-            break;
-          case 'sms':
-            results.sms = await this.sendSMSNotification(userId, notification, userSettings);
-            break;
-          case 'inApp':
-            results.inApp = await this.sendInAppNotification(userId, notification, userSettings);
-            break;
-          case 'browser':
-            results.browser = await this.sendBrowserNotification(userId, notification, userSettings);
-            break;
-        }
+        results.email = await this.sendEmailNotification(userId, notification, userPreferences);
       } catch (error) {
-        console.error(`❌ Error sending ${channel} notification:`, error);
-        results[channel] = { success: false, error: error.message };
+        console.error(`❌ Error sending email notification:`, error);
+        results.email = { success: false, error: error.message };
       }
     }
+
+    if (userPreferences.sms_enabled) {
+      try {
+        results.sms = await this.sendSMSNotification(userId, notification, userPreferences);
+      } catch (error) {
+        console.error(`❌ Error sending SMS notification:`, error);
+        results.sms = { success: false, error: error.message };
+      }
+    }
+
+    if (userPreferences.browser_enabled) {
+      try {
+        results.browser = await this.sendBrowserNotification(userId, notification, userPreferences);
+      } catch (error) {
+        console.error(`❌ Error sending browser notification:`, error);
+        results.browser = { success: false, error: error.message };
+      }
+    }
+
+    // In-app notifications are always stored in database
+    results.inApp = { success: true };
 
     return results;
   }
 
   /**
-   * Get user notification settings
+   * Get user notification preferences from database
    */
-  async getUserNotificationSettings(userId) {
+  async getUserNotificationPreferences(userId, category) {
     try {
-      // In a real implementation, you would fetch this from the database
-      // For now, return default settings
-      return notificationFilterService.getDefaultSettings();
+      const databaseService = require('./database');
+      const preferences = await databaseService.getUserNotificationPreferences(userId, category);
+      
+      // Return default preferences if none found
+      if (!preferences) {
+        return {
+          email_enabled: true,
+          sms_enabled: false,
+          in_app_enabled: true,
+          browser_enabled: true,
+          sound_enabled: true,
+          desktop_enabled: false,
+          frequency: 'immediate'
+        };
+      }
+      
+      return preferences;
     } catch (error) {
-      console.error('Error getting user notification settings:', error);
-      return notificationFilterService.getDefaultSettings();
+      console.error('Error getting user notification preferences:', error);
+      // Return safe defaults
+      return {
+        email_enabled: false,
+        sms_enabled: false,
+        in_app_enabled: true,
+        browser_enabled: false,
+        sound_enabled: false,
+        desktop_enabled: false,
+        frequency: 'immediate'
+      };
     }
   }
 
@@ -450,6 +511,268 @@ class NotificationService {
       return { success: true };
     } catch (error) {
       console.error('Error sending 2FA code:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get notification template by name
+   */
+  async getNotificationTemplate(templateName) {
+    try {
+      const databaseService = require('./database');
+      return await databaseService.getNotificationTemplate(templateName);
+    } catch (error) {
+      console.error('Error getting notification template:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Process template with variables
+   */
+  processTemplate(template, variables) {
+    if (!template || !variables) return template;
+    
+    return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+      return variables[key] || match;
+    });
+  }
+
+  /**
+   * Log notification activity for audit trail
+   */
+  async logNotificationActivity(notificationId, userId, action, metadata = {}) {
+    try {
+      const databaseService = require('./database');
+      await databaseService.createNotificationActivity({
+        notification_id: notificationId,
+        user_id: userId,
+        action,
+        metadata: JSON.stringify(metadata),
+        created_at: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error logging notification activity:', error);
+    }
+  }
+
+  /**
+   * Emit real-time notification via Socket.IO
+   */
+  async emitRealTimeNotification(userId, notification) {
+    try {
+      // Get Socket.IO instance
+      const socketService = require('./socketService');
+      if (socketService && socketService.emitToUser) {
+        socketService.emitToUser(userId, 'new_notification', {
+          id: notification.id,
+          title: notification.title,
+          message: notification.message,
+          type: notification.type,
+          category: notification.category,
+          priority: notification.priority,
+          actionUrl: notification.action_url,
+          actionLabel: notification.action_label,
+          timestamp: notification.created_at,
+          read: false
+        });
+        
+        // Also emit updated unread count
+        const unreadCount = await this.getUnreadNotificationCount(userId);
+        socketService.emitToUser(userId, 'notification_count', { unread: unreadCount });
+      }
+    } catch (error) {
+      console.error('Error emitting real-time notification:', error);
+    }
+  }
+
+  /**
+   * Get unread notification count for user
+   */
+  async getUnreadNotificationCount(userId) {
+    try {
+      const databaseService = require('./database');
+      return await databaseService.getUnreadNotificationCount(userId);
+    } catch (error) {
+      console.error('Error getting unread notification count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get notification history for user with pagination
+   */
+  async getNotificationHistory(userId, options = {}) {
+    try {
+      const {
+        limit = 50,
+        offset = 0,
+        category,
+        status = 'all',
+        startDate,
+        endDate
+      } = options;
+
+      const databaseService = require('./database');
+      return await databaseService.getNotificationHistory(userId, {
+        limit,
+        offset,
+        category,
+        status,
+        startDate,
+        endDate
+      });
+    } catch (error) {
+      console.error('Error getting notification history:', error);
+      return { notifications: [], total: 0 };
+    }
+  }
+
+  /**
+   * Mark notification as read
+   */
+  async markNotificationAsRead(notificationId, userId) {
+    try {
+      const databaseService = require('./database');
+      const success = await databaseService.markNotificationAsRead(notificationId, userId);
+      
+      if (success) {
+        // Log the activity
+        await this.logNotificationActivity(notificationId, userId, 'read');
+        
+        // Emit updated count via Socket.IO
+        await this.emitUpdatedNotificationCount(userId);
+      }
+      
+      return success;
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Mark all notifications as read for user
+   */
+  async markAllNotificationsAsRead(userId) {
+    try {
+      const databaseService = require('./database');
+      const count = await databaseService.markAllNotificationsAsRead(userId);
+      
+      if (count > 0) {
+        // Emit updated count via Socket.IO
+        await this.emitUpdatedNotificationCount(userId);
+      }
+      
+      return count;
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Archive notification
+   */
+  async archiveNotification(notificationId, userId) {
+    try {
+      const databaseService = require('./database');
+      const success = await databaseService.archiveNotification(notificationId, userId);
+      
+      if (success) {
+        await this.logNotificationActivity(notificationId, userId, 'archived');
+        await this.emitUpdatedNotificationCount(userId);
+      }
+      
+      return success;
+    } catch (error) {
+      console.error('Error archiving notification:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Delete notification
+   */
+  async deleteNotification(notificationId, userId) {
+    try {
+      const databaseService = require('./database');
+      const success = await databaseService.deleteNotification(notificationId, userId);
+      
+      if (success) {
+        await this.logNotificationActivity(notificationId, userId, 'deleted');
+        await this.emitUpdatedNotificationCount(userId);
+      }
+      
+      return success;
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Emit updated notification count via Socket.IO
+   */
+  async emitUpdatedNotificationCount(userId) {
+    try {
+      const socketService = require('./socketService');
+      if (socketService && socketService.emitToUser) {
+        const unreadCount = await this.getUnreadNotificationCount(userId);
+        socketService.emitToUser(userId, 'notification_count', { unread: unreadCount });
+      }
+    } catch (error) {
+      console.error('Error emitting updated notification count:', error);
+    }
+  }
+
+  /**
+   * Update user notification preferences
+   */
+  async updateNotificationPreferences(userId, category, preferences) {
+    try {
+      const databaseService = require('./database');
+      return await databaseService.updateNotificationPreferences(userId, category, preferences);
+    } catch (error) {
+      console.error('Error updating notification preferences:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get all notification preferences for user
+   */
+  async getAllNotificationPreferences(userId) {
+    try {
+      const databaseService = require('./database');
+      return await databaseService.getAllNotificationPreferences(userId);
+    } catch (error) {
+      console.error('Error getting all notification preferences:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Create notification from template with variables
+   */
+  async createNotificationFromTemplate(templateName, userId, variables = {}) {
+    try {
+      const template = await this.getNotificationTemplate(templateName);
+      if (!template) {
+        throw new Error(`Template ${templateName} not found`);
+      }
+
+      return await this.createNotification({
+        userId,
+        templateName,
+        category: template.category,
+        priority: template.priority,
+        metadata: variables,
+        organizationId: template.organization_id
+      });
+    } catch (error) {
+      console.error('Error creating notification from template:', error);
       return { success: false, error: error.message };
     }
   }
