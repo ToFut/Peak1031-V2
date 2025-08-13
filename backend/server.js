@@ -198,14 +198,12 @@ class PeakServer {
   initializeRoutes() {
     // Health check endpoint (no auth required)
     this.app.get('/api/health', (req, res) => {
-      console.log('🏥 Health check requested - ROUTE HANDLER REACHED');
       res.json({ 
         status: 'healthy', 
         timestamp: new Date().toISOString(),
         service: 'Peak 1031 Backend API',
         version: '1.0.0'
       });
-      console.log('🏥 Health response sent');
     });
 
     // API documentation endpoint (must be first)
@@ -428,7 +426,6 @@ class PeakServer {
           details: { socketId: socket.id }
         });
 
-        console.log('✅ Socket authentication successful');
         next();
       } catch (error) {
         console.error('❌ Socket authentication failed:', error.message);
@@ -438,7 +435,6 @@ class PeakServer {
 
     // Socket connection handler
     this.io.on('connection', async (socket) => {
-      console.log(`User ${socket.user.email} connected with socket ${socket.id}`);
 
       // Join user to their personal room
       socket.join(`user_${socket.user.id}`);
@@ -454,7 +450,6 @@ class PeakServer {
           const exchangeId = participation.exchange_id;
           socket.join(`exchange_${exchangeId}`);
           socket.join(`exchange-${exchangeId}`); // Both patterns for compatibility
-          console.log(`🏢 Auto-joined user ${socket.user.id} to exchange ${exchangeId}`);
         }
         
         console.log(`✅ User ${socket.user.email} joined ${userExchanges.length} exchange rooms`);
