@@ -91,7 +91,7 @@ class SmartPlaceholderService {
    * Fetch all related data for an exchange
    */
   async fetchAllRelatedData(exchangeId) {
-    console.log('📊 Fetching all related data...');
+    console.log('📊 Fetching all related data for exchange:', exchangeId);
     
     const data = {
       exchange: null,
@@ -103,22 +103,104 @@ class SmartPlaceholderService {
     };
     
     try {
-      // Fetch exchange
-      const { data: exchange } = await this.supabase
+      // Fetch exchange with all its data
+      const { data: exchange, error: exchangeError } = await this.supabase
         .from('exchanges')
         .select('*')
         .eq('id', exchangeId)
         .single();
-      data.exchange = exchange;
+        
+      if (exchangeError) {
+        console.error('❌ Error fetching exchange:', exchangeError);
+        throw exchangeError;
+      }
       
-      // Fetch client if exists
+      data.exchange = exchange;
+      console.log('✅ Exchange fetched:', exchange.name || exchange.exchange_name);
+      
+      // Try to extract client info from various sources
+      // 1. First try to get from contacts table if client_id exists
       if (exchange?.client_id) {
         const { data: client } = await this.supabase
           .from('contacts')
           .select('*')
           .eq('id', exchange.client_id)
           .single();
-        data.client = client;
+        
+        if (client) {
+          data.client = client;
+          console.log('✅ Client fetched from contacts:', client.first_name, client.last_name);
+        }
+      }
+      
+      // 2. If no client from contacts, try to extract from exchange fields
+      if (!data.client && exchange) {
+        // Try to extract client name from various sources
+        let firstName = '';
+        let lastName = '';
+        
+        // Try buyer_1_name first
+        if (exchange.buyer_1_name) {
+          const parts = exchange.buyer_1_name.split(' ');
+          firstName = parts[0] || '';
+          lastName = parts.slice(1).join(' ') || '';
+        }
+        // Then client_vesting
+        else if (exchange.client_vesting) {
+          const parts = exchange.client_vesting.split(' ');
+          firstName = parts[0] || '';
+          lastName = parts.slice(1).join(' ') || '';
+        }
+        // Finally, try to extract from exchange name (format: "LastName, FirstName - Property")
+        else if (exchange.name || exchange.exchange_name) {
+          const exchangeName = exchange.name || exchange.exchange_name;
+          // Check if name follows "LastName, FirstName" pattern
+          if (exchangeName.includes(',')) {
+            const namePart = exchangeName.split(' - ')[0]; // Get part before property address
+            const parts = namePart.split(',');
+            if (parts.length >= 2) {
+              lastName = parts[0].trim();
+              firstName = parts[1].trim();
+            }
+          } else {
+            // Otherwise just split by space
+            const namePart = exchangeName.split(' - ')[0];
+            const parts = namePart.split(' ');
+            firstName = parts[0] || '';
+            lastName = parts.slice(1).join(' ') || '';
+          }
+        }
+        
+        // Build a synthetic client from exchange data
+        data.client = {
+          first_name: firstName,
+          last_name: lastName,
+          email: exchange.client_email || '',
+          phone: exchange.client_phone || '',
+          street1: exchange.rel_property_address || exchange.property_sold_address || '',
+          city: exchange.rel_property_city || '',
+          state: exchange.rel_property_state || '',
+          zip_postal_code: exchange.rel_property_zip || ''
+        };
+        console.log('✅ Client info extracted from exchange data:', firstName, lastName);
+      }
+      
+      // 3. Check if pp_data has any useful information
+      if (exchange?.pp_data && typeof exchange.pp_data === 'object') {
+        // If pp_data is an array, use the first item
+        const ppData = Array.isArray(exchange.pp_data) ? exchange.pp_data[0] : exchange.pp_data;
+        if (ppData) {
+          // Override with pp_data if available
+          if (ppData['Contact.FirstName']) data.client.first_name = ppData['Contact.FirstName'];
+          if (ppData['Contact.LastName']) data.client.last_name = ppData['Contact.LastName'];
+          if (ppData['Contact.Email']) data.client.email = ppData['Contact.Email'];
+          if (ppData['Contact.HomeNumber']) data.client.phone = ppData['Contact.HomeNumber'];
+          if (ppData['Contact.Street1']) data.client.street1 = ppData['Contact.Street1'];
+          if (ppData['Contact.City']) data.client.city = ppData['Contact.City'];
+          if (ppData['Contact.ProvinceState']) data.client.state = ppData['Contact.ProvinceState'];
+          if (ppData['Contact.ZipPostalCode']) data.client.zip_postal_code = ppData['Contact.ZipPostalCode'];
+          console.log('✅ Client info enhanced from pp_data');
+        }
       }
       
       // Fetch coordinator if exists
@@ -129,28 +211,38 @@ class SmartPlaceholderService {
           .eq('id', exchange.coordinator_id)
           .single();
         data.coordinator = coordinator;
+        if (coordinator) {
+          console.log('✅ Coordinator fetched:', coordinator.first_name, coordinator.last_name);
+        }
       }
       
-      // Fetch participants
-      const { data: participants } = await this.supabase
-        .from('exchange_participants')
-        .select(`
-          *,
-          contact:contacts(*)
-        `)
-        .eq('exchange_id', exchangeId);
-      data.participants = participants || [];
+      // Fetch participants (but don't fail if table doesn't exist)
+      try {
+        const { data: participants } = await this.supabase
+          .from('exchange_participants')
+          .select('*')
+          .eq('exchange_id', exchangeId);
+        data.participants = participants || [];
+      } catch (e) {
+        console.log('⚠️ Could not fetch participants (table may not exist)');
+      }
       
-      // Fetch properties
-      const { data: properties } = await this.supabase
-        .from('properties')
-        .select('*')
-        .eq('exchange_id', exchangeId);
-      data.properties = properties || [];
+      // Fetch properties (but don't fail if table doesn't exist)
+      try {
+        const { data: properties } = await this.supabase
+          .from('properties')
+          .select('*')
+          .eq('exchange_id', exchangeId);
+        data.properties = properties || [];
+      } catch (e) {
+        console.log('⚠️ Could not fetch properties (table may not exist)');
+      }
       
       console.log('✅ Related data fetched:', {
         hasExchange: !!data.exchange,
         hasClient: !!data.client,
+        clientName: data.client ? `${data.client.first_name} ${data.client.last_name}` : 'None',
+        hasCoordinator: !!data.coordinator,
         participantsCount: data.participants.length,
         propertiesCount: data.properties.length
       });
@@ -169,19 +261,38 @@ class SmartPlaceholderService {
     const { exchange, client, coordinator, participants, properties } = data;
     const lowerPlaceholder = placeholder.toLowerCase();
     
+    // First check if we have pp_data that matches directly
+    if (exchange?.pp_data && typeof exchange.pp_data === 'object') {
+      const ppData = Array.isArray(exchange.pp_data) ? exchange.pp_data[0] : exchange.pp_data;
+      if (ppData && ppData[placeholder]) {
+        console.log(`🔍 Direct PP mapping "${placeholder}" → "${ppData[placeholder]}"`);
+        return ppData[placeholder];
+      }
+    }
+    
     // Exchange/Matter mappings
     if (lowerPlaceholder.includes('matter.number') || lowerPlaceholder.includes('exchange.number')) {
-      const result = exchange?.number || exchange?.exchange_number || exchange?.pp_matter_id || 'N/A';
+      const result = exchange?.exchange_number || exchange?.pp_matter_number || exchange?.pp_matter_id || exchange?.id || 'N/A';
       console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
       return result;
     }
     
     if (lowerPlaceholder.includes('matter.name') || lowerPlaceholder.includes('exchange.name')) {
-      return exchange?.name || exchange?.exchange_name || 'Unnamed Exchange';
+      const result = exchange?.name || exchange?.exchange_name || 'Unnamed Exchange';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
+    }
+    
+    if (lowerPlaceholder.includes('matter.client vesting')) {
+      const result = exchange?.client_vesting || this.formatClientName(client) || 'Client Name Not Available';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
     }
     
     if (lowerPlaceholder.includes('matter.client') || lowerPlaceholder.includes('client.name')) {
-      return this.formatClientName(client) || 'Client Name Not Available';
+      const result = this.formatClientName(client) || exchange?.client_vesting || exchange?.buyer_1_name || 'Client Name Not Available';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
     }
     
     // Client/Contact mappings
@@ -245,15 +356,54 @@ class SmartPlaceholderService {
       return exchange?.exchange_type || 'Delayed Exchange';
     }
     
-    // Properties
-    if (lowerPlaceholder.includes('relinquished') && lowerPlaceholder.includes('address')) {
-      const relinquishedProperty = properties.find(p => p.property_type === 'relinquished');
-      return relinquishedProperty?.address || 'Not specified';
+    // Properties - check multiple possible fields
+    if (lowerPlaceholder.includes('rel') && lowerPlaceholder.includes('property') && lowerPlaceholder.includes('address')) {
+      const result = exchange?.rel_property_address || exchange?.property_sold_address || exchange?.relinquished_property_address || 'Not specified';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
     }
     
-    if (lowerPlaceholder.includes('replacement') && lowerPlaceholder.includes('address')) {
+    if (lowerPlaceholder.includes('relinquished') && lowerPlaceholder.includes('address')) {
+      const relinquishedProperty = properties.find(p => p.property_type === 'relinquished');
+      const result = relinquishedProperty?.address || exchange?.rel_property_address || exchange?.property_sold_address || 'Not specified';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
+    }
+    
+    if ((lowerPlaceholder.includes('rep') || lowerPlaceholder.includes('replacement')) && lowerPlaceholder.includes('address')) {
       const replacementProperty = properties.find(p => p.property_type === 'replacement');
-      return replacementProperty?.address || 'Not specified';
+      const result = replacementProperty?.address || exchange?.rep_1_property_address || exchange?.property_bought_address || 'Not specified';
+      console.log(`🔍 Mapping "${placeholder}" → "${result}"`);
+      return result;
+    }
+    
+    // Settlement agents and escrow info
+    if (lowerPlaceholder.includes('rel') && lowerPlaceholder.includes('settlement')) {
+      if (lowerPlaceholder.includes('firstname')) return exchange?.rel_settlement_agent_first_name || '';
+      if (lowerPlaceholder.includes('lastname')) return exchange?.rel_settlement_agent_last_name || '';
+      if (lowerPlaceholder.includes('company')) return exchange?.rel_escrow_company || '';
+      if (lowerPlaceholder.includes('street1')) return exchange?.rel_settlement_street1 || '';
+      if (lowerPlaceholder.includes('city')) return exchange?.rel_settlement_city || '';
+      if (lowerPlaceholder.includes('state')) return exchange?.rel_settlement_state || '';
+      if (lowerPlaceholder.includes('zip')) return exchange?.rel_settlement_zip || '';
+    }
+    
+    if (lowerPlaceholder.includes('rep') && lowerPlaceholder.includes('settlement')) {
+      if (lowerPlaceholder.includes('firstname')) return exchange?.rep_settlement_agent_first_name || '';
+      if (lowerPlaceholder.includes('lastname')) return exchange?.rep_settlement_agent_last_name || '';
+      if (lowerPlaceholder.includes('company')) return exchange?.rep_escrow_company || '';
+      if (lowerPlaceholder.includes('street1')) return exchange?.rep_settlement_street1 || '';
+      if (lowerPlaceholder.includes('city')) return exchange?.rep_settlement_city || '';
+      if (lowerPlaceholder.includes('state')) return exchange?.rep_settlement_state || '';
+      if (lowerPlaceholder.includes('zip')) return exchange?.rep_settlement_zip || '';
+    }
+    
+    // Escrow numbers
+    if (lowerPlaceholder.includes('rel') && lowerPlaceholder.includes('escrow')) {
+      return exchange?.rel_escrow_number || '';
+    }
+    if (lowerPlaceholder.includes('rep') && lowerPlaceholder.includes('escrow')) {
+      return exchange?.rep_1_escrow_number || '';
     }
     
     // User/Coordinator mappings (User often refers to coordinator in templates)

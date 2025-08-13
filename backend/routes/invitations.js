@@ -7,6 +7,138 @@ const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
 
+// Get pending invitations for current user 
+router.get('/', authenticateToken, async (req, res) => {
+  try {
+    const userEmail = req.user.email;
+    
+    // Get all pending invitations for this user's email using direct query
+    const { data: invitations, error } = await supabaseService.client
+      .from('invitations')
+      .select(`
+        *,
+        exchange:exchange_id(id, exchange_name, exchange_number),
+        invited_by_user:invited_by(id, first_name, last_name, email)
+      `)
+      .eq('email', userEmail)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json({ 
+      invitations: invitations || [],
+      success: true 
+    });
+  } catch (error) {
+    console.error('Error fetching invitations:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch invitations',
+      invitations: []  
+    });
+  }
+});
+
+// Get sent invitations by current user for a specific exchange
+router.get('/sent/:exchangeId', authenticateToken, async (req, res) => {
+  try {
+    const { exchangeId } = req.params;
+    const userId = req.user.id;
+    
+    // Get all invitations sent by this user for this exchange using direct query
+    const { data: invitations, error } = await supabaseService.client
+      .from('invitations')
+      .select('*')
+      .eq('exchange_id', exchangeId)
+      .eq('invited_by', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json({ 
+      invitations: invitations || [],
+      success: true 
+    });
+  } catch (error) {
+    console.error('Error fetching sent invitations:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch sent invitations',
+      invitations: []  
+    });
+  }
+});
+
+// Simple send invitation endpoint for compatibility
+router.post('/send', authenticateToken, async (req, res) => {
+  try {
+    const { exchange_id, emails, role = 'client', message } = req.body;
+
+    if (!exchange_id || !emails || !emails.length) {
+      return res.status(400).json({ error: 'Exchange ID and emails are required' });
+    }
+
+    // Get exchange details using direct query
+    const { data: exchange, error: exchangeError } = await supabaseService.client
+      .from('exchanges')
+      .select('*')
+      .eq('id', exchange_id)
+      .single();
+      
+    if (exchangeError || !exchange) {
+      return res.status(404).json({ error: 'Exchange not found' });
+    }
+
+    const results = [];
+    for (const email of emails) {
+      try {
+        // Create invitation record using direct query
+        const invitationToken = uuidv4(); // Generate unique token
+        const { data: invitation, error: insertError } = await supabaseService.client
+          .from('invitations')
+          .insert({
+            id: uuidv4(),
+            exchange_id,
+            email: email.trim(),
+            role,
+            invited_by: req.user.id,
+            custom_message: message || `You've been invited to join the exchange: ${exchange.exchange_name || exchange.exchange_number}`,
+            invitation_token: invitationToken,
+            status: 'pending',
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        if (insertError) throw insertError;
+        
+        results.push({ email, status: 'sent', id: invitation.id });
+        
+        // TODO: Send email notification here
+        console.log(`📧 Would send invitation email to ${email} for exchange ${exchange.exchange_name || exchange.exchange_number}`);
+      } catch (err) {
+        console.error(`Failed to send invitation to ${email}:`, err);
+        results.push({ email, status: 'failed', error: err.message });
+      }
+    }
+
+    const successful = results.filter(r => r.status === 'sent').length;
+    const failed = results.filter(r => r.status === 'failed').length;
+
+    res.json({ 
+      success: true,
+      sent: successful,
+      failed,
+      message: `Sent ${successful} invitations${failed > 0 ? `, ${failed} failed` : ''}`,
+      results
+    });
+
+  } catch (error) {
+    console.error('Error sending invitations:', error);
+    res.status(500).json({ error: 'Failed to send invitations' });
+  }
+});
+
 // Send invitations to exchange
 router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coordinator']), [
   body('invitations').isArray().withMessage('Invitations must be an array'),

@@ -1147,7 +1147,8 @@ router.post('/generate', authenticateToken, requireExchangePermission('upload_do
     }
 
     // Use the new document template service
-    const documentTemplateService = require('../services/documentTemplateService');
+    const DocumentTemplateService = require('../services/documentTemplateService');
+    const documentTemplateService = new DocumentTemplateService();
     const result = await documentTemplateService.generateDocument(templateId, exchangeId, additionalData);
     
     // Log document generation using audit service
