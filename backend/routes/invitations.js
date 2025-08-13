@@ -92,7 +92,8 @@ router.post('/send', authenticateToken, async (req, res) => {
     for (const email of emails) {
       try {
         // Create invitation record using direct query
-        const invitationToken = uuidv4(); // Generate unique token
+        const crypto = require('crypto');
+        const invitationToken = crypto.randomBytes(32).toString('hex'); // Generate proper hex token
         const { data: invitation, error: insertError } = await supabaseService.client
           .from('invitations')
           .insert({
@@ -112,10 +113,21 @@ router.post('/send', authenticateToken, async (req, res) => {
         
         if (insertError) throw insertError;
         
-        results.push({ email, status: 'sent', id: invitation.id });
+        // Generate invitation link
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const invitationLink = `${frontendUrl}/onboarding/invitation/${invitationToken}`;
         
-        // TODO: Send email notification here
+        results.push({ 
+          email, 
+          status: 'sent', 
+          id: invitation.id,
+          invitationLink,
+          token: invitationToken
+        });
+        
+        // TODO: Send email notification with invitation link
         console.log(`📧 Would send invitation email to ${email} for exchange ${exchange.exchange_name || exchange.exchange_number}`);
+        console.log(`   Invitation link: ${invitationLink}`);
       } catch (err) {
         console.error(`Failed to send invitation to ${email}:`, err);
         results.push({ email, status: 'failed', error: err.message });

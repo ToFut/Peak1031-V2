@@ -1,87 +1,119 @@
+const axios = require('axios');
 require('dotenv').config();
-const { v4: uuidv4 } = require('uuid');
-const supabaseService = require('./services/supabase');
-const invitationService = require('./services/invitationService');
 
-async function testFullInvitationFlow() {
-  console.log('🧪 Testing complete invitation flow...');
-  
+const API_URL = 'http://localhost:5001/api';
+
+// Test user credentials
+const testUser = {
+  email: process.env.TEST_USER_EMAIL || 'admin@peak1031.com',
+  password: process.env.TEST_USER_PASSWORD || 'admin123'
+};
+
+async function testCompleteInvitationFlow() {
   try {
-    // 1. Get a real exchange from database
-    console.log('📋 Finding existing exchange...');
-    const exchanges = await supabaseService.getExchanges({ limit: 1 });
+    console.log('🚀 Testing Complete Invitation Flow\n');
     
-    if (!exchanges || exchanges.length === 0) {
-      throw new Error('No exchanges found in database');
+    // 1. Login
+    console.log('1. Logging in as admin...');
+    const loginResponse = await axios.post(`${API_URL}/auth/login`, testUser);
+    const token = loginResponse.data.token;
+    const userId = loginResponse.data.user.id;
+    
+    console.log('✅ Logged in successfully');
+    
+    const headers = { Authorization: `Bearer ${token}` };
+    
+    // 2. Get exchanges
+    console.log('\n2. Getting exchanges...');
+    const exchangesResponse = await axios.get(`${API_URL}/exchanges`, { headers });
+    const exchanges = exchangesResponse.data.exchanges || [];
+    
+    if (exchanges.length === 0) {
+      console.log('❌ No exchanges found. Please create an exchange first.');
+      return;
     }
     
     const exchange = exchanges[0];
-    console.log('✅ Found exchange:', exchange.id, exchange.name || exchange.exchange_number);
+    console.log(`✅ Using exchange: ${exchange.exchange_name || exchange.exchange_number} (ID: ${exchange.id})`);
     
-    // 2. Create mock invitation data
-    const mockInvitation = {
-      email: 'segev@futurixs.com',
-      phone: '+12137086881', 
+    // 3. Send invitation with new system
+    console.log('\n3. Sending invitation with link generation...');
+    const testEmail = `test_${Date.now()}@example.com`;
+    const invitationData = {
+      exchange_id: exchange.id,
+      emails: [testEmail],
       role: 'client',
-      method: 'email',
-      firstName: 'Segev',
-      lastName: 'TestUser'
+      message: 'Test invitation with proper token generation'
     };
     
-    // 3. Test the invitation route logic
-    console.log('📧 Sending Supabase invitation...');
-    const inviteResult = await invitationService.sendInvitation({
-      email: mockInvitation.email,
-      phone: mockInvitation.phone,
-      method: mockInvitation.method,
-      exchangeName: exchange.name || exchange.exchange_number,
-      inviterName: 'Test System',
-      role: mockInvitation.role,
-      firstName: mockInvitation.firstName,
-      lastName: mockInvitation.lastName,
-      customMessage: 'Welcome! This is a test invitation to verify the complete system works.',
-      exchangeId: exchange.id,
-      inviterId: 'test-inviter-123'
-    });
+    const sendResponse = await axios.post(`${API_URL}/invitations/send`, invitationData, { headers });
+    console.log('✅ Invitation sent successfully');
+    console.log(`   Response:`, JSON.stringify(sendResponse.data, null, 2));
     
-    console.log('✅ Invitation sent successfully:', {
-      email_sent: inviteResult.email.sent,
-      sms_sent: inviteResult.sms.sent,
-      user_id: inviteResult.supabaseUser?.id
-    });
-    
-    // 4. Store invitation record (simulate the full route logic)
-    if (inviteResult.email.sent) {
-      const invitationId = uuidv4();
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    // Check if we got invitation links
+    if (sendResponse.data.results && sendResponse.data.results[0]) {
+      const invitation = sendResponse.data.results[0];
       
-      const invitation = await supabaseService.insert('invitations', {
-        id: invitationId,
-        email: mockInvitation.email,
-        phone: mockInvitation.phone,
-        exchange_id: exchange.id,
-        role: mockInvitation.role,
-        invited_by: 'test-inviter-123',
-        invitation_token: inviteResult.supabaseUser?.id || invitationId,
-        expires_at: expiresAt.toISOString(),
-        status: 'pending',
-        first_name: mockInvitation.firstName,
-        last_name: mockInvitation.lastName,
-        custom_message: 'Welcome! This is a test invitation.',
-        created_at: new Date().toISOString(),
-        supabase_user_id: inviteResult.supabaseUser?.id
-      });
-      
-      console.log('✅ Invitation record created:', invitation.id);
-      console.log('📬 Check email for invitation link!');
-      console.log('🔗 Callback URL will be:', process.env.FRONTEND_URL + '/auth/callback?exchange=' + exchange.id);
-      console.log('🔗 Direct signup URL:', process.env.FRONTEND_URL + '/auth/callback#access_token=USER_TOKEN&exchange=' + exchange.id);
+      if (invitation.invitationLink) {
+        console.log('\n✅ Invitation link generated:');
+        console.log(`   ${invitation.invitationLink}`);
+        console.log(`   Token: ${invitation.token}`);
+        
+        // 4. Test token validation
+        console.log('\n4. Testing token validation...');
+        try {
+          const validateResponse = await axios.get(
+            `${API_URL}/invitation-auth/validate/${invitation.token}`
+          );
+          
+          if (validateResponse.data.success) {
+            console.log('✅ Token validation successful!');
+            console.log('   Invitation details:', JSON.stringify(validateResponse.data.invitation, null, 2));
+          } else {
+            console.log('❌ Token validation failed:', validateResponse.data.error);
+          }
+        } catch (validateError) {
+          console.log('❌ Token validation error:', validateError.response?.data || validateError.message);
+        }
+      } else {
+        console.log('❌ No invitation link generated in response');
+      }
     }
     
+    // 5. Get sent invitations to verify storage
+    console.log('\n5. Fetching sent invitations...');
+    try {
+      const sentResponse = await axios.get(`${API_URL}/invitations/sent/${exchange.id}`, { headers });
+      const sentInvitations = sentResponse.data.invitations || [];
+      
+      console.log(`✅ Found ${sentInvitations.length} sent invitations`);
+      const recent = sentInvitations.find(inv => inv.email === testEmail);
+      if (recent) {
+        console.log('   Recent invitation found:');
+        console.log(`   - Email: ${recent.email}`);
+        console.log(`   - Status: ${recent.status}`);
+        console.log(`   - Token exists: ${!!recent.invitation_token}`);
+        console.log(`   - Token length: ${recent.invitation_token?.length || 0} characters`);
+      }
+    } catch (error) {
+      console.log('❌ Failed to get sent invitations:', error.response?.data || error.message);
+    }
+    
+    console.log('\n✅ Test completed!');
+    console.log('\n📝 Summary:');
+    console.log('   - Invitations now generate proper hex tokens (64 characters)');
+    console.log('   - Invitation links are returned in the response');
+    console.log('   - Links follow the format: /onboarding/invitation/{token}');
+    console.log('   - Tokens can be validated via /api/invitation-auth/validate/{token}');
+    
   } catch (error) {
-    console.error('❌ Full invitation test failed:', error.message);
-    if (error.stack) console.error(error.stack);
+    console.error('❌ Test failed:', error.response?.data || error.message);
+    if (error.response?.status === 404) {
+      console.log('\n⚠️  Note: 404 errors suggest the invitation-auth routes may not be loaded.');
+      console.log('   Check that USE_MOCK_DATA is not set to true in your environment.');
+    }
   }
 }
 
-testFullInvitationFlow();
+// Run the test
+testCompleteInvitationFlow();

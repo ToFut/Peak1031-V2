@@ -274,16 +274,20 @@ router.get('/exchange/:exchangeId', authenticateToken, requireExchangePermission
 
     // Combine and format all documents
     const allDocuments = [
-      // Regular documents with uploader info
+      // Process documents - determine if uploaded or generated based on template_id
       ...(documents || []).map(doc => {
         const uploader = uploadersMap[doc.uploaded_by];
+        const isGenerated = !!doc.template_id;
+        
         return {
           ...doc,
-          document_type: 'uploaded',
-          source: 'manual_upload',
-          uploaded_by_name: uploader 
-            ? `${uploader.first_name || ''} ${uploader.last_name || ''}`.trim() || uploader.email
-            : 'Unknown'
+          document_type: isGenerated ? 'generated' : 'uploaded',
+          source: isGenerated ? 'template_generation' : 'manual_upload',
+          uploaded_by_name: isGenerated 
+            ? 'System Generated'
+            : (uploader 
+                ? `${uploader.first_name || ''} ${uploader.last_name || ''}`.trim() || uploader.email
+                : 'Unknown')
         };
       }),
       // Generated documents
@@ -312,14 +316,18 @@ router.get('/exchange/:exchangeId', authenticateToken, requireExchangePermission
     // Sort all documents by creation date
     allDocuments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    console.log(`✅ Found ${documents.length} regular + ${generatedDocs?.length || 0} generated documents`);
+    // Count uploaded vs generated
+    const uploadedCount = allDocuments.filter(d => d.document_type === 'uploaded').length;
+    const generatedCount = allDocuments.filter(d => d.document_type === 'generated').length;
+    
+    console.log(`✅ Found ${uploadedCount} uploaded + ${generatedCount} generated documents`);
 
     res.json({ 
       data: allDocuments,
       summary: {
         total: allDocuments.length,
-        uploaded: documents.length,
-        generated: generatedDocs?.length || 0
+        uploaded: uploadedCount,
+        generated: generatedCount
       }
     });
   } catch (error) {
