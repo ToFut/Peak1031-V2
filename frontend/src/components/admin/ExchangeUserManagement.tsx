@@ -76,6 +76,8 @@ export const ExchangeUserManagement: React.FC<ExchangeUserManagementProps> = ({
   const [showAddUser, setShowAddUser] = useState(false);
   const [selectedUser, setSelectedUser] = useState<ExchangeAccess | null>(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [showBulkActions, setShowBulkActions] = useState(false);
 
   // Fetch exchange users
   const fetchExchangeUsers = async () => {
@@ -229,6 +231,55 @@ export const ExchangeUserManagement: React.FC<ExchangeUserManagementProps> = ({
     return levelData?.label || level;
   };
 
+  // Bulk action handlers
+  const handleSelectAll = () => {
+    if (selectedUsers.length === users.length) {
+      setSelectedUsers([]);
+    } else {
+      setSelectedUsers(users.map(user => user.user_id));
+    }
+  };
+
+  const handleSelectUser = (userId: string) => {
+    setSelectedUsers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const bulkUpdateAccessLevel = async (accessLevel: string) => {
+    try {
+      const promises = selectedUsers.map(userId => 
+        updateUserAccess(userId, accessLevel)
+      );
+      await Promise.all(promises);
+      setSelectedUsers([]);
+      setShowBulkActions(false);
+      alert(`Successfully updated ${selectedUsers.length} users to ${getAccessLevelLabel(accessLevel)}`);
+    } catch (error) {
+      console.error('Bulk update failed:', error);
+      alert('Some updates failed. Please try again.');
+    }
+  };
+
+  const bulkRemoveUsers = async () => {
+    if (!window.confirm(`Remove ${selectedUsers.length} users from this exchange?`)) return;
+    
+    try {
+      const promises = selectedUsers.map(userId => 
+        removeUserFromExchange(userId)
+      );
+      await Promise.all(promises);
+      setSelectedUsers([]);
+      setShowBulkActions(false);
+      alert(`Successfully removed ${selectedUsers.length} users from exchange`);
+    } catch (error) {
+      console.error('Bulk removal failed:', error);
+      alert('Some removals failed. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="fixed inset-0 z-50 overflow-hidden">
@@ -259,6 +310,19 @@ export const ExchangeUserManagement: React.FC<ExchangeUserManagementProps> = ({
               </p>
             </div>
             <div className="flex items-center space-x-3">
+              {selectedUsers.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">
+                    {selectedUsers.length} selected
+                  </span>
+                  <button
+                    onClick={() => setShowBulkActions(!showBulkActions)}
+                    className="px-3 py-1 bg-orange-100 text-orange-700 rounded-md text-sm hover:bg-orange-200"
+                  >
+                    Bulk Actions
+                  </button>
+                </div>
+              )}
               <button
                 onClick={() => setShowAddUser(true)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2"
@@ -278,10 +342,56 @@ export const ExchangeUserManagement: React.FC<ExchangeUserManagementProps> = ({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
+          {/* Bulk Actions Dropdown */}
+          {showBulkActions && selectedUsers.length > 0 && (
+            <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+              <h4 className="text-sm font-medium text-orange-900 mb-3">
+                Bulk Actions for {selectedUsers.length} users:
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {ACCESS_LEVELS.filter(level => level.value !== 'none').map(level => (
+                  <button
+                    key={level.value}
+                    onClick={() => bulkUpdateAccessLevel(level.value)}
+                    className={`px-3 py-1 text-xs rounded-md bg-${level.color}-100 text-${level.color}-700 hover:bg-${level.color}-200`}
+                  >
+                    Set to {level.label}
+                  </button>
+                ))}
+                <button
+                  onClick={bulkRemoveUsers}
+                  className="px-3 py-1 text-xs rounded-md bg-red-100 text-red-700 hover:bg-red-200"
+                >
+                  Remove All
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedUsers([]);
+                    setShowBulkActions(false);
+                  }}
+                  className="px-3 py-1 text-xs rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Users List */}
           <div className="bg-white rounded-lg border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
               <h3 className="text-lg font-medium text-gray-900">Current Users ({users.length})</h3>
+              {users.length > 0 && (
+                <label className="flex items-center space-x-2 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={selectedUsers.length === users.length}
+                    onChange={handleSelectAll}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Select All</span>
+                </label>
+              )}
             </div>
             
             {users.length === 0 ? (
@@ -301,6 +411,12 @@ export const ExchangeUserManagement: React.FC<ExchangeUserManagementProps> = ({
                   <div key={userAccess.id} className="p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedUsers.includes(userAccess.user_id)}
+                          onChange={() => handleSelectUser(userAccess.user_id)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
                         <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                           <span className="text-blue-600 font-medium">
                             {userAccess.users.first_name?.[0]}{userAccess.users.last_name?.[0]}
@@ -349,7 +465,7 @@ export const ExchangeUserManagement: React.FC<ExchangeUserManagementProps> = ({
                         {/* Remove User Button */}
                         <button
                           onClick={() => {
-                            if (confirm('Remove this user from the exchange?')) {
+                            if (window.confirm('Remove this user from the exchange?')) {
                               removeUserFromExchange(userAccess.user_id);
                             }
                           }}

@@ -8,6 +8,7 @@ import { useSocket } from '../../../hooks/useSocket';
 import Layout from '../../../components/Layout';
 import UnifiedChatInterface from '../../messages/components/UnifiedChatInterface';
 import { ExchangeDocuments } from '../components/ExchangeDocuments';
+import { ExchangeUserManagement } from '../../../components/admin/ExchangeUserManagement';
 import {
   ArrowLeft,
   Calendar,
@@ -28,7 +29,9 @@ import {
   Banknote,
   Timer,
   Flag,
-  Gauge
+  Gauge,
+  Settings,
+  UserPlus
 } from 'lucide-react';
 
 // Tab Components
@@ -758,6 +761,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
   const [participants, setParticipants] = useState<any[]>([]);
   // Tasks are now managed by EnhancedTaskManager component
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showUserManagement, setShowUserManagement] = useState(false);
   
   // Define functions before using them in useEffect
   const loadDocuments = useCallback(async () => {
@@ -1147,8 +1151,21 @@ const ExchangeDetailEnhanced: React.FC = () => {
                 Back to Exchanges
               </button>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <StatusIndicator status={exchange.status} daysRemaining={daysUntilClosing || undefined} />
+                
+                {/* Manage Users Button - Only visible to admin/coordinator */}
+                {(isAdmin() || isCoordinator()) && (
+                  <button
+                    onClick={() => setShowUserManagement(true)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                    title="Manage user permissions for this exchange"
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span className="hidden sm:inline">Manage Users</span>
+                  </button>
+                )}
+                
                 <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
                   <MoreVertical className="w-5 h-5" />
                 </button>
@@ -1429,6 +1446,18 @@ const ExchangeDetailEnhanced: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* User Management Modal */}
+      {showUserManagement && (
+        <ExchangeUserManagement
+          exchangeId={id!}
+          onClose={() => {
+            setShowUserManagement(false);
+            // Refresh participants when closing the modal
+            loadParticipants();
+          }}
+        />
+      )}
     </Layout>
   );
 };

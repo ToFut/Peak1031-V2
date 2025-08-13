@@ -53,6 +53,10 @@ const Users: React.FC = () => {
   const [userActionMenu, setUserActionMenu] = useState<string | null>(null);
   const [showProfileDrawer, setShowProfileDrawer] = useState(false);
 
+  // Bulk operation states
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [showBulkActions, setShowBulkActions] = useState(false);
+
   // Check if user has admin access
   useEffect(() => {
     if (!isAdmin()) {
