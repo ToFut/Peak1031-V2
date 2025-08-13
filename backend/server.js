@@ -34,6 +34,7 @@ const syncRoutes = require('./routes/sync');
 const adminRoutes = require('./routes/admin');
 const notificationRoutes = require('./routes/notifications');
 const enhancedNotificationRoutes = require('./routes/notifications-enhanced');
+const exchangePermissionRoutes = require('./routes/exchange-permissions');
 const oauthRoutes = require('./routes/oauth');
 const exportRoutes = require('./routes/exports');
 const exchangeParticipantsRoutes = require('./routes/exchange-participants');
@@ -304,6 +305,7 @@ class PeakServer {
     this.app.use('/api/admin', adminRoutes);
     this.app.use('/api/notifications', notificationRoutes);
     this.app.use('/api/notifications-enhanced', enhancedNotificationRoutes);
+    this.app.use('/api/exchanges', exchangePermissionRoutes);
     this.app.use('/api/oauth', oauthRoutes);
     this.app.use('/api/exports', exportRoutes);
     this.app.use('/api/exchange-participants', exchangeParticipantsRoutes);

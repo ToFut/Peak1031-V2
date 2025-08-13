@@ -4,20 +4,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const { authenticateToken } = require('../middleware/auth');
 const { enforceRBAC } = require('../middleware/rbac');
-
-// Simple permission check function
-const checkPermission = (resource, action) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    
-    // For now, allow all authenticated users to access documents
-    // This can be enhanced later with more granular permissions
-    console.log(`🔐 Permission check: ${req.user.role} user accessing ${resource} with ${action} permission`);
-    next();
-  };
-};
+const { requireExchangePermission, requireDocumentAccess } = require('../middleware/permissions');
 const databaseService = require('../services/database');
 const supabaseService = require('../services/supabase');
 const rbacService = require('../services/rbacService');
@@ -224,7 +211,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Get documents for specific exchange
-router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
+router.get('/exchange/:exchangeId', authenticateToken, requireExchangePermission('view_documents'), async (req, res) => {
   try {
     const exchangeId = req.params.exchangeId;
     console.log(`📋 Fetching documents for exchange: ${exchangeId}`);
@@ -342,7 +329,7 @@ router.get('/exchange/:exchangeId', authenticateToken, async (req, res) => {
 });
 
 // Upload document
-router.post('/', authenticateToken, checkPermission('documents', 'write'), upload.single('file'), async (req, res) => {
+router.post('/', authenticateToken, requireExchangePermission('upload_documents'), upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -510,7 +497,7 @@ router.post('/', authenticateToken, checkPermission('documents', 'write'), uploa
 });
 
 // Download document
-router.get('/:id/download', authenticateToken, async (req, res) => {
+router.get('/:id/download', authenticateToken, requireDocumentAccess('view'), async (req, res) => {
   try {
     console.log('📥 Document download request for ID:', req.params.id);
     console.log('📥 Request headers:', req.headers);
@@ -652,7 +639,7 @@ router.get('/:id/download', authenticateToken, async (req, res) => {
 });
 
 // Delete document
-router.delete('/:id', authenticateToken, checkPermission('documents', 'write'), async (req, res) => {
+router.delete('/:id', authenticateToken, requireDocumentAccess('delete'), async (req, res) => {
   try {
     const document = await databaseService.getDocumentById(req.params.id);
     
@@ -692,7 +679,7 @@ router.delete('/:id', authenticateToken, checkPermission('documents', 'write'), 
 });
 
 // Get document by ID
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', authenticateToken, requireDocumentAccess('view'), async (req, res) => {
   try {
     const document = await databaseService.getDocumentById(req.params.id);
 
@@ -707,7 +694,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Verify PIN for document
-router.post('/:id/verify-pin', authenticateToken, async (req, res) => {
+router.post('/:id/verify-pin', authenticateToken, requireDocumentAccess('view'), async (req, res) => {
   try {
     const { pin } = req.body;
     const document = await databaseService.getDocumentById(req.params.id);
@@ -771,7 +758,7 @@ router.post('/:id/verify-pin', authenticateToken, async (req, res) => {
 });
 
 // Update document PIN
-router.put('/:id/pin', authenticateToken, checkPermission('documents', 'write'), async (req, res) => {
+router.put('/:id/pin', authenticateToken, requireDocumentAccess('edit'), async (req, res) => {
   try {
     const { currentPin, newPin, enablePin, disablePin } = req.body;
     const document = await databaseService.getDocumentById(req.params.id);
@@ -859,7 +846,7 @@ router.put('/:id/pin', authenticateToken, checkPermission('documents', 'write'),
 });
 
 // Get document access history
-router.get('/:id/access-history', authenticateToken, checkPermission('documents', 'read'), async (req, res) => {
+router.get('/:id/access-history', authenticateToken, requireDocumentAccess('view'), async (req, res) => {
   try {
     const document = await databaseService.getDocumentById(req.params.id);
     
@@ -895,7 +882,7 @@ router.get('/:id/access-history', authenticateToken, checkPermission('documents'
 });
 
 // Bulk PIN operations
-router.post('/bulk-pin-update', authenticateToken, checkPermission('documents', 'write'), async (req, res) => {
+router.post('/bulk-pin-update', authenticateToken, async (req, res) => {
   try {
     const { documentIds, action, pin } = req.body;
     
@@ -1077,7 +1064,7 @@ router.get('/templates', authenticateToken, async (req, res) => {
 });
 
 // Create a new template
-router.post('/templates', authenticateToken, checkPermission('documents', 'write'), async (req, res) => {
+router.post('/templates', authenticateToken, async (req, res) => {
   try {
     const {
       name,
@@ -1151,7 +1138,7 @@ router.post('/templates', authenticateToken, checkPermission('documents', 'write
 });
 
 // Generate document from template
-router.post('/generate', authenticateToken, checkPermission('documents', 'write'), async (req, res) => {
+router.post('/generate', authenticateToken, requireExchangePermission('upload_documents'), async (req, res) => {
   try {
     const { templateId, exchangeId, additionalData } = req.body;
     
@@ -1192,7 +1179,7 @@ router.post('/generate', authenticateToken, checkPermission('documents', 'write'
 });
 
 // Bulk generate documents
-router.post('/bulk-generate', authenticateToken, checkPermission('documents', 'write'), async (req, res) => {
+router.post('/bulk-generate', authenticateToken, async (req, res) => {
   try {
     const { templateId, exchangeIds, additionalData } = req.body;
     
@@ -1294,7 +1281,7 @@ router.post('/templates/:templateId/preview', authenticateToken, async (req, res
 });
 
 // Delete generated document
-router.delete('/generated/:documentId', authenticateToken, checkPermission('documents', 'write'), async (req, res) => {
+router.delete('/generated/:documentId', authenticateToken, requireDocumentAccess('delete'), async (req, res) => {
   try {
     const result = await DocumentTemplateService.deleteGeneratedDocument(req.params.documentId);
     
@@ -1319,7 +1306,7 @@ router.delete('/generated/:documentId', authenticateToken, checkPermission('docu
 });
 
 // Get document versions (placeholder implementation)
-router.get('/:documentId/versions', authenticateToken, checkPermission('documents', 'read'), async (req, res) => {
+router.get('/:documentId/versions', authenticateToken, requireDocumentAccess('view'), async (req, res) => {
   try {
     const { documentId } = req.params;
     
