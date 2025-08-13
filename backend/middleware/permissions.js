@@ -135,7 +135,7 @@ const requireDocumentAccess = (accessType = 'read') => {
   return async (req, res, next) => {
     try {
       const userId = req.user?.id;
-      const documentId = req.params.documentId || req.body.documentId || req.query.documentId;
+      const documentId = req.params.id || req.params.documentId || req.body.documentId || req.query.documentId;
 
       if (!userId) {
         return res.status(401).json({
@@ -151,10 +151,20 @@ const requireDocumentAccess = (accessType = 'read') => {
         });
       }
 
+      // Admin users bypass all document access checks
+      if (req.user?.role === 'admin') {
+        console.log(`✅ Admin user ${req.user.email} granted document access to ${documentId}`);
+        req.documentId = documentId;
+        req.documentAccess = accessType;
+        req.isSystemAdmin = true;
+        return next();
+      }
+
       // Check document access
       const hasAccess = await permissionService.checkDocumentAccess(userId, documentId, accessType);
 
       if (!hasAccess) {
+        console.log(`❌ Document access '${accessType}' denied for ${req.user.role} user ${req.user.email} on document ${documentId}`);
         return res.status(403).json({
           error: 'Insufficient document permissions',
           code: 'DOCUMENT_ACCESS_DENIED',

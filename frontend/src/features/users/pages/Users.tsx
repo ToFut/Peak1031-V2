@@ -67,6 +67,15 @@ const Users: React.FC = () => {
 
   // Create user modal state
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [formData, setFormData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    role: 'client',
+    is_active: true
+  });
 
   const loadUsers = useCallback(async () => {
     try {
@@ -202,9 +211,33 @@ const Users: React.FC = () => {
     setUserActionMenu(null);
   };
 
-  const handleEditUser = async (user: any) => {
-    // For now, just show current user data
-    alert(`Edit user profile for ${user.email}\n\nThis would open an edit form in a future update.`);
+  const handleEditUser = (user: any) => {
+    setEditingUser(user);
+    setFormData({
+      first_name: user.first_name || '',
+      last_name: user.last_name || '',
+      email: user.email || '',
+      role: user.role || 'client',
+      is_active: user.is_active !== undefined ? user.is_active : true
+    });
+    setShowEditModal(true);
+    setUserActionMenu(null);
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+    
+    try {
+      const response = await apiService.patch(`/admin/users/${editingUser.id}`, formData);
+      if (response.success) {
+        alert('User updated successfully');
+        setShowEditModal(false);
+        setEditingUser(null);
+        loadUsers();
+      }
+    } catch (error: any) {
+      alert(`Error updating user: ${error.message}`);
+    }
   };
 
   const handleResetPassword = async (user: any) => {
@@ -238,39 +271,142 @@ const Users: React.FC = () => {
     }
   };
 
+  // Bulk operation handlers
+  const handleSelectAll = () => {
+    if (selectedUsers.length === filteredUserList.length) {
+      setSelectedUsers([]);
+    } else {
+      setSelectedUsers(filteredUserList.map(user => user.id));
+    }
+  };
+
+  const handleSelectUser = (userId: string) => {
+    setSelectedUsers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const bulkActivateUsers = async () => {
+    try {
+      const promises = selectedUsers.map(userId => 
+        apiService.patch(`/admin/users/${userId}/status`, { isActive: true })
+      );
+      await Promise.all(promises);
+      alert(`Successfully activated ${selectedUsers.length} users`);
+      setSelectedUsers([]);
+      setShowBulkActions(false);
+      loadUsers();
+    } catch (error) {
+      console.error('Bulk activation failed:', error);
+      alert('Some activations failed. Please try again.');
+    }
+  };
+
+  const bulkDeactivateUsers = async () => {
+    if (!window.confirm(`Deactivate ${selectedUsers.length} users? This will prevent them from logging in.`)) return;
+    
+    try {
+      const promises = selectedUsers.map(userId => 
+        apiService.patch(`/admin/users/${userId}/status`, { isActive: false })
+      );
+      await Promise.all(promises);
+      alert(`Successfully deactivated ${selectedUsers.length} users`);
+      setSelectedUsers([]);
+      setShowBulkActions(false);
+      loadUsers();
+    } catch (error) {
+      console.error('Bulk deactivation failed:', error);
+      alert('Some deactivations failed. Please try again.');
+    }
+  };
+
+  const bulkChangeRole = async (newRole: string) => {
+    if (!window.confirm(`Change role of ${selectedUsers.length} users to ${newRole}?`)) return;
+    
+    try {
+      const promises = selectedUsers.map(userId => 
+        apiService.patch(`/admin/users/${userId}/role`, { role: newRole })
+      );
+      await Promise.all(promises);
+      alert(`Successfully changed role of ${selectedUsers.length} users to ${newRole}`);
+      setSelectedUsers([]);
+      setShowBulkActions(false);
+      loadUsers();
+    } catch (error) {
+      console.error('Bulk role change failed:', error);
+      alert('Some role changes failed. Please try again.');
+    }
+  };
+
+  const bulkSendLoginLinks = async () => {
+    try {
+      const promises = selectedUsers.map(userId => 
+        apiService.post(`/admin/users/${userId}/send-login-link`, {})
+      );
+      await Promise.all(promises);
+      alert(`Successfully sent login links to ${selectedUsers.length} users`);
+      setSelectedUsers([]);
+      setShowBulkActions(false);
+    } catch (error) {
+      console.error('Bulk login link sending failed:', error);
+      alert('Some login links failed to send. Please try again.');
+    }
+  };
+
   const handleCopyEmail = (email: string) => {
     navigator.clipboard.writeText(email);
     alert('Email copied to clipboard');
   };
 
   const handleDeleteUser = async (user: any) => {
-    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-    try {
-      const response = await apiService.delete(`/admin/users/${user.id}`);
-      if (response.success) {
-        alert(response.message);
-        // Refresh users list
-        loadUsers();
-        setShowProfileDrawer(false);
+    const confirmMessage = `Are you sure you want to delete ${user.email}?\n\n⚠️ This action cannot be undone.\n• All user data will be permanently removed\n• Associated exchanges will be unassigned\n• Message history will be preserved`;
+    
+    if (window.confirm(confirmMessage)) {
+      const finalConfirm = prompt(`Type "DELETE" to confirm deletion of ${user.email}`);
+      if (finalConfirm === 'DELETE') {
+        try {
+          const response = await apiService.delete(`/admin/users/${user.id}`);
+          if (response.success) {
+            alert('User deleted successfully');
+            loadUsers();
+            setShowProfileDrawer(false);
+            setUserActionMenu(null);
+          }
+        } catch (error: any) {
+          alert(`Error deleting user: ${error.message}`);
+        }
+      } else {
+        alert('Deletion cancelled');
       }
-    } catch (error: any) {
-      alert(`Error deleting user: ${error.message}`);
-    }
     }
   };
 
   const handleChangeRole = async (user: any, newRole: string) => {
-    try {
-    const response = await apiService.patch(`/admin/users/${user.id}/role`, {
-      role: newRole
-    });
-    if (response.success) {
-      alert(response.message);
-      // Refresh users list
-      loadUsers();
-    }
-    } catch (error: any) {
-    alert(`Error changing user role: ${error.message}`);
+    const roleDescriptions: Record<string, string> = {
+      admin: 'Full system access, user management, and all administrative functions',
+      coordinator: 'Manage exchanges and user assignments',
+      client: 'View and manage assigned exchanges only',
+      third_party: 'Read-only access to assigned exchanges',
+      agency: 'Manage multiple clients and their exchanges'
+    };
+    
+    const message = `Change ${user.email}'s role from ${user.role} to ${newRole}?\n\n${roleDescriptions[newRole] || ''}`;
+    
+    if (window.confirm(message)) {
+      try {
+        const response = await apiService.patch(`/admin/users/${user.id}/role`, {
+          role: newRole
+        });
+        if (response.success) {
+          alert('Role updated successfully');
+          loadUsers();
+          setUserActionMenu(null);
+        }
+      } catch (error: any) {
+        alert(`Error changing user role: ${error.message}`);
+      }
     }
   };
 
@@ -427,37 +563,116 @@ const Users: React.FC = () => {
                 <MoreVertical className="w-5 h-5 text-gray-500" />
               </button>
               {userActionMenu === user.id && (
-                <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded shadow-lg z-20 animate-fade-in">
-                  <button className="block w-full text-left px-4 py-2 hover:bg-blue-50" onClick={() => handleSendLoginLink(user)}>
-                    <Send className="w-4 h-4 inline mr-2" />
-                    Send Login Link
-                  </button>
-                  <button className="block w-full text-left px-4 py-2 hover:bg-blue-50" onClick={() => handleViewUserProfile(user)}>
-                    <BarChart3 className="w-4 h-4 inline mr-2" />
-                    View Analytics
-                  </button>
-                  <button className="block w-full text-left px-4 py-2 hover:bg-blue-50" onClick={() => handleSeeAudit(user)}>
-                    <BarChart3 className="w-4 h-4 inline mr-2" />
-                    See Audit
-                  </button>
-                  <button className="block w-full text-left px-4 py-2 hover:bg-blue-50" onClick={() => handleChat(user)}>
-                    <MessageSquare className="w-4 h-4 inline mr-2" />
-                    Chat
-                  </button>
+                <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-xl z-20 animate-fade-in overflow-hidden">
+                  <div className="p-1">
+                    <button 
+                      className="block w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm flex items-center gap-2" 
+                      onClick={(e) => { e.stopPropagation(); handleEditUser(user); }}
+                    >
+                      <Edit className="w-4 h-4" />
+                      Edit User
+                    </button>
+                    <button 
+                      className="block w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm flex items-center gap-2" 
+                      onClick={(e) => { e.stopPropagation(); handleSendLoginLink(user); }}
+                    >
+                      <Send className="w-4 h-4" />
+                      Send Login Link
+                    </button>
+                    <button 
+                      className="block w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm flex items-center gap-2" 
+                      onClick={(e) => { e.stopPropagation(); handleResetPassword(user); }}
+                    >
+                      <Lock className="w-4 h-4" />
+                      Reset Password
+                    </button>
+                    <button 
+                      className="block w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm flex items-center gap-2" 
+                      onClick={(e) => { e.stopPropagation(); handleEnable2FA(user); }}
+                    >
+                      <Shield className="w-4 h-4" />
+                      {user.two_fa_enabled ? 'Disable' : 'Enable'} 2FA
+                    </button>
+                  </div>
+                  
                   <div className="border-t my-1"></div>
-                  <button className="block w-full text-left px-4 py-2 hover:bg-red-50 text-red-600" onClick={() => handleDeactivate(user)}>
-                    {user.is_active ? (
-                      <>
-                        <Lock className="w-4 h-4 inline mr-2" />
-                        Deactivate
-                      </>
-                    ) : (
-                      <>
-                        <Unlock className="w-4 h-4 inline mr-2" />
-                        Activate
-                      </>
-                    )}
-                  </button>
+                  
+                  <div className="p-1">
+                    <div className="px-3 py-1 text-xs font-semibold text-gray-500 uppercase">Change Role</div>
+                    {['admin', 'coordinator', 'client', 'third_party', 'agency'].map(role => (
+                      <button
+                        key={role}
+                        className={`block w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm flex items-center gap-2 ${
+                          user.role === role ? 'bg-blue-50 text-blue-600' : ''
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (user.role !== role) handleChangeRole(user, role);
+                        }}
+                        disabled={user.role === role}
+                      >
+                        <User className="w-4 h-4" />
+                        {role.charAt(0).toUpperCase() + role.slice(1).replace('_', ' ')}
+                        {user.role === role && <span className="text-xs ml-auto">(current)</span>}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <div className="border-t my-1"></div>
+                  
+                  <div className="p-1">
+                    <button 
+                      className="block w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm flex items-center gap-2" 
+                      onClick={(e) => { e.stopPropagation(); handleViewUserProfile(user); }}
+                    >
+                      <Eye className="w-4 h-4" />
+                      View Profile
+                    </button>
+                    <button 
+                      className="block w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm flex items-center gap-2" 
+                      onClick={(e) => { e.stopPropagation(); handleSeeAudit(user); }}
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                      View Audit Log
+                    </button>
+                    <button 
+                      className="block w-full text-left px-3 py-2 hover:bg-gray-50 rounded text-sm flex items-center gap-2" 
+                      onClick={(e) => { e.stopPropagation(); handleChat(user); }}
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Send Message
+                    </button>
+                  </div>
+                  
+                  <div className="border-t my-1"></div>
+                  
+                  <div className="p-1">
+                    <button 
+                      className={`block w-full text-left px-3 py-2 rounded text-sm flex items-center gap-2 ${
+                        user.is_active ? 'hover:bg-orange-50 text-orange-600' : 'hover:bg-green-50 text-green-600'
+                      }`}
+                      onClick={(e) => { e.stopPropagation(); handleDeactivate(user); }}
+                    >
+                      {user.is_active ? (
+                        <>
+                          <Lock className="w-4 h-4" />
+                          Deactivate User
+                        </>
+                      ) : (
+                        <>
+                          <Unlock className="w-4 h-4" />
+                          Activate User
+                        </>
+                      )}
+                    </button>
+                    <button 
+                      className="block w-full text-left px-3 py-2 hover:bg-red-50 text-red-600 rounded text-sm flex items-center gap-2" 
+                      onClick={(e) => { e.stopPropagation(); handleDeleteUser(user); }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete User
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -527,6 +742,101 @@ const Users: React.FC = () => {
             <span className="text-red-800 font-medium">Error</span>
           </div>
           <p className="text-red-700 mt-1">{error}</p>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {showEditModal && editingUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Edit User</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  First Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.first_name}
+                  onChange={(e) => setFormData({...formData, first_name: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.last_name}
+                  onChange={(e) => setFormData({...formData, last_name: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Role
+                </label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({...formData, role: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="coordinator">Coordinator</option>
+                  <option value="client">Client</option>
+                  <option value="third_party">Third Party</option>
+                  <option value="agency">Agency</option>
+                </select>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="is_active"
+                  checked={formData.is_active}
+                  onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="is_active" className="ml-2 block text-sm text-gray-900">
+                  Active User
+                </label>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingUser(null);
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateUser}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
