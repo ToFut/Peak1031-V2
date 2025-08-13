@@ -509,15 +509,15 @@ router.post('/', authenticateToken, async (req, res) => {
       });
     }
 
-    // Validate assignment if assigned_to is provided
-    if (taskData.assigned_to) {
+    // Validate assignment if assigned_to is provided and not empty
+    if (taskData.assigned_to && taskData.assigned_to.trim() !== '') {
       console.log('🔍 Validating assignment:', taskData.assigned_to);
       
       try {
         // Get valid assignees for this exchange context
         const { data: participants, error: participantsError } = await supabaseService.client
           .from('exchange_participants')
-          .select('contact_id')
+          .select('contact_id, user_id')
           .eq('exchange_id', exchangeId)
           .eq('is_active', true);
 
@@ -531,23 +531,38 @@ router.post('/', authenticateToken, async (req, res) => {
         }
 
         // Check if the assigned_to ID is in the list of valid participants
-        const validAssigneeIds = (participants || []).map(p => p.contact_id).filter(id => id);
+        // Check both user_id and contact_id as participants can have either
+        const validAssigneeIds = (participants || []).flatMap(p => [p.contact_id, p.user_id]).filter(id => id);
         const isValidAssignee = validAssigneeIds.includes(taskData.assigned_to);
 
         console.log('📋 Assignment validation:', {
           assignedTo: taskData.assigned_to,
+          assignedToType: typeof taskData.assigned_to,
           validAssigneeIds: validAssigneeIds,
-          isValidAssignee: isValidAssignee
+          isValidAssignee: isValidAssignee,
+          participants: participants,
+          exchangeId: exchangeId
         });
 
         if (!isValidAssignee) {
-          console.log('❌ Invalid assignment: User not a participant in this exchange');
-          return res.status(400).json({
-            success: false,
-            error: 'Invalid assignment - user is not a participant in this exchange',
-            details: 'Tasks can only be assigned to participants in the exchange',
-            validAssignees: validAssigneeIds
-          });
+          // If there are no participants at all, allow assignment to any valid user
+          if (validAssigneeIds.length === 0) {
+            console.log('⚠️ No participants found in exchange - allowing assignment to any user');
+          } else {
+            console.log('❌ Invalid assignment: User not a participant in this exchange');
+            return res.status(400).json({
+              success: false,
+              error: 'Invalid assignment - user is not a participant in this exchange',
+              details: 'Tasks can only be assigned to participants in the exchange',
+              validAssignees: validAssigneeIds,
+              debugInfo: {
+                assignedTo: taskData.assigned_to,
+                assignedToType: typeof taskData.assigned_to,
+                participantCount: participants?.length || 0,
+                hasParticipants: validAssigneeIds.length > 0
+              }
+            });
+          }
         }
 
         console.log('✅ Assignment validation passed');

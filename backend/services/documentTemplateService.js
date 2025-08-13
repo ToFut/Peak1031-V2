@@ -5,6 +5,7 @@ const { createClient } = require('@supabase/supabase-js');
 const pdfParse = require('pdf-parse');
 const Docxtemplater = require('docxtemplater');
 const PizZip = require('pizzip');
+const SmartPlaceholderService = require('./smartPlaceholderService');
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -17,6 +18,7 @@ class DocumentTemplateService {
     this.templatesDir = path.join(__dirname, '../templates');
     this.outputDir = path.join(__dirname, '../uploads/generated');
     this.previewDir = path.join(__dirname, '../uploads/previews');
+    this.smartPlaceholderService = new SmartPlaceholderService();
     
     // Ensure directories exist
     this.ensureDirectories();
@@ -253,6 +255,12 @@ class DocumentTemplateService {
       if (!exchangeData) {
         throw new Error('Exchange not found');
       }
+      
+      console.log('📋 Raw exchange data structure:', {
+        hasClient: !!exchangeData.client,
+        clientFields: exchangeData.client ? Object.keys(exchangeData.client) : [],
+        exchangeFields: Object.keys(exchangeData).filter(k => !['client', 'coordinator'].includes(k))
+      });
 
       // Merge exchange data with additional data
       const templateData = {
@@ -262,6 +270,13 @@ class DocumentTemplateService {
 
       // Validate required fields and get enhanced data with fallbacks
       const enhancedTemplateData = await this.validateRequiredFields(template, templateData);
+      console.log('📋 Enhanced template data sample:', {
+        'Matter.Number': enhancedTemplateData['Matter.Number'],
+        'Matter.Client': enhancedTemplateData['Matter.Client'],
+        'Contact.FirstName': enhancedTemplateData['Contact.FirstName'],
+        'Contact.LastName': enhancedTemplateData['Contact.LastName'],
+        'Contact.Street1': enhancedTemplateData['Contact.Street1']
+      });
 
       // Generate document based on template type
       let generatedDocument;
@@ -688,29 +703,59 @@ class DocumentTemplateService {
     const properties = this.identifyPropertiesInExchange(exchangeData);
     const participants = this.identifyParticipantsInExchange(exchangeData);
     
+    // Get primary client contact information
+    const primaryClient = clients.primary || {};
+    const primaryContact = primaryClient.contact || primaryClient;
+    
+    // Extract exchange/matter information
+    const exchange = exchangeData.exchange || exchangeData;
+    const matter = exchange.matter || exchange;
+    
     return {
-      // Exchange Information
-      '#Exchange.ID#': exchangeData['#Exchange.ID#'] || exchangeData.exchange?.id || 'N/A',
-      '#Exchange.Number#': exchangeData['#Exchange.Number#'] || exchangeData.exchange?.number || 'N/A',
-      '#Exchange.Name#': exchangeData['#Exchange.Name#'] || exchangeData.exchange?.name || 'N/A',
-      '#Exchange.Type#': exchangeData['#Exchange.Type#'] || exchangeData.exchange?.type || 'Delayed Exchange',
-      '#Exchange.Status#': exchangeData['#Exchange.Status#'] || exchangeData.exchange?.status || 'In Progress',
-      '#Exchange.Value#': exchangeData['#Exchange.Value#'] || exchangeData.exchange?.value || '$0.00',
-      '#Exchange.StartDate#': exchangeData['#Exchange.StartDate#'] || exchangeData.exchange?.startDate || 'Not specified',
-      '#Exchange.CompletionDate#': exchangeData['#Exchange.CompletionDate#'] || exchangeData.exchange?.completionDate || 'Not specified',
-      '#Exchange.IdentificationDeadline#': exchangeData['#Exchange.IdentificationDeadline#'] || exchangeData.exchange?.identificationDeadline || 'Not specified',
-      '#Exchange.CompletionDeadline#': exchangeData['#Exchange.CompletionDeadline#'] || exchangeData.exchange?.completionDeadline || 'Not specified',
+      // Matter/Exchange Information (PracticePanther format)
+      'Matter.Number': matter.number || matter.pp_matter_id || exchange.number || 'N/A',
+      'Matter.Name': matter.name || exchange.name || exchange.exchange_name || 'Unnamed Exchange',
+      'Matter.Client': primaryClient.name || `${primaryContact.first_name || ''} ${primaryContact.last_name || ''}`.trim() || 'Client Name Not Available',
+      'Matter.Status': matter.status || exchange.status || 'Active',
+      'Matter.Type': matter.type || exchange.exchange_type || 'Delayed Exchange',
+      'Matter.Value': matter.value || exchange.exchange_value || exchange.value || '$0.00',
+      
+      // Exchange Information (Standard format)
+      '#Exchange.ID#': exchange.id || matter.id || 'N/A',
+      '#Exchange.Number#': matter.number || matter.pp_matter_id || exchange.number || 'N/A',
+      '#Exchange.Name#': matter.name || exchange.name || exchange.exchange_name || 'N/A',
+      '#Exchange.Type#': matter.type || exchange.exchange_type || 'Delayed Exchange',
+      '#Exchange.Status#': matter.status || exchange.status || 'In Progress',
+      '#Exchange.Value#': matter.value || exchange.exchange_value || exchange.value || '$0.00',
+      '#Exchange.StartDate#': matter.start_date || exchange.start_date || 'Not specified',
+      '#Exchange.CompletionDate#': matter.completion_date || exchange.completion_date || 'Not specified',
+      
+      // Contact Information (PracticePanther Contact fields)
+      'Contact.FirstName': primaryContact.first_name || primaryClient.firstName || '',
+      'Contact.LastName': primaryContact.last_name || primaryClient.lastName || '',
+      'Contact.FullName': primaryClient.name || `${primaryContact.first_name || ''} ${primaryContact.last_name || ''}`.trim() || 'Contact Name Not Available',
+      'Contact.Email': primaryContact.email || primaryClient.email || '',
+      'Contact.Phone': primaryContact.phone_mobile || primaryContact.phone_work || primaryContact.phone || primaryClient.phone || '',
+      'Contact.Mobile': primaryContact.phone_mobile || '',
+      'Contact.Work': primaryContact.phone_work || '',
+      'Contact.Company': primaryContact.company || primaryClient.company || '',
+      'Contact.Street1': primaryContact.address || primaryContact.street1 || primaryClient.address || '',
+      'Contact.Street2': primaryContact.address2 || primaryContact.street2 || '',
+      'Contact.City': primaryContact.city || '',
+      'Contact.State': primaryContact.state || primaryContact.region || '',
+      'Contact.ZipPostalCode': primaryContact.zip_postal_code || primaryContact.zip || primaryContact.postal_code || '',
+      'Contact.Country': primaryContact.country || 'United States',
 
-      // Intelligent Client Information
-      '#Client.Name#': exchangeData['#Client.Name#'] || clients.primary?.name || 'Client Name Not Available',
-      '#Client.FirstName#': exchangeData['#Client.FirstName#'] || clients.primary?.firstName || '',
-      '#Client.LastName#': exchangeData['#Client.LastName#'] || clients.primary?.lastName || '',
-      '#Client.Email#': exchangeData['#Client.Email#'] || clients.primary?.email || '',
-      '#Client.Phone#': exchangeData['#Client.Phone#'] || clients.primary?.phone || '',
-      '#Client.Company#': exchangeData['#Client.Company#'] || clients.primary?.company || '',
-      '#Client.Address#': exchangeData['#Client.Address#'] || clients.primary?.address || '',
-      '#Client.Role#': exchangeData['#Client.Role#'] || clients.primary?.role || 'client',
-      '#Client.OwnershipPercentage#': exchangeData['#Client.OwnershipPercentage#'] || clients.primary?.ownershipPercentage || '100%',
+      // Client Information (Standard format)
+      '#Client.Name#': primaryClient.name || `${primaryContact.first_name || ''} ${primaryContact.last_name || ''}`.trim() || 'Client Name Not Available',
+      '#Client.FirstName#': primaryContact.first_name || primaryClient.firstName || '',
+      '#Client.LastName#': primaryContact.last_name || primaryClient.lastName || '',
+      '#Client.Email#': primaryContact.email || primaryClient.email || '',
+      '#Client.Phone#': primaryContact.phone_mobile || primaryContact.phone_work || primaryContact.phone || primaryClient.phone || '',
+      '#Client.Company#': primaryContact.company || primaryClient.company || '',
+      '#Client.Address#': primaryContact.address || primaryClient.address || '',
+      '#Client.Role#': primaryClient.role || 'client',
+      '#Client.OwnershipPercentage#': primaryClient.ownershipPercentage || '100%',
 
       // Secondary Clients (for multiple client scenarios)
       '#SecondaryClients#': exchangeData['#SecondaryClients#'] || clients.secondary.map(c => c.name).join(', '),
@@ -843,7 +888,7 @@ class DocumentTemplateService {
         case '.pdf':
           return await this.processPdfTemplate(fileData, data);
         case '.docx':
-          return await this.processDocxTemplate(fileData, data);
+          return await this.processDocxTemplate(fileData, data, this.currentExchangeId || 'unknown');
         default:
           throw new Error(`Unsupported file type: ${fileExtension}`);
       }
@@ -958,26 +1003,32 @@ class DocumentTemplateService {
   /**
    * Process DOCX template with enhanced error handling
    */
-  async processDocxTemplate(fileData, data) {
+  async processDocxTemplate(fileData, data, exchangeId) {
     try {
-      console.log('📄 Processing DOCX template with docxtemplater...');
+      console.log('🚀 Processing DOCX template with smart placeholder system...');
       
-      // Convert Blob/File to Buffer if needed
+      // Convert to Buffer
       let buffer;
       if (fileData instanceof Blob) {
-        console.log('📄 Converting Blob to Buffer...');
         const arrayBuffer = await fileData.arrayBuffer();
         buffer = Buffer.from(arrayBuffer);
       } else if (fileData instanceof ArrayBuffer) {
-        console.log('📄 Converting ArrayBuffer to Buffer...');
         buffer = Buffer.from(fileData);
       } else {
-        // Assume it's already a Buffer
         buffer = fileData;
       }
+
+      // Use smart placeholder service to process the template
+      const smartProcessedBuffer = await this.smartPlaceholderService.processTemplate(buffer, exchangeId);
       
-      console.log('🔍 Available placeholders:', Object.keys(data).slice(0, 10));
-      console.log(`📋 Total placeholders available: ${Object.keys(data).length}`);
+      console.log('✅ Smart DOCX processing complete');
+      
+      return {
+        buffer: smartProcessedBuffer,
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        filename: this.generateDocumentFilename('docx'),
+        warnings: []
+      };
       
       // Validate buffer
       if (!buffer || buffer.length === 0) {
@@ -993,6 +1044,65 @@ class DocumentTemplateService {
         throw new Error('Invalid DOCX file format');
       }
       
+      // Preprocess template to fix known issues
+      console.log('🔄 Preprocessing template to fix known issues...');
+      const files = Object.keys(zip.files);
+      
+      files.forEach(fileName => {
+        if (fileName.endsWith('.xml') && !fileName.includes('rels')) {
+          let content = zip.files[fileName].asText();
+          let modified = false;
+          
+          // Fix the specific issue in header1.xml
+          if (fileName === 'word/header1.xml') {
+            // Look for the problematic pattern: E-#</w:t>...Matter.Number...#
+            const problematicPattern = /<w:t>Exchange #: E-#<\/w:t><\/w:r>.*?<w:t>Matter\.Number<\/w:t><\/w:r>.*?<w:t>#<\/w:t>/s;
+            
+            if (problematicPattern.test(content)) {
+              console.log(`🔧 Fixing unclosed tag in ${fileName}`);
+              // Replace with a properly closed tag
+              content = content.replace(problematicPattern, '<w:t>Exchange #: E-#Matter.Number#</w:t>');
+              modified = true;
+            }
+          }
+          
+          // Fix 1: Look for split placeholders across multiple text runs
+          // Pattern: #</w:t></w:r>...<w:r>...<w:t>placeholder</w:t></w:r>...<w:r>...<w:t>#
+          const splitPlaceholderPattern = /#<\/w:t><\/w:r>(?:<w:(?:proofErr|bookmarkStart|bookmarkEnd)[^>]*>)*<w:r[^>]*>.*?<w:t>([A-Za-z0-9_.]+)<\/w:t><\/w:r>(?:<w:(?:proofErr|bookmarkStart|bookmarkEnd)[^>]*>)*<w:r[^>]*>.*?<w:t>#/gs;
+          let match;
+          while ((match = splitPlaceholderPattern.exec(content)) !== null) {
+            console.log(`🔧 Fixing split placeholder in ${fileName}: #${match[1]}#`);
+            const replacement = `#${match[1]}#`;
+            content = content.substring(0, match.index) + replacement + content.substring(match.index + match[0].length);
+            modified = true;
+          }
+          
+          // Fix 2: General fix for orphaned # characters at end of text nodes
+          const orphanedHashPattern = /#<\/w:t><\/w:r><\/w:p>/g;
+          if (orphanedHashPattern.test(content)) {
+            console.log(`🔧 Fixing orphaned # in ${fileName}`);
+            content = content.replace(orphanedHashPattern, '</w:t></w:r></w:p>');
+            modified = true;
+          }
+          
+          // Fix 3: Look for incomplete placeholders (just a single #)
+          const singleHashPattern = /<w:t>([^<]*#[^<#]*)<\/w:t>/g;
+          const singleMatches = content.match(singleHashPattern);
+          if (singleMatches) {
+            singleMatches.forEach(match => {
+              const hashCount = (match.match(/#/g) || []).length;
+              if (hashCount === 1) {
+                console.log(`🔧 Found potential incomplete placeholder in ${fileName}: ${match}`);
+              }
+            });
+          }
+          
+          if (modified) {
+            zip.file(fileName, content);
+          }
+        }
+      })
+      
       let doc;
       try {
         // Initialize Docxtemplater with options in constructor
@@ -1005,14 +1115,54 @@ class DocumentTemplateService {
           }
         });
       } catch (docError) {
-        console.error('❌ Error creating Docxtemplater:', {
+        console.error('❌ Error creating Docxtemplater with # delimiters:', {
           message: docError.message,
           stack: docError.stack,
           name: docError.name,
           properties: docError.properties || {},
           offsets: docError.offsets || []
         });
-        throw new Error(`Failed to initialize document template processor: ${docError.message || 'Unknown error'}`);
+        
+        // If # delimiters fail, try with standard {} delimiters
+        console.log('🔄 Attempting to convert # delimiters to {} delimiters...');
+        
+        try {
+          // Convert all #...# placeholders to {...} in all XML files
+          const files = Object.keys(zip.files);
+          files.forEach(fileName => {
+            if (fileName.endsWith('.xml') && !fileName.includes('rels')) {
+              let content = zip.files[fileName].asText();
+              // Convert #placeholder# to {placeholder}
+              content = content.replace(/#([A-Za-z0-9_.]+)#/g, '{$1}');
+              zip.file(fileName, content);
+            }
+          });
+          
+          // Try again with standard delimiters
+          doc = new Docxtemplater(zip, {
+            paragraphLoop: true,
+            linebreaks: true
+          });
+          
+          console.log('✅ Successfully converted to {} delimiters');
+        } catch (convertError) {
+          console.error('❌ Failed to convert delimiters:', convertError);
+          
+          // Log detailed error information for debugging
+          if (docError.properties && docError.properties.errors) {
+            console.error('📋 Template errors:');
+            docError.properties.errors.forEach((err, index) => {
+              console.error(`  Error ${index + 1}:`);
+              console.error(`    Type: ${err.name}`);
+              console.error(`    Message: ${err.message}`);
+              console.error(`    File: ${err.properties?.file}`);
+              console.error(`    Context: ${err.properties?.context}`);
+              console.error(`    Explanation: ${err.properties?.explanation}`);
+            });
+          }
+          
+          throw new Error(`Failed to initialize document template processor: ${docError.message || 'Unknown error'}`);
+        }
       }
       
       // Prepare data for docxtemplater with intelligent client identification
@@ -1148,20 +1298,7 @@ class DocumentTemplateService {
       };
     } catch (error) {
       console.error('❌ Error processing DOCX template:', error);
-      
-      // Provide more detailed error information
-      let errorMessage = 'Failed to process DOCX template';
-      
-      if (error.message) {
-        errorMessage += `: ${error.message}`;
-      }
-      
-      if (error.properties && error.properties.errors) {
-        const errorDetails = error.properties.errors.map(err => err.message).join('; ');
-        errorMessage += ` - Details: ${errorDetails}`;
-      }
-      
-      throw new Error(errorMessage);
+      throw new Error(`Failed to process DOCX template: ${error.message}`);
     }
   }
 

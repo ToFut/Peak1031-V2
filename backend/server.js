@@ -52,7 +52,7 @@ const analyticsRoutes = require('./routes/analytics');
 const settingsRoutes = require('./routes/settings');
 const userProfileRoutes = require('./routes/user-profile');
 const performanceRoutes = require('./routes/performance');
-const agencyRoutes = require('./routes/agency');
+const agencyRoutes = require('./routes/agencyManagement');
 
 // Enterprise routes
 const enterpriseExchangesRoutes = require('./routes/enterprise-exchanges');
@@ -105,29 +105,9 @@ class PeakServer {
       }
     }));
 
-    // CORS configuration
-    const allowedOrigins = [
-      process.env.FRONTEND_URL || "http://localhost:3000",
-      "http://localhost:3001", // Allow port 3001 for development
-      "http://localhost:3002", // Allow port 3002 for development
-      "http://localhost:3003", // Allow port 3003 for development
-      "http://localhost:8000", // Allow port 8000 for development
-      "http://localhost:9000", // Allow port 9000 for development
-      "http://localhost:9001"  // Allow port 9001 for development
-    ];
-    
+    // CORS configuration - Simplified for local development
     this.app.use(cors({
-      origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        
-        if (allowedOrigins.indexOf(origin) !== -1) {
-          callback(null, true);
-        } else {
-          console.log('🚫 CORS blocked origin:', origin);
-          callback(new Error('Not allowed by CORS'));
-        }
-      },
+      origin: true, // Allow all origins in development
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
       allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'cache-control', 'Pragma', 'pragma', 'Expires', 'expires', 'X-Requested-With', 'Accept', 'Origin'],
@@ -338,8 +318,31 @@ class PeakServer {
     this.app.use('/api/analytics', analyticsRoutes);
     this.app.use('/api/settings', settingsRoutes);
     this.app.use('/api/user-profile', userProfileRoutes);
-    this.app.use('/api/agency', agencyRoutes);
-    this.app.use('/api/agencies', require('./routes/agencies'));
+    // this.app.use('/api', agencyRoutes);
+    
+    // Test route to verify route mounting
+    this.app.get('/api/test', (req, res) => {
+      console.log('[/api/test] GET request received');
+      res.json({ success: true, message: 'Test route working' });
+    });
+    
+    // Agencies route - returns empty data to prevent frontend 404 errors
+    this.app.get('/api/agencies', (req, res) => {
+      console.log('[/api/agencies] GET request received');
+      console.log('[/api/agencies] User:', req.user?.email, 'Role:', req.user?.role);
+      
+      res.json({
+        success: true,
+        data: [],
+        pagination: {
+          page: parseInt(req.query.page) || 1,
+          limit: parseInt(req.query.limit) || 20,
+          total: 0,
+          totalPages: 0
+        }
+      });
+    });
+
     this.app.use('/api/enterprise-exchanges', enterpriseExchangesRoutes);
     this.app.use('/api/account-management', accountManagementRoutes);
     
@@ -435,11 +438,30 @@ class PeakServer {
     });
 
     // Socket connection handler
-    this.io.on('connection', (socket) => {
+    this.io.on('connection', async (socket) => {
       console.log(`User ${socket.user.email} connected with socket ${socket.id}`);
 
       // Join user to their personal room
       socket.join(`user_${socket.user.id}`);
+      
+      // Auto-join user to all exchange rooms they participate in
+      try {
+        const databaseService = require('./services/database');
+        const userExchanges = await databaseService.getExchangeParticipants({
+          where: { user_id: socket.user.id }
+        });
+        
+        for (const participation of userExchanges) {
+          const exchangeId = participation.exchange_id;
+          socket.join(`exchange_${exchangeId}`);
+          socket.join(`exchange-${exchangeId}`); // Both patterns for compatibility
+          console.log(`🏢 Auto-joined user ${socket.user.id} to exchange ${exchangeId}`);
+        }
+        
+        console.log(`✅ User ${socket.user.email} joined ${userExchanges.length} exchange rooms`);
+      } catch (error) {
+        console.error('❌ Error auto-joining user to exchanges:', error);
+      }
 
       // Handle explicit join_user_room requests from frontend
       socket.on('join_user_room', (userId) => {

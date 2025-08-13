@@ -114,6 +114,7 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [exchanges, setExchanges] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [exchangeParticipants, setExchangeParticipants] = useState<any[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<FormData>({
@@ -138,16 +139,70 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (formData.exchangeId) {
+      console.log('Loading participants for exchange:', formData.exchangeId);
+      loadExchangeParticipants(formData.exchangeId);
+    } else {
+      // If no exchange selected, clear participants
+      console.log('No exchange selected, clearing participants');
+      setExchangeParticipants([]);
+    }
+  }, [formData.exchangeId]);
+
   const loadData = async () => {
     try {
       const [exchangesRes, usersRes] = await Promise.all([
         apiService.getExchanges(),
         apiService.getUsers()
       ]);
-      setExchanges((exchangesRes as any).data || exchangesRes || []);
+      
+      console.log('Exchanges response:', exchangesRes);
+      
+      // The API already extracts the exchanges array from response.exchanges
+      const exchangesData = Array.isArray(exchangesRes) ? exchangesRes : [];
+      
+      console.log('Exchanges data:', exchangesData);
+      console.log('First exchange:', exchangesData[0]);
+      console.log('Exchange properties:', exchangesData[0] ? Object.keys(exchangesData[0]) : 'No exchanges');
+      
+      setExchanges(exchangesData);
       setUsers(usersRes || []);
     } catch (error) {
       console.error('Failed to load data:', error);
+    }
+  };
+
+  const loadExchangeParticipants = async (exchangeId: string) => {
+    try {
+      const response = await apiService.getExchangeParticipants(exchangeId);
+      console.log('Exchange participants response:', response);
+      
+      // Handle different response formats
+      const participants = response.data || response.participants || response || [];
+      
+      // Format participants for display
+      const participantUsers = participants
+        .filter((p: any) => p.id) // Ensure participant has an ID
+        .map((p: any) => ({
+          id: p.id,
+          // Store the actual ID that should be used for assignment
+          assignmentId: p.userId || p.contactId || p.id,
+          userId: p.userId,
+          contactId: p.contactId,
+          name: p.firstName && p.lastName 
+            ? `${p.firstName} ${p.lastName}` 
+            : p.name || p.email || 'Unknown',
+          email: p.email,
+          role: p.role
+        }));
+      
+      console.log('Formatted participants:', participantUsers);
+      setExchangeParticipants(participantUsers);
+    } catch (error) {
+      console.error('Failed to load exchange participants:', error);
+      // Fallback to showing all users if failed
+      setExchangeParticipants(users);
     }
   };
 
@@ -181,8 +236,12 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
       const taskData = {
         ...formData,
         exchange_id: formData.exchangeId,
+        assigned_to: formData.assignedTo?.trim() || undefined, // Use undefined instead of null
         created_by: user?.id
       };
+      
+      // Remove the old camelCase field to avoid confusion
+      delete (taskData as any).assignedTo;
       
       const newTask = await apiService.createTask(taskData);
       onTaskCreated(newTask);
@@ -204,8 +263,15 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
       });
       setStep(1);
       setSelectedTemplate(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create task:', error);
+      
+      // Show user-friendly error message
+      if (error.message?.includes('not a participant')) {
+        alert('Assignment Error: The selected user is not a participant in this exchange. Please select a different assignee or leave the assignment blank.');
+      } else {
+        alert(`Failed to create task: ${error.message || 'Unknown error'}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -408,7 +474,11 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
                 </label>
                 <select
                   value={formData.exchangeId}
-                  onChange={(e) => setFormData(prev => ({ ...prev, exchangeId: e.target.value }))}
+                  onChange={(e) => setFormData(prev => ({ 
+                    ...prev, 
+                    exchangeId: e.target.value,
+                    assignedTo: '' // Clear assignee when exchange changes
+                  }))}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 ${
                     errors.exchangeId ? 'border-red-300' : 'border-gray-300'
                   }`}
@@ -416,7 +486,7 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
                   <option value="">Select an exchange...</option>
                   {exchanges.map(exchange => (
                     <option key={exchange.id} value={exchange.id}>
-                      {exchange.name || exchange.title}
+                      {exchange.exchange_number || exchange.exchangeNumber || exchange.name || exchange.exchangeName || `Exchange ${exchange.id.slice(0, 8)}`}
                     </option>
                   ))}
                 </select>
@@ -452,15 +522,28 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
                       value={formData.assignedTo}
                       onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
                       className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      disabled={!formData.exchangeId}
                     >
-                      <option value="">Unassigned</option>
-                      {users.map(user => (
-                        <option key={user.id} value={user.id}>
-                          {user.name || user.email}
+                      <option value="">
+                        {!formData.exchangeId 
+                          ? 'Select an exchange first' 
+                          : exchangeParticipants.length === 0 
+                            ? 'No participants found' 
+                            : 'Select a participant'}
+                      </option>
+                      {exchangeParticipants.map(participant => (
+                        <option key={participant.id} value={participant.assignmentId}>
+                          {participant.name || participant.email || 'Unknown User'}
+                          {participant.role ? ` (${participant.role})` : ''}
                         </option>
                       ))}
                     </select>
                   </div>
+                  {!formData.exchangeId && (
+                    <p className="mt-1 text-sm text-gray-500">
+                      Please select an exchange to see available participants
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -587,7 +670,7 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
                     <div>
                       <span className="text-sm text-gray-500">Assigned To</span>
                       <p className="text-gray-900">
-                        {users.find(u => u.id === formData.assignedTo)?.name || formData.assignedTo}
+                        {exchangeParticipants.find(u => u.assignmentId === formData.assignedTo)?.name || 'Selected participant'}
                       </p>
                     </div>
                   )}

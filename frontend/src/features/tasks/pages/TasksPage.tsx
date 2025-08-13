@@ -4,6 +4,7 @@ import { TaskBoard } from '../components/TaskBoard';
 import EnhancedTaskManager from '../components/EnhancedTaskManager';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
+import { useRealTimeTasks } from '../../../hooks/useRealTimeTasks';
 import { 
   Cog6ToothIcon, 
   XMarkIcon, 
@@ -36,6 +37,22 @@ const TasksPage: React.FC = () => {
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const { user } = useAuth();
+
+  // Real-time task updates
+  useRealTimeTasks({
+    onTaskCreated: (event) => {
+      console.log('📋 New task created:', event);
+      loadData(); // Reload all tasks
+    },
+    onTaskUpdated: (event) => {
+      console.log('📋 Task updated:', event);
+      loadData(); // Reload all tasks
+    },
+    onTaskDeleted: (event) => {
+      console.log('📋 Task deleted:', event);
+      loadData(); // Reload all tasks
+    }
+  });
 
   useEffect(() => {
     loadData();
@@ -417,7 +434,11 @@ const TasksPage: React.FC = () => {
               </button>
             </div>
             <div className="flex-1 overflow-hidden">
-              <EnhancedTaskManager />
+              <EnhancedTaskManager onTaskCreated={() => {
+                console.log('Task created in EnhancedTaskManager');
+                setShowEnhancedManager(false);
+                loadData();
+              }} />
             </div>
           </div>
         </div>

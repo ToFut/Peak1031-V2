@@ -21,33 +21,16 @@ import {
   PencilIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
-import { EnhancedTaskBoard } from '../../../components/tasks/EnhancedTaskBoard';
-import { SmartTaskCreationModal } from '../../../components/tasks/SmartTaskCreationModal';
-import { useEnhancedTasks } from '../../../hooks/useEnhancedTasks';
 
-const EnhancedTaskManager: React.FC<{ exchangeId?: string; exchangeName?: string }> = ({ exchangeId, exchangeName }) => {
-  const {
-    taskStats,
-    tasksByPriority,
-    suggestions,
-    loading,
-    error
-  } = useEnhancedTasks(exchangeId);
-
+const EnhancedTaskManager: React.FC<{ 
+  exchangeId?: string; 
+  exchangeName?: string;
+  onTaskCreated?: () => void;
+}> = ({ exchangeId, exchangeName, onTaskCreated }) => {
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [compactView, setCompactView] = useState(true);
-
-  // Auto-show suggestions for new users or when there are high-priority suggestions
-  useEffect(() => {
-    if (suggestions.length > 0) {
-      const hasHighPriority = suggestions.some(s => s.priority === 'critical' || s.priority === 'high');
-      if (hasHighPriority) {
-        setShowSuggestions(true);
-      }
-    }
-  }, [suggestions]);
 
   return (
     <div className="space-y-6">
@@ -100,246 +83,150 @@ const EnhancedTaskManager: React.FC<{ exchangeId?: string; exchangeName?: string
                   : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
               }`}
             >
-              <Squares2X2Icon className="h-4 w-4" />
-              <span>Compact</span>
+              <ChartBarIcon className="h-4 w-4" />
+              <span className="text-sm font-medium">
+                {compactView ? 'Compact' : 'Detailed'}
+              </span>
             </button>
 
-            {/* AI Suggestions Toggle */}
-            {suggestions.length > 0 && (
-              <button
-                onClick={() => setShowSuggestions(!showSuggestions)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
-                  showSuggestions
-                    ? 'bg-yellow-50 border-yellow-200 text-yellow-700'
-                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <LightBulbIcon className="h-4 w-4" />
-                <span>{suggestions.length} AI Suggestions</span>
-              </button>
-            )}
-
-            {/* Create Smart Task */}
+            {/* Create Task Button */}
             <button
               onClick={() => setShowCreateModal(true)}
               className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              <SparklesIcon className="h-4 w-4" />
-              <span>Create Smart Task</span>
+              <PlusIcon className="h-4 w-4" />
+              <span className="text-sm font-medium">Create Task</span>
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Stats Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Total Tasks */}
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Tasks</p>
-              <p className="text-3xl font-bold text-gray-900">{taskStats.total}</p>
-              <p className="text-sm text-gray-500 mt-1">
-                {taskStats.completionRate}% completed
-              </p>
+        {/* Quick Stats */}
+        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-blue-50 rounded-lg p-4">
+            <div className="flex items-center">
+              <ClockIcon className="h-5 w-5 text-blue-600 mr-2" />
+              <div>
+                <p className="text-sm font-medium text-blue-900">Pending</p>
+                <p className="text-2xl font-bold text-blue-600">0</p>
+              </div>
             </div>
-            <div className="p-3 bg-blue-100 rounded-xl">
-              <ChartBarIcon className="h-6 w-6 text-blue-600" />
+          </div>
+          <div className="bg-yellow-50 rounded-lg p-4">
+            <div className="flex items-center">
+              <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 mr-2" />
+              <div>
+                <p className="text-sm font-medium text-yellow-900">In Progress</p>
+                <p className="text-2xl font-bold text-yellow-600">0</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-green-50 rounded-lg p-4">
+            <div className="flex items-center">
+              <CheckCircleIcon className="h-5 w-5 text-green-600 mr-2" />
+              <div>
+                <p className="text-sm font-medium text-green-900">Completed</p>
+                <p className="text-2xl font-bold text-green-600">0</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-purple-50 rounded-lg p-4">
+            <div className="flex items-center">
+              <SparklesIcon className="h-5 w-5 text-purple-600 mr-2" />
+              <div>
+                <p className="text-sm font-medium text-purple-900">AI Suggestions</p>
+                <p className="text-2xl font-bold text-purple-600">0</p>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Pending Tasks */}
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Pending</p>
-              <p className="text-3xl font-bold text-gray-900">{taskStats.pending}</p>
-              <p className="text-sm text-gray-500 mt-1">Awaiting action</p>
-            </div>
-            <div className="p-3 bg-gray-100 rounded-xl">
-              <ClockIcon className="h-6 w-6 text-gray-600" />
-            </div>
-          </div>
-        </div>
-
-        {/* In Progress */}
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">In Progress</p>
-              <p className="text-3xl font-bold text-blue-600">{taskStats.inProgress}</p>
-              <p className="text-sm text-gray-500 mt-1">Being worked on</p>
-            </div>
-            <div className="p-3 bg-blue-100 rounded-xl">
-              <SparklesIcon className="h-6 w-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-        {/* Overdue Tasks */}
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Overdue</p>
-              <p className="text-3xl font-bold text-red-600">{taskStats.overdue}</p>
-              <p className="text-sm text-gray-500 mt-1">Need attention</p>
-            </div>
-            <div className="p-3 bg-red-100 rounded-xl">
-              <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
-            </div>
+        {/* Feature Badges */}
+        <div className="mt-4">
+          <div className="flex items-center space-x-2">
+            <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
+              AI-Powered
+            </span>
+            <span className="px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
+              Smart Templates
+            </span>
+            <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">
+              Chat Integration
+            </span>
           </div>
         </div>
       </div>
-
-      {/* Priority Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Tasks by Priority</h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                <span className="text-sm text-gray-600">Critical</span>
-              </div>
-              <span className="font-medium">{tasksByPriority.critical || 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                <span className="text-sm text-gray-600">High</span>
-              </div>
-              <span className="font-medium">{tasksByPriority.high || 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                <span className="text-sm text-gray-600">Medium</span>
-              </div>
-              <span className="font-medium">{tasksByPriority.medium || 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-sm text-gray-600">Low</span>
-              </div>
-              <span className="font-medium">{tasksByPriority.low || 0}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* AI Features Info */}
-        <div className="lg:col-span-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200 p-6">
-          <div className="flex items-start space-x-4">
-            <div className="p-3 bg-blue-100 rounded-xl">
-              <SparklesIcon className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-900 mb-2">AI-Powered Task Management</h3>
-              <p className="text-gray-600 text-sm mb-3">
-                Create tasks using natural language, get smart suggestions, and auto-complete common actions.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
-                  Natural Language Processing
-                </span>
-                <span className="px-3 py-1 bg-purple-100 text-purple-800 text-xs rounded-full font-medium">
-                  Auto-Complete Actions
-                </span>
-                <span className="px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
-                  Smart Templates
-                </span>
-                <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">
-                  Chat Integration
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* AI Suggestions Panel */}
-      {showSuggestions && suggestions.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-yellow-900 flex items-center">
-              <LightBulbIcon className="h-5 w-5 mr-2" />
-              AI Task Suggestions
-            </h3>
-            <button
-              onClick={() => setShowSuggestions(false)}
-              className="text-yellow-600 hover:text-yellow-800 text-sm"
-            >
-              Dismiss
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {suggestions.slice(0, 6).map((suggestion, index) => (
-              <div
-                key={index}
-                className="bg-white p-4 border border-yellow-200 rounded-lg cursor-pointer hover:shadow-sm transition-shadow"
-                onClick={() => {
-                  setShowCreateModal(true);
-                  // Pass suggestion data to modal
-                }}
-              >
-                <h4 className="font-medium text-gray-900 mb-2">{suggestion.title}</h4>
-                <p className="text-sm text-gray-600 mb-3">{suggestion.description}</p>
-                <div className="flex items-center justify-between">
-                  <span className={`inline-block px-2 py-1 text-xs rounded-full font-medium ${
-                    suggestion.priority === 'critical' ? 'bg-red-100 text-red-800' :
-                    suggestion.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                    suggestion.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-green-100 text-green-800'
-                  }`}>
-                    {suggestion.priority}
-                  </span>
-                  <span className="text-xs text-gray-500 capitalize">{suggestion.category}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mr-2" />
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
-        </div>
-      )}
 
       {/* Main Content */}
       {viewMode === 'board' ? (
-        <EnhancedTaskBoard
-          showCompact={compactView}
-          allowCreation={true}
-          exchangeId={exchangeId}
-        />
+        <div className="bg-white rounded-xl shadow-sm border p-8 text-center text-gray-500">
+          <Squares2X2Icon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+          <p>Enhanced Task Board coming soon. Use List view for now.</p>
+        </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border">
-          {/* List view would go here - can use existing TaskManager component */}
-          <div className="p-8 text-center text-gray-500">
-            <TableCellsIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <p>List view coming soon. Use Board view for now.</p>
-          </div>
+        <div className="bg-white rounded-xl shadow-sm border p-8 text-center text-gray-500">
+          <TableCellsIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+          <p>List view coming soon. Use Board view for now.</p>
         </div>
       )}
 
-      {/* Smart Task Creation Modal */}
-      <SmartTaskCreationModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        exchangeId={exchangeId}
-        exchangeName={exchangeName}
-        onTaskCreated={(task) => {
-          console.log('Task created:', task);
-          // Task list will auto-refresh via the hook
-        }}
-      />
+      {/* Simple Task Creation Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Create Task</h3>
+              <button 
+                onClick={() => setShowCreateModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Task Title
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter task title..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Enter task description..."
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    console.log('Task created');
+                    setShowCreateModal(false);
+                    if (onTaskCreated) {
+                      onTaskCreated();
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Create Task
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

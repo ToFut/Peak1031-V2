@@ -82,6 +82,13 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
   } = useChatTasks();
   
   const [taskPreview, setTaskPreview] = useState<any>(null);
+  
+  // @mention autocomplete state
+  const [mentionSuggestions, setMentionSuggestions] = useState<any[]>([]);
+  const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+  const [cursorPosition, setCursorPosition] = useState(0);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -141,10 +148,12 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
     }
   };
 
-  // Enhanced input change with auto-resize and typing indicators
+  // Enhanced input change with auto-resize, typing indicators, and @mention detection
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
+    const cursorPos = e.target.selectionStart || 0;
     setNewMessage(value);
+    setCursorPosition(cursorPos);
     
     // Auto-resize textarea
     const textarea = e.target;
@@ -157,6 +166,62 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
       stopTypingIndicator();
     }
     
+    // Check for @mention at cursor position
+    const textBeforeCursor = value.substring(0, cursorPos);
+    const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+    
+    if (mentionMatch && selectedExchange?.participants) {
+      const query = mentionMatch[1].toLowerCase();
+      setMentionQuery(query);
+      
+      console.log('🔍 @mention detection:', {
+        query,
+        participantCount: selectedExchange.participants.length,
+        participants: selectedExchange.participants
+      });
+      
+      // Filter participants based on query
+      const filtered = selectedExchange.participants.filter(participant => {
+        // Handle both backend (first_name, last_name) and frontend (firstName, lastName) formats
+        const firstName = (participant.first_name || participant.firstName || '')?.toLowerCase();
+        const lastName = (participant.last_name || participant.lastName || '')?.toLowerCase();
+        const fullName = `${firstName} ${lastName}`.trim();
+        const email = participant.email?.toLowerCase() || '';
+        
+        console.log('🔍 Checking participant:', {
+          participant,
+          firstName,
+          lastName,
+          email,
+          query,
+          matches: {
+            firstName: firstName.includes(query),
+            lastName: lastName.includes(query),
+            fullName: fullName.includes(query),
+            email: email.includes(query)
+          }
+        });
+        
+        // Empty query shows all participants
+        if (query === '') {
+          return true;
+        }
+        
+        return firstName.includes(query) || 
+               lastName.includes(query) || 
+               fullName.includes(query) ||
+               email.includes(query);
+      });
+      
+      setMentionSuggestions(filtered);
+      setShowMentionSuggestions(filtered.length > 0);
+      setSelectedSuggestionIndex(0);
+    } else {
+      setShowMentionSuggestions(false);
+      setMentionSuggestions([]);
+      setMentionQuery('');
+    }
+    
     // Check for task command
     const { hasTask, mentions } = parseTaskFromMessage(value);
     if (hasTask) {
@@ -165,6 +230,58 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
     } else {
       setTaskPreview(null);
     }
+  };
+
+  // Handle keyboard navigation for mention suggestions
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showMentionSuggestions && mentionSuggestions.length > 0) {
+      switch (e.key) {
+        case 'ArrowUp':
+          e.preventDefault();
+          setSelectedSuggestionIndex(prev => 
+            prev > 0 ? prev - 1 : mentionSuggestions.length - 1
+          );
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setSelectedSuggestionIndex(prev => 
+            prev < mentionSuggestions.length - 1 ? prev + 1 : 0
+          );
+          break;
+        case 'Tab':
+        case 'Enter':
+          if (!e.shiftKey) {
+            e.preventDefault();
+            insertMention(mentionSuggestions[selectedSuggestionIndex]);
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          setShowMentionSuggestions(false);
+          break;
+      }
+    }
+  };
+
+  // Insert selected mention into message
+  const insertMention = (participant: any) => {
+    const textBeforeCursor = newMessage.substring(0, cursorPosition);
+    const textAfterCursor = newMessage.substring(cursorPosition);
+    const beforeMention = textBeforeCursor.replace(/@\w*$/, '');
+    const mentionText = `@${participant.first_name || participant.firstName || 'user'}`;
+    
+    const newText = beforeMention + mentionText + ' ' + textAfterCursor;
+    setNewMessage(newText);
+    setShowMentionSuggestions(false);
+    
+    // Focus back to textarea and position cursor
+    setTimeout(() => {
+      if (messageInputRef.current) {
+        const newCursorPos = beforeMention.length + mentionText.length + 1;
+        messageInputRef.current.focus();
+        messageInputRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
   };
 
   // Enhanced file upload with drag & drop, validation, and better error handling
@@ -642,9 +759,9 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
                                     ? 'border-blue-400 bg-blue-700 text-white'
                                     : 'border-white bg-gradient-to-br from-indigo-400 to-purple-500 text-white'
                                 }`}
-                                title={`${participant.first_name} ${participant.last_name}`}
+                                title={`${participant.first_name || participant.firstName || ''} ${participant.last_name || participant.lastName || ''}`}
                               >
-                                {participant.first_name?.[0]}
+                                {(participant.first_name || participant.firstName || '')[0]}
                               </div>
                             ))}
                             {exchange.participants.length > 4 && (
@@ -682,9 +799,9 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
                       <div
                         key={participant.id}
                         className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-sm border-2 border-white"
-                        title={`${participant.first_name} ${participant.last_name}`}
+                        title={`${participant.first_name || participant.firstName || ''} ${participant.last_name || participant.lastName || ''}`}
                       >
-                        {participant.first_name?.[0]}{participant.last_name?.[0]}
+                        {(participant.first_name || participant.firstName || '')[0]}{(participant.last_name || participant.lastName || '')[0]}
                       </div>
                     ))}
                     {selectedExchange.participants.length > 3 && (
@@ -966,19 +1083,85 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
                     value={newMessage}
                     onChange={handleInputChange}
                     onBlur={stopTypingIndicator}
-                    placeholder="Type your message..."
+                    placeholder="Type your message... (use @name for mentions, @TASK to create tasks)"
                     className="w-full px-5 py-3 pr-12 bg-gray-50/80 border border-gray-200/50 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-transparent transition-all resize-none"
                     disabled={sending || !isConnected}
                     rows={1}
                     maxLength={1000}
                     style={{ minHeight: '44px', maxHeight: '120px' }}
                     onKeyDown={(e) => {
+                      // Handle mention suggestions first
+                      if (showMentionSuggestions && mentionSuggestions.length > 0) {
+                        switch (e.key) {
+                          case 'ArrowUp':
+                            e.preventDefault();
+                            setSelectedSuggestionIndex(prev => 
+                              prev > 0 ? prev - 1 : mentionSuggestions.length - 1
+                            );
+                            return;
+                          case 'ArrowDown':
+                            e.preventDefault();
+                            setSelectedSuggestionIndex(prev => 
+                              prev < mentionSuggestions.length - 1 ? prev + 1 : 0
+                            );
+                            return;
+                          case 'Tab':
+                            e.preventDefault();
+                            insertMention(mentionSuggestions[selectedSuggestionIndex]);
+                            return;
+                          case 'Escape':
+                            e.preventDefault();
+                            setShowMentionSuggestions(false);
+                            return;
+                          case 'Enter':
+                            if (!e.shiftKey) {
+                              e.preventDefault();
+                              insertMention(mentionSuggestions[selectedSuggestionIndex]);
+                              return;
+                            }
+                            break;
+                        }
+                      }
+                      
+                      // Handle regular Enter key for sending messages
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
                         handleSendMessage(e);
                       }
                     }}
                   />
+                  
+                  {/* @mention suggestions dropdown */}
+                  {showMentionSuggestions && mentionSuggestions.length > 0 && (
+                    <div className="absolute bottom-full left-0 w-full mb-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                      <div className="p-2 text-xs text-gray-500 border-b border-gray-100">
+                        Use ↑↓ to navigate, Enter/Tab to select, Esc to cancel
+                      </div>
+                      {mentionSuggestions.map((participant, index) => (
+                        <button
+                          key={participant.id}
+                          type="button"
+                          className={`w-full text-left px-3 py-2 flex items-center space-x-3 hover:bg-blue-50 ${
+                            index === selectedSuggestionIndex ? 'bg-blue-100' : ''
+                          }`}
+                          onClick={() => insertMention(participant)}
+                          onMouseEnter={() => setSelectedSuggestionIndex(index)}
+                        >
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                            {(participant.first_name || participant.firstName || '')[0]}{(participant.last_name || participant.lastName || '')[0]}
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {participant.first_name || participant.firstName || ''} {participant.last_name || participant.lastName || ''}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {participant.email} • {participant.role}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   
                   <div className="absolute right-2 bottom-2 flex items-center space-x-1">
                     <button
@@ -1070,7 +1253,7 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
                 </div>
                 <div className="flex-1">
                   <p className="font-medium text-gray-900">
-                    {participant.first_name} {participant.last_name}
+                    {participant.first_name || participant.firstName || ''} {participant.last_name || participant.lastName || ''}
                   </p>
                   <p className="text-sm text-gray-500 capitalize">{participant.role}</p>
                 </div>

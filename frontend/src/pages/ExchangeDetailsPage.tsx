@@ -3,10 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Exchange, Task, Document, AuditLog } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { usePermissions } from '../hooks/usePermissions';
+import { useRealTimeTasks } from '../hooks/useRealTimeTasks';
 import { apiService } from '../services/api';
 import UnifiedChatInterface from '../features/messages/components/UnifiedChatInterface';
 import EnterpriseParticipantsManager from '../components/EnterpriseParticipantsManager';
 import { EnhancedDocumentManager } from '../features/documents/components';
+import { TaskCreateModal } from '../features/tasks/components/TaskCreateModal';
+import { TaskBoard } from '../features/tasks/components/TaskBoard';
 import {
   ArrowLeft,
   Eye,
@@ -119,6 +122,26 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
   const [showParticipantsManager, setShowParticipantsManager] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('Client');
+  
+  // Task management
+  const [showTaskCreateModal, setShowTaskCreateModal] = useState(false);
+
+  // Real-time task updates
+  useRealTimeTasks({
+    exchangeId: id,
+    onTaskCreated: (event) => {
+      console.log('📋 New task created in exchange:', event);
+      loadExchangeData(); // Reload tasks
+    },
+    onTaskUpdated: (event) => {
+      console.log('📋 Task updated in exchange:', event);
+      loadExchangeData(); // Reload tasks
+    },
+    onTaskDeleted: (event) => {
+      console.log('📋 Task deleted in exchange:', event);
+      loadExchangeData(); // Reload tasks
+    }
+  });
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -924,43 +947,63 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900">Exchange Tasks</h3>
-                  <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                  <button 
+                    onClick={() => setShowTaskCreateModal(true)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
                     <Plus className="w-4 h-4 inline mr-2" />
                     Add Task
                   </button>
                 </div>
                 
-                <div className="space-y-4">
-                  {Array.isArray(tasks) && tasks.map((task) => (
-                    <div key={task.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900">{task.title}</h4>
-                          <p className="text-sm text-gray-600 mt-1">{task.description}</p>
-                          <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                            <span>Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}</span>
-                            <span>Priority: {task.priority}</span>
-                            <span>Status: {task.status}</span>
-                          </div>
-                        </div>
-                        <div className="ml-4">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            task.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                            task.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {task.status}
-                          </span>
-                        </div>
+                {/* Modern TaskBoard Component */}
+                <div className="min-h-[600px]">
+                  {Array.isArray(tasks) && tasks.length > 0 ? (
+                    <TaskBoard 
+                      tasks={tasks}
+                      onTaskUpdate={async (taskId: string, updates: Partial<Task>) => {
+                        try {
+                          await apiService.updateTask(taskId, updates);
+                          // Update local state optimistically
+                          setTasks(prev => prev.map(task => 
+                            task.id === taskId ? { ...task, ...updates } : task
+                          ));
+                        } catch (error) {
+                          console.error('Failed to update task:', error);
+                          // Reload data on error
+                          loadExchangeData();
+                        }
+                      }}
+                      onTaskSelect={(task: Task) => {
+                        // TODO: Open task details modal or navigate to task page
+                        console.log('Selected task:', task);
+                      }}
+                      showExchangeInfo={false}
+                      compact={false}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+                      <CheckSquare className="h-16 w-16 mb-4 text-gray-300" />
+                      <h3 className="text-xl font-medium text-gray-700 mb-2">No Tasks Yet</h3>
+                      <p className="text-gray-500 text-center mb-6 max-w-md">
+                        Create your first task for this exchange using the Add Task button above, 
+                        or mention @TASK in the chat to create tasks automatically.
+                      </p>
+                      <div className="flex items-center space-x-4">
+                        <button 
+                          onClick={() => setShowTaskCreateModal(true)}
+                          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                        >
+                          <Plus className="w-5 h-5 inline mr-2" />
+                          Create First Task
+                        </button>
+                        <button 
+                          onClick={() => setActiveTab('chat')}
+                          className="bg-purple-100 text-purple-700 px-6 py-3 rounded-lg hover:bg-purple-200 transition-colors font-medium"
+                        >
+                          Try @TASK in Chat
+                        </button>
                       </div>
-                    </div>
-                  ))}
-                  
-                  {(!Array.isArray(tasks) || tasks.length === 0) && (
-                    <div className="text-center py-12">
-                      <CheckSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Tasks</h3>
-                      <p className="text-gray-500">No tasks have been created for this exchange yet.</p>
                     </div>
                   )}
                 </div>
@@ -1264,6 +1307,19 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
             }}
           />
         )}
+        
+        {/* Task Create Modal */}
+        <TaskCreateModal
+          isOpen={showTaskCreateModal}
+          onClose={() => setShowTaskCreateModal(false)}
+          onTaskCreated={(task) => {
+            console.log('Task created:', task);
+            setShowTaskCreateModal(false);
+            // Reload exchange data to refresh tasks
+            loadExchangeData();
+          }}
+          exchangeId={id}
+        />
     </div>
   );
 };

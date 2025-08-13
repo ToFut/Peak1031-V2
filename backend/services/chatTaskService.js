@@ -23,13 +23,15 @@ class ChatTaskService {
 
       console.log('📋 Task detected in message:', taskData);
 
-      // Find assigned user
+      // Find assigned user within exchange participants
       let assignedUserId = null;
       if (taskData.assignedTo) {
-        const assignedUser = await TaskParser.findUserByMention(taskData.assignedTo);
+        const assignedUser = await TaskParser.findUserByMention(taskData.assignedTo, exchangeId);
         if (assignedUser) {
           assignedUserId = assignedUser.id;
           console.log('👤 Assigned to user:', assignedUser.email);
+        } else {
+          console.log('⚠️ User mentioned not found in exchange participants:', taskData.assignedTo);
         }
       }
 

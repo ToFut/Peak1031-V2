@@ -519,11 +519,34 @@ class SupabaseService {
       
       let query = this.client
         .from('tasks')
-        .select('*');
+        .select(`
+          *,
+          assignedUser:assigned_to (
+            id,
+            first_name,
+            last_name,
+            email
+          ),
+          createdByUser:created_by (
+            id,
+            first_name,
+            last_name,
+            email
+          ),
+          exchange:exchange_id (
+            id,
+            exchange_number,
+            status,
+            name
+          )
+        `);
 
       // Apply where conditions
       if (where.exchangeId) {
         query = query.eq('exchange_id', where.exchangeId);
+      }
+      if (where.exchange_id) {
+        query = query.eq('exchange_id', where.exchange_id);
       }
       if (where.status) {
         query = query.eq('status', where.status);

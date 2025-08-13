@@ -118,10 +118,33 @@ router.post('/:exchangeId/participants', authenticateToken, async (req, res) => 
     const result = await supabaseService.createExchangeParticipant(participantData);
     console.log('✅ Participant added successfully:', result);
 
-    // Emit real-time event for participant addition
+    // Emit real-time event for participant addition and auto-join user if online
     const io = req.app.get('io');
     if (io) {
       console.log(`📡 Emitting participant_added to exchange_${exchangeId}`);
+      
+      // Auto-join the new participant to the exchange room if they're currently online
+      if (finalUserId) {
+        // Find all sockets for this user and add them to the exchange room
+        const connectedSockets = Array.from(io.sockets.sockets.values());
+        const userSockets = connectedSockets.filter(s => s.user?.id === finalUserId);
+        
+        for (const socket of userSockets) {
+          socket.join(`exchange_${exchangeId}`);
+          socket.join(`exchange-${exchangeId}`);
+          console.log(`🚀 Auto-joined user ${finalUserId} to exchange ${exchangeId} rooms (socket: ${socket.id})`);
+        }
+        
+        if (userSockets.length > 0) {
+          // Notify the user they've been added to the exchange
+          io.to(`user_${finalUserId}`).emit('exchange_joined', {
+            exchangeId: exchangeId,
+            message: 'You have been added to this exchange',
+            addedBy: req.user.id
+          });
+        }
+      }
+      
       io.to(`exchange_${exchangeId}`).emit('participant_added', {
         exchangeId: exchangeId,
         participantId: result.id,

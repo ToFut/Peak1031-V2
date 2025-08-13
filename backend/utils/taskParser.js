@@ -179,7 +179,50 @@ class TaskParser {
   /**
    * Find user by mention (email or name)
    */
-  static async findUserByMention(mention) {
+  static async findUserByMention(mention, exchangeId = null) {
+    // If exchangeId is provided, limit search to exchange participants for security
+    if (exchangeId) {
+      // Get exchange participants first
+      const { data: participants } = await supabase
+        .from('exchange_participants')
+        .select(`
+          user_id,
+          users:user_id (
+            id, email, first_name, last_name
+          )
+        `)
+        .eq('exchange_id', exchangeId)
+        .not('user_id', 'is', null);
+
+      if (participants && participants.length > 0) {
+        const participantUsers = participants
+          .filter(p => p.users)
+          .map(p => p.users);
+
+        // Search within participants only
+        for (const user of participantUsers) {
+          // Exact email match
+          if (user.email === mention) return user;
+          
+          // Email without domain
+          if (mention.includes('@')) {
+            const username = mention.split('@')[0];
+            if (user.email.startsWith(username + '@')) return user;
+          }
+          
+          // First or last name match (case insensitive)
+          if (user.first_name?.toLowerCase() === mention.toLowerCase() ||
+              user.last_name?.toLowerCase() === mention.toLowerCase()) {
+            return user;
+          }
+        }
+      }
+      
+      // If no match in participants, return null for security
+      return null;
+    }
+
+    // Fallback to global search if no exchangeId provided (for compatibility)
     // First try exact email match
     const { data: emailMatch } = await supabase
       .from('users')

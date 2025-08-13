@@ -51,9 +51,13 @@ router.get('/:id/participants', [
         user:user_id(id, first_name, last_name, email, role),
         contact:contact_id(id, first_name, last_name, email)
       `)
-      .eq('exchange_id', req.params.id);
+      .eq('exchange_id', req.params.id)
+      .eq('is_active', true);
 
     if (error) throw error;
+
+    console.log(`📊 Found ${participants?.length || 0} participants for exchange ${req.params.id}`);
+    console.log('Raw participants:', JSON.stringify(participants?.slice(0, 2), null, 2));
 
     // Format the response - handle both user_id and contact_id cases
     const formattedParticipants = (participants || [])
@@ -66,7 +70,10 @@ router.get('/:id/participants', [
           lastName: user.last_name,
           email: user.email,
           role: p.role,
-          participantId: p.id
+          participantId: p.id,
+          // Include the original IDs for proper task assignment
+          userId: p.user_id,
+          contactId: p.contact_id
         };
       });
 
@@ -154,10 +161,8 @@ router.get('/:id/tasks', [
       orderBy: { column: 'due_date', ascending: true }
     });
 
-    res.json(transformToCamelCase({
-      success: true,
-      tasks: tasks || []
-    }));
+    // Return tasks array directly to match the /tasks route format
+    res.json(transformToCamelCase(tasks || []));
 
   } catch (error) {
     console.error('Error fetching exchange tasks:', error);
@@ -1253,10 +1258,8 @@ router.get('/:id/tasks', [
       orderBy: { column: 'due_date', ascending: true }
     });
 
-    res.json(transformToCamelCase({
-      success: true,
-      tasks: tasks || []
-    }));
+    // Return tasks array directly to match the /tasks route format
+    res.json(transformToCamelCase(tasks || []));
 
   } catch (error) {
     console.error('Error fetching exchange tasks:', error);
