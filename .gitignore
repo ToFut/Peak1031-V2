@@ -135,3 +135,4 @@ coverage/
 # Local development
 .local/ backend/data/ppdata-insert.sql
 backend/data/ppdata-raw.json
+.vercel
