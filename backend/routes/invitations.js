@@ -126,9 +126,23 @@ router.post('/send', authenticateToken, async (req, res) => {
           token: invitationToken
         });
         
-        // TODO: Send email notification with invitation link
-        console.log(`📧 Would send invitation email to ${email} for exchange ${exchange.exchange_name || exchange.exchange_number}`);
-        console.log(`   Invitation link: ${invitationLink}`);
+        // Send email notification with invitation link using the SAME token
+        if (process.env.SENDGRID_API_KEY) {
+          const invitationService = require('../services/invitationService');
+          await invitationService.sendInvitation({
+            email: email.trim(),
+            method: 'email',
+            invitationToken: invitationToken, // Pass the token we saved
+            exchangeName: exchange.exchange_name || exchange.exchange_number,
+            inviterName: req.user.first_name ? `${req.user.first_name} ${req.user.last_name}` : req.user.email,
+            role: role,
+            exchangeId: exchange_id,
+            inviterId: req.user.id
+          });
+        } else {
+          console.log(`📧 Would send invitation email to ${email} for exchange ${exchange.exchange_name || exchange.exchange_number}`);
+          console.log(`   Invitation link: ${invitationLink}`);
+        }
       } catch (err) {
         console.error(`Failed to send invitation to ${email}:`, err);
         results.push({ email, status: 'failed', error: err.message });
@@ -457,11 +471,12 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
           const invitationId = uuidv4();
           const invitationToken = crypto.randomBytes(32).toString('hex');
           
-          // Send invitation using Supabase Auth
+          // Send invitation using Supabase Auth - PASS THE TOKEN WE GENERATED
           const inviteResult = await invitationService.sendInvitation({
             email: invitation.email,
             phone: invitation.phone,
             method: invitation.method,
+            invitationToken: invitationToken, // USE THE SAME TOKEN WE'LL SAVE TO DB
             exchangeName: exchange.name || exchange.exchange_number,
             inviterName: req.user.first_name ? `${req.user.first_name} ${req.user.last_name}` : req.user.email,
             role: invitation.role,
@@ -520,7 +535,7 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
                 exchange_id: exchangeId,
                 role: invitation.role,
                 invited_by: inviterId,
-                invitation_token: inviteResult.invitationToken || invitationId,
+                invitation_token: invitationToken, // Use the same token we generated above
                 expires_at: expiresAt.toISOString(),
                 status: 'pending',
                 first_name: invitation.firstName || null,
