@@ -55,6 +55,7 @@ class DatabaseService {
   // Exchange operations
   async getExchanges(options = {}) {
     if (this.useSupabase) {
+      // Pass includeParticipants option to Supabase service
       return await supabaseService.getExchanges(options);
     } else {
       return await Exchange.findAll({

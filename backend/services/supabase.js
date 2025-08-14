@@ -133,52 +133,21 @@ class SupabaseService {
   }
 
   async getUserById(id) {
-    // Try people table first for authentication purposes (where users are stored)
-    try {
-      const users = await this.select('people', { where: { id } });
-      if (users && users.length > 0) {
-        return users[0];
-      }
-    } catch (peopleError) {
-      console.log('⚠️ Could not query people table with id, trying users table:', peopleError.message);
-    }
-
-    // Try users table second (for backward compatibility)
+    // Use only users table
     try {
       const users = await this.select('users', { where: { id } });
       if (users && users.length > 0) {
         return users[0];
       }
     } catch (userError) {
-      console.log('⚠️ Could not query users table with id, trying contacts table:', userError.message);
-    }
-
-    // Try contacts table third (for user profiles) - use 'id' field, not 'user_id'
-    try {
-      const users = await this.select('contacts', { where: { id } });
-      if (users && users.length > 0) {
-        return users[0];
-      }
-    } catch (contactError) {
-      console.log('⚠️ Could not query contacts table with id:', contactError.message);
+      console.log('⚠️ Could not query users table with id:', userError.message);
     }
     
     return null;
   }
 
   async getUserByEmail(email) {
-    // Try people table first (where users are stored)
-    try {
-      const users = await this.select('people', { where: { email } });
-      if (users && users.length > 0) {
-        // Return the first user (oldest) if there are duplicates
-        return users[0];
-      }
-    } catch (error) {
-      console.log('⚠️ Could not query people table, trying users table:', error.message);
-    }
-    
-    // Fallback to users table
+    // Use only users table
     try {
       const users = await this.select('users', { where: { email } });
       return users[0] || null;
@@ -202,10 +171,51 @@ class SupabaseService {
     }
 
     try {
-      const { where = {}, orderBy = { column: 'created_at', ascending: false }, limit, offset, select } = options;
+      const { where = {}, orderBy = { column: 'created_at', ascending: false }, limit, offset, select, includeParticipants = false } = options;
       
-      // Use basic select if specified for performance
-      const selectFields = select || '*';
+      // Use comprehensive select if participants are requested
+      let selectFields;
+      if (includeParticipants && !select) {
+        selectFields = `
+          *,
+          exchange_participants (
+            *,
+            user:user_id (
+              id,
+              first_name,
+              last_name,
+              email,
+              role,
+              is_active,
+              created_at,
+              updated_at
+            ),
+            contact:contact_id (
+              id,
+              first_name,
+              last_name,
+              email,
+              created_at,
+              updated_at
+            )
+          ),
+          coordinator:coordinator_id (
+            id,
+            first_name,
+            last_name,
+            email,
+            role
+          ),
+          client:client_id (
+            id,
+            first_name,
+            last_name,
+            email
+          )
+        `;
+      } else {
+        selectFields = select || '*';
+      }
       
       let query = this.client
         .from('exchanges')
@@ -241,9 +251,16 @@ class SupabaseService {
         throw new Error(error.message);
       }
 
-      // For performance, return exchanges without related data when fetching many
-      // Frontend can fetch details when needed
       const exchanges = data || [];
+      
+      // If participants were included, transform to match expected format
+      if (includeParticipants) {
+        return exchanges.map(exchange => ({
+          ...exchange,
+          // Ensure exchangeParticipants field exists for compatibility
+          exchangeParticipants: exchange.exchange_participants || []
+        }));
+      }
       
       // Only fetch related data if not using basic select and for small result sets
       if (!select && exchanges.length <= 10 && exchanges.length > 0) {
@@ -1039,44 +1056,61 @@ class SupabaseService {
     }
 
     try {
-      // First get exchanges
+      // Use the comprehensive query like V2 version to get participants with user/contact details
       const { data: exchanges, error: exchangesError } = await this.client
         .from('exchanges')
-        .select('*')
+        .select(`
+          *,
+          exchange_participants (
+            *,
+            user:user_id (
+              id,
+              first_name,
+              last_name,
+              email,
+              role,
+              is_active,
+              created_at,
+              updated_at
+            ),
+            contact:contact_id (
+              id,
+              first_name,
+              last_name,
+              email,
+              created_at,
+              updated_at
+            )
+          ),
+          coordinator:coordinator_id (
+            id,
+            first_name,
+            last_name,
+            email,
+            role
+          ),
+          client:client_id (
+            id,
+            first_name,
+            last_name,
+            email
+          )
+        `)
         .limit(5000);
 
       if (exchangesError) {
-        console.error('❌ Error fetching exchanges:', exchangesError);
+        console.error('❌ Error fetching exchanges with participants:', exchangesError);
         throw exchangesError;
       }
 
-      // Then get participants separately to avoid relationship issues
-      if (exchanges && exchanges.length > 0) {
-        const exchangeIds = exchanges.map(e => e.id);
-        
-        const { data: participants, error: participantsError } = await this.client
-          .from('exchange_participants')
-          .select('*')
-          .in('exchange_id', exchangeIds);
+      // Transform the data to match expected format
+      const transformedExchanges = (exchanges || []).map(exchange => ({
+        ...exchange,
+        // Ensure exchangeParticipants field exists for compatibility
+        exchangeParticipants: exchange.exchange_participants || []
+      }));
 
-        if (!participantsError && participants) {
-          // Map participants to exchanges
-          const participantsByExchange = {};
-          participants.forEach(p => {
-            if (!participantsByExchange[p.exchange_id]) {
-              participantsByExchange[p.exchange_id] = [];
-            }
-            participantsByExchange[p.exchange_id].push(p);
-          });
-
-          // Add participants to exchanges
-          exchanges.forEach(exchange => {
-            exchange.exchange_participants = participantsByExchange[exchange.id] || [];
-          });
-        }
-      }
-
-      return exchanges || [];
+      return transformedExchanges;
     } catch (error) {
       console.error('❌ Supabase query error:', error);
       throw error;

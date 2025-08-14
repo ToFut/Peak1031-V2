@@ -274,13 +274,19 @@ router.get('/', [
       where: whereClause,
       limit: parseInt(limit),
       offset: offset,
-      orderBy: { column: sort_by, ascending: sort_order === 'asc' }
+      orderBy: { column: sort_by, ascending: sort_order === 'asc' },
+      // Include participants for admin/staff/coordinator roles
+      includeParticipants: ['admin', 'staff', 'coordinator'].includes(req.user.role)
     });
     
     console.log('🔍 DEBUG: databaseService returned exchanges:', exchanges?.length || 0);
 
     // For now, we'll get count separately since our service doesn't support findAndCountAll yet
-    const allExchanges = await databaseService.getExchanges({ where: whereClause });
+    const allExchanges = await databaseService.getExchanges({ 
+      where: whereClause,
+      // Include participants for admin/staff/coordinator roles for consistent count
+      includeParticipants: ['admin', 'staff', 'coordinator'].includes(req.user.role)
+    });
     
     console.log('🔍 DEBUG: Total count query returned:', allExchanges?.length || 0);
     const count = allExchanges.length;

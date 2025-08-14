@@ -27,67 +27,15 @@ class FastDashboardService {
         totalUsers: 0
       };
 
-      // Get user info first - try people table first, then users table
-      let user = null;
-      let userError = null;
-      
-      // Try people table first (where users are stored)
-      try {
-        const { data: peopleUser, error: peopleError } = await supabaseService.client
-          .from('people')
-          .select('id, email, contact_id, role')
-          .eq('id', userId)
-          .single();
-        
-        if (!peopleError && peopleUser) {
-          user = peopleUser;
-        } else {
-          userError = peopleError;
-        }
-      } catch (peopleError) {
-        console.log('⚠️ Could not query people table, trying users table:', peopleError.message);
-      }
-      
-      // Try users table second (for backward compatibility)
-      if (!user) {
-        try {
-          const { data: usersUser, error: usersError } = await supabaseService.client
-            .from('users')
-            .select('id, email, contact_id, role')
-            .eq('id', userId)
-            .single();
-          
-          if (!usersError && usersUser) {
-            user = usersUser;
-          } else {
-            userError = usersError;
-          }
-        } catch (usersError) {
-          console.log('⚠️ Could not query users table:', usersError.message);
-        }
-      }
-      
-      // Try contacts table third (for user profiles)
-      if (!user) {
-        try {
-          const { data: contactsUser, error: contactsError } = await supabaseService.client
-            .from('contacts')
-            .select('id, email, role')
-            .eq('id', userId)
-            .single();
-          
-          if (!contactsError && contactsUser) {
-            user = contactsUser;
-          } else {
-            userError = contactsError;
-          }
-        } catch (contactsError) {
-          console.log('⚠️ Could not query contacts table:', contactsError.message);
-        }
-      }
+      // Get user info from users table only
+      const { data: user, error: userError } = await supabaseService.client
+        .from('users')
+        .select('id, email, contact_id, role')
+        .eq('id', userId)
+        .single();
 
-      if (!user) {
-        throw new Error(`User not found: ${userError?.message || 'User not found in any table'}`);
+      if (userError || !user) {
+        throw new Error(`User not found: ${userError?.message || 'User not found'}`);
       }
 
       switch (userRole) {
