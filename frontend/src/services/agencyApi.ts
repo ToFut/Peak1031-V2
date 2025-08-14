@@ -4,8 +4,8 @@
  * Handles all HTTP requests for agency operations
  */
 
-// API base URL - use relative URL to work with proxy
-const API_BASE_URL = '';  // Empty string to use relative URLs with proxy
+// API base URL - use backend URL directly
+const API_BASE_URL = 'http://localhost:5001';  // Direct backend URL
 
 // Types
 export interface Agency {
@@ -134,8 +134,8 @@ class AgencyApiService {
   private baseUrl: string;
 
   constructor() {
-    // Use relative URL for proxy - the setupProxy.js will handle /api/* requests
-    this.baseUrl = '/api/agencies';
+    // Use direct backend URL
+    this.baseUrl = `${API_BASE_URL}/api/agencies`;
     console.log('[AgencyApiService] Base URL set to:', this.baseUrl);
   }
 

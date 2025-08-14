@@ -321,22 +321,7 @@ class PeakServer {
     this.app.use('/api/invitation-auth', invitationAuthRoutes);
     this.app.use('/api/users', userRoutes);
     
-    // Agencies route - direct implementation
-    this.app.get('/api/agencies', (req, res) => {
-      console.log('[/api/agencies] GET request received');
-      console.log('[/api/agencies] Query params:', req.query);
-      
-      res.json({
-        success: true,
-        data: [],
-        pagination: {
-          page: parseInt(req.query.page) || 1,
-          limit: parseInt(req.query.limit) || 20,
-          total: 0,
-          totalPages: 0
-        }
-      });
-    });
+
     
     this.app.use('/api/dashboard', dashboardRoutes);
     this.app.use('/api/analytics', analyticsRoutes);

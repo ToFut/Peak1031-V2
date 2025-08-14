@@ -422,7 +422,9 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
           
         } else {
           // Create invitation for new user using Supabase Auth
+          const crypto = require('crypto');
           const invitationId = uuidv4();
+          const invitationToken = crypto.randomBytes(32).toString('hex');
           
           // Send invitation using Supabase Auth
           const inviteResult = await invitationService.sendInvitation({
@@ -450,7 +452,7 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
               exchange_id: exchangeId,
               role: invitation.role,
               invited_by: inviterId,
-              invitation_token: inviteResult.invitationToken || inviteResult.supabaseUser?.id || invitationId,
+              invitation_token: invitationToken, // Use the properly generated token
               expires_at: expiresAt.toISOString(),
               status: 'pending',
               first_name: invitation.firstName || null,
@@ -460,11 +462,19 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
               // Remove supabase_user_id as it doesn't exist in the table
             });
 
+            // Generate invitation link
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const invitationPath = process.env.NODE_ENV === 'production' ? '/invite' : '/onboarding/invitation';
+            const invitationLink = `${frontendUrl}${invitationPath}/${invitationToken}`;
+            
             results.push({
               email: invitation.email,
               status: 'invitation_sent',
               message: 'Invitation sent successfully via Supabase Auth',
-              expiresAt: expiresAt.toISOString()
+              expiresAt: expiresAt.toISOString(),
+              invitationLink,
+              token: invitationToken,
+              invitationId
             });
           } else {
             console.log('❌ Invitation sending failed, but storing for development mode');

@@ -1,54 +1,40 @@
-const fetch = require('node-fetch');
+const axios = require('axios');
 
 async function testAgenciesEndpoint() {
   try {
-    console.log('Testing /api/agencies endpoint...');
+    console.log('🧪 Testing agencies endpoint...');
     
-    // Login as admin
-    const loginRes = await fetch('http://localhost:5001/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@peak1031.com', password: 'admin123' })
+    // First, login as admin to get a token
+    console.log('🔐 Logging in as admin...');
+    const loginResponse = await axios.post('http://localhost:5001/api/auth/login', {
+      email: 'admin@peak1031.com',
+      password: 'admin123'
     });
     
-    if (!loginRes.ok) {
-      console.error('❌ Failed to login');
-      const error = await loginRes.text();
-      console.error('Login error:', error);
-      return;
-    }
+    const token = loginResponse.data.token;
+    console.log('✅ Login successful, token received');
     
-    const { token } = await loginRes.json();
-    console.log('✅ Logged in successfully');
-    
-    // Test the agencies endpoint
-    console.log('Testing GET /api/agencies...');
-    const agenciesRes = await fetch('http://localhost:5001/api/agencies', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    
-    console.log('Status:', agenciesRes.status);
-    console.log('Headers:', Object.fromEntries(agenciesRes.headers.entries()));
-    
-    if (agenciesRes.ok) {
-      const data = await agenciesRes.json();
-      console.log('✅ Success! Got agencies response:');
-      console.log('Response keys:', Object.keys(data));
-      if (data.data && Array.isArray(data.data)) {
-        console.log(`Found ${data.data.length} agencies`);
-        if (data.data.length > 0) {
-          console.log('Sample agency:', JSON.stringify(data.data[0], null, 2));
-        }
-      } else {
-        console.log('Full response:', JSON.stringify(data, null, 2));
+    // Test the agencies endpoint with the token
+    console.log('📡 Testing /api/agencies endpoint...');
+    const agenciesResponse = await axios.get('http://localhost:5001/api/agencies?page=1&limit=20&includeStats=true', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
-    } else {
-      const error = await agenciesRes.text();
-      console.error('❌ Error:', agenciesRes.status, error);
-    }
+    });
+    
+    console.log('✅ Agencies endpoint response:');
+    console.log('Status:', agenciesResponse.status);
+    console.log('Data:', JSON.stringify(agenciesResponse.data, null, 2));
+    
   } catch (error) {
-    console.error('❌ Test failed:', error.message);
-    console.error('Stack:', error.stack);
+    console.error('❌ Test failed:');
+    if (error.response) {
+      console.error('Status:', error.response.status);
+      console.error('Data:', error.response.data);
+    } else {
+      console.error('Error:', error.message);
+    }
   }
 }
 

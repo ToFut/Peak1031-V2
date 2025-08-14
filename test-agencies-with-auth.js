@@ -1,10 +1,10 @@
 const axios = require('axios');
 
-async function testFrontendAgenciesCall() {
+async function testAgenciesWithAuth() {
   try {
-    console.log('🧪 Testing frontend agencies API call...');
+    console.log('🧪 Testing agencies endpoint with authentication...');
     
-    // First, login as admin to get a token (simulating frontend login)
+    // First, login as admin to get a token
     console.log('🔐 Logging in as admin...');
     const loginResponse = await axios.post('http://localhost:5001/api/auth/login', {
       email: 'admin@peak1031.com',
@@ -14,16 +14,16 @@ async function testFrontendAgenciesCall() {
     const token = loginResponse.data.token;
     console.log('✅ Login successful, token received');
     
-    // Now test the agencies endpoint through the frontend proxy
-    console.log('📡 Testing /api/agencies through frontend proxy...');
-    const agenciesResponse = await axios.get('http://localhost:3000/api/agencies?page=1&limit=20&includeStats=true', {
+    // Test the agencies endpoint with the token
+    console.log('📡 Testing /api/agencies endpoint...');
+    const agenciesResponse = await axios.get('http://localhost:5001/api/agencies?page=1&limit=20&includeStats=true', {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     });
     
-    console.log('✅ Frontend agencies endpoint response:');
+    console.log('✅ Agencies endpoint response:');
     console.log('Status:', agenciesResponse.status);
     console.log('Data:', JSON.stringify(agenciesResponse.data, null, 2));
     
@@ -38,4 +38,4 @@ async function testFrontendAgenciesCall() {
   }
 }
 
-testFrontendAgenciesCall();
+testAgenciesWithAuth();
