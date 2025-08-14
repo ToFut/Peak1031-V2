@@ -20,8 +20,7 @@ import {
   EnvelopeIcon,
   CalendarIcon,
   ChartPieIcon,
-  TrendingUpIcon,
-  TrendingDownIcon
+  ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline';
 
 interface ThirdParty {
@@ -287,8 +286,8 @@ const ThirdPartyPerformanceModal: React.FC<{
                 <div className="text-2xl font-bold text-blue-600">{thirdParty.performance_score}</div>
                 <div className="text-sm text-gray-600">Performance Score</div>
                 <div className="flex items-center justify-center gap-1 mt-1">
-                  {performanceTrend === 'up' && <TrendingUpIcon className="h-4 w-4 text-green-500" />}
-                  {performanceTrend === 'down' && <TrendingDownIcon className="h-4 w-4 text-red-500" />}
+                  {performanceTrend === 'up' && <ArrowTrendingUpIcon className="h-4 w-4 text-green-500" />}
+                  {performanceTrend === 'down' && <ArrowTrendingDownIcon className="h-4 w-4 text-red-500" />}
                   <span className={`text-xs ${
                     performanceTrend === 'up' ? 'text-green-600' : 
                     performanceTrend === 'down' ? 'text-red-600' : 'text-gray-600'
@@ -392,16 +391,196 @@ const ThirdPartyPerformanceModal: React.FC<{
   );
 };
 
+// New Third Party Assignment Management Component
+const ThirdPartyAssignmentModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onRequestAssignment: (data: any) => void;
+}> = ({ isOpen, onClose, onRequestAssignment }) => {
+  const [formData, setFormData] = useState({
+    thirdPartyName: '',
+    email: '',
+    company: '',
+    phone: '',
+    reason: '',
+    expectedExchanges: '',
+    priority: 'medium'
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onRequestAssignment(formData);
+    setFormData({
+      thirdPartyName: '',
+      email: '',
+      company: '',
+      phone: '',
+      reason: '',
+      expectedExchanges: '',
+      priority: 'medium'
+    });
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Request Third Party Assignment</h2>
+            <p className="text-sm text-gray-600 mt-1">Request a new third party to be assigned to your agency</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <XMarkIcon className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Third Party Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.thirdPartyName}
+                onChange={(e) => setFormData({ ...formData, thirdPartyName: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter full name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address *
+              </label>
+              <input
+                type="email"
+                required
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="email@example.com"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Company
+              </label>
+              <input
+                type="text"
+                value={formData.company}
+                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Company name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="(555) 123-4567"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Reason for Assignment *
+            </label>
+            <textarea
+              required
+              value={formData.reason}
+              onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+              rows={3}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Explain why this third party should be assigned to your agency..."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Expected Number of Exchanges
+              </label>
+              <input
+                type="number"
+                value={formData.expectedExchanges}
+                onChange={(e) => setFormData({ ...formData, expectedExchanges: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="5"
+                min="1"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Priority Level
+              </label>
+              <select
+                value={formData.priority}
+                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-4 border-t border-gray-200">
+            <button
+              type="submit"
+              className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Submit Request
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 const ThirdPartiesContent: React.FC<{ thirdParties: ThirdParty[]; onThirdPartySelect?: (id: string) => void }> = ({ 
   thirdParties, 
   onThirdPartySelect 
 }) => {
   const [selectedThirdParty, setSelectedThirdParty] = useState<ThirdParty | null>(null);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
 
   const handleThirdPartyClick = (thirdParty: ThirdParty) => {
     setSelectedThirdParty(thirdParty);
     setShowPerformanceModal(true);
+  };
+
+  const handleRequestAssignment = (data: any) => {
+    // Here you would typically send the request to the backend
+    console.log('Requesting third party assignment:', data);
+    // You could add a toast notification here
+    alert('Assignment request submitted successfully!');
   };
 
   return (
@@ -416,6 +595,13 @@ const ThirdPartiesContent: React.FC<{ thirdParties: ThirdParty[]; onThirdPartySe
         }}
       />
 
+      {/* Third Party Assignment Modal */}
+      <ThirdPartyAssignmentModal
+        isOpen={showAssignmentModal}
+        onClose={() => setShowAssignmentModal(false)}
+        onRequestAssignment={handleRequestAssignment}
+      />
+
       {/* Third Party Management Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="p-6 border-b border-gray-200">
@@ -426,11 +612,17 @@ const ThirdPartiesContent: React.FC<{ thirdParties: ThirdParty[]; onThirdPartySe
                 Manage your assigned third parties and their exchange portfolios
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <span className="text-sm text-gray-500">Total Third Parties:</span>
               <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-medium">
                 {thirdParties.length}
               </span>
+              <button
+                onClick={() => setShowAssignmentModal(true)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                Request Assignment
+              </button>
             </div>
           </div>
         </div>
@@ -538,6 +730,12 @@ const ThirdPartiesContent: React.FC<{ thirdParties: ThirdParty[]; onThirdPartySe
               <p className="mt-1 text-sm text-gray-500">
                 Contact your administrator to assign third parties to your agency.
               </p>
+              <button
+                onClick={() => setShowAssignmentModal(true)}
+                className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                Request Assignment
+              </button>
             </div>
           )}
         </div>
@@ -591,6 +789,250 @@ const ExchangesContent: React.FC<{ thirdParties: ThirdParty[]; selectedThirdPart
             showFilters={true}
             showStats={true}
           />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// New Agency Analytics Component
+const AgencyAnalyticsContent: React.FC<{ thirdParties: ThirdParty[] }> = ({ thirdParties }) => {
+  const totalRevenue = thirdParties.reduce((sum, tp) => sum + tp.total_revenue_numeric, 0);
+  const avgPerformanceScore = thirdParties.length > 0 
+    ? Math.round(thirdParties.reduce((sum, tp) => sum + tp.performance_score, 0) / thirdParties.length)
+    : 0;
+  const totalExchanges = thirdParties.reduce((sum, tp) => sum + tp.assigned_exchanges, 0);
+  const activeExchanges = thirdParties.reduce((sum, tp) => sum + tp.active_exchanges, 0);
+
+  // Calculate performance distribution
+  const performanceDistribution = {
+    excellent: thirdParties.filter(tp => tp.performance_score >= 80).length,
+    good: thirdParties.filter(tp => tp.performance_score >= 60 && tp.performance_score < 80).length,
+    average: thirdParties.filter(tp => tp.performance_score >= 40 && tp.performance_score < 60).length,
+    poor: thirdParties.filter(tp => tp.performance_score < 40).length
+  };
+
+  // Top performers
+  const topPerformers = [...thirdParties]
+    .sort((a, b) => b.performance_score - a.performance_score)
+    .slice(0, 5);
+
+  return (
+    <div className="space-y-6">
+      {/* Analytics Header */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Agency Analytics & Performance</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Comprehensive analytics and performance insights for your third party network
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                Export Report
+              </button>
+              <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
+                Schedule Report
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Key Performance Indicators */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Portfolio Value</p>
+              <p className="text-2xl font-bold text-gray-900">${(totalRevenue / 1000000).toFixed(1)}M</p>
+            </div>
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <CurrencyDollarIcon className="h-6 w-6 text-green-600" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className="flex items-center">
+              <ArrowTrendingUpIcon className="h-4 w-4 text-green-500" />
+              <span className="text-sm text-green-600 ml-1">+12.5% from last month</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Average Performance Score</p>
+              <p className="text-2xl font-bold text-gray-900">{avgPerformanceScore}</p>
+            </div>
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <ChartBarIcon className="h-6 w-6 text-blue-600" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className="flex items-center">
+              <ArrowTrendingUpIcon className="h-4 w-4 text-green-500" />
+              <span className="text-sm text-green-600 ml-1">+3.2 points from last month</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Active Exchanges</p>
+              <p className="text-2xl font-bold text-gray-900">{activeExchanges}</p>
+            </div>
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <DocumentTextIcon className="h-6 w-6 text-purple-600" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className="flex items-center">
+              <span className="text-sm text-gray-600">of {totalExchanges} total</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Network Size</p>
+              <p className="text-2xl font-bold text-gray-900">{thirdParties.length}</p>
+            </div>
+            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+              <UserGroupIcon className="h-6 w-6 text-yellow-600" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className="flex items-center">
+              <ArrowTrendingUpIcon className="h-4 w-4 text-green-500" />
+              <span className="text-sm text-green-600 ml-1">+2 this quarter</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Performance Distribution Chart */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Distribution</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-sm text-gray-600">Excellent (80+)</span>
+                </div>
+                <span className="text-sm font-medium text-gray-900">{performanceDistribution.excellent}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm text-gray-600">Good (60-79)</span>
+                </div>
+                <span className="text-sm font-medium text-gray-900">{performanceDistribution.good}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                  <span className="text-sm text-gray-600">Average (40-59)</span>
+                </div>
+                <span className="text-sm font-medium text-gray-900">{performanceDistribution.average}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <span className="text-sm text-gray-600">Poor (&lt;40)</span>
+                </div>
+                <span className="text-sm font-medium text-gray-900">{performanceDistribution.poor}</span>
+              </div>
+            </div>
+          </div>
+          <div className="h-48 bg-gray-50 rounded-lg flex items-center justify-center">
+            <div className="text-center">
+              <ChartPieIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+              <p className="text-gray-500">Performance distribution chart</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Top Performers */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Performers</h3>
+        <div className="space-y-4">
+          {topPerformers.map((thirdParty, index) => (
+            <div key={thirdParty.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-4">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-sm font-bold text-blue-600">{index + 1}</span>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900">{thirdParty.name}</h4>
+                  <p className="text-sm text-gray-600">{thirdParty.company}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-blue-600">{thirdParty.performance_score}</div>
+                <div className="text-sm text-gray-600">Performance Score</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Performance Trends */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Trends</h3>
+        <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
+          <div className="text-center">
+            <ChartBarIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+            <p className="text-gray-500">Performance trends over time</p>
+            <p className="text-sm text-gray-400">Monthly performance tracking and forecasting</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button className="p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <UserGroupIcon className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-900">Add Third Party</h4>
+                <p className="text-sm text-gray-600">Request new assignment</p>
+              </div>
+            </div>
+          </button>
+          <button className="p-4 border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <ChartBarIcon className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-900">Performance Review</h4>
+                <p className="text-sm text-gray-600">Schedule reviews</p>
+              </div>
+            </div>
+          </button>
+          <button className="p-4 border border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-colors text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <DocumentTextIcon className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-900">Generate Report</h4>
+                <p className="text-sm text-gray-600">Create custom reports</p>
+              </div>
+            </div>
+          </button>
         </div>
       </div>
     </div>
@@ -661,6 +1103,8 @@ const StandardizedAgencyDashboard: React.FC = () => {
         return <ThirdPartiesContent thirdParties={mockThirdParties} onThirdPartySelect={setSelectedThirdParty} />;
       case 'exchanges':
         return <ExchangesContent thirdParties={mockThirdParties} selectedThirdParty={selectedThirdParty} onThirdPartySelect={setSelectedThirdParty} />;
+      case 'analytics':
+        return <AgencyAnalyticsContent thirdParties={mockThirdParties} />;
       default:
         return <AgencyOverviewContent thirdParties={mockThirdParties} />;
     }
@@ -705,6 +1149,17 @@ const StandardizedAgencyDashboard: React.FC = () => {
             >
               <DocumentTextIcon className="h-5 w-5 inline mr-2" />
               Exchanges
+            </button>
+            <button
+              onClick={() => setActiveSection('analytics')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeSection === 'analytics'
+                  ? 'border-orange-500 text-orange-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <ChartPieIcon className="h-5 w-5 inline mr-2" />
+              Analytics
             </button>
           </nav>
         </div>
