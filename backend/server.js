@@ -46,6 +46,7 @@ const ppTokenAdminRoutes = require('./routes/pp-token-admin');
 const ppDataRoutes = require('./routes/pp-data-api');
 const unifiedDataRoutes = require('./routes/unified-data');
 const invitationRoutes = require('./routes/invitations');
+const invitationAuthRoutes = require('./routes/invitation-auth');
 
 // New routes
 const userRoutes = require('./routes/users');
@@ -317,6 +318,7 @@ class PeakServer {
     this.app.use('/api/pp-data', ppDataRoutes);
     this.app.use('/api/unified-data', unifiedDataRoutes);
     this.app.use('/api/invitations', invitationRoutes);
+    this.app.use('/api/invitation-auth', invitationAuthRoutes);
     this.app.use('/api/users', userRoutes);
     
     // Agencies route - direct implementation

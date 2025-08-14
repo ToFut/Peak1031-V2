@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const InvitationAuthService = require('../services/invitationAuthService');
-const { authenticate } = require('../middleware/auth');
+const { authenticateToken: authenticate } = require('../middleware/auth');
 const { body, param, validationResult } = require('express-validator');
 const rateLimit = require('express-rate-limit');
 

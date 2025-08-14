@@ -113,9 +113,10 @@ router.post('/send', authenticateToken, async (req, res) => {
         
         if (insertError) throw insertError;
         
-        // Generate invitation link
+        // Generate invitation link - use correct path for production/local
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-        const invitationLink = `${frontendUrl}/onboarding/invitation/${invitationToken}`;
+        const invitationPath = process.env.NODE_ENV === 'production' ? '/invite' : '/onboarding/invitation';
+        const invitationLink = `${frontendUrl}${invitationPath}/${invitationToken}`;
         
         results.push({ 
           email, 
