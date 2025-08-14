@@ -121,7 +121,7 @@ class PeakServer {
     if (process.env.DISABLE_RATE_LIMIT !== 'true') {
       const limiter = rateLimit({
         windowMs: 15 * 60 * 1000, // 15 minutes
-        max: process.env.NODE_ENV === 'production' ? 100 : 1000, // requests per window
+        max: process.env.NODE_ENV === 'production' ? 1000 : 1000, // Increased for production
         message: {
           error: 'Too many requests from this IP, please try again later'
         },
@@ -131,11 +131,11 @@ class PeakServer {
       this.app.use(limiter);
     }
 
-    // Stricter rate limiting for auth endpoints
+    // More reasonable rate limiting for auth endpoints
     if (process.env.DISABLE_RATE_LIMIT !== 'true') {
       const authLimiter = rateLimit({
         windowMs: 15 * 60 * 1000,
-        max: process.env.NODE_ENV === 'production' ? 10 : 100, // Higher limit for development
+        max: process.env.NODE_ENV === 'production' ? 100 : 100, // Increased from 10 to 100
         message: {
           error: 'Too many authentication attempts, please try again later'
         }

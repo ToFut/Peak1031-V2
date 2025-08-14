@@ -120,23 +120,11 @@ class InvitationService {
   }
 
   /**
-   * Send invitation email and/or SMS (fallback method)
+   * Send invitation email and/or SMS (SendGrid primary method)
    */
   async sendInvitation(options) {
-    // Try Supabase Auth first
-    if (supabaseService.client) {
-      console.log('🔄 Trying Supabase Auth for invitation...');
-      const supabaseResult = await this.sendSupabaseInvitation(options);
-      
-      // If Supabase Auth worked, return the result
-      if (supabaseResult.email.sent) {
-        return supabaseResult;
-      }
-      
-      console.log('⚠️ Supabase Auth failed, trying fallback methods...');
-    }
-
-    console.log('🔄 Using SendGrid/Twilio/Mock fallback...');
+    // Skip Supabase Auth - use SendGrid directly
+    console.log('🔄 Using SendGrid for invitations...');
 
     const {
       email,

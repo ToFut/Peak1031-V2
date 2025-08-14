@@ -9,10 +9,33 @@ import { httpClient } from '../base/httpClient';
 export class TaskService {
   async getTasks(exchangeId?: string): Promise<Task[]> {
     const endpoint = exchangeId ? `/tasks/exchange/${exchangeId}` : '/tasks';
-    const response = await httpClient.get<any>(endpoint);
-    // The backend returns { success: true, tasks: [...], total: number, ... }
-    // Extract just the tasks array
-    return response.tasks || response || [];
+    console.log('📡 TaskService: Making request to endpoint:', endpoint);
+    
+    try {
+      const response = await httpClient.get<any>(endpoint);
+      console.log('✅ TaskService: Raw API response:', {
+        responseType: typeof response,
+        hasSuccess: 'success' in response,
+        hasTasks: 'tasks' in response,
+        tasksLength: response?.tasks?.length,
+        responseKeys: Object.keys(response || {}),
+        response: response
+      });
+      
+      // The backend returns { success: true, tasks: [...], total: number, ... }
+      // Extract just the tasks array
+      const tasks = response.tasks || response || [];
+      console.log('✅ TaskService: Returning tasks:', {
+        tasksLength: tasks?.length,
+        tasksType: typeof tasks,
+        isArray: Array.isArray(tasks)
+      });
+      
+      return tasks;
+    } catch (error) {
+      console.error('❌ TaskService: Request failed:', error);
+      throw error;
+    }
   }
 
   async getTask(id: string): Promise<Task> {

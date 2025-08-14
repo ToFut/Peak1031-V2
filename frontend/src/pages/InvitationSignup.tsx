@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   EnvelopeIcon, 
@@ -7,8 +7,7 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
   ClockIcon,
-  BuildingOfficeIcon,
-  UserIcon
+  BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
 import { useInvitations, InvitationDetails } from '../hooks/useInvitations';
 import { useAuth } from '../hooks/useAuth';
@@ -21,8 +20,7 @@ const InvitationSignup: React.FC = () => {
     loading, 
     error, 
     getInvitationDetails, 
-    acceptInvitation,
-    clearError
+    acceptInvitation
   } = useInvitations();
 
   const [invitationDetails, setInvitationDetails] = useState<InvitationDetails | null>(null);
@@ -37,13 +35,7 @@ const InvitationSignup: React.FC = () => {
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (token) {
-      loadInvitationDetails();
-    }
-  }, [token]);
-
-  const loadInvitationDetails = async () => {
+  const loadInvitationDetails = useCallback(async () => {
     if (!token) return;
     
     console.log('🔍 Loading invitation details for token:', token);
@@ -77,7 +69,13 @@ const InvitationSignup: React.FC = () => {
       }
       // The error is being set in the useInvitations hook
     }
-  };
+  }, [token, getInvitationDetails]);
+
+  useEffect(() => {
+    if (token) {
+      loadInvitationDetails();
+    }
+    }, [token, loadInvitationDetails]);
 
   const validateForm = () => {
     const errors: { [key: string]: string } = {};
@@ -100,7 +98,7 @@ const InvitationSignup: React.FC = () => {
       errors.confirmPassword = 'Passwords do not match';
     }
 
-    if (formData.phone && !/^\+?[\d\s\-\(\)]+$/.test(formData.phone)) {
+    if (formData.phone && !/^\+?[\d\s\-()]+$/.test(formData.phone)) {
       errors.phone = 'Please enter a valid phone number';
     }
 

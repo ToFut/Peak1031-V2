@@ -538,19 +538,10 @@ router.post('/', authenticateToken, requireExchangePermission('create_tasks'), a
           if (validAssigneeIds.length === 0) {
             console.log('⚠️ No participants found in exchange - allowing assignment to any user');
           } else {
-            console.log('❌ Invalid assignment: User not a participant in this exchange');
-            return res.status(400).json({
-              success: false,
-              error: 'Invalid assignment - user is not a participant in this exchange',
-              details: 'Tasks can only be assigned to participants in the exchange',
-              validAssignees: validAssigneeIds,
-              debugInfo: {
-                assignedTo: taskData.assigned_to,
-                assignedToType: typeof taskData.assigned_to,
-                participantCount: participants?.length || 0,
-                hasParticipants: validAssigneeIds.length > 0
-              }
-            });
+            console.log('⚠️ Invalid assignment: User not a participant in this exchange - creating task without assignment');
+            // Instead of returning an error, clear the assignment and continue with task creation
+            taskData.assigned_to = null;
+            console.log('📋 Task assignment cleared, creating unassigned task');
           }
         }
 

@@ -76,3 +76,5 @@ export const authHelpers = {
 };
 
 export default supabase;
+
+

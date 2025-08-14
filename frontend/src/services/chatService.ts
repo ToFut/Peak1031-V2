@@ -1,5 +1,4 @@
-import { apiService } from './api';
-import { Message, User, Exchange } from '../types';
+import { User } from '../types';
 
 export interface ChatMessage {
   id: string;
@@ -150,6 +149,15 @@ class ChatService {
                                  exchange.participants || 
                                  [];
           
+          console.log('🔍 DEBUG: Processing participants for exchange', exchange.id, {
+            exchangeName: exchange.name || exchange.exchange_name,
+            exchangeParticipants: exchange.exchangeParticipants,
+            exchange_participants: exchange.exchange_participants,
+            participants: exchange.participants,
+            participantsList,
+            participantsListLength: participantsList?.length || 0
+          });
+          
           if (Array.isArray(participantsList) && participantsList.length > 0) {
             participantsList.forEach((ep: any) => {
               try {
@@ -215,7 +223,7 @@ class ChatService {
             } as User);
           }
 
-          return {
+          const result = {
             id: exchange.id,
             exchange_name: exchange.name || exchange.exchange_name || exchange.title || 'Unnamed Exchange',
             status: exchange.status || 'PENDING',
@@ -223,6 +231,15 @@ class ChatService {
             unread_count: 0,
             participants: participants
           };
+          
+          console.log('✅ DEBUG: Final exchange result', {
+            exchangeId: result.id,
+            exchangeName: result.exchange_name,
+            participantCount: result.participants.length,
+            participantEmails: result.participants.map(p => p.email)
+          });
+          
+          return result;
         } catch (transformError) {
           console.error('Error transforming exchange:', transformError, exchange);
           return null;
