@@ -29,10 +29,36 @@ class ApiService {
   private connectionListeners: ((online: boolean) => void)[] = [];
 
   constructor() {
-    // Resolve base URL from env or current origin, trim trailing slashes
-    const resolvedBaseUrl = (process.env.REACT_APP_API_URL || 'http://localhost:5001/api').replace(/\/+$/, '');
-    this.baseURL = resolvedBaseUrl;
+    // Resolve base URL from env or provide intelligent fallback
+    let baseUrl = process.env.REACT_APP_API_URL;
+    
+    if (!baseUrl) {
+      // If no env var, try to construct from current domain
+      const isProduction = window.location.hostname !== 'localhost';
+      if (isProduction) {
+        // In production, try common backend URL patterns
+        const hostname = window.location.hostname;
+        if (hostname.includes('vercel.app')) {
+          // For Vercel deployments, we need the Railway backend URL
+          // This should be set via environment variable REACT_APP_API_URL
+          console.error('⚠️ REACT_APP_API_URL not set in production!');
+          console.error('Please set REACT_APP_API_URL to your Railway backend URL + /api');
+          // Temporary fallback - will likely fail but provides clear error
+          baseUrl = 'https://backend-not-configured.railway.app/api';
+        } else {
+          // Fallback: assume API is on same domain with /api path
+          baseUrl = `${window.location.protocol}//${window.location.hostname}/api`;
+        }
+      } else {
+        // Development fallback
+        baseUrl = 'http://localhost:5001/api';
+      }
+    }
+    
+    this.baseURL = baseUrl.replace(/\/+$/, '');
     console.log('🔗 API base URL:', this.baseURL);
+    console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
+    console.log('🏠 Hostname:', window.location.hostname);
     // Monitor connection status
     window.addEventListener('online', () => this.checkBackendHealth());
     window.addEventListener('offline', () => this.setConnectionStatus(false));
