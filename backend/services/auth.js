@@ -25,20 +25,26 @@ class AuthService {
       console.log('✅ AUTH SERVICE: User found:', user.email, 'ID:', user.id);
       console.log('🔐 AUTH SERVICE: Validating password...');
       
-      // For Supabase users, we need to handle password validation differently
-      // since the password hash might be stored differently
+      // For SQLite users, use the validatePassword method
+      // For Supabase users, handle password validation differently
       let isValidPassword = false;
       
-      // Check for password in different possible field names
-      const passwordHash = user.password_hash || user.password || user.passwordHash;
-      
-      if (passwordHash) {
-        console.log('🔐 AUTH SERVICE: Found password hash, comparing...');
-        // Standard bcrypt validation
-        isValidPassword = await bcrypt.compare(password, passwordHash);
+      if (user.validatePassword) {
+        // SQLite user - use the model's validatePassword method
+        console.log('🔐 AUTH SERVICE: Using validatePassword method...');
+        isValidPassword = await user.validatePassword(password);
       } else {
-        console.log('❌ AUTH SERVICE: No password hash found for user');
-        console.log('🔍 AUTH SERVICE: User object keys:', Object.keys(user));
+        // Supabase user - check for password in different possible field names
+        const passwordHash = user.password_hash || user.password || user.passwordHash;
+        
+        if (passwordHash) {
+          console.log('🔐 AUTH SERVICE: Found password hash, comparing...');
+          // Standard bcrypt validation
+          isValidPassword = await bcrypt.compare(password, passwordHash);
+        } else {
+          console.log('❌ AUTH SERVICE: No password hash found for user');
+          console.log('🔍 AUTH SERVICE: User object keys:', Object.keys(user));
+        }
       }
       
       if (!isValidPassword) {

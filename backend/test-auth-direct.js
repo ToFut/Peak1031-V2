@@ -3,21 +3,11 @@ const AuthService = require('./services/auth');
 
 async function testAuth() {
   try {
-    console.log('🔍 Testing authentication for agency@peak1031.com...');
-    
-    const user = await AuthService.authenticateUser('agency@peak1031.com', 'agency123');
-    
-    console.log('✅ Authentication successful!');
-    console.log('User:', {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      firstName: user.first_name || user.firstName,
-      lastName: user.last_name || user.lastName
-    });
-    
+    console.log('🔍 Testing authentication...');
+    const user = await AuthService.authenticateUser('admin@peak1031.com', 'admin123');
+    console.log('✅ Authentication successful:', user.email);
   } catch (error) {
-    console.error('❌ Authentication failed:', error.message);
+    console.log('❌ Authentication failed:', error.message);
   }
 }
 

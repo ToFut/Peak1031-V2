@@ -167,8 +167,25 @@ class SupabaseService {
   }
 
   async getUserByEmail(email) {
-    const users = await this.select('users', { where: { email } });
-    return users[0] || null;
+    // Try people table first (where users are stored)
+    try {
+      const users = await this.select('people', { where: { email } });
+      if (users && users.length > 0) {
+        // Return the first user (oldest) if there are duplicates
+        return users[0];
+      }
+    } catch (error) {
+      console.log('⚠️ Could not query people table, trying users table:', error.message);
+    }
+    
+    // Fallback to users table
+    try {
+      const users = await this.select('users', { where: { email } });
+      return users[0] || null;
+    } catch (error) {
+      console.log('⚠️ Could not query users table:', error.message);
+      return null;
+    }
   }
 
   async createUser(userData) {
@@ -196,39 +213,12 @@ class SupabaseService {
 
       // Apply where conditions
       if (where && Object.keys(where).length > 0) {
-        // Check for Sequelize Op.in operator
-        const Op = require('sequelize').Op;
-        
         Object.keys(where).forEach(key => {
-          if (key === Op.or) {
-            // Handle OR conditions - for now skip as it's complex
-            console.log('⚠️ Op.or conditions in getExchanges not fully supported yet');
-          } else if (key === 'id') {
-            // Check if it's an Op.in clause
-            if (where[key] && where[key][Op.in]) {
-              // Handle IN clause for id using Sequelize operator
-              const ids = where[key][Op.in];
-              if (Array.isArray(ids) && ids.length > 0) {
-                query = query.in('id', ids);
-              } else {
-                // Empty array means no results
-                query = query.eq('id', null);
-              }
-            } else if (where[key] && where[key].in) {
-              // Handle plain .in property
-              query = query.in('id', where[key].in);
-            } else if (where[key] === null) {
-              // Handle null id (no results)
-              query = query.is('id', null);
-            } else {
-              // Regular equality
-              query = query.eq(key, where[key]);
-            }
+          if (key === 'id' && where[key].in) {
+            // Handle IN clause for id
+            query = query.in('id', where[key].in);
           } else {
-            // Regular equality for other fields
-            if (where[key] !== undefined) {
-              query = query.eq(key, where[key]);
-            }
+            query = query.eq(key, where[key]);
           }
         });
       }
@@ -236,15 +226,12 @@ class SupabaseService {
       // Apply ordering
       query = query.order(orderBy.column, { ascending: orderBy.ascending });
 
-      // Apply limit and offset (allow up to 5000 for admin users)
-      const finalLimit = limit || 100; // Default 100 for performance
-      
-      // For very large limits, we may hit Supabase's row limit, so cap at 5000
-      const cappedLimit = Math.min(finalLimit, 5000);
-      query = query.limit(cappedLimit);
+      // Apply limit and offset (reduced default to prevent timeouts)
+      const finalLimit = limit || 1000;
+      query = query.limit(finalLimit);
       
       if (offset !== undefined) {
-        query = query.range(offset, offset + cappedLimit - 1);
+        query = query.range(offset, offset + finalLimit - 1);
       }
 
       const { data, error } = await query;
@@ -267,61 +254,33 @@ class SupabaseService {
         let clientsMap = {};
         let coordinatorsMap = {};
         
-        // Fetch all clients in one query - use explicit select to avoid relationship issues
+        // Fetch all clients in one query
         if (clientIds.length > 0) {
-          // Filter out invalid UUIDs to prevent database errors
-          const validClientIds = clientIds.filter(id => 
-            typeof id === 'string' && 
-            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-          );
+          const { data: clients } = await this.client
+            .from('contacts')
+            .select('id, first_name, last_name, email, company')
+            .in('id', clientIds);
           
-          if (validClientIds.length > 0) {
-            try {
-              const { data: clients, error: clientError } = await this.client
-                .from('contacts')
-                .select('id, first_name, last_name, email, company')
-                .in('id', validClientIds);
-              
-              if (clientError) {
-                console.warn('⚠️ Error fetching clients:', clientError.message);
-              } else if (clients) {
-                clientsMap = clients.reduce((acc, client) => {
-                  acc[client.id] = client;
-                  return acc;
-                }, {});
-              }
-            } catch (clientErr) {
-              console.warn('⚠️ Exception fetching clients:', clientErr.message);
-            }
+          if (clients) {
+            clientsMap = clients.reduce((acc, client) => {
+              acc[client.id] = client;
+              return acc;
+            }, {});
           }
         }
         
-        // Fetch all coordinators in one query - use explicit select to avoid relationship issues
+        // Fetch all coordinators in one query
         if (coordinatorIds.length > 0) {
-          // Filter out invalid UUIDs to prevent database errors
-          const validCoordinatorIds = coordinatorIds.filter(id => 
-            typeof id === 'string' && 
-            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-          );
+          const { data: coordinators } = await this.client
+            .from('users')
+            .select('id, first_name, last_name, email')
+            .in('id', coordinatorIds);
           
-          if (validCoordinatorIds.length > 0) {
-            try {
-              const { data: coordinators, error: coordinatorError } = await this.client
-                .from('users')
-                .select('id, first_name, last_name, email')
-                .in('id', validCoordinatorIds);
-              
-              if (coordinatorError) {
-                console.warn('⚠️ Error fetching coordinators:', coordinatorError.message);
-              } else if (coordinators) {
-                coordinatorsMap = coordinators.reduce((acc, coord) => {
-                  acc[coord.id] = coord;
-                  return acc;
-                }, {});
-              }
-            } catch (coordinatorErr) {
-              console.warn('⚠️ Exception fetching coordinators:', coordinatorErr.message);
-            }
+          if (coordinators) {
+            coordinatorsMap = coordinators.reduce((acc, coord) => {
+              acc[coord.id] = coord;
+              return acc;
+            }, {});
           }
         }
         
