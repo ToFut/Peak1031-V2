@@ -835,7 +835,16 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
                       )}
                     </h3>
                     <p className="text-sm text-gray-500">
-                      {selectedExchange.participants.length} participants • Secure chat
+                      {(() => {
+                        console.log('🔍 DEBUG: Chat header participant count', {
+                          exchangeId: selectedExchange.id,
+                          exchangeName: selectedExchange.exchange_name,
+                          participantsLength: selectedExchange.participants.length,
+                          participants: selectedExchange.participants,
+                          firstParticipant: selectedExchange.participants[0]
+                        });
+                        return selectedExchange.participants.length;
+                      })()} participants • Secure chat
                     </p>
                   </div>
                 </div>
