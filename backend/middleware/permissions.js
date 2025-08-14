@@ -12,6 +12,7 @@ const requireExchangePermission = (permissionType) => {
   const permissionMap = {
     'upload_documents': 'can_upload_documents',
     'send_messages': 'can_send_messages',
+    'view_messages': 'can_view_messages',
     'edit': 'can_edit',
     'delete': 'can_delete',
     'add_participants': 'can_add_participants'
@@ -61,7 +62,7 @@ const requireExchangePermission = (permissionType) => {
       }
 
       // For non-admin users, also check specific permission if needed
-      const hasPermission = await permissionService.checkPermission(userId, exchangeId, actualPermission);
+      const hasPermission = await rbacService.checkExchangePermission(req.user, exchangeId, actualPermission);
 
       if (!hasPermission) {
         console.log(`❌ Permission '${permissionType}' (mapped to '${actualPermission}') denied for ${req.user.role} user ${req.user.email} on exchange ${exchangeId}`);
@@ -69,7 +70,8 @@ const requireExchangePermission = (permissionType) => {
           error: 'Insufficient permissions',
           code: 'PERMISSION_DENIED',
           required: permissionType,
-          exchangeId
+          exchangeId,
+          message: `You do not have permission to ${permissionType} in this exchange`
         });
       }
 

@@ -2,6 +2,7 @@ const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
 const { enforceRBAC } = require('../middleware/rbac');
 const { requireExchangePermission } = require('../middleware/permissions');
+const { requireCanViewMessages } = require('../middleware/exchangePermissions');
 const databaseService = require('../services/database');
 const supabaseService = require('../services/supabase');
 const AuditService = require('../services/audit');
@@ -123,7 +124,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Get messages for exchange
-router.get('/exchange/:exchangeId', authenticateToken, requireExchangePermission('view_messages'), async (req, res) => {
+router.get('/exchange/:exchangeId', authenticateToken, requireCanViewMessages, async (req, res) => {
   try {
     console.log('📥 GET /messages/exchange/' + req.params.exchangeId);
     const { page = 1, limit = 50, before } = req.query;
@@ -136,7 +137,7 @@ router.get('/exchange/:exchangeId', authenticateToken, requireExchangePermission
       return res.status(404).json({ error: 'Exchange not found' });
     }
     
-    // Check access permissions
+    // Check access permissions using RBAC service
     console.log('🔐 User role check:', { 
       userId: req.user.id, 
       role: req.user.role,
@@ -144,24 +145,18 @@ router.get('/exchange/:exchangeId', authenticateToken, requireExchangePermission
       isAdmin: req.user.role === 'admin'
     });
     
-    let hasAccess = false;
-    if (req.user.role === 'admin' || req.user.role === 'staff') {
-      hasAccess = true;
-      console.log('✅ Admin/Staff access granted');
-    } else if (req.user.role === 'coordinator' && exchange.coordinator_id === req.user.id) {
-      hasAccess = true;
-    } else {
-      // Check if user is a participant
-      const participants = await databaseService.getExchangeParticipants({
-        where: { exchange_id: exchangeId, user_id: req.user.id }
-      });
-      hasAccess = participants && participants.length > 0;
-    }
+    const rbacService = require('../services/rbacService');
+    const hasAccess = await rbacService.canUserAccessExchange(req.user, exchangeId);
     
     if (!hasAccess) {
       console.log('❌ Access denied for user:', req.user.id, 'to exchange:', exchangeId);
-      return res.status(403).json({ error: 'Access denied' });
+      return res.status(403).json({ 
+        error: 'Access denied',
+        message: 'You do not have permission to view messages in this exchange'
+      });
     }
+    
+    console.log('✅ Access granted via RBAC service');
     
     // Use correct field name for Supabase (snake_case)
     const whereClause = { exchange_id: exchangeId };

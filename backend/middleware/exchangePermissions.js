@@ -106,33 +106,120 @@ const requireExchangePermission = (permission, requireRolePermission = true) => 
       // Define default permissions based on role
       const getDefaultPermissionsForRole = (role) => {
         const defaults = {
+          admin: {
+            can_edit: true,
+            can_delete: true,
+            can_add_participants: true,
+            can_upload_documents: true,
+            can_send_messages: true,
+            can_view_overview: true,
+            can_view_messages: true,
+            can_view_tasks: true,
+            can_create_tasks: true,
+            can_edit_tasks: true,
+            can_assign_tasks: true,
+            can_view_documents: true,
+            can_edit_documents: true,
+            can_delete_documents: true,
+            can_view_participants: true,
+            can_manage_participants: true,
+            can_view_financial: true,
+            can_edit_financial: true,
+            can_view_timeline: true,
+            can_edit_timeline: true,
+            can_view_reports: true
+          },
           coordinator: {
             can_edit: true,
             can_delete: false,
             can_add_participants: true,
             can_upload_documents: true,
-            can_send_messages: true
+            can_send_messages: true,
+            can_view_overview: true,
+            can_view_messages: true,
+            can_view_tasks: true,
+            can_create_tasks: true,
+            can_edit_tasks: true,
+            can_assign_tasks: true,
+            can_view_documents: true,
+            can_edit_documents: true,
+            can_delete_documents: false,
+            can_view_participants: true,
+            can_manage_participants: true,
+            can_view_financial: true,
+            can_edit_financial: true,
+            can_view_timeline: true,
+            can_edit_timeline: true,
+            can_view_reports: true
           },
           client: {
-            can_edit: false,
-            can_delete: false,
-            can_add_participants: false,
+            can_edit: true,
+            can_delete: false, // Clients cannot delete by default
+            can_add_participants: true,
             can_upload_documents: true,
-            can_send_messages: true
+            can_send_messages: true,
+            can_view_overview: true,
+            can_view_messages: true,
+            can_view_tasks: true,
+            can_create_tasks: true,
+            can_edit_tasks: true,
+            can_assign_tasks: true,
+            can_view_documents: true,
+            can_edit_documents: true,
+            can_delete_documents: false,
+            can_view_participants: true,
+            can_manage_participants: true,
+            can_view_financial: true,
+            can_edit_financial: true,
+            can_view_timeline: true,
+            can_edit_timeline: true,
+            can_view_reports: true
           },
           third_party: {
             can_edit: false,
             can_delete: false,
             can_add_participants: false,
-            can_upload_documents: true,
-            can_send_messages: false
+            can_upload_documents: false,
+            can_send_messages: false,
+            can_view_overview: true, // Only view overview by default
+            can_view_messages: false,
+            can_view_tasks: false,
+            can_create_tasks: false,
+            can_edit_tasks: false,
+            can_assign_tasks: false,
+            can_view_documents: false,
+            can_edit_documents: false,
+            can_delete_documents: false,
+            can_view_participants: false,
+            can_manage_participants: false,
+            can_view_financial: false,
+            can_edit_financial: false,
+            can_view_timeline: false,
+            can_edit_timeline: false,
+            can_view_reports: false
           },
           agency: {
             can_edit: false,
             can_delete: false,
             can_add_participants: false,
-            can_upload_documents: true,
-            can_send_messages: true
+            can_upload_documents: false,
+            can_send_messages: false,
+            can_view_overview: true, // Only view overview by default
+            can_view_messages: false,
+            can_view_tasks: false,
+            can_create_tasks: false,
+            can_edit_tasks: false,
+            can_assign_tasks: false,
+            can_view_documents: false,
+            can_edit_documents: false,
+            can_delete_documents: false,
+            can_view_participants: false,
+            can_manage_participants: false,
+            can_view_financial: false,
+            can_edit_financial: false,
+            can_view_timeline: false,
+            can_edit_timeline: false,
+            can_view_reports: false
           }
         };
 
@@ -141,7 +228,23 @@ const requireExchangePermission = (permission, requireRolePermission = true) => 
           can_delete: false,
           can_add_participants: false,
           can_upload_documents: false,
-          can_send_messages: false
+          can_send_messages: false,
+          can_view_overview: false,
+          can_view_messages: false,
+          can_view_tasks: false,
+          can_create_tasks: false,
+          can_edit_tasks: false,
+          can_assign_tasks: false,
+          can_view_documents: false,
+          can_edit_documents: false,
+          can_delete_documents: false,
+          can_view_participants: false,
+          can_manage_participants: false,
+          can_view_financial: false,
+          can_edit_financial: false,
+          can_view_timeline: false,
+          can_edit_timeline: false,
+          can_view_reports: false
         };
       };
 
@@ -192,6 +295,22 @@ const requireCanDelete = requireExchangePermission('can_delete');
 const requireCanAddParticipants = requireExchangePermission('can_add_participants');
 const requireCanUploadDocuments = requireExchangePermission('can_upload_documents');
 const requireCanSendMessages = requireExchangePermission('can_send_messages');
+const requireCanViewOverview = requireExchangePermission('can_view_overview');
+const requireCanViewMessages = requireExchangePermission('can_view_messages');
+const requireCanViewTasks = requireExchangePermission('can_view_tasks');
+const requireCanCreateTasks = requireExchangePermission('can_create_tasks');
+const requireCanEditTasks = requireExchangePermission('can_edit_tasks');
+const requireCanAssignTasks = requireExchangePermission('can_assign_tasks');
+const requireCanViewDocuments = requireExchangePermission('can_view_documents');
+const requireCanEditDocuments = requireExchangePermission('can_edit_documents');
+const requireCanDeleteDocuments = requireExchangePermission('can_delete_documents');
+const requireCanViewParticipants = requireExchangePermission('can_view_participants');
+const requireCanManageParticipants = requireExchangePermission('can_manage_participants');
+const requireCanViewFinancial = requireExchangePermission('can_view_financial');
+const requireCanEditFinancial = requireExchangePermission('can_edit_financial');
+const requireCanViewTimeline = requireExchangePermission('can_view_timeline');
+const requireCanEditTimeline = requireExchangePermission('can_edit_timeline');
+const requireCanViewReports = requireExchangePermission('can_view_reports');
 
 module.exports = {
   requireExchangePermission,
@@ -199,5 +318,21 @@ module.exports = {
   requireCanDelete,
   requireCanAddParticipants,
   requireCanUploadDocuments,
-  requireCanSendMessages
+  requireCanSendMessages,
+  requireCanViewOverview,
+  requireCanViewMessages,
+  requireCanViewTasks,
+  requireCanCreateTasks,
+  requireCanEditTasks,
+  requireCanAssignTasks,
+  requireCanViewDocuments,
+  requireCanEditDocuments,
+  requireCanDeleteDocuments,
+  requireCanViewParticipants,
+  requireCanManageParticipants,
+  requireCanViewFinancial,
+  requireCanEditFinancial,
+  requireCanViewTimeline,
+  requireCanEditTimeline,
+  requireCanViewReports
 };

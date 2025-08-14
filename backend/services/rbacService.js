@@ -246,6 +246,10 @@ class RBACService {
     // Admin can do everything
     if (user.role === 'admin') return true;
 
+    // First check if user has access to this exchange
+    const hasAccess = await this.canUserAccessExchange(user, exchangeId);
+    if (!hasAccess) return false;
+
     // Check participant permissions
     const { data: participant } = await supabaseService.client
       .from('exchange_participants')
@@ -269,21 +273,156 @@ class RBACService {
       return permissions[permission] === true;
     }
 
-    // Check if coordinator has default permissions
-    if (user.role === 'coordinator') {
-      const { data: exchange } = await supabaseService.client
-        .from('exchanges')
-        .select('coordinator_id')
-        .eq('id', exchangeId)
-        .single();
+    // If no participant permissions found, use role-based defaults
+    const defaultPermissions = this.getDefaultPermissionsForRole(user.role);
+    return defaultPermissions[permission] === true;
+  }
 
-      if (exchange && exchange.coordinator_id === user.id) {
-        // Coordinators have all permissions on their exchanges by default
-        return true;
+  /**
+   * Get default permissions for a user role
+   */
+  getDefaultPermissionsForRole(role) {
+    const defaults = {
+      admin: {
+        can_edit: true,
+        can_delete: true,
+        can_add_participants: true,
+        can_upload_documents: true,
+        can_send_messages: true,
+        can_view_overview: true,
+        can_view_messages: true,
+        can_view_tasks: true,
+        can_create_tasks: true,
+        can_edit_tasks: true,
+        can_assign_tasks: true,
+        can_view_documents: true,
+        can_edit_documents: true,
+        can_delete_documents: true,
+        can_view_participants: true,
+        can_manage_participants: true,
+        can_view_financial: true,
+        can_edit_financial: true,
+        can_view_timeline: true,
+        can_edit_timeline: true,
+        can_view_reports: true
+      },
+      coordinator: {
+        can_edit: true,
+        can_delete: false,
+        can_add_participants: true,
+        can_upload_documents: true,
+        can_send_messages: true,
+        can_view_overview: true,
+        can_view_messages: true,
+        can_view_tasks: true,
+        can_create_tasks: true,
+        can_edit_tasks: true,
+        can_assign_tasks: true,
+        can_view_documents: true,
+        can_edit_documents: true,
+        can_delete_documents: false,
+        can_view_participants: true,
+        can_manage_participants: true,
+        can_view_financial: true,
+        can_edit_financial: true,
+        can_view_timeline: true,
+        can_edit_timeline: true,
+        can_view_reports: true
+      },
+      client: {
+        can_edit: true,
+        can_delete: false, // Clients cannot delete by default
+        can_add_participants: true,
+        can_upload_documents: true,
+        can_send_messages: true,
+        can_view_overview: true,
+        can_view_messages: true,
+        can_view_tasks: true,
+        can_create_tasks: true,
+        can_edit_tasks: true,
+        can_assign_tasks: true,
+        can_view_documents: true,
+        can_edit_documents: true,
+        can_delete_documents: false,
+        can_view_participants: true,
+        can_manage_participants: true,
+        can_view_financial: true,
+        can_edit_financial: true,
+        can_view_timeline: true,
+        can_edit_timeline: true,
+        can_view_reports: true
+      },
+      third_party: {
+        can_edit: false,
+        can_delete: false,
+        can_add_participants: false,
+        can_upload_documents: false,
+        can_send_messages: false,
+        can_view_overview: true, // Only view overview by default
+        can_view_messages: false,
+        can_view_tasks: false,
+        can_create_tasks: false,
+        can_edit_tasks: false,
+        can_assign_tasks: false,
+        can_view_documents: false,
+        can_edit_documents: false,
+        can_delete_documents: false,
+        can_view_participants: false,
+        can_manage_participants: false,
+        can_view_financial: false,
+        can_edit_financial: false,
+        can_view_timeline: false,
+        can_edit_timeline: false,
+        can_view_reports: false
+      },
+      agency: {
+        can_edit: false,
+        can_delete: false,
+        can_add_participants: false,
+        can_upload_documents: false,
+        can_send_messages: false,
+        can_view_overview: true, // Only view overview by default
+        can_view_messages: false,
+        can_view_tasks: false,
+        can_create_tasks: false,
+        can_edit_tasks: false,
+        can_assign_tasks: false,
+        can_view_documents: false,
+        can_edit_documents: false,
+        can_delete_documents: false,
+        can_view_participants: false,
+        can_manage_participants: false,
+        can_view_financial: false,
+        can_edit_financial: false,
+        can_view_timeline: false,
+        can_edit_timeline: false,
+        can_view_reports: false
       }
-    }
+    };
 
-    return false;
+    return defaults[role] || {
+      can_edit: false,
+      can_delete: false,
+      can_add_participants: false,
+      can_upload_documents: false,
+      can_send_messages: false,
+      can_view_overview: false,
+      can_view_messages: false,
+      can_view_tasks: false,
+      can_create_tasks: false,
+      can_edit_tasks: false,
+      can_assign_tasks: false,
+      can_view_documents: false,
+      can_edit_documents: false,
+      can_delete_documents: false,
+      can_view_participants: false,
+      can_manage_participants: false,
+      can_view_financial: false,
+      can_edit_financial: false,
+      can_view_timeline: false,
+      can_edit_timeline: false,
+      can_view_reports: false
+    };
   }
 
   /**
