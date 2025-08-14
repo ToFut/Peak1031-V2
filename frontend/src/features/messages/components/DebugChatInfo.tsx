@@ -152,7 +152,7 @@ const DebugChatInfo: React.FC = () => {
     }
     
     try {
-      const response = await fetch('http://localhost:5000/api/test-messages/test', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/test-messages/test`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
