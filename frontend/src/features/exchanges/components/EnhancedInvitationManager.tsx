@@ -73,10 +73,10 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
   const canInvite = isAdmin() || isCoordinator();
 
   useEffect(() => {
-    if (canInvite && !isLoadingInvitations) {
+    if (!isLoadingInvitations) {
       loadExchangeUsersAndInvitations();
     }
-  }, [exchangeId, canInvite]);
+  }, [exchangeId]);
 
   const loadExchangeUsersAndInvitations = async () => {
     if (isLoadingInvitations) return;
@@ -353,14 +353,8 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
     (invitation.lastName && invitation.lastName.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  if (!canInvite) {
-    return (
-      <div className="bg-gray-50 rounded-lg p-6 text-center">
-        <UsersIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-600">You don't have permission to manage invitations for this exchange.</p>
-      </div>
-    );
-  }
+  // Remove the permission check entirely - let all users see participants
+  // The invite functionality will still be hidden based on canInvite
 
   return (
     <div className="space-y-6">
@@ -379,13 +373,15 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
             </div>
           )}
         </div>
-        <button
-          onClick={() => setShowInviteForm(!showInviteForm)}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          <UserPlusIcon className="h-4 w-4 mr-2" />
-          Send Invitations
-        </button>
+        {canInvite && (
+          <button
+            onClick={() => setShowInviteForm(!showInviteForm)}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <UserPlusIcon className="h-4 w-4 mr-2" />
+            Send Invitations
+          </button>
+        )}
       </div>
 
       {/* Tab Navigation */}
@@ -840,17 +836,19 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex space-x-2">
-                            <button
-                              onClick={() => handleRemoveParticipant(participant.id, 
-                                participant.firstName && participant.lastName 
-                                  ? `${participant.firstName} ${participant.lastName}`
-                                  : participant.email
-                              )}
-                              className="text-red-600 hover:text-red-900"
-                              title="Remove from exchange"
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </button>
+                            {canInvite && (
+                              <button
+                                onClick={() => handleRemoveParticipant(participant.id, 
+                                  participant.firstName && participant.lastName 
+                                    ? `${participant.firstName} ${participant.lastName}`
+                                    : participant.email
+                                )}
+                                className="text-red-600 hover:text-red-900"
+                                title="Remove from exchange"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -937,14 +935,16 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {invitation.invitedBy?.name || invitation.invitedBy || 'Unknown'}
+                        {typeof invitation.invitedBy === 'object' && invitation.invitedBy !== null && 'name' in invitation.invitedBy
+                          ? (invitation.invitedBy as any).name 
+                          : invitation.invitedBy || 'Unknown'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(invitation.expiresAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">
-                          {invitation.status === 'pending' && (
+                          {canInvite && invitation.status === 'pending' && (
                             <>
                               <button
                                 onClick={() => handleResendInvitation(invitation.id)}
