@@ -166,12 +166,23 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
       stopTypingIndicator();
     }
     
-    // Check for @mention at cursor position
+    // Check for @mention at cursor position (but exclude @task/@TASK)
     const textBeforeCursor = value.substring(0, cursorPos);
     const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
     
     if (mentionMatch && selectedExchange?.participants) {
       const query = mentionMatch[1].toLowerCase();
+      
+      // Skip @mention autocomplete if this is a @task command
+      if (query === 'task') {
+        setShowMentionSuggestions(false);
+        setMentionSuggestions([]);
+        
+        // Show task preview when typing @task
+        const taskPreviewData = getTaskPreview(value, []);
+        setTaskPreview(taskPreviewData);
+        return;
+      }
       setMentionQuery(query);
       
       console.log('🔍 @mention detection:', {
@@ -220,6 +231,11 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
       setShowMentionSuggestions(false);
       setMentionSuggestions([]);
       setMentionQuery('');
+      
+      // Clear task preview if no @task in message
+      if (!value.includes('@task')) {
+        setTaskPreview(null);
+      }
     }
     
     // Check for task command

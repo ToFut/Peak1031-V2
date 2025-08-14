@@ -90,7 +90,23 @@ const UserManagement: React.FC = () => {
         ...(statusFilter !== 'all' && { status: statusFilter })
       });
 
-      const response = await apiService.getUsers();
+      console.log('🔍 Loading users with params:', {
+        page: currentPage,
+        limit: 20,
+        search: searchTerm || undefined,
+        role: roleFilter !== 'all' ? roleFilter : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined
+      });
+      
+      const response = await apiService.getUsers({
+        page: currentPage,
+        limit: 20,
+        search: searchTerm || undefined,
+        role: roleFilter !== 'all' ? roleFilter : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined
+      });
+      
+      console.log('📋 Users API response:', response);
       
       if (Array.isArray(response)) {
         // Apply client-side filtering if backend doesn't support it

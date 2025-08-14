@@ -51,7 +51,7 @@ class DocumentTemplateServiceV2 {
         .from('document_templates')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       // Apply filters
       if (options.category) {
         query = query.eq('category', options.category);
@@ -68,7 +68,7 @@ class DocumentTemplateServiceV2 {
       if (options.search) {
         query = query.or(`name.ilike.%${options.search}%,description.ilike.%${options.search}%`);
       }
-      
+
       const { data: templates, error } = await query;
       
       if (error) throw error;
@@ -91,7 +91,7 @@ class DocumentTemplateServiceV2 {
         .from('document_templates')
         .select('category')
         .eq('is_active', true);
-      
+
       if (error) throw error;
       
       // Extract unique categories
@@ -119,7 +119,7 @@ class DocumentTemplateServiceV2 {
         }])
         .select()
         .single();
-      
+
       if (error) throw error;
       return template;
     } catch (error) {
@@ -136,14 +136,14 @@ class DocumentTemplateServiceV2 {
       const { data: template, error } = await supabase
         .from('document_templates')
         .update({
-          ...updateData,
+        ...updateData,
           updated_by: userId,
-          updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString()
         })
         .eq('id', templateId)
         .select()
         .single();
-      
+
       if (error) throw error;
       return template;
     } catch (error) {
@@ -161,7 +161,7 @@ class DocumentTemplateServiceV2 {
         .from('document_templates')
         .delete()
         .eq('id', templateId);
-      
+
       if (error) throw error;
       return true;
     } catch (error) {
@@ -214,7 +214,7 @@ class DocumentTemplateServiceV2 {
       if (!template) {
         throw new Error('Template not found');
       }
-      
+
       // Use sample data or default preview data
       const previewData = {
         ...this.preparePreviewData(),
@@ -486,7 +486,7 @@ class DocumentTemplateServiceV2 {
       } else {
         buffer = fileData;
       }
-
+      
       // Use smart placeholder service to process the template
       const smartProcessedBuffer = await this.smartPlaceholderService.processTemplate(buffer, exchangeId);
       
@@ -891,7 +891,7 @@ class DocumentTemplateServiceV2 {
         .single();
 
       if (dbError) throw dbError;
-
+      
       return document;
     } catch (error) {
       console.error('Error saving generated document:', error);

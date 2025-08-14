@@ -8,8 +8,11 @@ import { httpClient } from '../base/httpClient';
 
 export class TaskService {
   async getTasks(exchangeId?: string): Promise<Task[]> {
-    const endpoint = exchangeId ? `/exchanges/${exchangeId}/tasks` : '/tasks';
-    return httpClient.get<Task[]>(endpoint);
+    const endpoint = exchangeId ? `/tasks/exchange/${exchangeId}` : '/tasks';
+    const response = await httpClient.get<any>(endpoint);
+    // The backend returns { success: true, tasks: [...], total: number, ... }
+    // Extract just the tasks array
+    return response.tasks || response || [];
   }
 
   async getTask(id: string): Promise<Task> {

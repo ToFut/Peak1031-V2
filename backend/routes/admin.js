@@ -199,8 +199,14 @@ router.get('/users', authenticateToken, requireRole(['admin']), async (req, res)
           if (status) options.where.is_active = status === 'active';
         }
 
-        // Get users from 'people' table and associated contacts
-        const users = await supabaseService.select('people', options);
+        // Get users from both 'people' table and 'users' table
+        const [peopleUsers, systemUsers] = await Promise.all([
+          supabaseService.select('people', options),
+          supabaseService.select('users', options)
+        ]);
+        
+        // Combine both sets of users
+        const users = [...peopleUsers, ...systemUsers];
         
         // Get contacts for each user (where user_id matches)
         const contactsMap = {};
@@ -473,7 +479,24 @@ router.patch('/users/:userId/status', authenticateToken, requireRole(['admin']),
     // Try to update user in Supabase first
     if (supabaseService.client) {
       try {
-        const user = await supabaseService.updateUser(userId, {
+        // First check if user exists
+        let user = await supabaseService.getUserById(userId);
+        if (!user) {
+          // Try people table
+          const { data: peopleUser, error: peopleError } = await supabaseService.client
+            .from('people')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          
+          if (peopleError || !peopleUser) {
+            return res.status(404).json({ error: 'User not found' });
+          }
+          user = peopleUser;
+        }
+        
+        // Update the user
+        await supabaseService.updateUser(userId, {
           is_active: isActive,
           updated_at: new Date().toISOString()
         });
@@ -540,7 +563,24 @@ router.patch('/users/:userId/role', authenticateToken, requireRole(['admin']), a
     // Try to update user in Supabase first
     if (supabaseService.client) {
       try {
-        const user = await supabaseService.updateUser(userId, {
+        // First check if user exists
+        let user = await supabaseService.getUserById(userId);
+        if (!user) {
+          // Try people table
+          const { data: peopleUser, error: peopleError } = await supabaseService.client
+            .from('people')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          
+          if (peopleError || !peopleUser) {
+            return res.status(404).json({ error: 'User not found' });
+          }
+          user = peopleUser;
+        }
+        
+        // Update the user
+        await supabaseService.updateUser(userId, {
           role: role,
           updated_at: new Date().toISOString()
         });
@@ -600,9 +640,20 @@ router.post('/users/:userId/reset-password', authenticateToken, requireRole(['ad
     // Try to reset password in Supabase first
     if (supabaseService.client) {
       try {
-        const user = await supabaseService.getUserById(userId);
+        // Try to find user in both users and people tables
+        let user = await supabaseService.getUserById(userId);
         if (!user) {
-          return res.status(404).json({ error: 'User not found' });
+          // Try people table
+          const { data: peopleUser, error: peopleError } = await supabaseService.client
+            .from('people')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          
+          if (peopleError || !peopleUser) {
+            return res.status(404).json({ error: 'User not found' });
+          }
+          user = peopleUser;
         }
 
         // Generate new password
@@ -680,7 +731,24 @@ router.patch('/users/:userId/2fa', authenticateToken, requireRole(['admin']), as
     // Try to update user in Supabase first
     if (supabaseService.client) {
       try {
-        const user = await supabaseService.updateUser(userId, {
+        // First check if user exists
+        let user = await supabaseService.getUserById(userId);
+        if (!user) {
+          // Try people table
+          const { data: peopleUser, error: peopleError } = await supabaseService.client
+            .from('people')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          
+          if (peopleError || !peopleUser) {
+            return res.status(404).json({ error: 'User not found' });
+          }
+          user = peopleUser;
+        }
+        
+        // Update the user
+        await supabaseService.updateUser(userId, {
           two_fa_enabled: twoFaEnabled,
           updated_at: new Date().toISOString()
         });

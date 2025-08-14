@@ -246,4 +246,107 @@ router.delete('/:exchangeId/participants/:participantId', authenticateToken, asy
   }
 });
 
+// Update participant permissions
+router.put('/:exchangeId/participants/:participantId/permissions', authenticateToken, async (req, res) => {
+  try {
+    const { exchangeId, participantId } = req.params;
+    const { permissions } = req.body;
+
+    // Check if exchange exists
+    const exchange = await supabaseService.getExchangeById(exchangeId);
+    if (!exchange) {
+      return res.status(404).json({ error: 'Exchange not found' });
+    }
+
+    // Check permissions - only admins and coordinators can modify permissions
+    const userRole = req.user.role;
+    const isCoordinator = exchange.coordinator_id === req.user.id;
+    
+    if (userRole !== 'admin' && !isCoordinator) {
+      return res.status(403).json({ 
+        error: 'Insufficient privileges',
+        message: 'Only administrators and exchange coordinators can modify participant permissions'
+      });
+    }
+
+    // Validate permissions object structure
+    const validPermissions = ['can_edit', 'can_delete', 'can_add_participants', 'can_upload_documents', 'can_send_messages'];
+    
+    if (typeof permissions !== 'object' || permissions === null) {
+      return res.status(400).json({
+        error: 'Invalid permissions format',
+        message: 'Permissions must be an object'
+      });
+    }
+
+    for (const [key, value] of Object.entries(permissions)) {
+      if (!validPermissions.includes(key)) {
+        return res.status(400).json({
+          error: 'Invalid permission',
+          message: `Unknown permission: ${key}. Valid permissions: ${validPermissions.join(', ')}`
+        });
+      }
+      if (typeof value !== 'boolean') {
+        return res.status(400).json({
+          error: 'Invalid permission value',
+          message: `Permission ${key} must be a boolean value`
+        });
+      }
+    }
+
+    // Update participant permissions
+    const { data: updatedParticipant, error: updateError } = await supabaseService.client
+      .from('exchange_participants')
+      .update({
+        permissions: JSON.stringify(permissions),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', participantId)
+      .eq('exchange_id', exchangeId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Error updating participant permissions:', updateError);
+      return res.status(500).json({
+        error: 'Failed to update permissions',
+        message: updateError.message
+      });
+    }
+
+    if (!updatedParticipant) {
+      return res.status(404).json({
+        error: 'Participant not found',
+        message: 'Participant not found in this exchange'
+      });
+    }
+
+    console.log(`✅ Permissions updated for participant ${participantId} by ${req.user.email}`);
+
+    // Emit real-time event for permission change
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`exchange_${exchangeId}`).emit('participant_permissions_updated', {
+        exchangeId,
+        participantId,
+        permissions,
+        updatedBy: req.user.id
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Participant permissions updated successfully',
+      participant: updatedParticipant
+    });
+
+  } catch (error) {
+    console.error('Error updating participant permissions:', error);
+    res.status(500).json({ 
+      error: 'Failed to update participant permissions',
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;

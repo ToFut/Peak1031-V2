@@ -971,7 +971,7 @@ router.delete('/:invitationId', authenticateToken, requireRole(['admin', 'coordi
 });
 
 // Get all users and invitations for an exchange (combined view)
-router.get('/exchange/:exchangeId/users-and-invitations', authenticateToken, requireRole(['admin', 'coordinator']), async (req, res) => {
+router.get('/exchange/:exchangeId/users-and-invitations', authenticateToken, async (req, res) => {
   try {
     const { exchangeId } = req.params;
     
@@ -981,49 +981,23 @@ router.get('/exchange/:exchangeId/users-and-invitations', authenticateToken, req
       return res.status(404).json({ error: 'Exchange not found' });
     }
 
-    const userRole = req.user.role;
-    const isCoordinator = exchange.coordinator_id === req.user.id;
+    // Use the same RBAC logic as other exchange endpoints
+    const rbacService = require('../services/rbacService');
+    const canAccess = await rbacService.canUserAccessExchange(req.user, exchangeId);
     
-    if (userRole !== 'admin' && !isCoordinator) {
-      return res.status(403).json({ error: 'Not authorized to view exchange participants' });
+    if (!canAccess) {
+      return res.status(403).json({ 
+        error: 'Access denied',
+        message: 'You do not have permission to view participants for this exchange'
+      });
     }
 
-    // Get current participants (users already in the exchange)
+    // Get current participants using the same approach as working endpoint
     const { data: participants, error: participantsError } = await supabaseService.client
       .from('exchange_participants')
-      .select(`
-        id,
-        role,
-        permissions,
-        assigned_at,
-        is_active,
-        user:user_id(
-          id,
-          first_name,
-          last_name,
-          email,
-          phone,
-          role as user_role,
-          created_at
-        ),
-        contact:contact_id(
-          id,
-          first_name,
-          last_name,
-          email,
-          phone,
-          contact_type
-        ),
-        assigned_by_contact:assigned_by(
-          id,
-          first_name,
-          last_name,
-          email
-        )
-      `)
+      .select('*')
       .eq('exchange_id', exchangeId)
-      .eq('is_active', true)
-      .order('assigned_at', { ascending: false });
+      .eq('is_active', true);
 
     if (participantsError) {
       console.error('Error fetching participants:', participantsError);
@@ -1059,37 +1033,107 @@ router.get('/exchange/:exchangeId/users-and-invitations', authenticateToken, req
       console.error('Error fetching invitations:', invitationsError);
     }
 
-    // Format participants data
-    const formattedParticipants = (participants || []).map(p => {
-      const user = p.user;
-      const contact = p.contact;
-      const assignedBy = p.assigned_by_contact;
+    // Debug logging
+    console.log('🔍 Raw participants data:', JSON.stringify(participants, null, 2));
+    console.log('🔍 Raw invitations data:', JSON.stringify(invitations, null, 2));
 
-      return {
-        id: p.id,
-        type: 'participant',
-        status: 'active',
-        role: p.role,
-        permissions: p.permissions,
-        assignedAt: p.assigned_at,
+    // Get contact/user details separately (following the working pattern)
+    let formattedParticipants = [];
+    
+    if (participants && participants.length > 0) {
+      // Get unique contact and user IDs
+      const contactIds = [...new Set(participants.map(p => p.contact_id).filter(Boolean))];
+      const userIds = [...new Set(participants.map(p => p.user_id).filter(Boolean))];
+      
+      // Fetch contact details
+      let contacts = [];
+      if (contactIds.length > 0) {
+        const { data: contactData } = await supabaseService.client
+          .from('people')
+          .select('id, first_name, last_name, email, phone')
+          .in('id', contactIds);
+        contacts = contactData || [];
+      }
+      
+      // Fetch user details  
+      let users = [];
+      if (userIds.length > 0) {
+        const { data: userData } = await supabaseService.client
+          .from('users')
+          .select('id, first_name, last_name, email, phone, role')
+          .in('id', userIds);
+        users = userData || [];
+      }
+      
+      // Format participants with enriched data
+      formattedParticipants = await Promise.all(participants.map(async (participant) => {
+        let name = 'Unknown';
+        let email = '';
+        let phone = '';
+        let firstName = '';
+        let lastName = '';
         
-        // User info (prefer user data over contact data)
-        userId: user?.id || null,
-        contactId: contact?.id || null,
-        firstName: user?.first_name || contact?.first_name,
-        lastName: user?.last_name || contact?.last_name,
-        email: user?.email || contact?.email,
-        phone: user?.phone || contact?.phone,
-        userRole: user?.user_role,
+        // Try user data first (more reliable)
+        if (participant.user_id) {
+          const user = users.find(u => u.id === participant.user_id);
+          if (user) {
+            firstName = user.first_name || '';
+            lastName = user.last_name || '';
+            name = `${firstName} ${lastName}`.trim() || 'Unknown';
+            email = user.email || '';
+            phone = user.phone || '';
+          }
+        }
         
-        // Assignment info
-        assignedBy: assignedBy ? {
-          id: assignedBy.id,
-          name: `${assignedBy.first_name || ''} ${assignedBy.last_name || ''}`.trim() || assignedBy.email,
-          email: assignedBy.email
-        } : null
-      };
-    });
+        // Fallback to contact data if no user found
+        if (name === 'Unknown' && participant.contact_id) {
+          const contact = contacts.find(c => c.id === participant.contact_id);
+          if (contact) {
+            firstName = contact.first_name || '';
+            lastName = contact.last_name || '';
+            name = `${firstName} ${lastName}`.trim() || 'Unknown';
+            email = contact.email || '';
+            phone = contact.phone || '';
+          }
+        }
+        
+        // Parse permissions if they're stored as JSON string
+        let parsedPermissions = {};
+        if (participant.permissions) {
+          try {
+            parsedPermissions = typeof participant.permissions === 'string' 
+              ? JSON.parse(participant.permissions) 
+              : participant.permissions;
+          } catch (error) {
+            console.error('Error parsing permissions for participant:', participant.id, error);
+          }
+        }
+
+        return {
+          id: participant.id,
+          type: 'participant',
+          status: 'active',
+          role: participant.role,
+          permissions: parsedPermissions,
+          assignedAt: participant.assigned_at,
+          
+          // User info
+          userId: participant.user_id,
+          contactId: participant.contact_id,
+          firstName,
+          lastName,
+          name,
+          email,
+          phone,
+          
+          // For compatibility with existing UI
+          assignedBy: null // We can add this later if needed
+        };
+      }));
+    }
+
+    console.log('🔍 Final participants count:', formattedParticipants.length);
+    console.log('🔍 Participants data:', JSON.stringify(formattedParticipants, null, 2));
 
     // Format invitations data
     const formattedInvitations = (invitations || []).map(inv => {
@@ -1155,5 +1199,6 @@ router.get('/exchange/:exchangeId/users-and-invitations', authenticateToken, req
     });
   }
 });
+
 
 module.exports = router;

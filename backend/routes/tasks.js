@@ -191,14 +191,16 @@ router.get('/', authenticateToken, async (req, res) => {
 
     // Simple role-based filtering
     if (req.user.role === 'client') {
-      // Get client's exchanges first
-      const { data: exchanges } = await supabaseService.client
-        .from('exchanges')
-        .select('id')
-        .eq('client_id', req.user.id);
+      // Get client's exchanges through exchange_participants table
+      const { data: participantExchanges } = await supabaseService.client
+        .from('exchange_participants')
+        .select('exchange_id')
+        .eq('contact_id', req.user.contactId || req.user.contact_id)
+        .eq('is_active', true);
       
-      if (exchanges?.length) {
-        query = query.in('exchange_id', exchanges.map(e => e.id));
+      if (participantExchanges?.length) {
+        const exchangeIds = participantExchanges.map(e => e.exchange_id);
+        query = query.in('exchange_id', exchangeIds);
       } else {
         return res.json({ success: true, tasks: [], total: 0, page: parseInt(page), limit: parseInt(limit), hasMore: false });
       }

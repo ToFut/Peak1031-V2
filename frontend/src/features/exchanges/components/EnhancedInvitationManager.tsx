@@ -13,7 +13,8 @@ import {
   UsersIcon,
   ExclamationTriangleIcon,
   UserCircleIcon,
-  PlusIcon
+  PlusIcon,
+  CogIcon
 } from '@heroicons/react/24/outline';
 import { useInvitations, InvitationData, PendingInvitation } from '../../../hooks/useInvitations';
 import { useAuth } from '../../../hooks/useAuth';
@@ -69,6 +70,8 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
   const [lastResults, setLastResults] = useState<any>(null);
   const [isLoadingInvitations, setIsLoadingInvitations] = useState(false);
   const [activeTab, setActiveTab] = useState<'participants' | 'invitations'>('participants');
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const [selectedParticipant, setSelectedParticipant] = useState<any>(null);
 
   const canInvite = isAdmin() || isCoordinator();
 
@@ -308,6 +311,31 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
     } catch (err: any) {
       console.error('Failed to remove participant:', err);
       alert(`Failed to remove participant: ${err.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleManagePermissions = (participant: any) => {
+    setSelectedParticipant(participant);
+    setShowPermissionsModal(true);
+  };
+
+  const handleUpdatePermissions = async (participantId: string, newPermissions: Record<string, boolean>) => {
+    try {
+      await apiService.put(`/exchange-participants/${exchangeId}/participants/${participantId}/permissions`, {
+        permissions: newPermissions
+      });
+      
+      alert('Permissions updated successfully!');
+      await loadExchangeUsersAndInvitations();
+      setShowPermissionsModal(false);
+      setSelectedParticipant(null);
+      
+      if (onParticipantAdded) {
+        onParticipantAdded();
+      }
+    } catch (err: any) {
+      console.error('Failed to update permissions:', err);
+      alert(`Failed to update permissions: ${err.message || 'Unknown error'}`);
     }
   };
 
@@ -782,6 +810,9 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
                         Joined
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Permissions
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -834,20 +865,49 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(participant.assignedAt).toLocaleDateString()}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-xs">
+                            {participant.permissions && typeof participant.permissions === 'object' ? (
+                              <div className="flex flex-wrap gap-1">
+                                {Object.entries(participant.permissions as Record<string, boolean>).map(([key, value]) => 
+                                  value ? (
+                                    <span
+                                      key={key}
+                                      className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800"
+                                    >
+                                      {key.replace('can_', '').replace('_', ' ')}
+                                    </span>
+                                  ) : null
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">No permissions set</span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex space-x-2">
                             {canInvite && (
-                              <button
-                                onClick={() => handleRemoveParticipant(participant.id, 
-                                  participant.firstName && participant.lastName 
-                                    ? `${participant.firstName} ${participant.lastName}`
-                                    : participant.email
-                                )}
-                                className="text-red-600 hover:text-red-900"
-                                title="Remove from exchange"
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => handleManagePermissions(participant)}
+                                  className="text-blue-600 hover:text-blue-900"
+                                  title="Manage permissions"
+                                >
+                                  <CogIcon className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleRemoveParticipant(participant.id, 
+                                    participant.firstName && participant.lastName 
+                                      ? `${participant.firstName} ${participant.lastName}`
+                                      : participant.email
+                                  )}
+                                  className="text-red-600 hover:text-red-900"
+                                  title="Remove from exchange"
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -972,6 +1032,143 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
           )}
           </div>
         )}
+      </div>
+
+      {/* Permissions Management Modal */}
+      {showPermissionsModal && selectedParticipant && (
+        <PermissionsModal
+          participant={selectedParticipant}
+          onClose={() => {
+            setShowPermissionsModal(false);
+            setSelectedParticipant(null);
+          }}
+          onSave={(permissions) => handleUpdatePermissions(selectedParticipant.id, permissions)}
+        />
+      )}
+    </div>
+  );
+};
+
+// Permissions Modal Component
+interface PermissionsModalProps {
+  participant: any;
+  onClose: () => void;
+  onSave: (permissions: Record<string, boolean>) => void;
+}
+
+const PermissionsModal: React.FC<PermissionsModalProps> = ({ participant, onClose, onSave }) => {
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({
+    can_edit: false,
+    can_delete: false,
+    can_add_participants: false,
+    can_upload_documents: false,
+    can_send_messages: false
+  });
+
+  useEffect(() => {
+    if (participant.permissions) {
+      try {
+        const parsed = typeof participant.permissions === 'string' 
+          ? JSON.parse(participant.permissions) 
+          : participant.permissions;
+        setPermissions(parsed);
+      } catch (error) {
+        console.error('Error parsing permissions:', error);
+      }
+    }
+  }, [participant]);
+
+  const handlePermissionChange = (permission: string, value: boolean) => {
+    setPermissions(prev => ({
+      ...prev,
+      [permission]: value
+    }));
+  };
+
+  const handleSave = () => {
+    onSave(permissions);
+  };
+
+  const permissionLabels = {
+    can_edit: 'Edit Exchange',
+    can_delete: 'Delete Items',
+    can_add_participants: 'Add Participants',
+    can_upload_documents: 'Upload Documents',
+    can_send_messages: 'Send Messages'
+  };
+
+  const permissionDescriptions: Record<string, string> = {
+    can_edit: 'Allow editing exchange details and properties',
+    can_delete: 'Allow deleting documents and other items',
+    can_add_participants: 'Allow adding new participants to the exchange',
+    can_upload_documents: 'Allow uploading documents to the exchange',
+    can_send_messages: 'Allow sending messages in exchange chat'
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">
+            Manage Permissions
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-500"
+          >
+            <XCircleIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="mb-4">
+          <p className="text-sm text-gray-600">
+            Managing permissions for: <strong>
+              {participant.firstName && participant.lastName 
+                ? `${participant.firstName} ${participant.lastName}`
+                : participant.email}
+            </strong>
+          </p>
+          <p className="text-xs text-gray-500 mt-1">Role: {participant.role}</p>
+        </div>
+
+        <div className="space-y-4">
+          {Object.entries(permissionLabels).map(([key, label]) => (
+            <div key={key} className="flex items-start space-x-3">
+              <div className="flex items-center h-5">
+                <input
+                  type="checkbox"
+                  id={key}
+                  checked={permissions[key] || false}
+                  onChange={(e) => handlePermissionChange(key, e.target.checked)}
+                  className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <label htmlFor={key} className="text-sm font-medium text-gray-900">
+                  {label}
+                </label>
+                <p className="text-xs text-gray-500 mt-1">
+                  {permissionDescriptions[key]}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+          >
+            Save Changes
+          </button>
+        </div>
       </div>
     </div>
   );

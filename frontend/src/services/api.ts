@@ -330,9 +330,19 @@ class ApiService {
   }
 
   // Data methods - now using backend API
-  async getUsers(): Promise<User[]> {
-    return await this.request('/users');
+  async getUsers(options?: { page?: number; limit?: number; search?: string; role?: string; status?: string }): Promise<User[]> {
+    const params = new URLSearchParams();
+    
+    if (options?.page) params.append('page', options.page.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.search) params.append('search', options.search);
+    if (options?.role) params.append('role', options.role);
+    if (options?.status) params.append('isActive', options.status === 'active' ? 'true' : 'false');
+    
+    const endpoint = `/users${params.toString() ? `?${params.toString()}` : ''}`;
+    return await this.request(endpoint);
   }
+
 
   async getContacts(options?: { page?: number; limit?: number; search?: string }): Promise<Contact[]> {
     // Use pagination to prevent performance issues
@@ -418,8 +428,11 @@ class ApiService {
   }
 
   async getTasks(exchangeId?: string): Promise<Task[]> {
-    const endpoint = exchangeId ? `/exchanges/${exchangeId}/tasks` : '/tasks';
-    return await this.request(endpoint);
+    const endpoint = exchangeId ? `/tasks/exchange/${exchangeId}` : '/tasks';
+    const response = await this.request(endpoint) as any;
+    // Backend returns { success: true, tasks: [...], total: number, ... }
+    // Extract just the tasks array
+    return response?.tasks || (Array.isArray(response) ? response : []);
   }
 
   async getMessages(exchangeId?: string): Promise<Message[]> {
