@@ -7,6 +7,7 @@ import { useRealTimeTasks } from '../hooks/useRealTimeTasks';
 import { apiService } from '../services/api';
 import UnifiedChatInterface from '../features/messages/components/UnifiedChatInterface';
 import EnterpriseParticipantsManager from '../components/EnterpriseParticipantsManager';
+import EnhancedInvitationManager from '../features/exchanges/components/EnhancedInvitationManager';
 import { EnhancedDocumentManager } from '../features/documents/components';
 import { TaskCreateModal } from '../features/tasks/components/TaskCreateModal';
 import { TaskBoard } from '../features/tasks/components/TaskBoard';

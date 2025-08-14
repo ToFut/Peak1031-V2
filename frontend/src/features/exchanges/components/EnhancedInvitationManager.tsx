@@ -52,6 +52,8 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteMode, setInviteMode] = useState<InviteMode>('manual');
   const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
+  const [exchangeParticipants, setExchangeParticipants] = useState<any[]>([]);
+  const [exchangeStats, setExchangeStats] = useState<any>({});
   const [inviteFormData, setInviteFormData] = useState<InvitationData[]>([{
     email: '',
     phone: '',
@@ -66,34 +68,46 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
   const [showResults, setShowResults] = useState(false);
   const [lastResults, setLastResults] = useState<any>(null);
   const [isLoadingInvitations, setIsLoadingInvitations] = useState(false);
+  const [activeTab, setActiveTab] = useState<'participants' | 'invitations'>('participants');
 
   const canInvite = isAdmin() || isCoordinator();
 
   useEffect(() => {
     if (canInvite && !isLoadingInvitations) {
-      loadPendingInvitations();
+      loadExchangeUsersAndInvitations();
     }
   }, [exchangeId, canInvite]);
 
-  const loadPendingInvitations = async () => {
+  const loadExchangeUsersAndInvitations = async () => {
     if (isLoadingInvitations) return;
     
     setIsLoadingInvitations(true);
     try {
-      const response = await getPendingInvitations(exchangeId);
-      if (response && response.invitations) {
-        setPendingInvitations(response.invitations);
-      } else if (response && Array.isArray(response)) {
-        setPendingInvitations(response);
+      // Use the new combined endpoint
+      const response = await apiService.get(`/invitations/exchange/${exchangeId}/users-and-invitations`);
+      
+      if (response && response.success) {
+        setExchangeParticipants(response.participants || []);
+        setPendingInvitations(response.invitations || []);
+        setExchangeStats(response.stats || {});
       } else {
+        setExchangeParticipants([]);
         setPendingInvitations([]);
+        setExchangeStats({});
       }
     } catch (err) {
-      console.error('Failed to load pending invitations:', err);
+      console.error('Failed to load exchange users and invitations:', err);
+      setExchangeParticipants([]);
       setPendingInvitations([]);
+      setExchangeStats({});
     } finally {
       setIsLoadingInvitations(false);
     }
+  };
+
+  const loadPendingInvitations = async () => {
+    // This is for backward compatibility
+    await loadExchangeUsersAndInvitations();
   };
 
   const handleRemoveSelectedContact = (contactId: string) => {
@@ -196,7 +210,7 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
         // All were users, we're done
         setSelectedContacts([]);
         setShowInviteForm(false);
-        await loadPendingInvitations();
+        await loadExchangeUsersAndInvitations();
         
         if (onParticipantAdded) {
           onParticipantAdded();
@@ -241,8 +255,8 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
       setCustomMessage('');
       setShowInviteForm(false);
       
-      // Reload pending invitations
-      await loadPendingInvitations();
+      // Reload exchange data
+      await loadExchangeUsersAndInvitations();
       
       // Notify parent component
       if (onParticipantAdded) {
@@ -260,7 +274,7 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
     try {
       await resendInvitation(invitationId);
       alert('Invitation resent successfully!');
-      await loadPendingInvitations();
+      await loadExchangeUsersAndInvitations();
     } catch (err) {
       console.error('Failed to resend invitation:', err);
     }
@@ -273,9 +287,27 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
     try {
       await cancelInvitation(invitationId);
       alert('Invitation cancelled successfully!');
-      await loadPendingInvitations();
+      await loadExchangeUsersAndInvitations();
     } catch (err) {
       console.error('Failed to cancel invitation:', err);
+    }
+  };
+
+  const handleRemoveParticipant = async (participantId: string, participantName: string) => {
+    const confirmed = window.confirm(`Are you sure you want to remove ${participantName} from this exchange?`);
+    if (!confirmed) return;
+
+    try {
+      await apiService.delete(`/exchanges/${exchangeId}/participants/${participantId}`);
+      alert(`${participantName} has been removed from the exchange successfully!`);
+      await loadExchangeUsersAndInvitations();
+      
+      if (onParticipantAdded) {
+        onParticipantAdded();
+      }
+    } catch (err: any) {
+      console.error('Failed to remove participant:', err);
+      alert(`Failed to remove participant: ${err.message || 'Unknown error'}`);
     }
   };
 
@@ -309,6 +341,12 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
     }
   };
 
+  const filteredParticipants = exchangeParticipants.filter(participant =>
+    participant.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (participant.firstName && participant.firstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (participant.lastName && participant.lastName.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
   const filteredInvitations = pendingInvitations.filter(invitation =>
     invitation.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (invitation.firstName && invitation.firstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -329,10 +367,17 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-medium text-gray-900">Manage Invitations</h3>
+          <h3 className="text-lg font-medium text-gray-900">Exchange Members & Invitations</h3>
           <p className="text-sm text-gray-500">
-            Invite users to join {exchangeName}
+            Manage users and invitations for {exchangeName}
           </p>
+          {exchangeStats.totalParticipants !== undefined && (
+            <div className="flex items-center mt-2 space-x-4 text-sm text-gray-600">
+              <span>👥 {exchangeStats.totalParticipants} Active Members</span>
+              <span>📧 {exchangeStats.totalInvitations} Invitations</span>
+              <span>⏳ {exchangeStats.pendingInvitations} Pending</span>
+            </div>
+          )}
         </div>
         <button
           onClick={() => setShowInviteForm(!showInviteForm)}
@@ -341,6 +386,34 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
           <UserPlusIcon className="h-4 w-4 mr-2" />
           Send Invitations
         </button>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="flex space-x-8">
+          <button
+            onClick={() => setActiveTab('participants')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'participants'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <UsersIcon className="h-4 w-4 inline mr-2" />
+            Active Members ({filteredParticipants.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('invitations')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'invitations'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <EnvelopeIcon className="h-4 w-4 inline mr-2" />
+            Invitations ({filteredInvitations.length})
+          </button>
+        </nav>
       </div>
 
       {/* Error Display */}
@@ -660,27 +733,138 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
         </div>
       )}
 
-      {/* Pending Invitations */}
-      <div className="bg-white border border-gray-200 rounded-lg">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h4 className="text-lg font-medium text-gray-900">
-              Pending Invitations ({pendingInvitations.length})
-            </h4>
-            <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm"
-                placeholder="Search invitations..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
+      {/* Search Bar */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="relative">
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            placeholder={`Search ${activeTab === 'participants' ? 'members' : 'invitations'}...`}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
+      </div>
 
-        <div className="overflow-hidden">
+      {/* Content Area */}
+      <div className="bg-white border border-gray-200 rounded-lg">
+        {/* Participants Tab */}
+        {activeTab === 'participants' && (
+          <div className="overflow-hidden">
+            {filteredParticipants.length === 0 ? (
+              <div className="text-center py-12">
+                <UsersIcon className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-4 text-lg font-medium text-gray-900">
+                  {exchangeParticipants.length === 0 ? 'No participants yet' : 'No participants found'}
+                </h3>
+                <p className="text-gray-500">
+                  {exchangeParticipants.length === 0 
+                    ? "No users have been added to this exchange yet."
+                    : "No participants match your search criteria."
+                  }
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Member
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Role
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        User Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Added By
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Joined
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredParticipants.map((participant) => (
+                      <tr key={participant.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                              <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
+                                <CheckCircleIcon className="h-5 w-5 text-green-600" />
+                              </div>
+                            </div>
+                            <div className="ml-3">
+                              <div className="text-sm font-medium text-gray-900">
+                                {participant.firstName && participant.lastName 
+                                  ? `${participant.firstName} ${participant.lastName}`
+                                  : participant.email
+                                }
+                              </div>
+                              <div className="text-sm text-gray-500">{participant.email}</div>
+                              {participant.phone && (
+                                <div className="text-xs text-gray-400 flex items-center">
+                                  <DevicePhoneMobileIcon className="h-3 w-3 mr-1" />
+                                  {participant.phone}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                            {participant.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm text-gray-900">
+                            {participant.userId ? 'Registered User' : 'Contact Only'}
+                          </span>
+                          {participant.userRole && (
+                            <div className="text-xs text-gray-500">
+                              System Role: {participant.userRole}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {participant.assignedBy?.name || 'System'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(participant.assignedAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleRemoveParticipant(participant.id, 
+                                participant.firstName && participant.lastName 
+                                  ? `${participant.firstName} ${participant.lastName}`
+                                  : participant.email
+                              )}
+                              className="text-red-600 hover:text-red-900"
+                              title="Remove from exchange"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Invitations Tab */}
+        {activeTab === 'invitations' && (
+          <div className="overflow-hidden">
           {filteredInvitations.length === 0 ? (
             <div className="text-center py-12">
               <EnvelopeIcon className="mx-auto h-12 w-12 text-gray-400" />
@@ -753,7 +937,7 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {invitation.invitedBy}
+                        {invitation.invitedBy?.name || invitation.invitedBy || 'Unknown'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(invitation.expiresAt).toLocaleDateString()}
@@ -786,7 +970,8 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
               </table>
             </div>
           )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

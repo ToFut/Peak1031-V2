@@ -970,4 +970,190 @@ router.delete('/:invitationId', authenticateToken, requireRole(['admin', 'coordi
   }
 });
 
+// Get all users and invitations for an exchange (combined view)
+router.get('/exchange/:exchangeId/users-and-invitations', authenticateToken, requireRole(['admin', 'coordinator']), async (req, res) => {
+  try {
+    const { exchangeId } = req.params;
+    
+    // Verify exchange exists and user has access
+    const exchange = await supabaseService.getExchangeById(exchangeId);
+    if (!exchange) {
+      return res.status(404).json({ error: 'Exchange not found' });
+    }
+
+    const userRole = req.user.role;
+    const isCoordinator = exchange.coordinator_id === req.user.id;
+    
+    if (userRole !== 'admin' && !isCoordinator) {
+      return res.status(403).json({ error: 'Not authorized to view exchange participants' });
+    }
+
+    // Get current participants (users already in the exchange)
+    const { data: participants, error: participantsError } = await supabaseService.client
+      .from('exchange_participants')
+      .select(`
+        id,
+        role,
+        permissions,
+        assigned_at,
+        is_active,
+        user:user_id(
+          id,
+          first_name,
+          last_name,
+          email,
+          phone,
+          role as user_role,
+          created_at
+        ),
+        contact:contact_id(
+          id,
+          first_name,
+          last_name,
+          email,
+          phone,
+          contact_type
+        ),
+        assigned_by_contact:assigned_by(
+          id,
+          first_name,
+          last_name,
+          email
+        )
+      `)
+      .eq('exchange_id', exchangeId)
+      .eq('is_active', true)
+      .order('assigned_at', { ascending: false });
+
+    if (participantsError) {
+      console.error('Error fetching participants:', participantsError);
+    }
+
+    // Get all invitations for this exchange
+    const { data: invitations, error: invitationsError } = await supabaseService.client
+      .from('invitations')
+      .select(`
+        id,
+        email,
+        phone,
+        role,
+        status,
+        first_name,
+        last_name,
+        custom_message,
+        invitation_token,
+        expires_at,
+        created_at,
+        accepted_at,
+        invited_by_user:invited_by(
+          id,
+          first_name,
+          last_name,
+          email
+        )
+      `)
+      .eq('exchange_id', exchangeId)
+      .order('created_at', { ascending: false });
+
+    if (invitationsError) {
+      console.error('Error fetching invitations:', invitationsError);
+    }
+
+    // Format participants data
+    const formattedParticipants = (participants || []).map(p => {
+      const user = p.user;
+      const contact = p.contact;
+      const assignedBy = p.assigned_by_contact;
+
+      return {
+        id: p.id,
+        type: 'participant',
+        status: 'active',
+        role: p.role,
+        permissions: p.permissions,
+        assignedAt: p.assigned_at,
+        
+        // User info (prefer user data over contact data)
+        userId: user?.id || null,
+        contactId: contact?.id || null,
+        firstName: user?.first_name || contact?.first_name,
+        lastName: user?.last_name || contact?.last_name,
+        email: user?.email || contact?.email,
+        phone: user?.phone || contact?.phone,
+        userRole: user?.user_role,
+        
+        // Assignment info
+        assignedBy: assignedBy ? {
+          id: assignedBy.id,
+          name: `${assignedBy.first_name || ''} ${assignedBy.last_name || ''}`.trim() || assignedBy.email,
+          email: assignedBy.email
+        } : null
+      };
+    });
+
+    // Format invitations data
+    const formattedInvitations = (invitations || []).map(inv => {
+      const invitedBy = inv.invited_by_user;
+
+      return {
+        id: inv.id,
+        type: 'invitation',
+        status: inv.status,
+        role: inv.role,
+        
+        // Invitation info
+        email: inv.email,
+        phone: inv.phone,
+        firstName: inv.first_name,
+        lastName: inv.last_name,
+        customMessage: inv.custom_message,
+        invitationToken: inv.invitation_token,
+        expiresAt: inv.expires_at,
+        createdAt: inv.created_at,
+        acceptedAt: inv.accepted_at,
+        
+        // Inviter info
+        invitedBy: invitedBy ? {
+          id: invitedBy.id,
+          name: `${invitedBy.first_name || ''} ${invitedBy.last_name || ''}`.trim() || invitedBy.email,
+          email: invitedBy.email
+        } : null
+      };
+    });
+
+    // Calculate summary statistics
+    const stats = {
+      totalParticipants: formattedParticipants.length,
+      totalInvitations: formattedInvitations.length,
+      pendingInvitations: formattedInvitations.filter(inv => inv.status === 'pending').length,
+      acceptedInvitations: formattedInvitations.filter(inv => inv.status === 'accepted').length,
+      expiredInvitations: formattedInvitations.filter(inv => inv.status === 'expired').length,
+      
+      // Role breakdown for participants
+      roleBreakdown: formattedParticipants.reduce((acc, p) => {
+        acc[p.role] = (acc[p.role] || 0) + 1;
+        return acc;
+      }, {})
+    };
+
+    res.json({
+      success: true,
+      exchangeId,
+      participants: formattedParticipants,
+      invitations: formattedInvitations,
+      stats,
+      total: formattedParticipants.length + formattedInvitations.length
+    });
+
+  } catch (error) {
+    console.error('Error fetching exchange users and invitations:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch exchange users and invitations',
+      participants: [],
+      invitations: [],
+      stats: {}
+    });
+  }
+});
+
 module.exports = router;
