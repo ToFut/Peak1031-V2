@@ -414,6 +414,37 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
             console.warn('⚠️ Socket.IO not available for participant addition notification');
           }
           
+          // Create invitation record for existing user to show in pending list
+          const crypto = require('crypto');
+          const invitationToken = crypto.randomBytes(32).toString('hex');
+          
+          try {
+            const { data: invitationRecord, error: invError } = await supabaseService.client
+              .from('invitations')
+              .insert({
+                id: uuidv4(),
+                exchange_id: exchangeId,
+                email: invitation.email,
+                role: invitation.role,
+                invited_by: inviterId,
+                invitation_token: invitationToken,
+                status: 'auto_accepted', // Special status for existing users
+                accepted_at: new Date().toISOString(),
+                user_id: existingUser.id,
+                custom_message: message || null,
+                expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                created_at: new Date().toISOString()
+              })
+              .select()
+              .single();
+            
+            if (!invError && invitationRecord) {
+              console.log(`✅ Created invitation record for existing user ${existingUser.email}`);
+            }
+          } catch (invErr) {
+            console.error('Failed to create invitation record:', invErr);
+          }
+          
           results.push({
             email: invitation.email,
             status: 'added_existing_user',
