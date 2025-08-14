@@ -94,10 +94,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       if (isProduction) {
         const hostname = window.location.hostname;
         if (hostname.includes('vercel.app')) {
-          // For Vercel deployments, we need the Railway backend URL
-          console.error('⚠️ REACT_APP_SOCKET_URL not set in production!');
-          console.error('Please set REACT_APP_SOCKET_URL to your Railway backend URL');
-          socketUrl = 'https://backend-not-configured.railway.app';
+          // For Vercel deployments, use the known Railway backend URL
+          socketUrl = 'https://peak1031-production.up.railway.app';
+          console.log('🚀 Using production Railway WebSocket URL');
         } else {
           // Fallback: assume backend is on same domain
           socketUrl = `${window.location.protocol}//${window.location.hostname}`;

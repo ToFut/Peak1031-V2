@@ -39,12 +39,9 @@ class ApiService {
         // In production, try common backend URL patterns
         const hostname = window.location.hostname;
         if (hostname.includes('vercel.app')) {
-          // For Vercel deployments, we need the Railway backend URL
-          // This should be set via environment variable REACT_APP_API_URL
-          console.error('⚠️ REACT_APP_API_URL not set in production!');
-          console.error('Please set REACT_APP_API_URL to your Railway backend URL + /api');
-          // Temporary fallback - will likely fail but provides clear error
-          baseUrl = 'https://backend-not-configured.railway.app/api';
+          // For Vercel deployments, use the known Railway backend URL
+          baseUrl = 'https://peak1031-production.up.railway.app/api';
+          console.log('🚀 Using production Railway backend URL');
         } else {
           // Fallback: assume API is on same domain with /api path
           baseUrl = `${window.location.protocol}//${window.location.hostname}/api`;

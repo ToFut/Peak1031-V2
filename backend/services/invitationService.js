@@ -156,6 +156,10 @@ class InvitationService {
     if (method === 'email' || method === 'both') {
       if (this.sendgridEnabled) {
         try {
+          console.log(`🔄 Attempting to send invitation email to ${email}`);
+          console.log(`📧 SendGrid API Key configured: ${process.env.SENDGRID_API_KEY ? 'Yes' : 'No'}`);
+          console.log(`📧 From email: ${process.env.SENDGRID_FROM_EMAIL}`);
+          
           await this.sendInvitationEmail({
             email,
             inviteUrl,
@@ -167,9 +171,10 @@ class InvitationService {
             isResend
           });
           results.email.sent = true;
-          console.log(`✅ Invitation email sent to ${email}`);
+          console.log(`✅ Invitation email sent successfully to ${email}`);
         } catch (error) {
           console.error(`❌ Failed to send invitation email to ${email}:`, error);
+          console.error(`❌ Error details:`, error);
           results.email.error = error.message;
         }
       } else {
@@ -233,6 +238,11 @@ class InvitationService {
       isResend
     } = options;
 
+    console.log(`📧 Preparing SendGrid email for ${email}`);
+    console.log(`📧 Exchange: ${exchangeName}`);
+    console.log(`📧 Inviter: ${inviterName}`);
+    console.log(`📧 Invite URL: ${inviteUrl}`);
+
     const subject = isResend 
       ? `Reminder: You're invited to join ${exchangeName} - Peak 1031 Exchange`
       : `You're invited to join ${exchangeName} - Peak 1031 Exchange`;
@@ -277,7 +287,20 @@ class InvitationService {
       }
     };
 
-    await sgMail.send(msg);
+    console.log(`📧 SendGrid message prepared:`, {
+      to: msg.to,
+      from: msg.from,
+      subject: msg.subject
+    });
+
+    try {
+      const response = await sgMail.send(msg);
+      console.log(`✅ SendGrid API response:`, response[0].statusCode);
+      return response;
+    } catch (error) {
+      console.error(`❌ SendGrid API error:`, error.response?.body || error.message);
+      throw error;
+    }
   }
 
   /**
