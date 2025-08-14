@@ -25,8 +25,29 @@ class InvitationService {
       console.log('⚠️ Twilio not configured');
     }
 
-    this.frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    // Intelligent frontend URL detection
+    this.frontendUrl = process.env.FRONTEND_URL || this.detectFrontendUrl();
     console.log('✅ InvitationService initialized - using Supabase Auth for invitations');
+    console.log(`🌐 Frontend URL configured as: ${this.frontendUrl}`);
+  }
+
+  /**
+   * Detect frontend URL based on environment
+   */
+  detectFrontendUrl() {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const railwayUrl = process.env.RAILWAY_STATIC_URL;
+    
+    if (isProduction) {
+      // Production environment - use Vercel frontend URL
+      return 'https://peak1031-v2-8uus.vercel.app';
+    } else if (railwayUrl) {
+      // Railway development/staging
+      return `https://${railwayUrl}`;
+    } else {
+      // Local development
+      return 'http://localhost:3000';
+    }
   }
 
   /**
