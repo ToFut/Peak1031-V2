@@ -34,6 +34,7 @@ import {
 import { ExchangeOverview } from '../components/ExchangeOverview';
 import { TasksList } from '../components/TasksList';
 import { DocumentsList } from '../components/DocumentsList';
+import { TaskCreateModal } from '../../tasks/components/TaskCreateModal';
 
 interface TabProps {
   exchange: Exchange;
@@ -308,6 +309,9 @@ const ExchangeDetail: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [ppData, setPpData] = useState<any>(null);
   const [loadingPpData, setLoadingPpData] = useState(false);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
   
   useEffect(() => {
     if (id) {
@@ -321,6 +325,9 @@ const ExchangeDetail: React.FC = () => {
       const data = await getExchange(id!);
       setExchange(data);
       
+      // Load tasks for this exchange
+      loadTasks();
+      
       // Load PP data in background (optional - remove if not using PP integration)
       // loadPPData();
     } catch (error) {
@@ -328,6 +335,28 @@ const ExchangeDetail: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadTasks = async () => {
+    if (!id) return;
+    
+    try {
+      setLoadingTasks(true);
+      const response = await apiService.getTasksByExchange(id);
+      console.log('📋 Exchange tasks loaded:', response);
+      setTasks(response.tasks || []);
+    } catch (error) {
+      console.error('Error loading exchange tasks:', error);
+      setTasks([]);
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
+  const handleTaskCreated = (task: any) => {
+    console.log('📋 Task created:', task);
+    setShowTaskModal(false);
+    loadTasks(); // Reload tasks to include the new one
   };
   
   const loadPPData = async () => {
@@ -500,9 +529,33 @@ const ExchangeDetail: React.FC = () => {
           
           {/* Tab Content */}
           <div className="p-6">
-            {activeTab === 'overview' && <ExchangeOverview exchange={exchange as any} participants={[]} tasks={[]} documents={[]} />}
+            {activeTab === 'overview' && <ExchangeOverview exchange={exchange as any} participants={[]} tasks={tasks} documents={[]} />}
             {activeTab === 'timeline' && <TimelineTab exchange={exchange} />}
-            {activeTab === 'tasks' && <TasksList tasks={[]} />}
+            {activeTab === 'tasks' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Exchange Tasks</h3>
+                    <p className="text-sm text-gray-600">{tasks.length} task{tasks.length !== 1 ? 's' : ''}</p>
+                  </div>
+                  <button
+                    onClick={() => setShowTaskModal(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    + Add Task
+                  </button>
+                </div>
+                {loadingTasks ? (
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-20 bg-gray-200 rounded-lg"></div>
+                    <div className="h-20 bg-gray-200 rounded-lg"></div>
+                    <div className="h-20 bg-gray-200 rounded-lg"></div>
+                  </div>
+                ) : (
+                  <TasksList tasks={tasks} />
+                )}
+              </div>
+            )}
             {activeTab === 'documents' && <DocumentsList documents={[]} onUploadClick={() => {}} onDownload={() => {}} canUpload={true} canDelete={false} />}
             {activeTab === 'messages' && <MessagesTab exchange={exchange} />}
             
@@ -639,6 +692,14 @@ const ExchangeDetail: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Task Creation Modal */}
+      <TaskCreateModal
+        isOpen={showTaskModal}
+        onClose={() => setShowTaskModal(false)}
+        onTaskCreated={handleTaskCreated}
+        exchangeId={id}
+      />
     </Layout>
   );
 };

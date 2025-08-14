@@ -297,10 +297,10 @@ class InvitationService {
       subject,
       text: textContent,
       html: htmlContent,
-      // Track clicks and opens
+      // Track opens but disable click tracking to keep clean URLs
       trackingSettings: {
         clickTracking: {
-          enable: true
+          enable: false
         },
         openTracking: {
           enable: true
@@ -501,7 +501,16 @@ Peak 1031 Exchange Platform - Secure & Compliant 1031 Exchange Management
       },
       subject,
       text: textContent,
-      html: htmlContent
+      html: htmlContent,
+      // Track opens but disable click tracking to keep clean URLs
+      trackingSettings: {
+        clickTracking: {
+          enable: false
+        },
+        openTracking: {
+          enable: true
+        }
+      }
     };
 
     await sgMail.send(msg);

@@ -8,7 +8,7 @@ require('dotenv').config();
 const supabaseService = require('./services/supabase');
 
 async function testInvitationToken() {
-  const token = 'c6f395a31e8486923cff745eaf698059b30ddd321458604c8661b6a92023c076';
+  const token = 'b5981781a9ba87cd3e7e452f2787217ff735fb3a95d27bc9be11b25d9e5d4e2d';
   
   console.log('🔍 Testing invitation token:', token);
   console.log('');
