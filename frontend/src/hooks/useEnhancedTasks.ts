@@ -57,23 +57,31 @@ export const useEnhancedTasks = (exchangeId?: string) => {
 
   // Load tasks
   const loadTasks = useCallback(async (_filters: Record<string, any> = {}) => {
+    console.log('🔍 useEnhancedTasks: Loading tasks...', { exchangeId, user: user?.email });
     setLoading(true);
     setError(null);
 
     try {
+      console.log('📡 useEnhancedTasks: Calling taskService.getTasks with exchangeId:', exchangeId);
       const tasks = await taskService.getTasks(exchangeId);
+      console.log('✅ useEnhancedTasks: Received tasks:', {
+        tasksLength: tasks?.length || 0,
+        tasksType: typeof tasks,
+        tasks: tasks?.slice(0, 3) // Show first 3 tasks
+      });
       setTasks(tasks || []);
     } catch (err) {
+      console.error('❌ useEnhancedTasks: Failed to load tasks:', err);
       setError(err instanceof Error ? err.message : 'Failed to load tasks');
     } finally {
       setLoading(false);
     }
-  }, [exchangeId]);
+  }, [exchangeId, user]);
 
   // Load task templates
   const loadTaskTemplates = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/tasks/templates', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/tasks/templates`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -95,7 +103,7 @@ export const useEnhancedTasks = (exchangeId?: string) => {
       if (exchangeId) params.append('exchangeId', exchangeId);
       if (context.userId) params.append('userId', context.userId);
 
-      const response = await fetch(`http://localhost:5001/api/tasks/suggestions?${params}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/tasks/suggestions?${params}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -116,7 +124,7 @@ export const useEnhancedTasks = (exchangeId?: string) => {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:5001/api/tasks/parse-natural', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/tasks/parse-natural`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -153,7 +161,7 @@ export const useEnhancedTasks = (exchangeId?: string) => {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:5001/api/tasks/natural-language', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/tasks/natural-language`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -197,7 +205,7 @@ export const useEnhancedTasks = (exchangeId?: string) => {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:5001/api/tasks/bulk-natural', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/tasks/bulk-natural`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -236,7 +244,7 @@ export const useEnhancedTasks = (exchangeId?: string) => {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:5001/api/tasks/from-chat', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/tasks/from-chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -274,7 +282,7 @@ export const useEnhancedTasks = (exchangeId?: string) => {
   // Get auto-complete actions for a task
   const getAutoCompleteActions = useCallback(async (taskId: string) => {
     try {
-      const response = await fetch(`http://localhost:5001/api/tasks/${taskId}/auto-complete`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/tasks/${taskId}/auto-complete`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

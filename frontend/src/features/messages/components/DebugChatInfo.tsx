@@ -71,7 +71,7 @@ const DebugChatInfo: React.FC = () => {
     // API Health Check
     try {
       const startTime = performance.now();
-      const response = await fetch('http://localhost:5001/api/health', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/health`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,

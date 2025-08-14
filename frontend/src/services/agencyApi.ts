@@ -4,8 +4,8 @@
  * Handles all HTTP requests for agency operations
  */
 
-// API base URL - use backend URL directly
-const API_BASE_URL = 'http://localhost:5001';  // Direct backend URL
+// API base URL - use environment variable or fallback to localhost for development
+const API_BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5001';  // Backend URL
 
 // Types
 export interface Agency {

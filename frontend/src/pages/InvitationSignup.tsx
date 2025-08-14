@@ -69,7 +69,7 @@ const InvitationSignup: React.FC = () => {
       
       // Try direct fetch as a test
       try {
-        const testResponse = await fetch(`http://localhost:5001/api/invitations/details/${token}`);
+        const testResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/invitations/details/${token}`);
         const testData = await testResponse.json();
         console.log('🧪 Direct fetch test result:', testData);
       } catch (testErr) {
