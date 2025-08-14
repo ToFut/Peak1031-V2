@@ -32,7 +32,7 @@ router.get('/', authenticateToken, async (req, res) => {
     
     try {
       // Get all users with agency role
-      const allUsers = await databaseService.getAllUsers();
+      const allUsers = await databaseService.getUsers();
       const agencyUsers = allUsers.filter(user => user.role === 'agency');
       
       console.log('[/api/agencies] Found agency users:', agencyUsers.length);

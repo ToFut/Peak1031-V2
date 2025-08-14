@@ -14,7 +14,14 @@ import {
   ClockIcon,
   ExclamationTriangleIcon,
   FunnelIcon,
-  BuildingOfficeIcon
+  BuildingOfficeIcon,
+  XMarkIcon,
+  PhoneIcon,
+  EnvelopeIcon,
+  CalendarIcon,
+  ChartPieIcon,
+  TrendingUpIcon,
+  TrendingDownIcon
 } from '@heroicons/react/24/outline';
 
 interface ThirdParty {
@@ -209,12 +216,206 @@ const AgencyOverviewContent: React.FC<{ thirdParties: ThirdParty[] }> = ({ third
   );
 };
 
+// New Third Party Performance Modal Component
+const ThirdPartyPerformanceModal: React.FC<{
+  thirdParty: ThirdParty | null;
+  isOpen: boolean;
+  onClose: () => void;
+}> = ({ thirdParty, isOpen, onClose }) => {
+  if (!isOpen || !thirdParty) return null;
+
+  const performanceTrend = thirdParty.performance_score > 75 ? 'up' : thirdParty.performance_score > 50 ? 'stable' : 'down';
+  const successRateColor = thirdParty.success_rate >= 80 ? 'text-green-600' : thirdParty.success_rate >= 60 ? 'text-yellow-600' : 'text-red-600';
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <UserGroupIcon className="h-6 w-6 text-purple-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">{thirdParty.name}</h2>
+              <p className="text-sm text-gray-600">{thirdParty.company}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <XMarkIcon className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-6">
+          {/* Contact Information */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center gap-3">
+              <EnvelopeIcon className="h-5 w-5 text-gray-400" />
+              <span className="text-sm text-gray-600">{thirdParty.email}</span>
+            </div>
+            {thirdParty.phone && (
+              <div className="flex items-center gap-3">
+                <PhoneIcon className="h-5 w-5 text-gray-400" />
+                <span className="text-sm text-gray-600">{thirdParty.phone}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-3">
+              <CalendarIcon className="h-5 w-5 text-gray-400" />
+              <span className="text-sm text-gray-600">
+                Assigned since {new Date(thirdParty.assignment_date).toLocaleDateString()}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <CheckCircleIcon className="h-5 w-5 text-gray-400" />
+              <span className={`text-sm font-medium ${
+                thirdParty.status === 'active' ? 'text-green-600' : 'text-gray-600'
+              }`}>
+                {thirdParty.status.charAt(0).toUpperCase() + thirdParty.status.slice(1)}
+              </span>
+            </div>
+          </div>
+
+          {/* Performance Overview */}
+          <div className="bg-gray-50 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Overview</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{thirdParty.performance_score}</div>
+                <div className="text-sm text-gray-600">Performance Score</div>
+                <div className="flex items-center justify-center gap-1 mt-1">
+                  {performanceTrend === 'up' && <TrendingUpIcon className="h-4 w-4 text-green-500" />}
+                  {performanceTrend === 'down' && <TrendingDownIcon className="h-4 w-4 text-red-500" />}
+                  <span className={`text-xs ${
+                    performanceTrend === 'up' ? 'text-green-600' : 
+                    performanceTrend === 'down' ? 'text-red-600' : 'text-gray-600'
+                  }`}>
+                    {performanceTrend === 'up' ? '+12%' : performanceTrend === 'down' ? '-5%' : 'Stable'}
+                  </span>
+                </div>
+              </div>
+              <div className="text-center">
+                <div className={`text-2xl font-bold ${successRateColor}`}>{thirdParty.success_rate}%</div>
+                <div className="text-sm text-gray-600">Success Rate</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">{thirdParty.avg_completion_time}</div>
+                <div className="text-sm text-gray-600">Avg. Days to Complete</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">{thirdParty.total_revenue}</div>
+                <div className="text-sm text-gray-600">Total Revenue</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Exchange Statistics */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Exchange Portfolio</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-xl font-bold text-blue-600">{thirdParty.assigned_exchanges}</div>
+                <div className="text-sm text-blue-700">Total Assigned</div>
+              </div>
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-xl font-bold text-green-600">{thirdParty.active_exchanges}</div>
+                <div className="text-sm text-green-700">Currently Active</div>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-xl font-bold text-purple-600">{thirdParty.completed_exchanges}</div>
+                <div className="text-sm text-purple-700">Completed</div>
+              </div>
+              <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                <div className="text-xl font-bold text-yellow-600">{thirdParty.pending_exchanges}</div>
+                <div className="text-sm text-yellow-700">Pending</div>
+              </div>
+            </div>
+
+            {/* Recent Exchanges */}
+            {thirdParty.exchanges && thirdParty.exchanges.length > 0 && (
+              <div>
+                <h4 className="text-md font-medium text-gray-900 mb-3">Recent Exchanges</h4>
+                <div className="space-y-3">
+                  {thirdParty.exchanges.slice(0, 5).map((exchange) => (
+                    <div key={exchange.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <div className="font-medium text-gray-900">{exchange.title}</div>
+                        <div className="text-sm text-gray-600">{exchange.client_name}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-gray-900">{exchange.value}</div>
+                        <div className={`text-xs px-2 py-1 rounded-full ${
+                          exchange.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                          exchange.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {exchange.status}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Performance Charts Placeholder */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Trends</h3>
+            <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
+              <div className="text-center">
+                <ChartPieIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500">Performance charts coming soon</p>
+                <p className="text-sm text-gray-400">Monthly trends, success rates, and revenue analytics</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-4 border-t border-gray-200">
+            <button className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+              View All Exchanges
+            </button>
+            <button className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors">
+              Export Performance Report
+            </button>
+            <button className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors">
+              Send Performance Review
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ThirdPartiesContent: React.FC<{ thirdParties: ThirdParty[]; onThirdPartySelect?: (id: string) => void }> = ({ 
   thirdParties, 
   onThirdPartySelect 
 }) => {
+  const [selectedThirdParty, setSelectedThirdParty] = useState<ThirdParty | null>(null);
+  const [showPerformanceModal, setShowPerformanceModal] = useState(false);
+
+  const handleThirdPartyClick = (thirdParty: ThirdParty) => {
+    setSelectedThirdParty(thirdParty);
+    setShowPerformanceModal(true);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Third Party Performance Modal */}
+      <ThirdPartyPerformanceModal
+        thirdParty={selectedThirdParty}
+        isOpen={showPerformanceModal}
+        onClose={() => {
+          setShowPerformanceModal(false);
+          setSelectedThirdParty(null);
+        }}
+      />
+
       {/* Third Party Management Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="p-6 border-b border-gray-200">
@@ -239,7 +440,7 @@ const ThirdPartiesContent: React.FC<{ thirdParties: ThirdParty[]; onThirdPartySe
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {thirdParties.map((thirdParty) => (
               <div key={thirdParty.id} className="bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
-                   onClick={() => onThirdPartySelect?.(thirdParty.id)}>
+                   onClick={() => handleThirdPartyClick(thirdParty)}>
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">

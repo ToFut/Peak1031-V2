@@ -34,12 +34,17 @@ export interface MonthlyActivity {
 export interface UserInfo {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
+  first_name?: string; // Backend compatibility
+  last_name?: string; // Backend compatibility
   role: string;
-  isActive: boolean;
+  isActive?: boolean;
+  is_active?: boolean; // Backend compatibility
   lastLogin?: string;
-  createdAt: string;
+  last_login?: string; // Backend compatibility
+  createdAt?: string;
+  created_at?: string; // Backend compatibility
 }
 
 export interface AuditActivity {
@@ -176,14 +181,18 @@ export class UserProfileService {
    * Format user display name
    */
   static formatUserName(user: UserInfo): string {
-    if (user.firstName && user.lastName) {
-      return `${user.firstName} ${user.lastName}`;
+    // Handle both camelCase and snake_case properties
+    const firstName = user.firstName || user.first_name;
+    const lastName = user.lastName || user.last_name;
+    
+    if (firstName && lastName) {
+      return `${firstName} ${lastName}`;
     }
-    if (user.firstName) {
-      return user.firstName;
+    if (firstName) {
+      return firstName;
     }
-    if (user.lastName) {
-      return user.lastName;
+    if (lastName) {
+      return lastName;
     }
     return user.email.split('@')[0];
   }

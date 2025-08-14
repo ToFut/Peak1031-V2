@@ -19,8 +19,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   showPPInfo = true,
   compact = false
 }) => {
-  console.log('🔥 TASKBOARD RECEIVED:', tasks.length, 'tasks');
-  console.log('🔥 TASKBOARD TASKS:', tasks.map(t => ({ title: t.title, status: t.status, id: t.id })));
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
 
   const columns = [
@@ -119,20 +117,12 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   };
 
   const filteredTasks = (status: TaskStatus) => {
-    console.log(`🔥 FILTERING TASKS FOR STATUS "${status}":`, tasks.length, 'total tasks');
-    
-    const filtered = tasks.filter(task => {
+    return tasks.filter(task => {
       // Normalize both statuses for comparison
       const normalizedTaskStatus = normalizeStatus(task.status);
       const normalizedColumnStatus = normalizeStatus(status);
-      const matches = normalizedTaskStatus === normalizedColumnStatus;
-      
-      console.log(`   - Task "${task.title}" status: "${task.status}" -> "${normalizedTaskStatus}" matches "${normalizedColumnStatus}":`, matches);
-      return matches;
+      return normalizedTaskStatus === normalizedColumnStatus;
     });
-    
-    console.log(`✅ FILTERED RESULT FOR "${status}":`, filtered.length, 'tasks');
-    return filtered;
   };
 
   const isOverdue = (task: Task) => {
