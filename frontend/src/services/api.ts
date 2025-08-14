@@ -44,6 +44,10 @@ class ApiService {
     this.checkBackendHealth();
   }
 
+  public getBaseURL(): string {
+    return this.baseURL;
+  }
+
   private setConnectionStatus(online: boolean) {
     if (this.isOnline !== online) {
       this.isOnline = online;
@@ -278,6 +282,8 @@ class ApiService {
       throw error;
     }
   }
+
+
 
   async logout(): Promise<void> {
     try {

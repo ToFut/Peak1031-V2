@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Invitation Flow</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <h1>Invitation Debug Test</h1>
+    <div id="results"></div>
+    
+    <script>
+        const token = 'be24c1c62f3e6e144f85ba604904c65965566bf98567139e51a1f033bcb78e83';
+        const resultsDiv = document.getElementById('results');
+        
+        function log(message, data = null) {
+            const p = document.createElement('p');
+            p.innerHTML = `<strong>${message}</strong>`;
+            if (data) {
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(data, null, 2);
+                p.appendChild(pre);
+            }
+            resultsDiv.appendChild(p);
+        }
+        
+        async function testInvitation() {
+            log('Testing invitation token: ' + token);
+            
+            // 1. Test backend directly
+            try {
+                const backendResponse = await axios.get(`http://localhost:5001/api/invitations/details/${token}`);
+                log('✅ Backend API Response:', backendResponse.data);
+            } catch (error) {
+                log('❌ Backend API Error:', error.response?.data || error.message);
+            }
+            
+            // 2. Test through frontend proxy (if configured)
+            try {
+                const frontendResponse = await axios.get(`http://localhost:3000/api/invitations/details/${token}`);
+                log('✅ Frontend Proxy Response:', frontendResponse.data);
+            } catch (error) {
+                log('❌ Frontend Proxy Error:', error.response?.data || error.message);
+            }
+            
+            // 3. Check localStorage for any auth tokens
+            const authToken = localStorage.getItem('token');
+            log('Auth Token in localStorage:', authToken ? 'Present' : 'None');
+            
+            // 4. Test with auth header if token exists
+            if (authToken) {
+                try {
+                    const authResponse = await axios.get(`http://localhost:5001/api/invitations/details/${token}`, {
+                        headers: {
+                            'Authorization': `Bearer ${authToken}`
+                        }
+                    });
+                    log('✅ With Auth Header:', authResponse.data);
+                } catch (error) {
+                    log('❌ With Auth Header Error:', error.response?.data || error.message);
+                }
+            }
+        }
+        
+        testInvitation();
+    </script>
+</body>
+</html>

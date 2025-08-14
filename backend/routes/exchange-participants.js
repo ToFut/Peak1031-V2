@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
+const { requireCanAddParticipants } = require('../middleware/exchangePermissions');
 const supabaseService = require('../services/supabase');
 const databaseService = require('../services/database');
 const { v4: uuidv4 } = require('uuid');
@@ -42,7 +43,7 @@ router.get('/:exchangeId/participants', authenticateToken, async (req, res) => {
 });
 
 // Add participant to exchange
-router.post('/:exchangeId/participants', authenticateToken, async (req, res) => {
+router.post('/:exchangeId/participants', authenticateToken, requireCanAddParticipants, async (req, res) => {
   try {
     const { exchangeId } = req.params;
     const { contactId, userId, role, permissions } = req.body;

@@ -18,7 +18,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useInvitations, InvitationData, PendingInvitation } from '../../../hooks/useInvitations';
 import { useAuth } from '../../../hooks/useAuth';
-import { usePermissions } from '../../../hooks/usePermissions';
+import { useEnhancedPermissions } from '../../../hooks/useEnhancedPermissions';
 import { apiService } from '../../../services/api';
 import { Contact } from '../../../types';
 import UserDirectory from '../../users/components/UserDirectory';
@@ -39,7 +39,16 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
   onParticipantAdded
 }) => {
   const { user } = useAuth();
-  const { isAdmin, isCoordinator } = usePermissions();
+  const { 
+    isAdmin, 
+    isCoordinator, 
+    canInviteParticipants,
+    canEditExchange,
+    canDeleteInExchange,
+    exchangePermissions,
+    loading: permissionsLoading,
+    getPermissionSummary 
+  } = useEnhancedPermissions(exchangeId);
   const {
     loading,
     error,
@@ -73,7 +82,7 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedParticipant, setSelectedParticipant] = useState<any>(null);
 
-  const canInvite = isAdmin() || isCoordinator();
+  const canInvite = canInviteParticipants();
 
   useEffect(() => {
     if (!isLoadingInvitations) {
@@ -398,6 +407,23 @@ const EnhancedInvitationManager: React.FC<EnhancedInvitationManagerProps> = ({
               <span>👥 {exchangeStats.totalParticipants} Active Members</span>
               <span>📧 {exchangeStats.totalInvitations} Invitations</span>
               <span>⏳ {exchangeStats.pendingInvitations} Pending</span>
+            </div>
+          )}
+          {exchangePermissions && (
+            <div className="mt-2">
+              <details className="text-xs text-gray-500">
+                <summary className="cursor-pointer hover:text-gray-700">Your permissions in this exchange</summary>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {getPermissionSummary().map(permission => (
+                    <span key={permission} className="inline-flex px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs">
+                      {permission}
+                    </span>
+                  ))}
+                  {getPermissionSummary().length === 0 && (
+                    <span className="text-gray-400">No special permissions granted</span>
+                  )}
+                </div>
+              </details>
             </div>
           )}
         </div>

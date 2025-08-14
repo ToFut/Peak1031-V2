@@ -169,10 +169,30 @@ export function useInvitations() {
     setLoading(true);
     setError(null);
     
+    console.log('🔎 useInvitations: Getting details for token:', token);
+    console.log('📍 API URL:', apiService.getBaseURL());
+    
     try {
-      const response = await apiService.get(`/invitations/details/${token}`);
+      const url = `/invitations/details/${token}`;
+      console.log('🌐 Full URL:', apiService.getBaseURL() + url);
+      
+      const response = await apiService.get(url);
+      console.log('✅ useInvitations: Got response:', response);
+      
+      if (!response || !response.data) {
+        throw new Error('No data received from API');
+      }
+      
+      setError(null); // Clear any previous errors
       return response.data;
     } catch (err: any) {
+      console.error('❌ useInvitations: Error details:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message,
+        url: err.config?.url
+      });
+      
       const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch invitation details';
       setError(errorMessage);
       throw new Error(errorMessage);

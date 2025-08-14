@@ -46,8 +46,11 @@ const InvitationSignup: React.FC = () => {
   const loadInvitationDetails = async () => {
     if (!token) return;
     
+    console.log('🔍 Loading invitation details for token:', token);
+    
     try {
       const details = await getInvitationDetails(token);
+      console.log('✅ Invitation details loaded:', details);
       setInvitationDetails(details);
       
       // Pre-fill form with invitation details (only if details exists)
@@ -58,8 +61,11 @@ const InvitationSignup: React.FC = () => {
           lastName: details.lastName || ''
         }));
       }
-    } catch (err) {
-      console.error('Failed to load invitation details:', err);
+    } catch (err: any) {
+      console.error('❌ Failed to load invitation details:', err);
+      console.error('Error response:', err.response);
+      console.error('Error message:', err.message);
+      // The error is being set in the useInvitations hook
     }
   };
 
