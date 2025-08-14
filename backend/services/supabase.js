@@ -133,7 +133,17 @@ class SupabaseService {
   }
 
   async getUserById(id) {
-    // Try users table first for authentication purposes (has role and auth fields)
+    // Try people table first for authentication purposes (where users are stored)
+    try {
+      const users = await this.select('people', { where: { id } });
+      if (users && users.length > 0) {
+        return users[0];
+      }
+    } catch (peopleError) {
+      console.log('⚠️ Could not query people table with id, trying users table:', peopleError.message);
+    }
+
+    // Try users table second (for backward compatibility)
     try {
       const users = await this.select('users', { where: { id } });
       if (users && users.length > 0) {
@@ -143,24 +153,14 @@ class SupabaseService {
       console.log('⚠️ Could not query users table with id, trying contacts table:', userError.message);
     }
 
-    // Try contacts table second (for user profiles) - use 'id' field, not 'user_id'
+    // Try contacts table third (for user profiles) - use 'id' field, not 'user_id'
     try {
       const users = await this.select('contacts', { where: { id } });
       if (users && users.length > 0) {
         return users[0];
       }
     } catch (contactError) {
-      console.log('⚠️ Could not query contacts table with id, trying people table:', contactError.message);
-    }
-    
-    // Fallback to people table
-    try {
-      const users = await this.select('people', { where: { id } });
-      if (users && users.length > 0) {
-        return users[0];
-      }
-    } catch (peopleError) {
-      console.log('⚠️ Could not query people table:', peopleError.message);
+      console.log('⚠️ Could not query contacts table with id:', contactError.message);
     }
     
     return null;
