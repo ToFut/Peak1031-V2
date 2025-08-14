@@ -134,7 +134,19 @@ export class DashboardService {
   // Export Operations
   async bulkExportData(type: string, options?: any): Promise<Blob> {
     const endpoint = `/admin/export/${type}${options ? '?' + new URLSearchParams(options).toString() : ''}`;
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}${endpoint}`, {
+    // Use intelligent URL detection
+    let baseUrl = process.env.REACT_APP_API_URL;
+    
+    if (!baseUrl) {
+      const isProduction = window.location.hostname !== 'localhost';
+      if (isProduction && window.location.hostname.includes('vercel.app')) {
+        baseUrl = 'https://peak1031-production.up.railway.app/api';
+      } else {
+        baseUrl = 'http://localhost:5001/api';
+      }
+    }
+
+    const response = await fetch(`${baseUrl}${endpoint}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -152,7 +164,19 @@ export class DashboardService {
 
   async exportEnterpriseData(type: string, filters?: any): Promise<Blob> {
     const endpoint = `/enterprise-exchanges/export/${type}`;
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}${endpoint}`, {
+    // Use intelligent URL detection
+    let baseUrl = process.env.REACT_APP_API_URL;
+    
+    if (!baseUrl) {
+      const isProduction = window.location.hostname !== 'localhost';
+      if (isProduction && window.location.hostname.includes('vercel.app')) {
+        baseUrl = 'https://peak1031-production.up.railway.app/api';
+      } else {
+        baseUrl = 'http://localhost:5001/api';
+      }
+    }
+
+    const response = await fetch(`${baseUrl}${endpoint}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`,

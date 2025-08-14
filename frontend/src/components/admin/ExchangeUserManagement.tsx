@@ -100,7 +100,19 @@ export const ExchangeUserManagement: React.FC<ExchangeUserManagementProps> = ({
   // Fetch all users for adding new ones
   const fetchAllUsers = async () => {
     try {
-      const response = await fetch('/api/admin/users', {
+      // Use intelligent URL detection
+      let baseUrl = process.env.REACT_APP_API_URL;
+      
+      if (!baseUrl) {
+        const isProduction = window.location.hostname !== 'localhost';
+        if (isProduction && window.location.hostname.includes('vercel.app')) {
+          baseUrl = 'https://peak1031-production.up.railway.app/api';
+        } else {
+          baseUrl = 'http://localhost:5001/api';
+        }
+      }
+
+      const response = await fetch(`${baseUrl}/admin/users`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -118,7 +130,19 @@ export const ExchangeUserManagement: React.FC<ExchangeUserManagementProps> = ({
   // Fetch permission templates
   const fetchTemplates = async () => {
     try {
-      const response = await fetch('/api/admin/permission-templates', {
+      // Use intelligent URL detection
+      let baseUrl = process.env.REACT_APP_API_URL;
+      
+      if (!baseUrl) {
+        const isProduction = window.location.hostname !== 'localhost';
+        if (isProduction && window.location.hostname.includes('vercel.app')) {
+          baseUrl = 'https://peak1031-production.up.railway.app/api';
+        } else {
+          baseUrl = 'http://localhost:5001/api';
+        }
+      }
+
+      const response = await fetch(`${baseUrl}/admin/permission-templates`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

@@ -232,7 +232,17 @@ class SmartFetcher {
    * Build URL with query parameters
    */
   private buildUrl(endpoint: string, options: any): string {
-    const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+    // Use intelligent URL detection
+    let baseUrl = process.env.REACT_APP_API_URL;
+    
+    if (!baseUrl) {
+      const isProduction = window.location.hostname !== 'localhost';
+      if (isProduction && window.location.hostname.includes('vercel.app')) {
+        baseUrl = 'https://peak1031-production.up.railway.app/api';
+      } else {
+        baseUrl = 'http://localhost:5001/api';
+      }
+    }
     const url = new URL(endpoint, baseUrl);
 
     // Add query parameters

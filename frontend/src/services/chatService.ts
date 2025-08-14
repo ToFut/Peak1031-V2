@@ -34,7 +34,23 @@ export interface ChatExchange {
 }
 
 class ChatService {
-  private baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+  private baseURL: string;
+
+  constructor() {
+    // Use intelligent URL detection like api.ts
+    let baseUrl = process.env.REACT_APP_API_URL;
+    
+    if (!baseUrl) {
+      const isProduction = window.location.hostname !== 'localhost';
+      if (isProduction && window.location.hostname.includes('vercel.app')) {
+        baseUrl = 'https://peak1031-production.up.railway.app/api';
+      } else {
+        baseUrl = 'http://localhost:5001/api';
+      }
+    }
+    
+    this.baseURL = baseUrl;
+  }
   private messageListeners = new Map<string, (message: ChatMessage) => void>();
   private readReceiptListeners = new Map<string, (data: { messageId: string; userId: string }) => void>();
   private typingListeners = new Map<string, (data: { userId: string; name: string; isTyping: boolean }) => void>();

@@ -123,12 +123,22 @@ const InvitationSignup: React.FC = () => {
 
       // Auto-login the user and redirect
       if (result.token) {
-        await login(result.user.email, formData.password);
+        // Store the token and user data directly since we already have them
+        localStorage.setItem('token', result.token);
+        if (result.refreshToken) {
+          localStorage.setItem('refreshToken', result.refreshToken);
+        }
+        localStorage.setItem('user', JSON.stringify(result.user));
+        
+        // Navigate directly to the exchange without additional login call
         navigate(`/exchanges/${result.exchange.id}`, {
           state: { 
-            message: `Welcome! You've successfully joined ${result.exchange.name} as a ${result.exchange.role}.` 
+            message: `Welcome! You've successfully joined ${result.exchange.name} as a ${invitationDetails?.role}.` 
           }
         });
+        
+        // Reload the page to trigger auth context update
+        window.location.reload();
       } else {
         // Fallback: redirect to login with success message
         navigate('/login', {

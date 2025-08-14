@@ -54,7 +54,19 @@ export class AuthService {
         throw new Error('No refresh token available');
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/auth/refresh`, {
+      // Use intelligent URL detection
+      let baseUrl = process.env.REACT_APP_API_URL;
+      
+      if (!baseUrl) {
+        const isProduction = window.location.hostname !== 'localhost';
+        if (isProduction && window.location.hostname.includes('vercel.app')) {
+          baseUrl = 'https://peak1031-production.up.railway.app/api';
+        } else {
+          baseUrl = 'http://localhost:5001/api';
+        }
+      }
+
+      const response = await fetch(`${baseUrl}/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

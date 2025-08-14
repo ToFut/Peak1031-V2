@@ -7,7 +7,23 @@ import { Document } from '../../types';
 import { httpClient } from '../base/httpClient';
 
 export class DocumentService {
-  private baseURL: string = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+  private baseURL: string;
+
+  constructor() {
+    // Use intelligent URL detection
+    let baseUrl = process.env.REACT_APP_API_URL;
+    
+    if (!baseUrl) {
+      const isProduction = window.location.hostname !== 'localhost';
+      if (isProduction && window.location.hostname.includes('vercel.app')) {
+        baseUrl = 'https://peak1031-production.up.railway.app/api';
+      } else {
+        baseUrl = 'http://localhost:5001/api';
+      }
+    }
+    
+    this.baseURL = baseUrl;
+  }
 
   async getDocuments(): Promise<Document[]> {
     return httpClient.get<Document[]>('/documents');
