@@ -234,10 +234,10 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
       }
       */
 
-      // Use FAST dashboard overview endpoint for super quick loading
+      // Use standard dashboard overview endpoint which has proper RBAC
       try {
-        console.log('⚡ Using FAST dashboard endpoint...');
-        const response = await apiService.getFastDashboardOverview();
+        console.log('⚡ Using standard dashboard endpoint with RBAC...');
+        const response = await apiService.getDashboardOverview();
         
         console.log('📊 Raw dashboard response:', response);
         

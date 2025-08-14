@@ -856,17 +856,12 @@ router.get('/:id/audit-logs', async (req, res) => {
  */
 router.get('/:id/tasks', async (req, res) => {
   try {
+    console.log('📋 Fetching tasks for exchange:', req.params.id);
+    
+    // Simplified query without the join that might be failing
     const { data: tasks, error } = await supabase
       .from('tasks')
-      .select(`
-        *,
-        assignedUser:people!assigned_to (
-          id,
-          first_name,
-          last_name,
-          email
-        )
-      `)
+      .select('*')
       .eq('exchange_id', req.params.id)
       .order('due_date', { ascending: true });
 
@@ -878,13 +873,14 @@ router.get('/:id/tasks', async (req, res) => {
       });
     }
 
-    const transformedTasks = tasks.map(task => 
-      transformApiResponse(task, { includeComputed: true })
-    );
+    console.log(`✅ Found ${tasks?.length || 0} tasks for exchange ${req.params.id}`);
+    
+    // Return tasks directly without transformation for now
+    const transformedTasks = tasks || [];
 
-    res.json(transformToCamelCase({
+    res.json({
       tasks: transformedTasks
-    }));
+    });
 
   } catch (error) {
     console.error('Error fetching exchange tasks:', error);

@@ -188,10 +188,17 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
       }
 
       console.log('Exchange details loaded successfully:', exchangeData);
+      console.log('Tasks data received:', tasksData);
+      console.log('Tasks array:', tasksData?.tasks || tasksData || []);
 
       setExchange(exchangeData);
       setParticipants(participantsData?.participants || participantsData || []);
-      setTasks(tasksData?.tasks || tasksData || []);
+      
+      const extractedTasks = tasksData?.tasks || tasksData || [];
+      console.log('🔥 EXTRACTED TASKS COUNT:', extractedTasks.length);
+      console.log('🔥 EXTRACTED TASKS SAMPLE:', extractedTasks[0]);
+      setTasks(extractedTasks);
+      
       setAuditLogs(auditData?.auditLogs || auditData || []);
       setTimeline(timelineData || []);
       setCompliance(complianceData);
@@ -816,6 +823,13 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
                 
                 {/* Modern TaskBoard Component */}
                 <div className="min-h-[600px]">
+                  {(() => {
+                    console.log('🔥 RENDER CHECK - tasks:', tasks);
+                    console.log('🔥 RENDER CHECK - Array.isArray(tasks):', Array.isArray(tasks));
+                    console.log('🔥 RENDER CHECK - tasks.length:', tasks?.length);
+                    console.log('🔥 RENDER CHECK - condition result:', Array.isArray(tasks) && tasks.length > 0);
+                    return null;
+                  })()}
                   {Array.isArray(tasks) && tasks.length > 0 ? (
                     <TaskBoard 
                       tasks={tasks}

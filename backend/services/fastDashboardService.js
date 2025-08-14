@@ -27,42 +27,120 @@ class FastDashboardService {
         totalUsers: 0
       };
 
-      // Get user info first
-      const { data: users, error: userError } = await supabaseService.client
-        .from('users')
-        .select('id, email, contact_id, role')
-        .eq('id', userId)
-        .single();
-
-      if (userError || !users) {
-        throw new Error(`User not found: ${userError?.message}`);
+      // Get user info first - try people table first, then users table
+      let user = null;
+      let userError = null;
+      
+      // Try people table first (where users are stored)
+      try {
+        const { data: peopleUser, error: peopleError } = await supabaseService.client
+          .from('people')
+          .select('id, email, contact_id, role')
+          .eq('id', userId)
+          .single();
+        
+        if (!peopleError && peopleUser) {
+          user = peopleUser;
+        } else {
+          userError = peopleError;
+        }
+      } catch (peopleError) {
+        console.log('⚠️ Could not query people table, trying users table:', peopleError.message);
+      }
+      
+      // Try users table second (for backward compatibility)
+      if (!user) {
+        try {
+          const { data: usersUser, error: usersError } = await supabaseService.client
+            .from('users')
+            .select('id, email, contact_id, role')
+            .eq('id', userId)
+            .single();
+          
+          if (!usersError && usersUser) {
+            user = usersUser;
+          } else {
+            userError = usersError;
+          }
+        } catch (usersError) {
+          console.log('⚠️ Could not query users table:', usersError.message);
+        }
+      }
+      
+      // Try contacts table third (for user profiles)
+      if (!user) {
+        try {
+          const { data: contactsUser, error: contactsError } = await supabaseService.client
+            .from('contacts')
+            .select('id, email, role')
+            .eq('id', userId)
+            .single();
+          
+          if (!contactsError && contactsUser) {
+            user = contactsUser;
+          } else {
+            userError = contactsError;
+          }
+        } catch (contactsError) {
+          console.log('⚠️ Could not query contacts table:', contactsError.message);
+        }
       }
 
-      const user = users;
+      if (!user) {
+        throw new Error(`User not found: ${userError?.message || 'User not found in any table'}`);
+      }
 
       switch (userRole) {
         case 'admin':
-          // Admin - simple count queries only
-          console.log('   📊 Admin: Getting total counts...');
+          // Admin - get actual counts including tasks
+          console.log('   📊 Admin: Getting total counts including tasks...');
           
-          const [exchangeCount, userCount] = await Promise.all([
+          const [exchangeCount, userCount, taskCount, pendingTaskCount, completedTaskCount] = await Promise.all([
             supabaseService.client
               .from('exchanges')
               .select('id', { count: 'exact', head: true }),
             supabaseService.client
               .from('users')
+              .select('id', { count: 'exact', head: true }),
+            // Get total task count
+            supabaseService.client
+              .from('tasks')
+              .select('id', { count: 'exact', head: true }),
+            // Get pending task count
+            supabaseService.client
+              .from('tasks')
               .select('id', { count: 'exact', head: true })
+              .or('status.eq.PENDING,status.eq.IN_PROGRESS,status.eq.pending,status.eq.in_progress'),
+            // Get completed task count
+            supabaseService.client
+              .from('tasks')
+              .select('id', { count: 'exact', head: true })
+              .or('status.eq.COMPLETED,status.eq.completed')
           ]);
 
           stats.totalExchanges = exchangeCount.count || 0;
           stats.totalUsers = userCount.count || 0;
+          stats.totalTasks = taskCount.count || 0;
+          stats.pendingTasks = pendingTaskCount.count || 0;
+          stats.completedTasks = completedTaskCount.count || 0;
           
-          // For admin, estimate status breakdown (faster than filtering)
-          stats.activeExchanges = Math.floor(stats.totalExchanges * 0.7);
-          stats.completedExchanges = Math.floor(stats.totalExchanges * 0.25);
+          // For exchanges, get actual status breakdown
+          const [activeExCount, completedExCount] = await Promise.all([
+            supabaseService.client
+              .from('exchanges')
+              .select('id', { count: 'exact', head: true })
+              .or('status.eq.45D,status.eq.180D,status.eq.ACTIVE'),
+            supabaseService.client
+              .from('exchanges')
+              .select('id', { count: 'exact', head: true })
+              .or('status.eq.COMPLETED,status.eq.completed')
+          ]);
+          
+          stats.activeExchanges = activeExCount.count || 0;
+          stats.completedExchanges = completedExCount.count || 0;
           stats.pendingExchanges = stats.totalExchanges - stats.activeExchanges - stats.completedExchanges;
           
-          console.log(`   ✅ Admin fast stats: ${stats.totalExchanges} exchanges, ${stats.totalUsers} users`);
+          console.log(`   ✅ Admin fast stats: ${stats.totalExchanges} exchanges, ${stats.totalTasks} tasks, ${stats.totalUsers} users`);
           break;
 
         case 'coordinator':
@@ -187,10 +265,70 @@ class FastDashboardService {
             stats.totalExchanges = 0;
           }
 
-          // Estimate task counts based on exchanges (much faster than querying tasks)
-          stats.totalTasks = stats.totalExchanges * 3; // Estimate 3 tasks per exchange
-          stats.pendingTasks = Math.floor(stats.totalTasks * 0.3);
-          stats.completedTasks = stats.totalTasks - stats.pendingTasks;
+          // Get actual task counts for the user based on their exchanges
+          if (stats.totalExchanges > 0) {
+            // Get exchange IDs for this user
+            let exchangeIds = [];
+            
+            if (userRole === 'client' || userRole === 'third_party') {
+              // Get exchanges they participate in
+              const { data: participantData } = await supabaseService.client
+                .from('exchange_participants')
+                .select('exchange_id')
+                .eq('contact_id', user.contact_id || user.id)
+                .eq('is_active', true);
+              
+              exchangeIds = participantData?.map(p => p.exchange_id) || [];
+            } else if (userRole === 'coordinator') {
+              // Get exchanges they coordinate or participate in
+              const { data: coordExchanges } = await supabaseService.client
+                .from('exchanges')
+                .select('id')
+                .eq('coordinator_id', user.id);
+              
+              const { data: participantData } = await supabaseService.client
+                .from('exchange_participants')
+                .select('exchange_id')
+                .eq('user_id', user.id)
+                .eq('is_active', true);
+              
+              const coordIds = coordExchanges?.map(e => e.id) || [];
+              const partIds = participantData?.map(p => p.exchange_id) || [];
+              exchangeIds = [...new Set([...coordIds, ...partIds])];
+            }
+            
+            if (exchangeIds.length > 0) {
+              // Get task counts for these exchanges
+              const [totalTaskCount, pendingTaskCount, completedTaskCount] = await Promise.all([
+                supabaseService.client
+                  .from('tasks')
+                  .select('id', { count: 'exact', head: true })
+                  .in('exchange_id', exchangeIds),
+                supabaseService.client
+                  .from('tasks')
+                  .select('id', { count: 'exact', head: true })
+                  .in('exchange_id', exchangeIds)
+                  .or('status.eq.PENDING,status.eq.IN_PROGRESS,status.eq.pending,status.eq.in_progress'),
+                supabaseService.client
+                  .from('tasks')
+                  .select('id', { count: 'exact', head: true })
+                  .in('exchange_id', exchangeIds)
+                  .or('status.eq.COMPLETED,status.eq.completed')
+              ]);
+              
+              stats.totalTasks = totalTaskCount.count || 0;
+              stats.pendingTasks = pendingTaskCount.count || 0;
+              stats.completedTasks = completedTaskCount.count || 0;
+            } else {
+              stats.totalTasks = 0;
+              stats.pendingTasks = 0;
+              stats.completedTasks = 0;
+            }
+          } else {
+            stats.totalTasks = 0;
+            stats.pendingTasks = 0;
+            stats.completedTasks = 0;
+          }
           break;
 
         default:
@@ -238,6 +376,69 @@ class FastDashboardService {
         console.error('User fetch error:', userError);
       }
 
+      // Fetch recent tasks for the dashboard (limit to 5 most recent)
+      let tasksList = [];
+      try {
+        if (userRole === 'admin') {
+          // Admin sees all recent tasks
+          const { data: recentTasks } = await supabaseService.client
+            .from('tasks')
+            .select('id, title, description, status, priority, due_date, exchange_id, created_at')
+            .order('created_at', { ascending: false })
+            .limit(5);
+          
+          tasksList = recentTasks || [];
+        } else {
+          // Other users see tasks from their exchanges
+          // First get their exchange IDs
+          let exchangeIds = [];
+          
+          if (userRole === 'client' || userRole === 'third_party') {
+            const { data: participantData } = await supabaseService.client
+              .from('exchange_participants')
+              .select('exchange_id')
+              .eq('contact_id', user?.contact_id || userId)
+              .eq('is_active', true);
+            
+            exchangeIds = participantData?.map(p => p.exchange_id) || [];
+          } else if (userRole === 'coordinator') {
+            const { data: coordExchanges } = await supabaseService.client
+              .from('exchanges')
+              .select('id')
+              .eq('coordinator_id', userId);
+            
+            exchangeIds = coordExchanges?.map(e => e.id) || [];
+          }
+          
+          if (exchangeIds.length > 0) {
+            const { data: recentTasks } = await supabaseService.client
+              .from('tasks')
+              .select('id, title, description, status, priority, due_date, exchange_id, created_at')
+              .in('exchange_id', exchangeIds)
+              .order('created_at', { ascending: false })
+              .limit(5);
+            
+            tasksList = recentTasks || [];
+          }
+        }
+        
+        // Convert snake_case to camelCase for frontend
+        tasksList = tasksList.map(task => ({
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          status: task.status,
+          priority: task.priority,
+          dueDate: task.due_date,
+          exchangeId: task.exchange_id,
+          createdAt: task.created_at
+        }));
+        
+      } catch (taskError) {
+        console.error('Error fetching tasks list:', taskError);
+        tasksList = [];
+      }
+
       // Return standardized dashboard format
       const dashboardData = {
         user: user || { id: userId, email: 'unknown', role: userRole },
@@ -282,9 +483,9 @@ class FastDashboardService {
           systemHealth: 'healthy'
         },
         
-        // Empty lists for now (populated by other endpoints when needed)
+        // Now includes actual task data!
         exchangesList: [],
-        tasksList: [],
+        tasksList: tasksList,
         documentsList: [],
         messagesList: [],
         usersList: []

@@ -8,6 +8,16 @@ const permissionService = require('../services/permissionService');
  * Check if user has specific permission for an exchange
  */
 const requireExchangePermission = (permissionType) => {
+  // Map old permission names to new ones for backward compatibility
+  const permissionMap = {
+    'upload_documents': 'can_upload_documents',
+    'send_messages': 'can_send_messages',
+    'edit': 'can_edit',
+    'delete': 'can_delete',
+    'add_participants': 'can_add_participants'
+  };
+  
+  const actualPermission = permissionMap[permissionType] || permissionType;
   return async (req, res, next) => {
     try {
       const userId = req.user?.id;
@@ -51,10 +61,10 @@ const requireExchangePermission = (permissionType) => {
       }
 
       // For non-admin users, also check specific permission if needed
-      const hasPermission = await permissionService.checkPermission(userId, exchangeId, permissionType);
+      const hasPermission = await permissionService.checkPermission(userId, exchangeId, actualPermission);
 
       if (!hasPermission) {
-        console.log(`❌ Permission '${permissionType}' denied for ${req.user.role} user ${req.user.email} on exchange ${exchangeId}`);
+        console.log(`❌ Permission '${permissionType}' (mapped to '${actualPermission}') denied for ${req.user.role} user ${req.user.email} on exchange ${exchangeId}`);
         return res.status(403).json({
           error: 'Insufficient permissions',
           code: 'PERMISSION_DENIED',

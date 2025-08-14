@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { Eye, EyeOff, Lock, Mail, Shield } from 'lucide-react';
 
@@ -153,9 +153,19 @@ const Login: React.FC = () => {
             {isSignUp ? 'Already have an account? Sign in' : 'Need an account? Create one'}
           </button>
           {!isSignUp && (
-            <p className="text-xs text-gray-400 mt-2">
-              Demo: admin@peak1031.com / admin123
-            </p>
+            <>
+              <div className="mt-2">
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-blue-600 hover:text-blue-500"
+                >
+                  Forgot your password?
+                </Link>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                Demo: admin@peak1031.com / admin123
+              </p>
+            </>
           )}
         </div>
       </div>

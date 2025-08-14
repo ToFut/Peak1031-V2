@@ -199,7 +199,7 @@ export interface SyncDetails {
 
 // Enums
 export type UserRole = 'admin' | 'coordinator' | 'client' | 'third_party' | 'agency';
-export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'pending' | 'in_progress' | 'completed';
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 export type MessageType = 'text' | 'file' | 'system';
 

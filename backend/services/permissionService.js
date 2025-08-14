@@ -36,6 +36,50 @@ class PermissionService {
    */
   async checkPermission(userId, exchangeId, permissionType) {
     try {
+      // First check if user is a participant
+      const { data: participant, error: participantError } = await supabaseService.client
+        .from('exchange_participants')
+        .select('id, role, permissions')
+        .eq('exchange_id', exchangeId)
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .single();
+
+      if (participantError && participantError.code !== 'PGRST116') {
+        console.error('Error checking participant permissions:', participantError);
+        return false;
+      }
+
+      if (participant) {
+        // Parse permissions
+        let permissions = {};
+        try {
+          permissions = typeof participant.permissions === 'string' 
+            ? JSON.parse(participant.permissions) 
+            : participant.permissions || {};
+        } catch (error) {
+          console.error('Error parsing participant permissions:', error);
+        }
+
+        // Check the specific permission
+        if (permissions[permissionType] !== undefined) {
+          return permissions[permissionType] === true;
+        }
+      }
+
+      // Check if user is the coordinator
+      const { data: exchange } = await supabaseService.client
+        .from('exchanges')
+        .select('coordinator_id')
+        .eq('id', exchangeId)
+        .single();
+
+      if (exchange && exchange.coordinator_id === userId) {
+        // Coordinators have all permissions by default
+        return true;
+      }
+
+      // Fallback to RPC if it exists
       const { data, error } = await supabaseService.client
         .rpc('check_user_permission', {
           user_uuid: userId,
@@ -43,12 +87,11 @@ class PermissionService {
           permission_name: permissionType
         });
 
-      if (error) {
-        console.error('Error checking permission:', error);
-        return false;
+      if (!error && data !== null) {
+        return data === true;
       }
 
-      return data === true;
+      return false;
     } catch (error) {
       console.error('Error in checkPermission:', error);
       return false;
@@ -82,6 +125,34 @@ class PermissionService {
    */
   async getUserExchangeAccess(userId, exchangeId) {
     try {
+      // First check exchange_participants table
+      const { data: participant, error: participantError } = await supabaseService.client
+        .from('exchange_participants')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('exchange_id', exchangeId)
+        .eq('is_active', true)
+        .single();
+
+      if (!participantError && participant) {
+        // Parse permissions if they exist
+        let permissions = {};
+        try {
+          permissions = typeof participant.permissions === 'string' 
+            ? JSON.parse(participant.permissions) 
+            : participant.permissions || {};
+        } catch (error) {
+          console.error('Error parsing participant permissions:', error);
+        }
+
+        return {
+          ...participant,
+          permissions,
+          is_active: true
+        };
+      }
+
+      // Fallback to user_exchange_access table if it exists
       const { data, error } = await supabaseService.client
         .from('user_exchange_access')
         .select('*')
@@ -90,12 +161,11 @@ class PermissionService {
         .eq('is_active', true)
         .single();
 
-      if (error) {
-        console.error('Error getting user exchange access:', error);
-        return null;
+      if (!error && data) {
+        return data;
       }
 
-      return data;
+      return null;
     } catch (error) {
       console.error('Error in getUserExchangeAccess:', error);
       return null;
@@ -348,6 +418,54 @@ class PermissionService {
    */
   async checkDocumentAccess(userId, documentId, accessType = 'read') {
     try {
+      // First get the document to know which exchange it belongs to
+      const { data: document, error: docInfoError } = await supabaseService.client
+        .from('documents')
+        .select('exchange_id')
+        .eq('id', documentId)
+        .single();
+
+      if (docInfoError || !document) {
+        console.error('Error getting document info:', docInfoError);
+        return false;
+      }
+
+      // Check if user is a participant with document permissions
+      const { data: participant } = await supabaseService.client
+        .from('exchange_participants')
+        .select('permissions')
+        .eq('exchange_id', document.exchange_id)
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .single();
+
+      if (participant) {
+        let permissions = {};
+        try {
+          permissions = typeof participant.permissions === 'string' 
+            ? JSON.parse(participant.permissions) 
+            : participant.permissions || {};
+        } catch (error) {
+          console.error('Error parsing participant permissions:', error);
+        }
+
+        // Check document permissions based on access type
+        switch (accessType) {
+          case 'read':
+            if (permissions.can_view_documents === false) return false;
+            break;
+          case 'write':
+            if (permissions.can_edit_documents === false) return false;
+            break;
+          case 'download':
+            if (permissions.can_upload_documents === false) return false;
+            break;
+          case 'admin':
+            if (permissions.can_delete_documents === false) return false;
+            break;
+        }
+      }
+
       // Check if user has direct document permission
       const { data: docPerm, error: docError } = await supabaseService.client
         .from('document_permissions')
@@ -375,17 +493,6 @@ class PermissionService {
       }
 
       // Check exchange-level document permission
-      const { data: document, error: docInfoError } = await supabaseService.client
-        .from('documents')
-        .select('exchange_id')
-        .eq('id', documentId)
-        .single();
-
-      if (docInfoError || !document) {
-        return false;
-      }
-
-      // Check exchange document permission
       const permissionMap = {
         'read': 'view_documents',
         'write': 'edit_documents',

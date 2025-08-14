@@ -3,6 +3,7 @@ const { authenticateToken } = require('../middleware/auth');
 const { enforceRBAC } = require('../middleware/rbac');
 const { requireExchangePermission } = require('../middleware/permissions');
 const databaseService = require('../services/database');
+const supabaseService = require('../services/supabase');
 const AuditService = require('../services/audit');
 const messageAgentService = require('../services/messageAgentService');
 const ChatTaskService = require('../services/chatTaskService');
@@ -223,7 +224,7 @@ router.get('/exchange/:exchangeId', authenticateToken, requireExchangePermission
 });
 
 // Send message
-router.post('/', authenticateToken, requireExchangePermission('send_messages'), async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   try {
     console.log('📨 Message POST request reached main handler:', {
       body: req.body,
@@ -247,6 +248,36 @@ router.post('/', authenticateToken, requireExchangePermission('send_messages'), 
 
     // Check if user has access to this exchange
     console.log('🔐 Checking access for user role:', req.user.role);
+    
+    // Check if user is a participant and has message permissions
+    const { data: participant } = await supabaseService.client
+      .from('exchange_participants')
+      .select('id, role, permissions')
+      .eq('exchange_id', exchangeId)
+      .eq('user_id', req.user.id)
+      .eq('is_active', true)
+      .single();
+    
+    if (participant) {
+      // Parse permissions
+      let permissions = {};
+      try {
+        permissions = typeof participant.permissions === 'string' 
+          ? JSON.parse(participant.permissions) 
+          : participant.permissions || {};
+      } catch (error) {
+        console.error('Error parsing participant permissions:', error);
+      }
+      
+      // Check if user has permission to send messages
+      if (permissions.can_send_messages === false) {
+        console.log('❌ User does not have permission to send messages in this exchange');
+        return res.status(403).json({ 
+          error: 'Permission denied',
+          message: 'You do not have permission to send messages in this exchange'
+        });
+      }
+    }
     
     if (req.user.role === 'admin') {
       console.log('✅ Admin user - access granted');

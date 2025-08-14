@@ -16,18 +16,94 @@ router.get('/', authenticateToken, async (req, res) => {
   console.log('[/api/agencies] User:', req.user?.email, 'Role:', req.user?.role);
   
   try {
-    // For now, return empty response to prevent frontend errors
-    // This can be enhanced later with actual agency data
-    res.json({
-      success: true,
-      data: [],
-      pagination: {
-        page: parseInt(req.query.page) || 1,
-        limit: parseInt(req.query.limit) || 20,
-        total: 0,
-        totalPages: 0
+    const databaseService = require('../services/database');
+    
+    // Get query parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const search = req.query.search || '';
+    const offset = (page - 1) * limit;
+    
+    console.log('[/api/agencies] Fetching agencies with params:', { page, limit, search, offset });
+    
+    // Fetch users with 'agency' role from the database
+    let agencies = [];
+    let total = 0;
+    
+    try {
+      // Get all users with agency role
+      const allUsers = await databaseService.getAllUsers();
+      const agencyUsers = allUsers.filter(user => user.role === 'agency');
+      
+      console.log('[/api/agencies] Found agency users:', agencyUsers.length);
+      
+      // Apply search filter if provided
+      if (search) {
+        const searchLower = search.toLowerCase();
+        agencies = agencyUsers.filter(user => 
+          user.email?.toLowerCase().includes(searchLower) ||
+          user.first_name?.toLowerCase().includes(searchLower) ||
+          user.last_name?.toLowerCase().includes(searchLower) ||
+          user.company?.toLowerCase().includes(searchLower)
+        );
+      } else {
+        agencies = agencyUsers;
       }
-    });
+      
+      total = agencies.length;
+      
+      // Apply pagination
+      agencies = agencies.slice(offset, offset + limit);
+      
+      // Transform to match frontend expected format
+      const transformedAgencies = agencies.map(user => ({
+        id: user.id,
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        display_name: user.display_name || `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+        email: user.email || '',
+        company: user.company || '',
+        phone_primary: user.phone_primary || user.phone || '',
+        address: user.address || '',
+        city: user.city || '',
+        state: user.state || '',
+        zip: user.zip || '',
+        contact_type: ['agency'],
+        status: user.is_active ? 'active' : 'inactive',
+        created_at: user.created_at || new Date().toISOString(),
+        updated_at: user.updated_at || new Date().toISOString(),
+        metadata: {
+          role: user.role,
+          last_login: user.last_login
+        }
+      }));
+      
+      console.log('[/api/agencies] Returning agencies:', transformedAgencies.length);
+      
+      res.json({
+        success: true,
+        data: transformedAgencies,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      });
+    } catch (dbError) {
+      console.error('[/api/agencies] Database error:', dbError);
+      // Fallback to empty response if database fails
+      res.json({
+        success: true,
+        data: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 0
+        }
+      });
+    }
   } catch (error) {
     console.error('[/api/agencies] Error fetching agencies:', error);
     res.status(500).json({ 

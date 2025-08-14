@@ -218,8 +218,72 @@ class RBACService {
     // Admin can access all
     if (user.role === 'admin') return true;
 
+    // Check if user is a participant with proper permissions
+    const { data: participant } = await supabaseService.client
+      .from('exchange_participants')
+      .select('id, role, permissions, is_active')
+      .eq('exchange_id', exchangeId)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single();
+
+    if (participant) {
+      // User is a participant, they have basic access
+      return true;
+    }
+
+    // Fall back to role-based check
     const { data: exchanges } = await this.getExchangesForUser(user);
     return exchanges.some(ex => ex.id === exchangeId);
+  }
+
+  /**
+   * Check if user has a specific permission for an exchange
+   */
+  async checkExchangePermission(user, exchangeId, permission) {
+    if (!user || !exchangeId || !permission) return false;
+
+    // Admin can do everything
+    if (user.role === 'admin') return true;
+
+    // Check participant permissions
+    const { data: participant } = await supabaseService.client
+      .from('exchange_participants')
+      .select('id, role, permissions')
+      .eq('exchange_id', exchangeId)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single();
+
+    if (participant && participant.permissions) {
+      let permissions = {};
+      try {
+        permissions = typeof participant.permissions === 'string' 
+          ? JSON.parse(participant.permissions) 
+          : participant.permissions;
+      } catch (error) {
+        console.error('Error parsing participant permissions:', error);
+      }
+
+      // Check the specific permission
+      return permissions[permission] === true;
+    }
+
+    // Check if coordinator has default permissions
+    if (user.role === 'coordinator') {
+      const { data: exchange } = await supabaseService.client
+        .from('exchanges')
+        .select('coordinator_id')
+        .eq('id', exchangeId)
+        .single();
+
+      if (exchange && exchange.coordinator_id === user.id) {
+        // Coordinators have all permissions on their exchanges by default
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**

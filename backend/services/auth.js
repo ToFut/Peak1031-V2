@@ -354,55 +354,97 @@ class AuthService {
   }
 
   static async generatePasswordResetToken(email) {
-    const user = await User.findOne({ where: { email, isActive: true } });
-    if (!user) {
-      // Don't reveal if user exists for security
+    try {
+      // Try Supabase first
+      const { createClient } = require('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_KEY
+      );
+
+      // Use Supabase's built-in password reset
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${process.env.FRONTEND_URL}/reset-password`
+      });
+
+      if (error) {
+        console.error('Supabase password reset error:', error);
+        // Fallback to local implementation
+        const user = await User.findOne({ where: { email, isActive: true } });
+        if (!user) {
+          return { success: true, message: 'If the email exists, a reset link has been sent' };
+        }
+
+        // Generate secure reset token
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
+
+        await user.update({
+          passwordResetToken: resetToken,
+          passwordResetExpiry: resetTokenExpiry
+        });
+
+        // Send reset email
+        await NotificationService.sendPasswordResetEmail(user.email, user.firstName, resetToken);
+      }
+
+      return { success: true, message: 'If the email exists, a reset link has been sent' };
+    } catch (error) {
+      console.error('Password reset token generation error:', error);
       return { success: true, message: 'If the email exists, a reset link has been sent' };
     }
-
-    // Generate secure reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
-
-    await user.update({
-      passwordResetToken: resetToken,
-      passwordResetExpiry: resetTokenExpiry
-    });
-
-    // Send reset email
-    await NotificationService.sendPasswordResetEmail(user.email, user.firstName, resetToken);
-
-    return { success: true, message: 'If the email exists, a reset link has been sent' };
   }
 
   static async resetPassword(resetToken, newPassword) {
-    const user = await User.findOne({
-      where: {
-        passwordResetToken: resetToken,
-        passwordResetExpiry: {
-          [Op.gt]: new Date()
-        },
-        isActive: true
+    try {
+      // Try Supabase first
+      const { createClient } = require('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_KEY
+      );
+
+      // For Supabase, we need to handle the reset differently
+      // The token comes from the URL in the email
+      const { data, error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) {
+        console.error('Supabase password reset error:', error);
+        // Fallback to local implementation
+        const user = await User.findOne({
+          where: {
+            passwordResetToken: resetToken,
+            passwordResetExpiry: {
+              [Op.gt]: new Date()
+            },
+            isActive: true
+          }
+        });
+
+        if (!user) {
+          throw new Error('Invalid or expired reset token');
+        }
+
+        // Hash new password
+        const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+        await user.update({
+          passwordHash: hashedPassword,
+          passwordResetToken: null,
+          passwordResetExpiry: null
+        });
+
+        // Send confirmation email
+        await NotificationService.sendPasswordResetConfirmation(user.email, user.firstName);
       }
-    });
 
-    if (!user) {
-      throw new Error('Invalid or expired reset token');
+      return { success: true, message: 'Password has been reset successfully' };
+    } catch (error) {
+      console.error('Password reset error:', error);
+      throw new Error('Failed to reset password. Please try again.');
     }
-
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-
-    await user.update({
-      passwordHash: hashedPassword,
-      passwordResetToken: null,
-      passwordResetExpiry: null
-    });
-
-    // Send confirmation email
-    await NotificationService.sendPasswordResetConfirmation(user.email, user.firstName);
-
-    return { success: true, message: 'Password has been reset successfully' };
   }
 
   static async refreshAuthToken(refreshToken) {

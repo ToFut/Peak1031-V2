@@ -36,7 +36,7 @@ import {
 
 // Tab Components
 import { ExchangeOverview } from '../components/ExchangeOverview';
-import EnhancedTaskManager from '../../tasks/components/EnhancedTaskManager';
+import { ModernTaskUI } from '../../tasks/components/ModernTaskUI';
 import EnhancedInvitationManager from '../components/EnhancedInvitationManager';
 import { DocumentUploader } from '../../../components/shared';
 
@@ -1394,9 +1394,9 @@ const ExchangeDetailEnhanced: React.FC = () => {
             <div className="p-6">
             {activeTab === 'overview' && <ExchangeOverview exchange={exchange as any} participants={participants} tasks={[]} documents={documents} />}
             {activeTab === 'tasks' && (
-              <EnhancedTaskManager 
+              <ModernTaskUI 
                 exchangeId={exchange.id}
-                exchangeName={exchange.name}
+                initialView="kanban"
               />
             )}
             {activeTab === 'all-details' && <AllDetailsView />}

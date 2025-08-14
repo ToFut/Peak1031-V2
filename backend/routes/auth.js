@@ -138,6 +138,47 @@ router.post('/logout', authenticateToken, (req, res) => {
   res.json({ message: 'Logged out successfully' });
 });
 
+// Forgot password endpoint
+router.post('/forgot-password', [
+  body('email').isEmail().normalizeEmail()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { email } = req.body;
+    const result = await AuthService.generatePasswordResetToken(email);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Failed to process password reset request' });
+  }
+});
+
+// Reset password endpoint
+router.post('/reset-password', [
+  body('token').isLength({ min: 1 }),
+  body('password').isLength({ min: 8 })
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { token, password } = req.body;
+    const result = await AuthService.resetPassword(token, password);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // Get current user
 router.get('/me', authenticateToken, async (req, res) => {
   try {

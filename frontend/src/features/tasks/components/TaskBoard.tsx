@@ -19,6 +19,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   showPPInfo = true,
   compact = false
 }) => {
+  console.log('🔥 TASKBOARD RECEIVED:', tasks.length, 'tasks');
+  console.log('🔥 TASKBOARD TASKS:', tasks.map(t => ({ title: t.title, status: t.status, id: t.id })));
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
 
   const columns = [
@@ -44,6 +46,19 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
       headerColor: 'text-green-700'
     }
   ];
+  
+  // Map lowercase to uppercase for column matching
+  const normalizeStatus = (status: string): TaskStatus => {
+    const statusMap: Record<string, TaskStatus> = {
+      'pending': 'PENDING',
+      'in_progress': 'IN_PROGRESS', 
+      'completed': 'COMPLETED',
+      'PENDING': 'PENDING',
+      'IN_PROGRESS': 'IN_PROGRESS',
+      'COMPLETED': 'COMPLETED'
+    };
+    return statusMap[status] || 'PENDING';
+  };
 
   const getPriorityConfig = (priority: string) => {
     switch (priority) {
@@ -104,7 +119,20 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   };
 
   const filteredTasks = (status: TaskStatus) => {
-    return tasks.filter(task => task.status === status);
+    console.log(`🔥 FILTERING TASKS FOR STATUS "${status}":`, tasks.length, 'total tasks');
+    
+    const filtered = tasks.filter(task => {
+      // Normalize both statuses for comparison
+      const normalizedTaskStatus = normalizeStatus(task.status);
+      const normalizedColumnStatus = normalizeStatus(status);
+      const matches = normalizedTaskStatus === normalizedColumnStatus;
+      
+      console.log(`   - Task "${task.title}" status: "${task.status}" -> "${normalizedTaskStatus}" matches "${normalizedColumnStatus}":`, matches);
+      return matches;
+    });
+    
+    console.log(`✅ FILTERED RESULT FOR "${status}":`, filtered.length, 'tasks');
+    return filtered;
   };
 
   const isOverdue = (task: Task) => {

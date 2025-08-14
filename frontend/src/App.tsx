@@ -31,8 +31,12 @@ import AuditLogSystem from './features/admin/components/AuditLogSystem';
 import AgencyManagement from './pages/admin/AgencyManagement';
 import AgencyAssignments from './components/admin/AgencyAssignments';
 
+// Import Login directly since it's a critical path
+import Login from './features/auth/pages/Login';
+import ForgotPassword from './features/auth/pages/ForgotPassword';
+import ResetPassword from './features/auth/pages/ResetPassword';
+
 // Lazy load heavy components for better performance
-const Login = lazy(() => import(/* webpackChunkName: "login" */ './features/auth/pages/Login'));
 const AdminDashboard = lazy(() => import(/* webpackChunkName: "admin-dashboard" */ './features/dashboard/components/StandardizedAdminDashboard'));
 const ClientDashboard = lazy(() => import(/* webpackChunkName: "client-dashboard" */ './features/dashboard/components/StandardizedClientDashboard'));
 const CoordinatorDashboard = lazy(() => import(/* webpackChunkName: "coordinator-dashboard" */ './features/dashboard/components/StandardizedCoordinatorDashboard'));
@@ -149,8 +153,18 @@ const App: React.FC = () => {
               <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
-              <Route path="/invite/:token" element={<InvitationSignup />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/invite/:token" element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <InvitationSignup />
+                </Suspense>
+              } />
+              <Route path="/auth/callback" element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <AuthCallback />
+                </Suspense>
+              } />
               
               {/* Protected Routes */}
               <Route 

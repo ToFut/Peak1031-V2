@@ -685,7 +685,7 @@ router.post('/', authenticateToken, requireExchangePermission('create_tasks'), a
 });
 
 // Update task
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, requireExchangePermission('edit_tasks'), async (req, res) => {
   // Check task permissions before updating
   try {
     const { data: task, error } = await supabaseService.client
@@ -839,7 +839,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete task
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, requireExchangePermission('delete_tasks'), async (req, res) => {
   // Check task permissions before deleting
   try {
     const { data: task, error } = await supabaseService.client

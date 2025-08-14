@@ -25,7 +25,7 @@ const StandardizedAdminDashboard: React.FC = () => {
   const [aiMode, setAiMode] = useState(false);
   
   // Get dashboard data for correct RBAC-filtered totals
-  const { stats: dashboardStats } = useDashboardData({ 
+  const { stats: dashboardStats, tasks: dashboardTasks } = useDashboardData({ 
     role: 'admin', 
     autoRefresh: true, 
     refreshInterval: 300000 
