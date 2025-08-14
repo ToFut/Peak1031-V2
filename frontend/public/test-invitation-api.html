@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Invitation API</title>
+</head>
+<body>
+    <h1>Testing Invitation API Access</h1>
+    <div id="results"></div>
+    
+    <script>
+        const token = 'be24c1c62f3e6e144f85ba604904c65965566bf98567139e51a1f033bcb78e83';
+        const resultsDiv = document.getElementById('results');
+        
+        function addResult(label, data) {
+            const div = document.createElement('div');
+            div.style.marginBottom = '20px';
+            div.innerHTML = `<h3>${label}</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            resultsDiv.appendChild(div);
+        }
+        
+        async function testInvitationAPI() {
+            // Test 1: Direct to backend
+            try {
+                const response1 = await fetch(`http://localhost:5001/api/invitations/details/${token}`);
+                const data1 = await response1.json();
+                addResult('✅ Direct Backend Call (http://localhost:5001/api/...)', data1);
+            } catch (error) {
+                addResult('❌ Direct Backend Error', { error: error.message });
+            }
+            
+            // Test 2: Through React proxy
+            try {
+                const response2 = await fetch(`/api/invitations/details/${token}`);
+                const data2 = await response2.json();
+                addResult('✅ Through React Proxy (/api/...)', data2);
+            } catch (error) {
+                addResult('❌ React Proxy Error', { error: error.message });
+            }
+            
+            // Test 3: Check what apiService base URL would be
+            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+            addResult('ℹ️ Environment API URL', { REACT_APP_API_URL: process.env.REACT_APP_API_URL, resolved: apiUrl });
+        }
+        
+        testInvitationAPI();
+    </script>
+</body>
+</html>

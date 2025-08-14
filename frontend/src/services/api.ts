@@ -229,8 +229,11 @@ class ApiService {
         console.log('💾 Cached data for offline fallback:', endpoint);
       }
       
-      // Return data.data if it exists (backend format), otherwise return the whole response
-      // Handle both {data: [...]} and {success: true, data: [...]} formats
+      // Return the full response object if it contains success or pagination properties
+      // Otherwise, return data.data if it exists (backend format), or the whole response
+      if (data.success !== undefined || data.pagination !== undefined) {
+        return data;
+      }
       if (data.data !== undefined) {
         return data.data;
       }

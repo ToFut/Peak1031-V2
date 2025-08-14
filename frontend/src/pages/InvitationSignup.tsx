@@ -65,6 +65,16 @@ const InvitationSignup: React.FC = () => {
       console.error('❌ Failed to load invitation details:', err);
       console.error('Error response:', err.response);
       console.error('Error message:', err.message);
+      console.error('Full error object:', err);
+      
+      // Try direct fetch as a test
+      try {
+        const testResponse = await fetch(`http://localhost:5001/api/invitations/details/${token}`);
+        const testData = await testResponse.json();
+        console.log('🧪 Direct fetch test result:', testData);
+      } catch (testErr) {
+        console.error('🧪 Direct fetch test failed:', testErr);
+      }
       // The error is being set in the useInvitations hook
     }
   };

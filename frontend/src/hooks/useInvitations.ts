@@ -176,15 +176,36 @@ export function useInvitations() {
       const url = `/invitations/details/${token}`;
       console.log('🌐 Full URL:', apiService.getBaseURL() + url);
       
-      const response = await apiService.get(url);
-      console.log('✅ useInvitations: Got response:', response);
+      // Direct fetch to bypass any apiService issues
+      const fullUrl = `${apiService.getBaseURL()}${url}`;
+      const authToken = localStorage.getItem('token');
       
-      if (!response || !response.data) {
+      console.log('🔗 Fetching directly from:', fullUrl);
+      
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken && { 'Authorization': `Bearer ${authToken}` })
+        }
+      });
+      
+      console.log('📡 Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to parse error' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ useInvitations: Got data:', data);
+      
+      if (!data) {
         throw new Error('No data received from API');
       }
       
       setError(null); // Clear any previous errors
-      return response.data;
+      return data;
     } catch (err: any) {
       console.error('❌ useInvitations: Error details:', {
         status: err.response?.status,
