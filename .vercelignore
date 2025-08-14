@@ -69,11 +69,12 @@ backend/data/*.json
 # Git files
 .git/
 
-# Build artifacts
-build/
+# Build artifacts (exclude general build dirs but allow frontend/build)
 dist/
 .next/
 out/
+# Allow frontend/build for deployment
+!frontend/build/
 
 # Logs
 logs/
