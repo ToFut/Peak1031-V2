@@ -426,8 +426,8 @@ const ExchangeDetail: React.FC = () => {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-xl p-8 text-white">
-          <div className="flex items-start justify-between">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl sm:rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 text-white">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <button
                 onClick={() => navigate('/exchanges')}
@@ -437,9 +437,9 @@ const ExchangeDetail: React.FC = () => {
                 Back to Exchanges
               </button>
               
-              <h1 className="text-3xl font-bold mb-2">{exchange.name || `Exchange #${exchange.exchangeNumber}`}</h1>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2">{exchange.name || `Exchange #${exchange.exchangeNumber}`}</h1>
               
-              <div className="flex items-center space-x-4 text-blue-100">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-blue-100">
                 <span className="flex items-center">
                   <Users className="w-4 h-4 mr-1" />
                   {exchange.client?.firstName} {exchange.client?.lastName}
@@ -455,10 +455,10 @@ const ExchangeDetail: React.FC = () => {
               </div>
             </div>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {/* Status Badge */}
               <div className={`
-                px-4 py-2 rounded-full font-medium flex items-center space-x-2
+                px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm
                 ${(exchange.status === 'In Progress' || exchange.status === '45D' || exchange.status === '180D') ? 'bg-green-500 text-white' :
                   exchange.status === 'PENDING' ? 'bg-yellow-500 text-white' :
                   exchange.status === 'COMPLETED' ? 'bg-blue-500 text-white' :
@@ -471,7 +471,7 @@ const ExchangeDetail: React.FC = () => {
               {/* Days remaining */}
               {daysUntilClosing !== null && daysUntilClosing > 0 && (
                 <div className={`
-                  px-4 py-2 rounded-full font-medium flex items-center space-x-2
+                  px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm
                   ${daysUntilClosing <= 45 ? 'bg-red-500 text-white animate-pulse' :
                     daysUntilClosing <= 180 ? 'bg-orange-500 text-white' :
                     'bg-blue-500 text-white'}
@@ -482,8 +482,8 @@ const ExchangeDetail: React.FC = () => {
               )}
               
               {/* Action Menu */}
-              <button className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
-                <MoreVertical className="w-5 h-5" />
+              <button className="p-1.5 sm:p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
+                <MoreVertical className="w-4 sm:w-5 h-4 sm:h-5" />
               </button>
             </div>
           </div>
@@ -504,16 +504,16 @@ const ExchangeDetail: React.FC = () => {
         </div>
         
         {/* Tabs */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="border-b border-gray-200">
-            <nav className="flex -mb-px">
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="border-b border-gray-200 overflow-x-auto">
+            <nav className="flex -mb-px min-w-max">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`
-                    flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm transition-all
-                    flex items-center justify-center space-x-2
+                    flex-1 py-3 sm:py-4 px-3 sm:px-6 text-center border-b-2 font-medium text-xs sm:text-sm transition-all
+                    flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap
                     ${activeTab === tab.id
                       ? 'border-blue-500 text-blue-600 bg-blue-50'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -528,7 +528,7 @@ const ExchangeDetail: React.FC = () => {
           </div>
           
           {/* Tab Content */}
-          <div className="p-6">
+          <div className="p-3 sm:p-6">
             {activeTab === 'overview' && <ExchangeOverview exchange={exchange as any} participants={[]} tasks={tasks} documents={[]} />}
             {activeTab === 'timeline' && <TimelineTab exchange={exchange} />}
             {activeTab === 'tasks' && (

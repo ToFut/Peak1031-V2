@@ -299,18 +299,18 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white rounded-lg sm:rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <SparklesIcon className="w-5 h-5 text-purple-600" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-purple-100 rounded-lg">
+                <SparklesIcon className="w-4 sm:w-5 h-4 sm:h-5 text-purple-600" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Create New Task</h2>
-                <p className="text-sm text-gray-500">Fill in the details to create a task</p>
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900">Create New Task</h2>
+                <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">Fill in the details to create a task</p>
               </div>
             </div>
             <button
@@ -323,12 +323,12 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
         </div>
 
         {/* Progress Steps */}
-        <div className="px-6 py-3 border-b border-gray-200">
+        <div className="px-4 sm:px-6 py-2 sm:py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <button
                 onClick={() => setStep(1)}
-                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${
                   step === 1 ? 'bg-purple-100 text-purple-700' : 'text-gray-500'
                 }`}
               >
@@ -337,7 +337,7 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
               <ChevronDownIcon className="w-4 h-4 text-gray-400 rotate-[-90deg]" />
               <button
                 onClick={() => setStep(2)}
-                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${
                   step === 2 ? 'bg-purple-100 text-purple-700' : 'text-gray-500'
                 }`}
               >
@@ -346,7 +346,7 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
               <ChevronDownIcon className="w-4 h-4 text-gray-400 rotate-[-90deg]" />
               <button
                 onClick={() => setStep(3)}
-                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${
                   step === 3 ? 'bg-purple-100 text-purple-700' : 'text-gray-500'
                 }`}
               >
@@ -357,7 +357,7 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+        <div className="p-4 sm:p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 200px)' }}>
           {step === 1 && (
             <div className="space-y-6">
               {/* Quick Templates */}
@@ -365,7 +365,7 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Quick Templates
                 </label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
                   {QUICK_TEMPLATES.map(template => (
                     <button
                       key={template.id}
@@ -706,16 +706,16 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200 bg-gray-50">
           <div className="flex items-center justify-between">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 hover:text-gray-900"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base text-gray-700 hover:text-gray-900"
             >
               Cancel
             </button>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {step > 1 && (
                 <button
                   onClick={() => setStep(step - 1)}

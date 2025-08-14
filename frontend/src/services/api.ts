@@ -48,7 +48,7 @@ class ApiService {
         }
       } else {
         // Development fallback
-        baseUrl = 'http://localhost:5001/api';
+        baseUrl = 'https://peak1031-production.up.railway.app/api';
       }
     }
     

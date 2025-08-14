@@ -411,7 +411,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
     if (view === 'list') {
       return (
         <div
-          className={`group flex items-center p-5 bg-white border rounded-xl hover:shadow-lg transition-all cursor-pointer ${
+          className={`group flex flex-col sm:flex-row sm:items-center p-3 sm:p-5 bg-white border rounded-lg sm:rounded-xl hover:shadow-lg transition-all cursor-pointer ${
             isSelected ? 'ring-2 ring-purple-500 border-purple-500 shadow-md' : 'border-gray-200'
           } ${isOverdue ? 'border-l-4 border-l-red-500' : ''}`}
           onClick={() => onTaskSelect?.(task)}
@@ -651,7 +651,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
     const statusColumns = ['pending', 'in_progress', 'completed', 'blocked', 'review'];
     
     return (
-      <div className="flex gap-6 p-6 overflow-x-auto min-h-full">
+      <div className="flex gap-3 sm:gap-6 p-3 sm:p-6 overflow-x-auto min-h-full">
         {statusColumns.map((status) => {
           const config = STATUS_CONFIG[status as StatusConfigKey] || STATUS_CONFIG.pending;
           const tasks = groupedTasks[status] || [];
@@ -659,7 +659,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
           return (
             <div
               key={status}
-              className={`flex-shrink-0 w-96 ${
+              className={`flex-shrink-0 w-72 sm:w-80 lg:w-96 ${
                 hoveredColumn === status ? 'bg-gray-50 rounded-lg' : ''
               }`}
               onDragOver={(e) => {
@@ -723,7 +723,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
   };
 
   const renderListView = () => (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       <div className="space-y-2">
         {processedTasks.map(task => (
           <TaskCard key={task.id} task={task} view="list" />
@@ -733,8 +733,8 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
   );
 
   const renderGridView = () => (
-    <div className="p-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+    <div className="p-3 sm:p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6">
         {processedTasks.map(task => (
           <TaskCard key={task.id} task={task} view="grid" />
         ))}
@@ -762,98 +762,120 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <div className="bg-white border-b border-gray-200">
-          <div className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
+          <div className="px-3 sm:px-6 py-3 sm:py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+              <div className="flex items-center gap-2 sm:gap-4">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Tasks</h1>
                 
-                {/* Quick Stats */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1 px-3 py-1 bg-yellow-50 rounded-full">
-                    <ClockIcon className="w-4 h-4 text-yellow-600" />
-                    <span className="text-sm font-medium text-yellow-700">{stats.pending}</span>
+                {/* Quick Stats - Hidden on mobile, shown on sm+ */}
+                <div className="hidden sm:flex items-center gap-2 lg:gap-3">
+                  <div className="flex items-center gap-1 px-2 lg:px-3 py-1 bg-yellow-50 rounded-full">
+                    <ClockIcon className="w-3 lg:w-4 h-3 lg:h-4 text-yellow-600" />
+                    <span className="text-xs lg:text-sm font-medium text-yellow-700">{stats.pending}</span>
                   </div>
-                  <div className="flex items-center gap-1 px-3 py-1 bg-blue-50 rounded-full">
-                    <ArrowPathIcon className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm font-medium text-blue-700">{stats.inProgress}</span>
+                  <div className="flex items-center gap-1 px-2 lg:px-3 py-1 bg-blue-50 rounded-full">
+                    <ArrowPathIcon className="w-3 lg:w-4 h-3 lg:h-4 text-blue-600" />
+                    <span className="text-xs lg:text-sm font-medium text-blue-700">{stats.inProgress}</span>
                   </div>
-                  <div className="flex items-center gap-1 px-3 py-1 bg-green-50 rounded-full">
-                    <CheckCircleIcon className="w-4 h-4 text-green-600" />
-                    <span className="text-sm font-medium text-green-700">{stats.completed}</span>
+                  <div className="flex items-center gap-1 px-2 lg:px-3 py-1 bg-green-50 rounded-full">
+                    <CheckCircleIcon className="w-3 lg:w-4 h-3 lg:h-4 text-green-600" />
+                    <span className="text-xs lg:text-sm font-medium text-green-700">{stats.completed}</span>
                   </div>
                   {stats.overdue > 0 && (
-                    <div className="flex items-center gap-1 px-3 py-1 bg-red-50 rounded-full">
-                      <ExclamationTriangleIcon className="w-4 h-4 text-red-600" />
-                      <span className="text-sm font-medium text-red-700">{stats.overdue} overdue</span>
+                    <div className="flex items-center gap-1 px-2 lg:px-3 py-1 bg-red-50 rounded-full">
+                      <ExclamationTriangleIcon className="w-3 lg:w-4 h-3 lg:h-4 text-red-600" />
+                      <span className="text-xs lg:text-sm font-medium text-red-700">{stats.overdue} overdue</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                {/* Search */}
-                <div className="relative">
-                  <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Search - Responsive width */}
+                <div className="relative flex-1 sm:flex-initial">
+                  <MagnifyingGlassIcon className="w-4 sm:w-5 h-4 sm:h-5 absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Search tasks..."
+                    placeholder="Search..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 pr-4 py-2 w-64 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="pl-8 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 w-full sm:w-48 lg:w-64 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm sm:text-base"
                   />
                 </div>
 
-                {/* Filter Button */}
+                {/* Filter Button - Icon only on mobile */}
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
+                  className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border ${
                     showFilters ? 'bg-purple-50 border-purple-300 text-purple-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                   }`}
                 >
                   <FunnelIcon className="w-4 h-4" />
-                  <span>Filters</span>
+                  <span className="hidden sm:inline">Filters</span>
                   {Object.values(filters).some(v => v !== 'all' && v !== false && (!Array.isArray(v) || v.length > 0)) && (
                     <span className="w-2 h-2 bg-purple-500 rounded-full" />
                   )}
                 </button>
 
-                {/* View Mode Switcher */}
-                <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                {/* View Mode Switcher - Hidden on mobile */}
+                <div className="hidden sm:flex items-center bg-gray-100 rounded-lg p-1">
                   <button
                     onClick={() => setViewMode('kanban')}
-                    className={`p-2 rounded ${viewMode === 'kanban' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
+                    className={`p-1.5 sm:p-2 rounded ${viewMode === 'kanban' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
                   >
-                    <Squares2X2Icon className="w-4 h-4" />
+                    <Squares2X2Icon className="w-3 sm:w-4 h-3 sm:h-4" />
                   </button>
                   <button
                     onClick={() => setViewMode('list')}
-                    className={`p-2 rounded ${viewMode === 'list' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
+                    className={`p-1.5 sm:p-2 rounded ${viewMode === 'list' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
                   >
-                    <ListBulletIcon className="w-4 h-4" />
+                    <ListBulletIcon className="w-3 sm:w-4 h-3 sm:h-4" />
                   </button>
                   <button
                     onClick={() => setViewMode('grid')}
-                    className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
+                    className={`p-1.5 sm:p-2 rounded ${viewMode === 'grid' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
                   >
-                    <TableCellsIcon className="w-4 h-4" />
+                    <TableCellsIcon className="w-3 sm:w-4 h-3 sm:h-4" />
                   </button>
                 </div>
 
-                {/* Create Button */}
+                {/* Create Button - Icon only on mobile */}
                 <button
                   onClick={() => onCreateClick?.()}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                 >
                   <PlusIcon className="w-4 h-4" />
-                  <span>New Task</span>
+                  <span className="hidden sm:inline">New Task</span>
                 </button>
               </div>
             </div>
 
+            {/* Mobile Stats Bar */}
+            <div className="flex sm:hidden items-center gap-2 mt-3 overflow-x-auto pb-2">
+              <div className="flex items-center gap-1 px-2 py-1 bg-yellow-50 rounded-full flex-shrink-0">
+                <ClockIcon className="w-3 h-3 text-yellow-600" />
+                <span className="text-xs font-medium text-yellow-700">{stats.pending}</span>
+              </div>
+              <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-full flex-shrink-0">
+                <ArrowPathIcon className="w-3 h-3 text-blue-600" />
+                <span className="text-xs font-medium text-blue-700">{stats.inProgress}</span>
+              </div>
+              <div className="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-full flex-shrink-0">
+                <CheckCircleIcon className="w-3 h-3 text-green-600" />
+                <span className="text-xs font-medium text-green-700">{stats.completed}</span>
+              </div>
+              {stats.overdue > 0 && (
+                <div className="flex items-center gap-1 px-2 py-1 bg-red-50 rounded-full flex-shrink-0">
+                  <ExclamationTriangleIcon className="w-3 h-3 text-red-600" />
+                  <span className="text-xs font-medium text-red-700">{stats.overdue}</span>
+                </div>
+              )}
+            </div>
+
             {/* Filters Bar */}
             {showFilters && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex items-center gap-4">
+              <div className="mt-4 p-3 sm:p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                   <select
                     value={filters.status}
                     onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
@@ -919,11 +941,11 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
 
             {/* Bulk Actions Bar */}
             {selectedTasks.size > 0 && (
-              <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200 flex items-center justify-between">
-                <span className="text-sm font-medium text-purple-700">
+              <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <span className="text-xs sm:text-sm font-medium text-purple-700">
                   {selectedTasks.size} task{selectedTasks.size > 1 ? 's' : ''} selected
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2">
                   <button
                     onClick={() => handleBulkAction('complete')}
                     className="px-3 py-1 text-sm bg-white border border-purple-300 rounded text-purple-700 hover:bg-purple-100"
