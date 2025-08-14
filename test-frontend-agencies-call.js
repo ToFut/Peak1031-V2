@@ -14,9 +14,9 @@ async function testFrontendAgenciesCall() {
     const token = loginResponse.data.token;
     console.log('✅ Login successful, token received');
     
-    // Now test the agencies endpoint through the frontend proxy
-    console.log('📡 Testing /api/agencies through frontend proxy...');
-    const agenciesResponse = await axios.get('http://localhost:3000/api/agencies?page=1&limit=20&includeStats=true', {
+    // Now test the agencies endpoint directly on backend
+    console.log('📡 Testing /api/agencies directly on backend...');
+    const agenciesResponse = await axios.get('http://localhost:5001/api/agencies?page=1&limit=20&includeStats=true', {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'

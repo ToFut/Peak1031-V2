@@ -335,20 +335,32 @@ class InvitationAuthService {
    */
   static async getExchangeInvitations(exchangeId) {
     try {
+      // Get ALL invitations for this exchange, not filtered by status
       const { data: invitations, error } = await supabase
         .from('invitations')
-        .select('*')
+        .select(`
+          *,
+          exchanges (
+            id,
+            exchange_name,
+            exchange_number,
+            status
+          )
+        `)
         .eq('exchange_id', exchangeId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      console.log(`📋 Found ${invitations?.length || 0} invitations for exchange ${exchangeId}`);
 
       // Transform the data to match frontend expectations
       const transformedInvitations = invitations?.map(inv => ({
         ...inv,
         token: inv.invitation_token, // Map invitation_token to token
         message: inv.custom_message, // Map custom_message to message
-        invited_by: inv.invited_by ? { id: inv.invited_by } : undefined // Will need to fetch user details separately
+        invited_by: inv.invited_by ? { id: inv.invited_by } : undefined, // Will need to fetch user details separately
+        exchange: inv.exchanges // Include exchange details
       })) || [];
 
       return transformedInvitations;
