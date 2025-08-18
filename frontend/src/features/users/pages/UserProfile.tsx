@@ -83,13 +83,40 @@ const UserProfile: React.FC = () => {
             <div>
               <h3 className="text-lg font-medium text-red-800">Error Loading Profile</h3>
               <p className="text-red-700 mt-1">{error}</p>
-              <button
-                onClick={refreshAll}
-                className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              >
-                <ArrowPathIcon className="h-4 w-4 mr-2" />
-                Try Again
-              </button>
+              {error.includes('not found') || error.includes('does not exist') ? (
+                <div className="mt-3">
+                  <p className="text-sm text-red-600 mb-2">The requested user profile could not be found.</p>
+                  <p className="text-sm text-gray-600 mb-3">Try navigating to a valid user profile:</p>
+                  <div className="space-x-2">
+                    <a
+                      href="/users/user-profile/a189afb6-3f04-48fa-8b2e-21469130ea7b"
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
+                    >
+                      Admin Profile
+                    </a>
+                    <a
+                      href="/users/user-profile/ebe86825-c9d3-48ea-865a-c545f4418179"
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
+                    >
+                      Client Profile
+                    </a>
+                    <a
+                      href="/users/user-profile/d67cef47-5419-42c8-894d-f89403685e5b"
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-purple-700 bg-purple-100 hover:bg-purple-200"
+                    >
+                      Agency Profile
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={refreshAll}
+                  className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  <ArrowPathIcon className="h-4 w-4 mr-2" />
+                  Try Again
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -102,7 +129,29 @@ const UserProfile: React.FC = () => {
       <div className="p-6">
         <div className="text-center text-gray-500">
           <UserIcon className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-          <p>No profile data available</p>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Profile Data Available</h3>
+          <p className="text-gray-600 mb-4">The requested user profile could not be loaded.</p>
+          <p className="text-sm text-gray-500 mb-6">Try navigating to a valid user profile:</p>
+          <div className="space-x-2">
+            <a
+              href="/users/user-profile/a189afb6-3f04-48fa-8b2e-21469130ea7b"
+              className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
+            >
+              Admin Profile
+            </a>
+            <a
+              href="/users/user-profile/ebe86825-c9d3-48ea-865a-c545f4418179"
+              className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
+            >
+              Client Profile
+            </a>
+            <a
+              href="/users/user-profile/d67cef47-5419-42c8-894d-f89403685e5b"
+              className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-purple-700 bg-purple-100 hover:bg-purple-200"
+            >
+              Agency Profile
+            </a>
+          </div>
         </div>
       </div>
     );

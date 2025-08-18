@@ -257,55 +257,8 @@ const Reports: React.FC = () => {
             </h1>
             <p className="text-gray-600 mt-1">Comprehensive insights powered by AI</p>
           </div>
-          <div className="flex items-center space-x-4">
-            <select
-              value={selectedReport}
-              onChange={(e) => setSelectedReport(e.target.value)}
-              className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              {reportTypes.map((report) => (
-                <option key={report.key} value={report.key}>
-                  {report.name}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={exportReport}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors flex items-center"
-            >
-              <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
-              Export
-            </button>
           </div>
-        </div>
 
-        {/* Tab Navigation */}
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => setActiveTab('standard')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'standard'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <ChartBarIcon className="h-4 w-4 inline mr-2" />
-              Standard Reports
-            </button>
-            <button
-              onClick={() => setActiveTab('ai')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'ai'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <SparklesIcon className="h-4 w-4 inline mr-2" />
-              AI-Powered Analysis
-            </button>
-          </nav>
-        </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
