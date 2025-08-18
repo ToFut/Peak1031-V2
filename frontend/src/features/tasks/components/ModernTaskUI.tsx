@@ -756,6 +756,168 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
     </div>
   );
 
+  const renderTimelineView = () => {
+    // Group tasks by date (due date or created date)
+    const tasksByDate = processedTasks.reduce((acc, task) => {
+      const date = task.dueDate ? new Date(task.dueDate) : new Date(task.createdAt || '');
+      const dateKey = date.toISOString().split('T')[0];
+      
+      if (!acc[dateKey]) {
+        acc[dateKey] = [];
+      }
+      acc[dateKey].push(task);
+      return acc;
+    }, {} as Record<string, Task[]>);
+
+    // Sort dates
+    const sortedDates = Object.keys(tasksByDate).sort();
+
+    return (
+      <div className="p-3 sm:p-6">
+        <div className="max-w-4xl mx-auto">
+          {sortedDates.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <CalendarIcon className="w-8 h-8 text-gray-300" />
+              </div>
+              <p className="text-gray-500 mb-4">No tasks scheduled</p>
+              <button
+                onClick={() => onCreateClick?.()}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              >
+                Create first task
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {sortedDates.map((dateKey) => {
+                const date = new Date(dateKey);
+                const tasks = tasksByDate[dateKey];
+                const isToday = date.toDateString() === new Date().toDateString();
+                const isPast = date < new Date() && !isToday;
+                const isFuture = date > new Date();
+
+                return (
+                  <div key={dateKey} className="relative">
+                    {/* Date Header */}
+                    <div className={`sticky top-0 z-10 mb-4 p-3 rounded-lg ${
+                      isToday ? 'bg-purple-50 border border-purple-200' :
+                      isPast ? 'bg-red-50 border border-red-200' :
+                      'bg-gray-50 border border-gray-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <CalendarIcon className={`w-5 h-5 ${
+                            isToday ? 'text-purple-600' :
+                            isPast ? 'text-red-600' :
+                            'text-gray-600'
+                          }`} />
+                          <h3 className={`font-semibold ${
+                            isToday ? 'text-purple-900' :
+                            isPast ? 'text-red-900' :
+                            'text-gray-900'
+                          }`}>
+                            {isToday ? 'Today' : 
+                             isPast ? 'Overdue' :
+                             date.toLocaleDateString('en-US', { 
+                               weekday: 'long', 
+                               month: 'long', 
+                               day: 'numeric' 
+                             })}
+                          </h3>
+                          <span className={`text-sm ${
+                            isToday ? 'text-purple-700' :
+                            isPast ? 'text-red-700' :
+                            'text-gray-600'
+                          }`}>
+                            {tasks.length} task{tasks.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => onCreateClick?.()}
+                          className="px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                        >
+                          Add Task
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Timeline Line */}
+                    <div className="relative">
+                      <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+                      
+                      {/* Tasks */}
+                      <div className="space-y-4">
+                        {tasks.map((task, index) => {
+                          const statusConfig = STATUS_CONFIG[task.status as StatusConfigKey] || STATUS_CONFIG.pending;
+                          const priorityConfig = PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG] || PRIORITY_CONFIG.MEDIUM;
+                          const StatusIcon = statusConfig.icon;
+                          const PriorityIcon = priorityConfig.icon;
+
+                          return (
+                            <div key={task.id} className="relative flex items-start gap-4 group">
+                              {/* Timeline Dot */}
+                              <div className={`relative z-10 w-12 h-12 rounded-full border-4 border-white shadow-sm flex items-center justify-center ${
+                                isToday ? 'bg-purple-500' :
+                                isPast ? 'bg-red-500' :
+                                'bg-blue-500'
+                              }`}>
+                                <StatusIcon className="w-5 h-5 text-white" />
+                              </div>
+
+                              {/* Task Card */}
+                              <div 
+                                className={`flex-1 bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-all cursor-pointer ${
+                                  isToday ? 'border-purple-200' :
+                                  isPast ? 'border-red-200' :
+                                  'border-gray-200'
+                                }`}
+                                onClick={() => onTaskSelect?.(task)}
+                              >
+                                <div className="flex items-start justify-between mb-2">
+                                  <h4 className="font-semibold text-gray-900">{task.title}</h4>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusConfig.bgClass} ${statusConfig.textClass}`}>
+                                      {statusConfig.label}
+                                    </span>
+                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${priorityConfig.bgClass} ${priorityConfig.textClass}`}>
+                                      {priorityConfig.label}
+                                    </span>
+                                  </div>
+                                </div>
+                                
+                                {task.description && (
+                                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{task.description}</p>
+                                )}
+
+                                <div className="flex items-center gap-4 text-sm text-gray-500">
+                                  <div className="flex items-center gap-1">
+                                    <PriorityIcon className={`w-4 h-4 ${priorityConfig.textClass}`} />
+                                    <span>{priorityConfig.label} Priority</span>
+                                  </div>
+                                  {task.assignedTo && (
+                                    <div className="flex items-center gap-1">
+                                      <UserCircleIcon className="w-4 h-4" />
+                                      <span>Assigned to {task.assignedTo}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-full bg-gray-50">
       {/* Main Content */}
@@ -822,20 +984,30 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
                   <button
                     onClick={() => setViewMode('kanban')}
                     className={`p-1.5 sm:p-2 rounded ${viewMode === 'kanban' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
+                    title="Kanban Board"
                   >
                     <Squares2X2Icon className="w-3 sm:w-4 h-3 sm:h-4" />
                   </button>
                   <button
                     onClick={() => setViewMode('list')}
                     className={`p-1.5 sm:p-2 rounded ${viewMode === 'list' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
+                    title="List View"
                   >
                     <ListBulletIcon className="w-3 sm:w-4 h-3 sm:h-4" />
                   </button>
                   <button
                     onClick={() => setViewMode('grid')}
                     className={`p-1.5 sm:p-2 rounded ${viewMode === 'grid' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
+                    title="Card Grid"
                   >
                     <TableCellsIcon className="w-3 sm:w-4 h-3 sm:h-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('timeline')}
+                    className={`p-1.5 sm:p-2 rounded ${viewMode === 'timeline' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
+                    title="Timeline View"
+                  >
+                    <CalendarIcon className="w-3 sm:w-4 h-3 sm:h-4" />
                   </button>
                 </div>
 
@@ -1006,6 +1178,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
               {viewMode === 'kanban' && renderKanbanView()}
               {viewMode === 'list' && renderListView()}
               {viewMode === 'grid' && renderGridView()}
+              {viewMode === 'timeline' && renderTimelineView()}
             </>
           )}
         </div>
