@@ -97,7 +97,7 @@ const UserProfile: React.FC = () => {
     );
   }
 
-  if (!profile) {
+  if (!profile || !profile.user) {
     return (
       <div className="p-6">
         <div className="text-center text-gray-500">

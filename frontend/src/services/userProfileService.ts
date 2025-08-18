@@ -180,7 +180,11 @@ export class UserProfileService {
   /**
    * Format user display name
    */
-  static formatUserName(user: UserInfo): string {
+  static formatUserName(user: UserInfo | null | undefined): string {
+    if (!user) {
+      return 'Unknown User';
+    }
+    
     // Handle both camelCase and snake_case properties
     const firstName = user.firstName || user.first_name;
     const lastName = user.lastName || user.last_name;
@@ -200,7 +204,7 @@ export class UserProfileService {
   /**
    * Format role display name
    */
-  static formatRole(role: string): string {
+  static formatRole(role: string | null | undefined): string {
     if (!role || typeof role !== 'string') return 'User';
     switch (role.toLowerCase()) {
       case 'admin':
