@@ -5,14 +5,14 @@ import { useAuth } from '../../../hooks/useAuth';
 import { 
   ChartBarIcon, 
   DocumentArrowDownIcon, 
-  SparklesIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   ClockIcon,
   UserGroupIcon,
   BuildingOfficeIcon,
   ArrowTrendingUpIcon,
-  BoltIcon
+  EyeIcon,
+  CalendarIcon
 } from '@heroicons/react/24/outline';
 
 interface ReportData {

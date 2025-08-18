@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import UserProfile from '../pages/UserProfile';
-import AgencyProfile from '../../admin/components/AgencyProfile';
 import { useUserProfile } from '../../../hooks/useUserProfile';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 
@@ -39,13 +38,7 @@ const SmartUserProfile: React.FC = () => {
     );
   }
 
-  // Route to appropriate profile component based on user role
-  if (profile.user.role === 'agency') {
-    return <AgencyProfile />;
-  }
-
-  // Default to full user profile for all other roles
-  // UserProfile already uses the useUserProfile hook, so it will handle its own data
+  // Use UserProfile for all user types - it already handles agency users properly
   return <UserProfile />;
 };
 
