@@ -177,6 +177,9 @@ class ChatService {
           if (Array.isArray(participantsList) && participantsList.length > 0) {
             participantsList.forEach((ep: any) => {
               try {
+                // Each participant record represents ONE participant
+                // They might have user data, contact data, or both
+                // Prefer user data if available, otherwise use contact data
                 if (ep.user && ep.user.id && ep.user.email) {
                   participants.push({
                     id: ep.user.id,
@@ -189,8 +192,8 @@ class ChatService {
                     created_at: ep.user.created_at || new Date().toISOString(),
                     updated_at: ep.user.updated_at || new Date().toISOString()
                   } as User);
-                }
-                if (ep.contact && ep.contact.id && ep.contact.email) {
+                } else if (ep.contact && ep.contact.id && ep.contact.email) {
+                  // Only add contact if there's no user data
                   participants.push({
                     id: `contact_${ep.contact.id}`,
                     email: ep.contact.email,

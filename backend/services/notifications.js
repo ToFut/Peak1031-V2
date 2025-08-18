@@ -776,6 +776,102 @@ class NotificationService {
       return { success: false, error: error.message };
     }
   }
+
+  /**
+   * Send assignment approval email with token link
+   */
+  async sendAssignmentApprovalEmail(email, assignmentData) {
+    if (!this.sendGridEnabled) {
+      console.log('📧 SendGrid not enabled - skipping assignment approval email to:', email);
+      return { success: true, skipped: true };
+    }
+
+    try {
+      const { 
+        firstName, 
+        lastName, 
+        role, 
+        exchangeName, 
+        assignedByName, 
+        approvalToken,
+        exchangeId 
+      } = assignmentData;
+      
+      const approvalUrl = `${this.baseUrl}/approve-assignment/${approvalToken}`;
+      const displayName = firstName && lastName ? `${firstName} ${lastName}` : email.split('@')[0];
+      
+      const subject = `Assignment Approval Required - ${exchangeName}`;
+      
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #2563eb; color: white; padding: 20px; text-align: center;">
+            <h1>Assignment Approval Required</h1>
+          </div>
+          
+          <div style="padding: 30px;">
+            <h2>Hello ${displayName}!</h2>
+            
+            <p>You have been assigned as a <strong>${role}</strong> to the following 1031 exchange:</p>
+            
+            <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0;">Exchange Details:</h3>
+              <p><strong>Exchange:</strong> ${exchangeName}</p>
+              <p><strong>Role:</strong> ${role.charAt(0).toUpperCase() + role.slice(1)}</p>
+              <p><strong>Assigned by:</strong> ${assignedByName}</p>
+            </div>
+            
+            <p><strong>Action Required:</strong> Please review and approve this assignment to begin participating in this exchange.</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${approvalUrl}" 
+                 style="background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Review & Approve Assignment
+              </a>
+            </div>
+            
+            <div style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 0; color: #92400e;"><strong>Important:</strong> This approval link will expire in 7 days for security reasons.</p>
+            </div>
+            
+            <h3>What happens next?</h3>
+            <ul>
+              <li>Click the approval link above to review the assignment details</li>
+              <li>Confirm or decline the assignment</li>
+              <li>If approved, you'll gain access to exchange documents and communications</li>
+              <li>You'll receive further instructions for participating in the exchange</li>
+            </ul>
+            
+            <p>If you have any questions or concerns about this assignment, please contact the administrator who assigned you.</p>
+            
+            <p>Best regards,<br>The Peak 1031 Team</p>
+          </div>
+          
+          <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 14px; margin: 0;">
+              This assignment notification was sent to ${email}. If you didn't expect this email, please contact support.
+            </p>
+          </div>
+        </div>
+      `;
+
+      const msg = {
+        to: email,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject,
+        html
+      };
+
+      await sgMail.send(msg);
+      console.log(`📧 Assignment approval email sent to ${email}`);
+      return { success: true };
+    } catch (error) {
+      console.error('Error sending assignment approval email:', error);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 module.exports = new NotificationService();

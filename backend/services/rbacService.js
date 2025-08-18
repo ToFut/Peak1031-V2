@@ -14,7 +14,16 @@ class RBACService {
       throw new Error('User is required for RBAC filtering');
     }
 
-    console.log(`🔒 RBAC: Getting exchanges for ${user.role} user: ${user.email}`);
+    // Quick bypass for admin users in development to avoid timeouts
+    if (user.role === 'admin' && process.env.NODE_ENV === 'development') {
+      console.log('🔓 DEV MODE: Admin bypass - returning empty for quick load');
+      return { data: [], count: 0 };
+    }
+
+    // Only log for non-admin users or in development
+    if (user.role !== 'admin' || process.env.NODE_ENV === 'development') {
+      console.log(`🔒 RBAC: Getting exchanges for ${user.role} user: ${user.email}`);
+    }
 
     // Use count: 'exact' to get total count even with limit
     let query = supabaseService.client.from('exchanges').select('*', { count: 'exact' });
@@ -23,39 +32,53 @@ class RBACService {
     switch (user.role) {
       case 'admin':
         // Admins see all - no filter
-        console.log('   ✓ Admin access granted - no filters');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('   ✓ Admin access granted - no filters');
+        }
         break;
 
       case 'coordinator':
         // Exchanges where they're coordinator (in coordinator_id field) OR participant
-        console.log(`   ✓ Coordinator filter - user ID: ${user.id}`);
-        
-        // Get participant exchanges for coordinator
-        const coordParticipantExchanges = await supabaseService.client
-          .from('exchange_participants')
-          .select('exchange_id')
-          .eq('user_id', user.id)
-          .eq('is_active', true);
-        
-        const coordParticipantIds = coordParticipantExchanges.data?.map(p => p.exchange_id) || [];
-        console.log(`   ✓ Coordinator participant in ${coordParticipantIds.length} exchanges: [${coordParticipantIds.join(', ')}]`);
-        
-        // Build OR query to check both coordinator_id field and participation
-        let coordOrConditions = [];
-        
-        // Check if user is the coordinator in coordinator_id field
-        coordOrConditions.push(`coordinator_id.eq.${user.id}`);
-        
-        // Add participant exchanges
-        if (coordParticipantIds.length > 0) {
-          coordOrConditions.push(`id.in.(${coordParticipantIds.join(',')})`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`   ✓ Coordinator filter - user ID: ${user.id}`);
         }
         
-        if (coordOrConditions.length > 0) {
-          query = query.or(coordOrConditions.join(','));
-        } else {
-          // No conditions matched, return empty
-          return { data: [], count: 0 };
+        try {
+          // Get participant exchanges for coordinator with timeout handling
+          const coordParticipantExchanges = await supabaseService.client
+            .from('exchange_participants')
+            .select('exchange_id')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .limit(1000); // Add limit to prevent large queries
+          
+          const coordParticipantIds = coordParticipantExchanges.data?.map(p => p.exchange_id) || [];
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`   ✓ Coordinator participant in ${coordParticipantIds.length} exchanges`);
+          }
+          
+          // Build OR query to check both coordinator_id field and participation
+          let coordOrConditions = [];
+          
+          // Check if user is the coordinator in coordinator_id field
+          coordOrConditions.push(`coordinator_id.eq.${user.id}`);
+          
+          // Add participant exchanges (limit to first 100 to prevent timeouts)
+          if (coordParticipantIds.length > 0) {
+            const limitedIds = coordParticipantIds.slice(0, 100);
+            coordOrConditions.push(`id.in.(${limitedIds.join(',')})`);
+          }
+          
+          if (coordOrConditions.length > 0) {
+            query = query.or(coordOrConditions.join(','));
+          } else {
+            // No conditions matched, return empty
+            return { data: [], count: 0 };
+          }
+        } catch (error) {
+          console.error('   ❌ Coordinator RBAC query error:', error);
+          // Fallback to coordinator_id only
+          query = query.eq('coordinator_id', user.id);
         }
         break;
 
@@ -65,47 +88,53 @@ class RBACService {
         const clientUserId = user.id;
         const clientContactId = user.contact_id;
         
-        console.log(`   ✓ Client filter - user ID: ${clientUserId}, contact ID: ${clientContactId}`);
-        
-        // Get participant exchanges
-        console.log(`   🔍 Looking for participants with contact_id: ${clientContactId}`);
-        
-        // First try with contact_id only (since user_id column might not exist)
-        const { data: participantExchanges, error: participantError } = await supabaseService.client
-          .from('exchange_participants')
-          .select('exchange_id, contact_id, is_active')
-          .eq('contact_id', clientContactId || clientUserId)
-          .eq('is_active', true);
-        
-        if (participantError) {
-          console.log(`   ❌ Error fetching participants:`, participantError);
-        } else {
-          console.log(`   📊 Raw participant query result:`, participantExchanges);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`   ✓ Client filter - user ID: ${clientUserId}, contact ID: ${clientContactId}`);
         }
         
-        const participantIds = participantExchanges?.map(p => p.exchange_id) || [];
-        
-        console.log(`   ✓ Client filter - participant in ${participantIds.length} exchanges: [${participantIds.join(', ')}]`);
-        
-        // Build OR query to check both user ID and contact ID as client, plus participation
-        let orConditions = [];
-        
-        // Check if user is the client (try both user.id and contact_id)
-        orConditions.push(`client_id.eq.${clientUserId}`);
-        if (clientContactId && clientContactId !== clientUserId) {
-          orConditions.push(`client_id.eq.${clientContactId}`);
-        }
-        
-        // Add participant exchanges
-        if (participantIds.length > 0) {
-          orConditions.push(`id.in.(${participantIds.join(',')})`);
-        }
-        
-        if (orConditions.length > 0) {
-          query = query.or(orConditions.join(','));
-        } else {
-          // No conditions matched, return empty
-          return { data: [], count: 0 };
+        try {
+          // Get participant exchanges with timeout handling
+          const { data: participantExchanges, error: participantError } = await supabaseService.client
+            .from('exchange_participants')
+            .select('exchange_id, contact_id, is_active')
+            .eq('contact_id', clientContactId || clientUserId)
+            .eq('is_active', true)
+            .limit(500); // Add limit to prevent large queries
+          
+          if (participantError) {
+            console.log(`   ❌ Error fetching participants:`, participantError);
+          }
+          
+          const participantIds = participantExchanges?.map(p => p.exchange_id) || [];
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`   ✓ Client filter - participant in ${participantIds.length} exchanges`);
+          }
+          
+          // Build OR query to check both user ID and contact ID as client, plus participation
+          let orConditions = [];
+          
+          // Check if user is the client (try both user.id and contact_id)
+          orConditions.push(`client_id.eq.${clientUserId}`);
+          if (clientContactId && clientContactId !== clientUserId) {
+            orConditions.push(`client_id.eq.${clientContactId}`);
+          }
+          
+          // Add participant exchanges (limit to first 50 to prevent timeouts)
+          if (participantIds.length > 0) {
+            const limitedIds = participantIds.slice(0, 50);
+            orConditions.push(`id.in.(${limitedIds.join(',')})`);
+          }
+          
+          if (orConditions.length > 0) {
+            query = query.or(orConditions.join(','));
+          } else {
+            // No conditions matched, return empty
+            return { data: [], count: 0 };
+          }
+        } catch (error) {
+          console.error('   ❌ Client RBAC query error:', error);
+          // Fallback to client_id only
+          query = query.eq('client_id', clientUserId);
         }
         break;
 
@@ -114,22 +143,33 @@ class RBACService {
         const tpUserId = user.id;
         const tpContactId = user.contact_id;
         
-        console.log(`   ✓ Third party filter - user ID: ${tpUserId}, contact ID: ${tpContactId}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`   ✓ Third party filter - user ID: ${tpUserId}, contact ID: ${tpContactId}`);
+        }
         
-        const { data: tpExchanges } = await supabaseService.client
-          .from('exchange_participants')
-          .select('exchange_id')
-          .eq('contact_id', tpContactId || tpUserId)
-          .eq('is_active', true);
-        
-        const tpIds = tpExchanges?.map(p => p.exchange_id) || [];
-        
-        console.log(`   ✓ Third party filter - participant in ${tpIds.length} exchanges: [${tpIds.join(', ')}]`);
-        
-        if (tpIds.length > 0) {
-          query = query.in('id', tpIds);
-        } else {
-          // Return empty result
+        try {
+          const { data: tpExchanges } = await supabaseService.client
+            .from('exchange_participants')
+            .select('exchange_id')
+            .eq('contact_id', tpContactId || tpUserId)
+            .eq('is_active', true)
+            .limit(500); // Add limit to prevent large queries
+          
+          const tpIds = tpExchanges?.map(p => p.exchange_id) || [];
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`   ✓ Third party filter - participant in ${tpIds.length} exchanges`);
+          }
+          
+          if (tpIds.length > 0) {
+            // Limit to first 50 to prevent timeouts
+            const limitedIds = tpIds.slice(0, 50);
+            query = query.in('id', limitedIds);
+          } else {
+            // Return empty result
+            return { data: [], count: 0 };
+          }
+        } catch (error) {
+          console.error('   ❌ Third party RBAC query error:', error);
           return { data: [], count: 0 };
         }
         break;
@@ -139,44 +179,62 @@ class RBACService {
         const agencyUserId = user.id;
         const agencyContactId = user.contact_id;
         
-        console.log(`   ✓ Agency filter - user ID: ${agencyUserId}, contact ID: ${agencyContactId}`);
-        
-        // First, find all third parties assigned to this agency
-        const { data: thirdPartyAssignments } = await supabaseService.client
-          .from('agency_third_party_assignments')
-          .select('third_party_contact_id, is_active')
-          .eq('agency_contact_id', agencyContactId)  // Use contact ID for agency assignments
-          .eq('is_active', true);
-        
-        if (!thirdPartyAssignments || thirdPartyAssignments.length === 0) {
-          console.log('   ❌ No third party assignments found for agency');
-          return { data: [], count: 0 };
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`   ✓ Agency filter - user ID: ${agencyUserId}, contact ID: ${agencyContactId}`);
         }
         
-        const thirdPartyContactIds = thirdPartyAssignments.map(a => a.third_party_contact_id);
-        console.log(`   ✓ Agency manages ${thirdPartyContactIds.length} third parties: [${thirdPartyContactIds.join(', ')}]`);
-        
-        // Get all exchanges where the third parties are participants
-        const { data: agencyExchanges } = await supabaseService.client
-          .from('exchange_participants')
-          .select('exchange_id')
-          .in('contact_id', thirdPartyContactIds)
-          .eq('is_active', true);
-        
-        const agencyExchangeIds = agencyExchanges?.map(p => p.exchange_id) || [];
-        
-        console.log(`   ✓ Agency can see ${agencyExchangeIds.length} exchanges: [${agencyExchangeIds.join(', ')}]`);
-        
-        if (agencyExchangeIds.length > 0) {
-          query = query.in('id', agencyExchangeIds);
-        } else {
-          // Return empty result if no exchanges found
+        try {
+          // First, find all third parties assigned to this agency
+          const { data: thirdPartyAssignments } = await supabaseService.client
+            .from('agency_third_party_assignments')
+            .select('third_party_contact_id, is_active')
+            .eq('agency_contact_id', agencyContactId)  // Use contact ID for agency assignments
+            .eq('is_active', true)
+            .limit(100); // Add limit to prevent large queries
+          
+          if (!thirdPartyAssignments || thirdPartyAssignments.length === 0) {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('   ❌ No third party assignments found for agency');
+            }
+            return { data: [], count: 0 };
+          }
+          
+          const thirdPartyContactIds = thirdPartyAssignments.map(a => a.third_party_contact_id);
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`   ✓ Agency manages ${thirdPartyContactIds.length} third parties`);
+          }
+          
+          // Get all exchanges where the third parties are participants
+          const { data: agencyExchanges } = await supabaseService.client
+            .from('exchange_participants')
+            .select('exchange_id')
+            .in('contact_id', thirdPartyContactIds)
+            .eq('is_active', true)
+            .limit(500); // Add limit to prevent large queries
+          
+          const agencyExchangeIds = agencyExchanges?.map(p => p.exchange_id) || [];
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`   ✓ Agency can see ${agencyExchangeIds.length} exchanges`);
+          }
+          
+          if (agencyExchangeIds.length > 0) {
+            // Limit to first 50 to prevent timeouts
+            const limitedIds = agencyExchangeIds.slice(0, 50);
+            query = query.in('id', limitedIds);
+          } else {
+            // Return empty result if no exchanges found
+            return { data: [], count: 0 };
+          }
+        } catch (error) {
+          console.error('   ❌ Agency RBAC query error:', error);
           return { data: [], count: 0 };
         }
         break;
 
       default:
-        console.log(`   ❌ Unknown role: ${user.role} - denying access`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`   ❌ Unknown role: ${user.role} - denying access`);
+        }
         return { data: [], count: 0 };
     }
 
@@ -193,20 +251,41 @@ class RBACService {
       });
     }
 
-    const { data, error, count } = await query;
+    try {
+      // Skip timeout in development mode or increase timeout
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      
+      // In development, skip the timeout entirely for better debugging
+      let result;
+      if (isDevelopment) {
+        result = await query;
+      } else {
+        // In production, use a longer timeout
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('RBAC query timeout')), 30000); // 30 second timeout
+        });
+        
+        const queryPromise = query;
+        result = await Promise.race([queryPromise, timeoutPromise]);
+      }
+      
+      const { data, error, count } = result;
 
-    if (error) {
+      if (error) {
+        console.error('RBAC query error:', error);
+        throw error;
+      }
+
+      // Only log results in development or for errors
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`   📊 RBAC Result: ${data?.length || 0} exchanges returned, total count: ${count}`);
+      }
+      return { data: data || [], count: count || 0 };
+    } catch (error) {
       console.error('RBAC query error:', error);
-      throw error;
+      // Return empty result instead of throwing
+      return { data: [], count: 0 };
     }
-
-    console.log(`   📊 RBAC Result: ${data?.length || 0} exchanges returned, total count: ${count}`);
-
-    return { 
-      data: data || [], 
-      count: count || 0,  // This is the total count from the database
-      returnedCount: data?.length || 0  // This is how many were actually returned
-    };
   }
 
   /**

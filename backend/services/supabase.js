@@ -133,7 +133,7 @@ class SupabaseService {
   }
 
   async getUserById(id) {
-    // Use only users table
+    // First try users table, then people table
     try {
       const users = await this.select('users', { where: { id } });
       if (users && users.length > 0) {
@@ -143,18 +143,41 @@ class SupabaseService {
       console.log('⚠️ Could not query users table with id:', userError.message);
     }
     
+    // Try people table if not found in users table
+    try {
+      const people = await this.select('people', { where: { id } });
+      if (people && people.length > 0) {
+        return people[0];
+      }
+    } catch (peopleError) {
+      console.log('⚠️ Could not query people table with id:', peopleError.message);
+    }
+    
     return null;
   }
 
   async getUserByEmail(email) {
-    // Use only users table
+    // First try users table, then people table
     try {
       const users = await this.select('users', { where: { email } });
-      return users[0] || null;
-    } catch (error) {
-      console.log('⚠️ Could not query users table:', error.message);
-      return null;
+      if (users && users.length > 0) {
+        return users[0];
+      }
+    } catch (userError) {
+      console.log('⚠️ Could not query users table with email:', userError.message);
     }
+    
+    // Try people table if not found in users table
+    try {
+      const people = await this.select('people', { where: { email } });
+      if (people && people.length > 0) {
+        return people[0];
+      }
+    } catch (peopleError) {
+      console.log('⚠️ Could not query people table with email:', peopleError.message);
+    }
+    
+    return null;
   }
 
   async createUser(userData) {
@@ -349,8 +372,8 @@ class SupabaseService {
         let coordinator = null;
         if (data.coordinator_id) {
           const { data: coordData } = await this.client
-            .from('contacts')
-            .select('id, first_name, last_name, email')
+            .from('users')
+            .select('id, first_name, last_name, email, role')
             .eq('id', data.coordinator_id)
             .single();
           coordinator = coordData;

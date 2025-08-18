@@ -552,7 +552,7 @@ const ExchangeDetail: React.FC = () => {
                     <div className="h-20 bg-gray-200 rounded-lg"></div>
                   </div>
                 ) : (
-                  <TasksList tasks={tasks} />
+                  <TasksList tasks={tasks} onTaskClick={(task) => console.log('Task clicked:', task)} onTaskUpdate={loadTasks} />
                 )}
               </div>
             )}

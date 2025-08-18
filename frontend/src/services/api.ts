@@ -47,8 +47,9 @@ class ApiService {
           baseUrl = `${window.location.protocol}//${window.location.hostname}/api`;
         }
       } else {
-        // Development fallback
-        baseUrl = 'https://peak1031-production.up.railway.app/api';
+        // Development fallback - use local backend on port 5001
+        baseUrl = 'http://localhost:5001/api';
+        console.log('🔧 Using local development backend URL');
       }
     }
     

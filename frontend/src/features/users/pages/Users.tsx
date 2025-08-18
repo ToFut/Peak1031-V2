@@ -94,7 +94,12 @@ const Users: React.FC = () => {
       // Handle both direct array and paginated response
       const usersData = response.users || response.data || response || [];
       
-      setUsers(usersData);
+      // Remove duplicate users based on ID
+      const uniqueUsers = usersData.filter((user: any, index: number, self: any[]) => 
+        index === self.findIndex((u: any) => u.id === user.id)
+      );
+      
+      setUsers(uniqueUsers);
     } catch (err: any) {
       console.error('❌ Error loading users:', err);
       setError(err.message || 'Failed to load users');
@@ -110,19 +115,23 @@ const Users: React.FC = () => {
     }
   }, [isAdmin, loadUsers]);
 
-  // Filter users based on all criteria
-  const filteredUserList = users.filter(user => {
-    const matchesSearch = !userSearch || 
-    user.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
-    user.first_name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-    user.last_name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-    `${user.first_name} ${user.last_name}`.toLowerCase().includes(userSearch.toLowerCase());
-    
-    const matchesRole = !userRoleFilter || user.role === userRoleFilter;
-    const matchesStatus = !userStatusFilter || (userStatusFilter === 'Active' ? user.is_active : !user.is_active);
-    
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  // Filter users based on all criteria and ensure uniqueness
+  const filteredUserList = users
+    .filter(user => {
+      const matchesSearch = !userSearch || 
+      user.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
+      user.first_name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+      user.last_name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+      `${user.first_name} ${user.last_name}`.toLowerCase().includes(userSearch.toLowerCase());
+      
+      const matchesRole = !userRoleFilter || user.role === userRoleFilter;
+      const matchesStatus = !userStatusFilter || (userStatusFilter === 'Active' ? user.is_active : !user.is_active);
+      
+      return matchesSearch && matchesRole && matchesStatus;
+    })
+    .filter((user, index, self) => 
+      index === self.findIndex(u => u.id === user.id)
+    );
 
   // Don't load users if user is not admin
   if (!isAdmin()) {
@@ -153,7 +162,7 @@ const Users: React.FC = () => {
 
   const handleViewUserProfile = (user: any) => {
     // Navigate to the detailed user profile page
-    navigate(`/users/user-profile/${user.id}`);
+    navigate(`/user-profile/${user.id}`);
     setUserActionMenu(null);
   };
 

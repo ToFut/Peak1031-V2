@@ -443,9 +443,29 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
           limit: 100
         });
         console.log('✅ Coordinator exchanges fetched:', exchanges.length);
+      } else if (targetUser.role === 'agency') {
+        console.log('🔍 Agency role - getting exchanges for contact_id:', userContactId);
+        // Agency users see exchanges where they are participants
+        try {
+          exchangeParticipations = await databaseService.getExchangeParticipants({
+            where: { contact_id: userContactId }
+          });
+          console.log('✅ Agency exchange participations fetched:', exchangeParticipations.length);
+          const exchangeIds = exchangeParticipations.map(p => p.exchange_id);
+          if (exchangeIds.length > 0) {
+            exchanges = await databaseService.getExchanges({
+              where: { id: { in: exchangeIds } },
+              limit: 100
+            });
+            console.log('✅ Agency exchanges from participations fetched:', exchanges.length);
+          }
+        } catch (err) {
+          console.error('❌ Error getting agency participations:', err.message);
+          // Continue with empty exchanges
+        }
       } else {
         console.log('🔍 Other role - checking participations for contact_id:', userContactId);
-        // Other roles - check participations
+        // Other roles (like third_party) - check participations
         try {
           exchangeParticipations = await databaseService.getExchangeParticipants({
             where: { contact_id: userContactId }
@@ -514,7 +534,7 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
         exchangeType: ex.exchange_type
       }));
     
-    // Get message activity if user has exchanges
+    // Get message activity if user has exchanges (optimized)
     let messageStats = {
       totalMessages: 0,
       messagesLast30Days: 0,
@@ -523,30 +543,25 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
     
     if (exchanges.length > 0) {
       try {
-        // Get all messages for user's exchanges
-        const exchangeIds = exchanges.map(ex => ex.id);
-        let allMessages = [];
+        // Get all messages for user's exchanges in a single optimized query
+        const exchangeIds = exchanges.map(ex => ex.id).slice(0, 10); // Limit to 10 exchanges for performance
         
-        // For performance, batch the message queries
-        for (const exchangeId of exchangeIds.slice(0, 20)) { // Limit to avoid timeouts
-          try {
-            const messages = await databaseService.getMessages({
-              where: { exchange_id: exchangeId },
-              limit: 100
-            });
-            allMessages = allMessages.concat(messages);
-          } catch (msgErr) {
-            console.warn(`Could not get messages for exchange ${exchangeId}:`, msgErr.message);
-          }
+        if (exchangeIds.length > 0) {
+          // Single batch query instead of sequential queries
+          const allMessages = await databaseService.getMessages({
+            where: { exchange_id: { in: exchangeIds } },
+            limit: 500, // Reasonable limit for total messages
+            orderBy: { column: 'created_at', ascending: false }
+          });
+          
+          messageStats = {
+            totalMessages: allMessages.length,
+            messagesLast30Days: allMessages.filter(msg => 
+              new Date(msg.created_at) > thirtyDaysAgo
+            ).length,
+            avgMessagesPerExchange: exchanges.length > 0 ? Math.round(allMessages.length / exchanges.length) : 0
+          };
         }
-        
-        messageStats = {
-          totalMessages: allMessages.length,
-          messagesLast30Days: allMessages.filter(msg => 
-            new Date(msg.created_at) > thirtyDaysAgo
-          ).length,
-          avgMessagesPerExchange: exchanges.length > 0 ? Math.round(allMessages.length / exchanges.length) : 0
-        };
       } catch (err) {
         console.warn('Could not calculate message stats:', err.message);
       }
@@ -565,36 +580,14 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
     try {
       console.log('🔍 Fetching audit logs for user:', userId);
       
-      // Get audit logs for this user (check both person_id and details.userId)
+      // Get audit logs for this user (optimized)
       const auditLogs = await AuditService.getAuditLogs({
         userId: userId,
-        limit: 200 // Get more logs for better analysis
+        limit: 50 // Reduced limit for faster loading
       });
       
-      // Also get logs where userId is stored in details (newer format)
-      const auditLogsFromDetails = await databaseService.client
-        .from('audit_logs')
-        .select('*')
-        .contains('details', { userId: userId })
-        .order('created_at', { ascending: false })
-        .limit(200);
-      
-      // Combine both sets of logs
-      let allAuditLogs = [...auditLogs];
-      if (auditLogsFromDetails.data) {
-        allAuditLogs = [...allAuditLogs, ...auditLogsFromDetails.data];
-      }
-      
-      // Remove duplicates based on id
-      const uniqueLogs = allAuditLogs.reduce((acc, log) => {
-        if (!acc.find(l => l.id === log.id)) {
-          acc.push(log);
-        }
-        return acc;
-      }, []);
-      
-      // Sort by created_at descending
-      uniqueLogs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      // Skip the expensive details search for now to improve performance
+      const uniqueLogs = auditLogs || [];
       
       console.log(`✅ Found ${uniqueLogs.length} audit logs for user`);
       

@@ -126,7 +126,10 @@ class DashboardService {
                 return { error: 'User not found' };
             }
 
-            console.log(`📊 Dashboard stats request for ${role} user: ${user.email}`);
+            // Only log in development
+            if (process.env.NODE_ENV === 'development') {
+                console.log(`📊 Dashboard stats request for ${role} user: ${user.email}`);
+            }
 
             switch (role) {
                 case 'admin':

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDashboardData } from '../../../shared/hooks/useDashboardData';
 import { DashboardStats } from '../../../shared/hooks/useDashboardData';
@@ -12,6 +12,7 @@ import {
   CogIcon,
   ArrowPathIcon,
   ExclamationCircleIcon,
+  ExclamationTriangleIcon,
   CheckCircleIcon,
   ClockIcon,
   ChatBubbleLeftRightIcon,
@@ -19,11 +20,15 @@ import {
   PlusIcon,
   EyeIcon,
   PencilIcon,
-  TrashIcon
+  TrashIcon,
+  BuildingOfficeIcon,
+  FireIcon,
+  BellAlertIcon
 } from '@heroicons/react/24/outline';
 import {
   SparklesIcon
 } from '@heroicons/react/24/solid';
+import { formatDistanceToNow, isAfter, addDays, addHours, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 
 // Role-specific configurations
 const roleConfigs: Record<string, any> = {
@@ -33,6 +38,7 @@ const roleConfigs: Record<string, any> = {
     quickActions: [
       { id: 'sync', label: 'Sync PracticePanther', icon: ArrowPathIcon, action: 'sync', color: 'purple' },
       { id: 'users', label: 'Manage Users', icon: UsersIcon, action: 'create-user', color: 'blue' },
+      { id: 'agencies', label: 'Agency Management', icon: BuildingOfficeIcon, action: 'agencies', color: 'orange' },
       { id: 'audit', label: 'View Audit Logs', icon: DocumentTextIcon, action: 'audit', color: 'green' },
       { id: 'settings', label: 'System Settings', icon: CogIcon, action: 'settings', color: 'gray' }
     ]
@@ -166,6 +172,50 @@ const EmptyState: React.FC<{
   </div>
 );
 
+// Urgency detection for messages
+const detectMessageUrgency = (message: any): { score: number; reasons: string[] } => {
+  const urgentKeywords = ['urgent', 'asap', 'immediately', 'critical', 'deadline', 'today', 'now', 'emergency', 'important'];
+  const content = (message.content || '').toLowerCase();
+  
+  let score = 0;
+  const reasons: string[] = [];
+  
+  urgentKeywords.forEach(keyword => {
+    if (content.includes(keyword)) {
+      score += 20;
+      reasons.push(`Contains "${keyword}"`);
+    }
+  });
+  
+  if (!message.read_by?.includes(message.sender_id)) {
+    score += 10;
+    reasons.push('Unread');
+  }
+  
+  const messageTime = new Date(message.created_at);
+  const twoHoursAgo = addHours(new Date(), -2);
+  if (isAfter(messageTime, twoHoursAgo)) {
+    score += 15;
+    reasons.push('Recent message');
+  }
+  
+  return { score: Math.min(score, 100), reasons };
+};
+
+// Calculate deadline urgency
+const getDeadlineUrgency = (date: string | Date) => {
+  const deadline = new Date(date);
+  const now = new Date();
+  const hoursUntil = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60);
+  
+  if (hoursUntil < 0) return { level: 'overdue', color: 'red', text: 'OVERDUE' };
+  if (hoursUntil < 24) return { level: 'critical', color: 'red', text: `${Math.floor(hoursUntil)} hours` };
+  if (hoursUntil < 48) return { level: 'urgent', color: 'orange', text: 'Tomorrow' };
+  if (hoursUntil < 72) return { level: 'soon', color: 'yellow', text: '2 days' };
+  if (hoursUntil < 168) return { level: 'upcoming', color: 'blue', text: `${Math.floor(hoursUntil / 24)} days` };
+  return { level: 'future', color: 'gray', text: formatDistanceToNow(deadline) };
+};
+
 export const StandardDashboard: React.FC<{
   role?: string;
   customContent?: React.ReactElement;
@@ -193,22 +243,56 @@ export const StandardDashboard: React.FC<{
     refreshInterval: 300000 // 5 minutes
   });
 
-  // Debug: Log what stats are being displayed
-  React.useEffect(() => {
-    if (stats) {
-      console.log('🎯 StandardDashboard - Displaying stats:', {
-        role,
-        userEmail: user?.email,
-        propRole,
-        actualRole: user?.role,
-        'stats.exchanges.total': stats.exchanges.total,
-        'stats.tasks.total': stats.tasks.total,
-        'stats.messages': stats.messages,
-        'raw stats': stats
-      });
-    }
-  }, [stats, role, user, propRole]);
+  // Calculate urgent items (next 48 hours)
+  const urgentItems = useMemo(() => {
+    const now = new Date();
+    const in48Hours = addDays(now, 2);
+    
+    const urgentExchanges = exchanges.filter((ex: any) => {
+      const deadline = ex.targetCloseDate || ex.deadline || ex.dueDate;
+      if (!deadline) return false;
+      const date = new Date(deadline);
+      return date < in48Hours && ex.status !== 'COMPLETED';
+    });
+    
+    const urgentTasks = tasks.filter((task: any) => {
+      const dueDate = task.dueDate || task.due_date;
+      if (!dueDate) return false;
+      const date = new Date(dueDate);
+      return date < in48Hours && task.status !== 'COMPLETED';
+    });
+    
+    const overdueTasks = tasks.filter((task: any) => {
+      const dueDate = task.dueDate || task.due_date;
+      if (!dueDate) return false;
+      const date = new Date(dueDate);
+      return date < now && task.status !== 'COMPLETED';
+    });
+    
+    const pendingDocs = documents.filter((doc: any) => 
+      doc.status === 'pending_signature' || doc.status === 'pending_review'
+    );
+    
+    const urgentMessages = messages
+      .map((msg: any) => ({
+        ...msg,
+        urgency: detectMessageUrgency(msg)
+      }))
+      .filter((msg: any) => msg.urgency.score > 50)
+      .sort((a: any, b: any) => b.urgency.score - a.urgency.score);
+    
+    return {
+      exchanges: urgentExchanges,
+      tasks: urgentTasks,
+      overdueTasks,
+      documents: pendingDocs,
+      messages: urgentMessages,
+      total: urgentExchanges.length + urgentTasks.length + overdueTasks.length + pendingDocs.length
+    };
+  }, [exchanges, tasks, documents, messages]);
 
+  const navigate = useNavigate();
+  
   const handleQuickAction = async (actionId: string, action: string) => {
     try {
       switch (action) {
@@ -216,26 +300,29 @@ export const StandardDashboard: React.FC<{
           await syncPracticePanther();
           break;
         case 'create-user':
-          window.location.href = '/admin/users';
+          navigate('/users');
+          break;
+        case 'agencies':
+          navigate('/agencies');
           break;
         case 'audit':
-          window.location.href = '/admin/audit';
+          navigate('/admin/audit');
           break;
         case 'settings':
-          window.location.href = '/admin/system';
+          navigate('/settings');
           break;
         case 'exchanges':
         case 'my_exchanges':
-          window.location.href = '/exchanges';
+          navigate('/exchanges');
           break;
         case 'tasks':
-          window.location.href = '/tasks';
+          navigate('/tasks');
           break;
         case 'upload':
-          window.location.href = '/documents';
+          navigate('/documents');
           break;
         case 'clients':
-          window.location.href = '/contacts';
+          navigate('/contacts');
           break;
         default:
           
@@ -290,15 +377,12 @@ export const StandardDashboard: React.FC<{
               </p>
             </div>
             <div className="flex items-center space-x-3">
-              {/* Debug button - temporarily available for all users to fix cache issues */}
-              <button
-                onClick={clearCache}
-                className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                title="Clear cache and refresh data"
-              >
-                <TrashIcon className="h-3 w-3 mr-1" />
-                Clear Cache
-              </button>
+              {urgentItems.total > 0 && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-red-100 text-red-800 rounded-full">
+                  <FireIcon className="h-4 w-4" />
+                  <span className="text-sm font-bold">{urgentItems.total} Urgent Items</span>
+                </div>
+              )}
               <button
                 onClick={refreshData}
                 disabled={loading}
@@ -339,59 +423,169 @@ export const StandardDashboard: React.FC<{
           </div>
         )}
 
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <MetricCard
-            title="Total Exchanges"
-            value={stats.exchanges.total}
-            subtitle={stats.exchanges.total === 0 ? 'No exchanges assigned' : `${stats.exchanges.active} active`}
-            icon={DocumentTextIcon}
-            color={stats.exchanges.total === 0 ? 'yellow' : config.primaryColor}
-            trend={stats.exchanges.total > 0 ? 'up' : 'neutral'}
-            trendValue={stats.exchanges.total === 0 ? 'Contact admin' : `${stats.exchanges.completed} completed`}
-          />
-          
-          <MetricCard
-            title="Pending Tasks"
-            value={stats.tasks.pending}
-            subtitle={`${stats.tasks.total} total`}
-            icon={CalendarIcon}
-            color="blue"
-            trend={stats.tasks.pending > 0 ? 'down' : 'up'}
-            trendValue={`${stats.tasks.completed} completed`}
-          />
-          
-          {stats.documents && (
-            <MetricCard
-              title="Documents"
-              value={stats.documents.total}
-              subtitle={`${stats.documents.recent} recent`}
-              icon={CloudArrowUpIcon}
-              color="purple"
-            />
-          )}
-          
-          {stats.messages && (
-            <MetricCard
-              title="Messages"
-              value={stats.messages.unread}
-              subtitle="unread"
-              icon={ChatBubbleLeftRightIcon}
-              color="yellow"
-              trend={stats.messages.unread > 0 ? 'attention' : 'neutral'}
-            />
-          )}
-          
-          {/* Admin-specific metrics */}
-          {role === 'admin' && stats.users && (
-            <MetricCard
-              title="Active Users"
-              value={stats.users.active}
-              subtitle={`${stats.users.total} total`}
-              icon={UsersIcon}
-              color="green"
-            />
-          )}
+        {/* Urgent Deadlines Section - Replacing meaningless metrics */}
+        {(urgentItems.overdueTasks.length > 0 || urgentItems.exchanges.length > 0) && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
+              <h2 className="text-lg font-semibold text-red-900">Critical Deadlines - Action Required!</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {urgentItems.overdueTasks.slice(0, 3).map((task: any) => (
+                <Link key={task.id} to="/tasks" className="block p-3 bg-white border border-red-300 rounded-lg hover:shadow-md transition-all">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-red-900">{task.title || task.name}</p>
+                      <p className="text-sm text-red-600">OVERDUE</p>
+                    </div>
+                    <BellAlertIcon className="h-5 w-5 text-red-500" />
+                  </div>
+                </Link>
+              ))}
+              {urgentItems.exchanges.slice(0, 3).map((exchange: any) => (
+                <Link key={exchange.id} to={`/exchanges/${exchange.id}`} className="block p-3 bg-white border border-orange-300 rounded-lg hover:shadow-md transition-all">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-orange-900">{exchange.exchangeName || `Exchange ${exchange.exchangeNumber}`}</p>
+                      <p className="text-sm text-orange-600">Due: {getDeadlineUrgency(exchange.targetCloseDate || exchange.deadline).text}</p>
+                    </div>
+                    <ClockIcon className="h-5 w-5 text-orange-500" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Next 48 Hours - Priority Items */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <ClockIcon className="h-5 w-5 text-orange-600" />
+                Next 48 Hours - Priority Items
+              </h2>
+              <span className="text-sm text-gray-500">
+                {urgentItems.tasks.length + urgentItems.exchanges.length} urgent items
+              </span>
+            </div>
+            
+            {urgentItems.tasks.length === 0 && urgentItems.exchanges.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No urgent deadlines in the next 48 hours</p>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {urgentItems.tasks.map((task: any) => {
+                  const urgency = getDeadlineUrgency(task.dueDate || task.due_date);
+                  return (
+                    <Link key={task.id} to="/tasks" className={`block p-3 rounded-lg border transition-all hover:shadow-md ${
+                      urgency.level === 'critical' ? 'border-red-200 bg-red-50' :
+                      urgency.level === 'urgent' ? 'border-orange-200 bg-orange-50' :
+                      'border-gray-200 bg-white'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <CheckCircleIcon className={`h-5 w-5 ${
+                            urgency.level === 'critical' ? 'text-red-600' :
+                            urgency.level === 'urgent' ? 'text-orange-600' :
+                            'text-gray-600'
+                          }`} />
+                          <div>
+                            <p className="font-medium text-gray-900">{task.title || task.name}</p>
+                            <p className="text-sm text-gray-600">{task.priority} priority</p>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                          urgency.level === 'critical' ? 'bg-red-100 text-red-800' :
+                          urgency.level === 'urgent' ? 'bg-orange-100 text-orange-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {urgency.text}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+                {urgentItems.exchanges.map((exchange: any) => {
+                  const urgency = getDeadlineUrgency(exchange.targetCloseDate || exchange.deadline);
+                  return (
+                    <Link key={exchange.id} to={`/exchanges/${exchange.id}`} className={`block p-3 rounded-lg border transition-all hover:shadow-md ${
+                      urgency.level === 'critical' ? 'border-red-200 bg-red-50' :
+                      urgency.level === 'urgent' ? 'border-orange-200 bg-orange-50' :
+                      'border-gray-200 bg-white'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <DocumentTextIcon className={`h-5 w-5 ${
+                            urgency.level === 'critical' ? 'text-red-600' :
+                            urgency.level === 'urgent' ? 'text-orange-600' :
+                            'text-gray-600'
+                          }`} />
+                          <div>
+                            <p className="font-medium text-gray-900">{exchange.exchangeName || `Exchange ${exchange.exchangeNumber}`}</p>
+                            <p className="text-sm text-gray-600">${(exchange.exchangeValue || 0).toLocaleString()}</p>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                          urgency.level === 'critical' ? 'bg-red-100 text-red-800' :
+                          urgency.level === 'urgent' ? 'bg-orange-100 text-orange-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {urgency.text}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Quick Stats - Simplified */}
+          <div className="space-y-4">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Current Status</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Overdue Items</span>
+                  <span className={`font-bold ${urgentItems.overdueTasks.length > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    {urgentItems.overdueTasks.length}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Due in 48h</span>
+                  <span className={`font-bold ${urgentItems.total > 0 ? 'text-orange-600' : 'text-gray-600'}`}>
+                    {urgentItems.total}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Unread Messages</span>
+                  <span className="font-bold text-blue-600">{stats?.messages?.unread || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Pending Documents</span>
+                  <span className="font-bold text-purple-600">{urgentItems.documents.length}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Urgent Messages */}
+            {urgentItems.messages.length > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <h4 className="font-medium text-orange-900 mb-2 flex items-center gap-2">
+                  <BellAlertIcon className="h-4 w-4" />
+                  Urgent Messages
+                </h4>
+                <div className="space-y-2">
+                  {urgentItems.messages.slice(0, 3).map((msg: any) => (
+                    <Link key={msg.id} to="/messages" className="block p-2 bg-white rounded border border-orange-200 hover:border-orange-300">
+                      <p className="text-sm font-medium text-gray-900">{msg.sender?.firstName || 'Unknown'}</p>
+                      <p className="text-xs text-gray-600">{msg.content?.substring(0, 50)}...</p>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Quick Actions */}

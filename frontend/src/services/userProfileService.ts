@@ -99,6 +99,7 @@ export interface UserProfile {
 
 export interface ExchangesSummary {
   totalCount: number;
+  totalExchanges?: number; // Added for compatibility
   byStatus: Record<string, RecentExchange[]>;
   byType: Record<string, RecentExchange[]>;
   byCreationMonth: Record<string, RecentExchange[]>;
@@ -127,7 +128,7 @@ export class UserProfileService {
         etag
       });
       
-      // The API service already unwraps the response, so we get the data directly
+      // The API service returns the data, but we need to handle the backend response format
       if (!response) {
         throw new Error('Failed to load user profile');
       }
@@ -137,7 +138,21 @@ export class UserProfileService {
         this.etagCache.set(endpoint, response.etag);
       }
       
-      return response;
+      // Handle both direct data and wrapped response formats
+      console.log('🔍 UserProfileService response:', response);
+      
+      if (response.user) {
+        // Direct user profile data
+        console.log('✅ Using direct user profile data');
+        return response;
+      } else if (response.data && response.data.user) {
+        // Backend wrapped response format
+        console.log('✅ Using backend wrapped response data');
+        return response.data;
+      } else {
+        console.error('❌ Invalid user profile response format:', response);
+        throw new Error('Invalid user profile response format');
+      }
     } catch (error) {
       console.error('Error fetching user profile:', error);
       throw error;
@@ -170,7 +185,21 @@ export class UserProfileService {
         this.etagCache.set(endpoint, response.etag);
       }
       
-      return response;
+      // Handle both direct data and wrapped response formats
+      console.log('🔍 ExchangesSummary response:', response);
+      
+      if (response.totalExchanges !== undefined || response.totalCount !== undefined) {
+        // Direct exchanges summary data
+        console.log('✅ Using direct exchanges summary data');
+        return response;
+      } else if (response.data && (response.data.totalExchanges !== undefined || response.data.totalCount !== undefined)) {
+        // Backend wrapped response format
+        console.log('✅ Using backend wrapped exchanges summary data');
+        return response.data;
+      } else {
+        console.error('❌ Invalid exchanges summary response format:', response);
+        throw new Error('Invalid exchanges summary response format');
+      }
     } catch (error) {
       console.error('Error fetching exchanges summary:', error);
       throw error;
@@ -180,7 +209,11 @@ export class UserProfileService {
   /**
    * Format user display name
    */
-  static formatUserName(user: UserInfo): string {
+  static formatUserName(user: UserInfo | null | undefined): string {
+    if (!user) {
+      return 'Unknown User';
+    }
+    
     // Handle both camelCase and snake_case properties
     const firstName = user.firstName || user.first_name;
     const lastName = user.lastName || user.last_name;
@@ -194,7 +227,13 @@ export class UserProfileService {
     if (lastName) {
       return lastName;
     }
-    return user.email.split('@')[0];
+    
+    // Fallback to email if available
+    if (user.email) {
+      return user.email.split('@')[0];
+    }
+    
+    return 'Unknown User';
   }
 
   /**

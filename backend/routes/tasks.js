@@ -148,9 +148,12 @@ router.post('/test-create', authenticateToken, async (req, res) => {
 // Get all tasks (role-filtered)
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    console.log('📋 TASKS ROUTE: Getting tasks for', req.user?.email, 'Role:', req.user?.role);
+    // Only log in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📋 TASKS ROUTE: Getting tasks for', req.user?.email, 'Role:', req.user?.role);
+    }
     
-    const { page = 1, limit = 20, search, status, priority, exchangeId, assignedTo, sortBy = 'due_date', sortOrder = 'asc' } = req.query;
+    const { page = 1, limit = 20, status, priority, assignee, search, exchangeId, sortBy = 'created_at', sortOrder = 'desc' } = req.query;
     
     // Direct Supabase query (simplified to avoid RBAC issues)
     let query = supabaseService.client.from('tasks').select(`
@@ -185,8 +188,8 @@ router.get('/', authenticateToken, async (req, res) => {
       query = query.eq('exchange_id', exchangeId);
     }
     
-    if (assignedTo) {
-      query = query.eq('assigned_to', assignedTo);
+    if (assignee) {
+      query = query.eq('assigned_to', assignee);
     }
 
     // Simple role-based filtering
@@ -520,8 +523,8 @@ router.post('/', authenticateToken, requireExchangePermission('create_tasks'), a
         }
 
         // Check if the assigned_to ID is in the list of valid participants
-        // Check both user_id and contact_id as participants can have either
-        const validAssigneeIds = (participants || []).flatMap(p => [p.contact_id, p.user_id]).filter(id => id);
+        // Only user_id can be assigned to tasks, not contact_id
+        const validAssigneeIds = (participants || []).map(p => p.user_id).filter(id => id);
         const isValidAssignee = validAssigneeIds.includes(taskData.assigned_to);
 
         console.log('📋 Assignment validation:', {
@@ -541,13 +544,13 @@ router.post('/', authenticateToken, requireExchangePermission('create_tasks'), a
             console.log('⚠️ Invalid assignment: User not a participant in this exchange');
             console.log('📋 Available participants for assignment:', validAssigneeIds);
             
-            // Try to assign to the first valid participant as fallback, or clear assignment
+            // Try to assign to the first valid user participant as fallback, or clear assignment
             if (validAssigneeIds.length > 0) {
               const fallbackAssignee = validAssigneeIds[0];
-              console.log(`📋 Auto-assigning to first participant: ${fallbackAssignee}`);
+              console.log(`📋 Auto-assigning to first user participant: ${fallbackAssignee}`);
               taskData.assigned_to = fallbackAssignee;
             } else {
-              console.log('📋 No valid participants found, creating unassigned task');
+              console.log('📋 No valid user participants found, creating unassigned task');
               taskData.assigned_to = null;
             }
           }
@@ -701,8 +704,8 @@ router.put('/:id', authenticateToken, requireExchangePermission('edit_tasks'), a
     const permissionService = require('../services/permissionService');
     const hasEditPermission = await permissionService.checkPermission(req.user.id, task.exchange_id, 'edit_tasks');
     
-    // Allow if user has edit permission, is assigned to the task, or created the task
-    if (!hasEditPermission && task.assigned_to !== req.user.id && task.created_by !== req.user.id) {
+    // Allow if user has edit permission, is assigned to the task, created the task, or is admin
+    if (!hasEditPermission && task.assigned_to !== req.user.id && task.created_by !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ 
         success: false, 
         error: 'You do not have permission to edit this task' 
@@ -719,9 +722,9 @@ router.put('/:id', authenticateToken, requireExchangePermission('edit_tasks'), a
     console.log('📋 TASK UPDATE: Updating task', req.params.id, 'for user', req.user?.email);
     console.log('📋 UPDATE DATA:', req.body);
 
-    // Prepare update data
+    // Prepare update data - transform camelCase to snake_case for database
     const updateData = {
-      ...req.body,
+      ...transformToSnakeCase(req.body),
       updated_at: new Date().toISOString()
     };
 

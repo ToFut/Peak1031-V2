@@ -253,6 +253,14 @@ router.put('/:exchangeId/participants/:participantId/permissions', authenticateT
     const { exchangeId, participantId } = req.params;
     const { permissions } = req.body;
 
+    console.log('🔐 PERMISSIONS UPDATE REQUEST:');
+    console.log('   - User:', req.user.email);
+    console.log('   - Exchange ID:', exchangeId);
+    console.log('   - Participant ID:', participantId);
+    console.log('   - Permissions data:', JSON.stringify(permissions, null, 2));
+    console.log('   - Permissions type:', typeof permissions);
+    console.log('   - Is array:', Array.isArray(permissions));
+
     // Check if exchange exists
     const exchange = await supabaseService.getExchangeById(exchangeId);
     if (!exchange) {
@@ -273,14 +281,25 @@ router.put('/:exchangeId/participants/:participantId/permissions', authenticateT
     // Validate permissions object structure
     const validPermissions = ['can_edit', 'can_delete', 'can_add_participants', 'can_upload_documents', 'can_send_messages'];
     
-    if (typeof permissions !== 'object' || permissions === null) {
+    // Handle both object format and array format
+    let processedPermissions = permissions;
+    
+    if (Array.isArray(permissions)) {
+      // Convert array format to object format
+      processedPermissions = {};
+      validPermissions.forEach(perm => {
+        processedPermissions[perm] = permissions.includes(perm.replace('can_', ''));
+      });
+      console.log('   - Converted array to object:', JSON.stringify(processedPermissions, null, 2));
+    } else if (typeof permissions !== 'object' || permissions === null) {
       return res.status(400).json({
         error: 'Invalid permissions format',
-        message: 'Permissions must be an object'
+        message: 'Permissions must be an object or array'
       });
     }
 
-    for (const [key, value] of Object.entries(permissions)) {
+    // Validate the processed permissions
+    for (const [key, value] of Object.entries(processedPermissions)) {
       if (!validPermissions.includes(key)) {
         return res.status(400).json({
           error: 'Invalid permission',
@@ -299,7 +318,7 @@ router.put('/:exchangeId/participants/:participantId/permissions', authenticateT
     const { data: updatedParticipant, error: updateError } = await supabaseService.client
       .from('exchange_participants')
       .update({
-        permissions: JSON.stringify(permissions),
+        permissions: JSON.stringify(processedPermissions),
         updated_at: new Date().toISOString()
       })
       .eq('id', participantId)
@@ -330,7 +349,7 @@ router.put('/:exchangeId/participants/:participantId/permissions', authenticateT
       io.to(`exchange_${exchangeId}`).emit('participant_permissions_updated', {
         exchangeId,
         participantId,
-        permissions,
+        permissions: processedPermissions,
         updatedBy: req.user.id
       });
     }

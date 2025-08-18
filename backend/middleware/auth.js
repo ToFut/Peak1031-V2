@@ -2,130 +2,54 @@ const jwt = require('jsonwebtoken');
 // const { User, AuditLog } = require('../models'); // Disabled - using Supabase
 const AuthService = require('../services/auth');
 const databaseService = require('../services/database');
+const supabaseService = require('../services/supabase');
 
 /**
  * JWT Authentication Middleware
  * Verifies JWT tokens and attaches user to request
  */
-async function authenticateToken(req, res, next) {
-  try {
-    // Extract token from Authorization header
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.startsWith('Bearer ') 
-      ? authHeader.slice(7) 
-      : null;
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
-    if (!token) {
-      return res.status(401).json({
-        error: 'Authentication required',
-        message: 'Please provide a valid authentication token'
-      });
-    }
-
-    // Verify and decode token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    } catch (jwtError) {
-      console.log('❌ JWT verification failed:', jwtError.message);
-      return res.status(401).json({
-        error: 'Invalid token',
-        message: 'The provided token is malformed or invalid'
-      });
-    }
-    
-    // Check if token is expired
-    if (decoded.exp && decoded.exp < Date.now() / 1000) {
-      return res.status(401).json({
-        error: 'Token expired',
-        message: 'Please refresh your authentication token'
-      });
-    }
-
-    // Find user and verify account status
-    console.log('🔍 AUTH MIDDLEWARE: Looking for user with ID:', decoded.userId);
-    
-    // Use database service which handles both Supabase and SQLite
-    const user = await databaseService.getUserById(decoded.userId);
-
-    if (!user) {
-      console.log('❌ AUTH MIDDLEWARE: User not found for ID:', decoded.userId);
-      return res.status(401).json({
-        error: 'Invalid token',
-        message: 'User associated with token not found'
-      });
-    }
-
-    console.log('✅ AUTH MIDDLEWARE: User found:', user.email, 'isActive:', user.is_active || user.isActive);
-    
-    // Check if user is active (handle both Supabase snake_case and Sequelize camelCase)
-    const isActive = user.is_active !== undefined ? user.is_active : user.isActive;
-    if (!isActive) {
-      console.log('❌ AUTH MIDDLEWARE: User account disabled:', user.email);
-      return res.status(403).json({
-        error: 'Account disabled',
-        message: 'Your account has been disabled. Please contact support.'
-      });
-    }
-
-    // Check for account lockout (only if locked_until column exists)
-    if (user.locked_until && new Date() < user.locked_until) {
-      const unlockTime = new Date(user.locked_until).toISOString();
-      return res.status(423).json({
-        error: 'Account locked',
-        message: `Account is temporarily locked until ${unlockTime}`
-      });
-    }
-
-    // Attach user to request
-    req.user = user;
-    req.token = token;
-    
-    // Debug log for RBAC
-    console.log('🔐 AUTH: User authenticated:', {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      contact_id: user.contact_id
-    });
-
-    // Update last activity (async, don't wait)
-    setImmediate(async () => {
-      try {
-        await databaseService.updateUser(user.id, { 
-          last_login: new Date().toISOString()
-          // Note: failed_login_attempts field doesn't exist in people table
-        });
-      } catch (error) {
-        console.error('Error updating user last activity:', error.message);
-      }
-    });
-
-    next();
-
-  } catch (error) {
-    // Handle specific JWT errors
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        error: 'Invalid token',
-        message: 'The provided token is malformed or invalid'
-      });
-    }
-
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        error: 'Token expired',
-        message: 'Please refresh your authentication token'
-      });
-    }
-
-    console.error('❌ AUTH MIDDLEWARE: Unexpected error:', error);
-    return res.status(500).json({
-      error: 'Authentication error',
-      message: 'An unexpected error occurred during authentication'
-    });
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
   }
-}
+
+  jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+
+    try {
+      // Get user from database
+      const { data: user, error } = await supabaseService.client
+        .from('users')
+        .select('*')
+        .eq('id', decoded.userId)
+        .single();
+
+      if (error || !user) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+
+      if (!user.is_active) {
+        return res.status(401).json({ error: 'User account is inactive' });
+      }
+
+      // Only log authentication for important events or errors
+      if (process.env.NODE_ENV === 'development' && req.path.includes('/admin')) {
+        console.log(`🔐 AUTH: User authenticated: ${user.email} (${user.role})`);
+      }
+
+      req.user = user;
+      next();
+    } catch (error) {
+      console.error('❌ Authentication error:', error);
+      return res.status(500).json({ error: 'Authentication failed' });
+    }
+  });
+};
 
 /**
  * Optional Authentication Middleware
@@ -142,9 +66,11 @@ async function optionalAuth(req, res, next) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
       if (decoded.exp && decoded.exp >= Date.now() / 1000) {
-        const user = await User.findByPk(decoded.userId, {
-          attributes: { exclude: ['password_hash', 'two_fa_secret'] }
-        });
+        const { data: user, error } = await supabaseService.client
+          .from('users')
+          .select('*')
+          .eq('id', decoded.userId)
+          .single();
         
         if (user && user.is_active) {
           req.user = user;

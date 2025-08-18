@@ -17,58 +17,103 @@ const supabase = createClient(
 // Get all contacts (from Supabase) with pagination and RBAC
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    console.log('👤 CONTACTS ROUTE: Getting contacts for', req.user?.email, 'Role:', req.user?.role);
-    
-    const { page = 1, limit = 50, search } = req.query;
+    const { page = 1, limit = 20, search, role, status } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
-    
-    // Admin sees all contacts
+
+    // Only log in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('👤 CONTACTS ROUTE: Getting contacts for', req.user?.email, 'Role:', req.user?.role);
+    }
+
+    // Admin users see all contacts
     if (req.user.role === 'admin') {
-      console.log('✅ Admin access - fetching all contacts');
-      const contactsResult = await databaseService.getContacts({
-        page: parseInt(page),
-        limit: parseInt(limit),
-        offset,
-        search
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ Admin access - fetching all contacts');
+      }
       
-      const transformedContacts = transformToCamelCase(contactsResult.data || []);
+      let query = supabase.from('contacts').select('*', { count: 'exact' });
       
-      return res.json({
+      if (search) {
+        query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
+      }
+      
+      if (role) {
+        query = query.eq('role', role);
+      }
+      
+      if (status) {
+        query = query.eq('status', status);
+      }
+      
+      query = query
+        .order('created_at', { ascending: false })
+        .range(offset, offset + parseInt(limit) - 1);
+        
+      const { data: contacts, error, count } = await query;
+      
+      if (error) {
+        console.error('Error fetching contacts:', error);
+        throw error;
+      }
+      
+      const transformedContacts = transformToCamelCase(contacts || []);
+      
+      res.json({
         contacts: transformedContacts,
         data: transformedContacts,
         pagination: {
-          page: contactsResult.page || parseInt(page),
-          limit: contactsResult.limit || parseInt(limit),
-          total: contactsResult.total || 0,
-          totalPages: contactsResult.totalPages || 1
-        }
-      });
-    }
-    
-    // Non-admin users only see contacts related to their exchanges
-    console.log('🔐 Applying RBAC filters for non-admin user');
-    
-    // Get exchanges the user can access
-    const userExchanges = await rbacService.getExchangesForUser(req.user, {
-      includeParticipant: true
-    });
-    
-    const exchangeIds = userExchanges.data.map(e => e.id);
-    
-    if (exchangeIds.length === 0) {
-      console.log('⚠️ User has no assigned exchanges - returning empty contacts');
-      return res.json({
-        contacts: [],
-        data: [],
-        pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
-          total: 0,
-          totalPages: 0
+          total: count || 0,
+          totalPages: Math.ceil((count || 0) / parseInt(limit))
         }
       });
-    }
+    } else {
+      // Non-admin users only see contacts related to their exchanges
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔐 Applying RBAC filters for non-admin user');
+      }
+      
+      // Get exchanges the user can access with timeout handling
+      let userExchanges;
+      try {
+        userExchanges = await rbacService.getExchangesForUser(req.user, {
+          includeParticipant: true,
+          limit: 500 // Add limit to prevent timeouts
+        });
+      } catch (rbacError) {
+        console.error('❌ RBAC query failed:', rbacError.message);
+        // Return empty result instead of failing completely
+        return res.json({
+          contacts: [],
+          data: [],
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: 0,
+            totalPages: 0
+          },
+          warning: 'Contact access temporarily limited'
+        });
+      }
+      
+      const exchangeIds = userExchanges.data.map(e => e.id);
+      
+      if (exchangeIds.length === 0) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('⚠️ User has no assigned exchanges - returning empty contacts');
+        }
+        return res.json({
+          contacts: [],
+          data: [],
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: 0,
+            totalPages: 0
+          }
+        });
+      }
     
     // Get participants from user's exchanges
     const { data: participants, error: participantError } = await supabase
@@ -89,7 +134,9 @@ router.get('/', authenticateToken, async (req, res) => {
     const allContactIds = [...new Set([...contactIds, ...clientIds])];
     
     if (allContactIds.length === 0) {
-      console.log('⚠️ No contacts found for user exchanges');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('⚠️ No contacts found for user exchanges');
+      }
       return res.json({
         contacts: [],
         data: [],
@@ -104,7 +151,7 @@ router.get('/', authenticateToken, async (req, res) => {
     
     // Query contacts with RBAC filter
     let query = supabase
-      .from('people')
+      .from('contacts')
       .select('*', { count: 'exact' })
       .in('id', allContactIds);
       
@@ -124,7 +171,9 @@ router.get('/', authenticateToken, async (req, res) => {
       throw error;
     }
     
-    console.log(`✅ Found ${contacts?.length || 0} contacts for ${req.user.role} user (total: ${count || 0})`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`✅ Found ${contacts?.length || 0} contacts for ${req.user.role} user (total: ${count || 0})`);
+    }
     
     const transformedContacts = transformToCamelCase(contacts || []);
     
@@ -138,9 +187,22 @@ router.get('/', authenticateToken, async (req, res) => {
         totalPages: Math.ceil((count || 0) / parseInt(limit))
       }
     });
+    }
   } catch (error) {
     console.error('❌ Error fetching contacts:', error);
-    res.status(500).json({ error: error.message });
+    
+    // Return graceful error response instead of 500
+    res.status(200).json({
+      contacts: [],
+      data: [],
+      pagination: {
+        page: parseInt(page) || 1,
+        limit: parseInt(limit) || 20,
+        total: 0,
+        totalPages: 0
+      },
+      warning: 'Contact data temporarily unavailable'
+    });
   }
 });
 

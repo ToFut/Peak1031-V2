@@ -9,6 +9,14 @@ import Layout from '../../../components/Layout';
 import UnifiedChatInterface from '../../messages/components/UnifiedChatInterface';
 import { ExchangeDocuments } from '../components/ExchangeDocuments';
 import { ExchangeUserManagement } from '../../../components/admin/ExchangeUserManagement';
+import { 
+  extractCustomFieldData, 
+  getPropertyAddress, 
+  getPropertyValue, 
+  getClosingDate, 
+  getFullPropertyAddress 
+} from '../../../utils/extractCustomFields';
+import { AssignmentModal } from '../../../components/AssignmentModal';
 import {
   ArrowLeft,
   Calendar,
@@ -610,14 +618,14 @@ const PropertyCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
             <div>
               <p className="text-sm text-gray-500">Address</p>
               <p className="font-medium text-gray-900">
-                {exchange.relinquishedPropertyAddress || 'Not specified'}
+                {getFullPropertyAddress(exchange)}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Value</p>
               <p className="font-medium text-gray-900 text-lg">
                 {(() => {
-                  const value = exchange.relinquishedValue || exchange.relinquished_property_value;
+                  const value = getPropertyValue(exchange);
                   return value
                     ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
                     : 'Not specified';
@@ -628,7 +636,7 @@ const PropertyCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
               <p className="text-sm text-gray-500">Sale Date</p>
               <p className="font-medium text-gray-900">
                 {(() => {
-                  const date = exchange.relinquishedClosingDate;
+                  const date = getClosingDate(exchange);
                   return date ? new Date(date).toLocaleDateString() : 'Not scheduled';
                 })()}
               </p>
@@ -663,7 +671,13 @@ const PropertyCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
 };
 
 // Contact Information
-const ContactCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
+const ContactCard: React.FC<{ 
+  exchange: Exchange; 
+  isAdmin: boolean; 
+  isCoordinator: boolean;
+  onAssignClient: () => void;
+  onAssignCoordinator: () => void;
+}> = ({ exchange, isAdmin, isCoordinator, onAssignClient, onAssignCoordinator }) => {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
       <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -674,9 +688,18 @@ const ContactCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Client */}
         <div className="space-y-3">
-          <h4 className="font-medium text-gray-700 border-b border-gray-200 pb-2">
-            Client
-          </h4>
+          <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+            <h4 className="font-medium text-gray-700">Client</h4>
+            {!exchange.client && (isAdmin || isCoordinator) && (
+              <button
+                onClick={onAssignClient}
+                className="flex items-center text-sm text-blue-600 hover:text-blue-700"
+              >
+                <UserPlus className="w-4 h-4 mr-1" />
+                Assign Client
+              </button>
+            )}
+          </div>
           {exchange.client ? (
             <div className="space-y-2">
               <p className="font-semibold text-gray-900 text-lg">
@@ -704,15 +727,35 @@ const ContactCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
               )}
             </div>
           ) : (
-            <p className="text-gray-500 italic">No client information available</p>
+            <div className="text-center py-4">
+              <p className="text-gray-500 italic mb-2">No client information available</p>
+              {(isAdmin || isCoordinator) && (
+                <button
+                  onClick={onAssignClient}
+                  className="inline-flex items-center px-3 py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-600 hover:border-blue-300 hover:text-blue-600"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Assign Client
+                </button>
+              )}
+            </div>
           )}
         </div>
 
         {/* Coordinator */}
         <div className="space-y-3">
-          <h4 className="font-medium text-gray-700 border-b border-gray-200 pb-2">
-            Exchange Coordinator
-          </h4>
+          <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+            <h4 className="font-medium text-gray-700">Exchange Coordinator</h4>
+            {!exchange.coordinator && (isAdmin || isCoordinator) && (
+              <button
+                onClick={onAssignCoordinator}
+                className="flex items-center text-sm text-blue-600 hover:text-blue-700"
+              >
+                <UserPlus className="w-4 h-4 mr-1" />
+                Assign Coordinator
+              </button>
+            )}
+          </div>
           {exchange.coordinator ? (
             <div className="space-y-2">
               <p className="font-semibold text-gray-900 text-lg">
@@ -726,7 +769,18 @@ const ContactCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
               </div>
             </div>
           ) : (
-            <p className="text-gray-500 italic">No coordinator assigned</p>
+            <div className="text-center py-4">
+              <p className="text-gray-500 italic mb-2">No coordinator assigned</p>
+              {(isAdmin || isCoordinator) && (
+                <button
+                  onClick={onAssignCoordinator}
+                  className="inline-flex items-center px-3 py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-600 hover:border-blue-300 hover:text-blue-600"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Assign Coordinator
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -751,7 +805,9 @@ const ExchangeDetailEnhanced: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { getExchange } = useExchanges();
-  const { isAdmin, isCoordinator } = usePermissions();
+  const permissions = usePermissions();
+  const isAdmin = permissions.isAdmin();
+  const isCoordinator = permissions.isCoordinator();
   const { socket, joinExchange, leaveExchange } = useSocket();
   
   const [exchange, setExchange] = useState<Exchange | null>(null);
@@ -762,6 +818,8 @@ const ExchangeDetailEnhanced: React.FC = () => {
   // Tasks are now managed by EnhancedTaskManager component
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showUserManagement, setShowUserManagement] = useState(false);
+  const [showClientAssignmentModal, setShowClientAssignmentModal] = useState(false);
+  const [showCoordinatorAssignmentModal, setShowCoordinatorAssignmentModal] = useState(false);
   
   // Define functions before using them in useEffect
   const loadDocuments = useCallback(async () => {
@@ -920,13 +978,13 @@ const ExchangeDetailEnhanced: React.FC = () => {
   };
 
   const handleRemoveParticipant = async (participantId: string, participantName: string) => {
-    if (!id || !(isAdmin() || isCoordinator())) {
+    if (!id || !(isAdmin || isCoordinator)) {
       alert('You do not have permission to remove participants from this exchange.');
       return;
     }
     
     // Enhanced confirmation dialog for coordinators and admins
-    const userRole = isAdmin() ? 'Administrator' : 'Coordinator';
+    const userRole = isAdmin ? 'Administrator' : 'Coordinator';
     const confirmMessage = `⚠️ REMOVE PARTICIPANT CONFIRMATION ⚠️\n\n` +
       `You are about to remove "${participantName}" from this exchange.\n\n` +
       `This action will:\n` +
@@ -969,6 +1027,86 @@ const ExchangeDetailEnhanced: React.FC = () => {
     setActiveTab('messages');
     // You could add logic here to focus on the message input and pre-fill @mention
     console.log(`📨 Opening message to ${fullName}:`, participant);
+  };
+
+  const handleAssignClient = async (userId: string) => {
+    if (!id) return;
+    
+    try {
+      await apiService.put(`/exchanges/${id}/assign-client`, { 
+        client_id: userId 
+      });
+      
+      // Reload exchange data to get updated client info
+      await loadExchange();
+      setShowClientAssignmentModal(false);
+    } catch (error: any) {
+      console.error('Error assigning client:', error);
+      throw error;
+    }
+  };
+
+  const handleInviteClient = async (email: string, firstName: string, lastName: string) => {
+    if (!id || !exchange) return;
+    
+    try {
+      // Send invitation for client role
+      await apiService.post('/invitations/send', {
+        exchangeId: id,
+        email,
+        firstName,
+        lastName,
+        role: 'client',
+        exchangeName: exchange.name || exchange.exchangeName
+      });
+      
+      setShowClientAssignmentModal(false);
+      // Show success message
+      alert(`Invitation sent to ${email} to join as a client`);
+    } catch (error: any) {
+      console.error('Error sending client invitation:', error);
+      throw error;
+    }
+  };
+
+  const handleAssignCoordinator = async (userId: string) => {
+    if (!id) return;
+    
+    try {
+      await apiService.put(`/exchanges/${id}/assign-coordinator`, { 
+        coordinator_id: userId 
+      });
+      
+      // Reload exchange data to get updated coordinator info
+      await loadExchange();
+      setShowCoordinatorAssignmentModal(false);
+    } catch (error: any) {
+      console.error('Error assigning coordinator:', error);
+      throw error;
+    }
+  };
+
+  const handleInviteCoordinator = async (email: string, firstName: string, lastName: string) => {
+    if (!id || !exchange) return;
+    
+    try {
+      // Send invitation for coordinator role
+      await apiService.post('/invitations/send', {
+        exchangeId: id,
+        email,
+        firstName,
+        lastName,
+        role: 'coordinator',
+        exchangeName: exchange.name || exchange.exchangeName
+      });
+      
+      setShowCoordinatorAssignmentModal(false);
+      // Show success message
+      alert(`Invitation sent to ${email} to join as a coordinator`);
+    } catch (error: any) {
+      console.error('Error sending coordinator invitation:', error);
+      throw error;
+    }
   };
 
   
@@ -1025,7 +1163,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
   };
 
   const daysUntilClosing = getDaysUntilClosing();
-  const canManageInvitations = isAdmin() || isCoordinator();
+  const canManageInvitations = isAdmin || isCoordinator;
   
   // Component to display all exchange fields
   const AllDetailsView = () => {
@@ -1155,7 +1293,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
                 <StatusIndicator status={exchange.status} daysRemaining={daysUntilClosing || undefined} />
                 
                 {/* Manage Users Button - Only visible to admin/coordinator */}
-                {(isAdmin() || isCoordinator()) && (
+                {(isAdmin || isCoordinator) && (
                   <button
                     onClick={() => setShowUserManagement(true)}
                     className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
@@ -1184,7 +1322,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
                     <ParticipantAvatars 
                       participants={participants} 
                       maxVisible={4} 
-                      canManage={isAdmin() || isCoordinator()}
+                      canManage={isAdmin || isCoordinator}
                       exchangeId={id}
                       onRemoveParticipant={handleRemoveParticipant}
                       onAddParticipant={handleAddParticipant}
@@ -1286,24 +1424,28 @@ const ExchangeDetailEnhanced: React.FC = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Address:</span>
-                      <span className="text-gray-900">{exchange.relinquishedPropertyAddress || 'Not specified'}</span>
+                      <span className="text-gray-900">
+                        {getFullPropertyAddress(exchange)}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Sale Price:</span>
                       <span className="text-gray-900 font-medium">
-                        {exchange.relinquishedSalePrice 
-                          ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(exchange.relinquishedSalePrice)
-                          : 'Not specified'
-                        }
+                        {(() => {
+                          const value = getPropertyValue(exchange);
+                          return value
+                            ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
+                            : 'Not specified';
+                        })()}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Closing Date:</span>
                       <span className="text-gray-900">
-                        {exchange.relinquishedClosingDate 
-                          ? new Date(exchange.relinquishedClosingDate).toLocaleDateString()
-                          : 'Not scheduled'
-                        }
+                        {(() => {
+                          const date = getClosingDate(exchange);
+                          return date ? new Date(date).toLocaleDateString() : 'Not scheduled';
+                        })()}
                       </span>
                     </div>
                   </div>
@@ -1319,7 +1461,18 @@ const ExchangeDetailEnhanced: React.FC = () => {
               
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Client</h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-gray-700">Client</h4>
+                    {!exchange.client && (isAdmin || isCoordinator) && (
+                      <button
+                        onClick={() => setShowClientAssignmentModal(true)}
+                        className="flex items-center text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        <UserPlus className="w-3 h-3 mr-1" />
+                        Assign
+                      </button>
+                    )}
+                  </div>
                   {exchange.client ? (
                     <div className="space-y-1 text-sm">
                       <p className="font-medium text-gray-900">
@@ -1346,7 +1499,18 @@ const ExchangeDetailEnhanced: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Coordinator</h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-gray-700">Coordinator</h4>
+                    {!exchange.coordinator && (isAdmin || isCoordinator) && (
+                      <button
+                        onClick={() => setShowCoordinatorAssignmentModal(true)}
+                        className="flex items-center text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        <UserPlus className="w-3 h-3 mr-1" />
+                        Assign
+                      </button>
+                    )}
+                  </div>
                   {exchange.coordinator ? (
                     <div className="space-y-1 text-sm">
                       <p className="font-medium text-gray-900">
@@ -1456,6 +1620,34 @@ const ExchangeDetailEnhanced: React.FC = () => {
             // Refresh participants when closing the modal
             loadParticipants();
           }}
+        />
+      )}
+
+      {/* Client Assignment Modal */}
+      {showClientAssignmentModal && exchange && (
+        <AssignmentModal
+          isOpen={showClientAssignmentModal}
+          onClose={() => setShowClientAssignmentModal(false)}
+          onAssign={handleAssignClient}
+          onInvite={handleInviteClient}
+          title="Assign Client to Exchange"
+          role="client"
+          exchangeId={id!}
+          exchangeName={exchange.name || exchange.exchangeName || 'Exchange'}
+        />
+      )}
+
+      {/* Coordinator Assignment Modal */}
+      {showCoordinatorAssignmentModal && exchange && (
+        <AssignmentModal
+          isOpen={showCoordinatorAssignmentModal}
+          onClose={() => setShowCoordinatorAssignmentModal(false)}
+          onAssign={handleAssignCoordinator}
+          onInvite={handleInviteCoordinator}
+          title="Assign Coordinator to Exchange"
+          role="coordinator"
+          exchangeId={id!}
+          exchangeName={exchange.name || exchange.exchangeName || 'Exchange'}
         />
       )}
     </Layout>

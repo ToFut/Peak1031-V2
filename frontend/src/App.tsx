@@ -23,13 +23,15 @@ import Reports from './features/reports/pages/Reports';
 import Settings from './features/settings/pages/Settings';
 import Profile from './features/settings/pages/Profile';
 import UserProfile from './features/users/pages/UserProfile';
+// import SmartUserProfile from './features/users/components/SmartUserProfile';
 import Preferences from './features/settings/pages/Preferences';
 import AuthTest from './features/auth/pages/AuthTest';
-import TemplateDocumentManager from './pages/TemplateDocumentManager';
+// import TemplateDocumentManager from './pages/TemplateDocumentManager';
 import { AdminGPT, PracticePantherManager } from './features/admin/components';
 import AuditLogSystem from './features/admin/components/AuditLogSystem';
-import AgencyManagement from './pages/admin/AgencyManagement';
-import AgencyAssignments from './components/admin/AgencyAssignments';
+// import AgencyProfile from './features/admin/components/AgencyProfile';
+// import AgencyManagement from './pages/admin/AgencyManagement';
+// import AgencyAssignments from './components/admin/AgencyAssignments';
 
 // Import Login directly since it's a critical path
 import Login from './features/auth/pages/Login';
@@ -42,8 +44,8 @@ const ClientDashboard = lazy(() => import(/* webpackChunkName: "client-dashboard
 const CoordinatorDashboard = lazy(() => import(/* webpackChunkName: "coordinator-dashboard" */ './features/dashboard/components/StandardizedCoordinatorDashboard'));
 const ThirdPartyDashboard = lazy(() => import(/* webpackChunkName: "thirdparty-dashboard" */ './features/dashboard/components/StandardizedThirdPartyDashboard'));
 const AgencyDashboard = lazy(() => import(/* webpackChunkName: "agency-dashboard" */ './features/dashboard/components/StandardizedAgencyDashboard'));
-const InvitationSignup = lazy(() => import(/* webpackChunkName: "invitation" */ './pages/InvitationSignup'));
-const AuthCallback = lazy(() => import(/* webpackChunkName: "auth-callback" */ './pages/AuthCallback'));
+// const InvitationSignup = lazy(() => import(/* webpackChunkName: "invitation" */ './pages/InvitationSignup'));
+// const AuthCallback = lazy(() => import(/* webpackChunkName: "auth-callback" */ './pages/AuthCallback'));
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -155,7 +157,7 @@ const App: React.FC = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/invite/:token" element={
+              {/* <Route path="/invite/:token" element={
                 <Suspense fallback={<LoadingFallback />}>
                   <InvitationSignup />
                 </Suspense>
@@ -164,7 +166,7 @@ const App: React.FC = () => {
                 <Suspense fallback={<LoadingFallback />}>
                   <AuthCallback />
                 </Suspense>
-              } />
+              } /> */}
               
               {/* Protected Routes */}
               <Route 
@@ -272,6 +274,20 @@ const App: React.FC = () => {
 
               {/* Users - Admin only */}
               <Route 
+                path="/users" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <RouteErrorBoundary routeName="Users">
+                        <Users />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Admin Users route (legacy) */}
+              <Route 
                 path="/admin/users" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
@@ -339,6 +355,20 @@ const App: React.FC = () => {
                   </ProtectedRoute>
                 } 
               />
+              
+              {/* User Profile alternate route - Admin only */}
+              <Route 
+                path="/user-profile/:userId" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Layout>
+                      <RouteErrorBoundary routeName="UserProfile">
+                        <UserProfile />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
 
               {/* Preferences - Available to all authenticated users */}
               <Route 
@@ -355,7 +385,7 @@ const App: React.FC = () => {
               />
 
               {/* Template Document Manager - Available to admin and coordinators */}
-              <Route 
+              {/* <Route 
                 path="/templates" 
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
@@ -369,7 +399,7 @@ const App: React.FC = () => {
               />
 
               {/* Admin-specific routes */}
-              <Route 
+              {/* <Route 
                 path="/admin/templates" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
@@ -380,7 +410,7 @@ const App: React.FC = () => {
                     </Layout>
                   </ProtectedRoute>
                 } 
-              />
+              /> */}
 
               <Route 
                 path="/admin/audit" 
@@ -434,7 +464,7 @@ const App: React.FC = () => {
                 } 
               />
 
-              <Route 
+              {/* <Route 
                 path="/admin/agencies" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
@@ -471,7 +501,7 @@ const App: React.FC = () => {
                     </Layout>
                   </ProtectedRoute>
                 } 
-              />
+              /> */}
 
               <Route 
                 path="/admin/system" 

@@ -157,7 +157,7 @@ router.get('/:id/tasks', [
 ], async (req, res) => {
   try {
     const tasks = await databaseService.getTasks({
-      where: { exchange_id: req.params.id },
+      where: { exchangeId: req.params.id },
       orderBy: { column: 'due_date', ascending: true }
     });
 
@@ -410,6 +410,118 @@ router.get('/:id', [
     console.error('Error fetching exchange details:', error);
     res.status(500).json({
       error: 'Failed to fetch exchange details',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/exchanges/:id/assign-client
+ * Assign a client to an exchange
+ */
+router.put('/:id/assign-client', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  body('client_id').isUUID().withMessage('Client ID must be a valid UUID'),
+  authenticateToken,
+  requireRole(['admin', 'coordinator'])
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { id } = req.params;
+    const { client_id } = req.body;
+
+    // Update the exchange
+    const updatedExchange = await databaseService.updateExchange(id, { client_id });
+    
+    if (!updatedExchange) {
+      return res.status(404).json({
+        error: 'Exchange not found'
+      });
+    }
+
+    // Log the assignment
+    await AuditService.log({
+      action: 'EXCHANGE_CLIENT_ASSIGNED',
+      entityType: 'exchange',
+      entityId: id,
+      userId: req.user.id,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: { client_id }
+    });
+
+    res.json({
+      message: 'Client assigned successfully',
+      exchange: transformToCamelCase(updatedExchange)
+    });
+
+  } catch (error) {
+    console.error('Error assigning client to exchange:', error);
+    res.status(500).json({
+      error: 'Failed to assign client',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/exchanges/:id/assign-coordinator
+ * Assign a coordinator to an exchange
+ */
+router.put('/:id/assign-coordinator', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  body('coordinator_id').isUUID().withMessage('Coordinator ID must be a valid UUID'),
+  authenticateToken,
+  requireRole(['admin', 'coordinator'])
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { id } = req.params;
+    const { coordinator_id } = req.body;
+
+    // Update the exchange
+    const updatedExchange = await databaseService.updateExchange(id, { coordinator_id });
+    
+    if (!updatedExchange) {
+      return res.status(404).json({
+        error: 'Exchange not found'
+      });
+    }
+
+    // Log the assignment
+    await AuditService.log({
+      action: 'EXCHANGE_COORDINATOR_ASSIGNED',
+      entityType: 'exchange',
+      entityId: id,
+      userId: req.user.id,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: { coordinator_id }
+    });
+
+    res.json({
+      message: 'Coordinator assigned successfully',
+      exchange: transformToCamelCase(updatedExchange)
+    });
+
+  } catch (error) {
+    console.error('Error assigning coordinator to exchange:', error);
+    res.status(500).json({
+      error: 'Failed to assign coordinator',
       message: error.message
     });
   }
@@ -1260,7 +1372,7 @@ router.get('/:id/tasks', [
 ], async (req, res) => {
   try {
     const tasks = await databaseService.getTasks({
-      where: { exchange_id: req.params.id },
+      where: { exchangeId: req.params.id },
       orderBy: { column: 'due_date', ascending: true }
     });
 

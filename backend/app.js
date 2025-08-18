@@ -60,9 +60,14 @@ app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/documents', require('./routes/documents'));
 app.use('/api/templates', require('./routes/template-management'));
 app.use('/api/messages', require('./routes/messages'));
+app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/users', require('./routes/users'));
 app.use('/api/sync', require('./routes/sync'));
 app.use('/api/oauth', require('./routes/oauth'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/user-profile', require('./routes/user-profile'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

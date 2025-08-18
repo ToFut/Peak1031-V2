@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   UserIcon, 
   ChartBarIcon, 
@@ -15,11 +16,106 @@ import {
   EyeIcon,
   BoltIcon,
   BuildingOfficeIcon,
-  UserGroupIcon
+  UserGroupIcon,
+  PlusIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import { useUserProfile } from '../../../hooks/useUserProfile';
 import { UserProfileService } from '../../../services/userProfileService';
 import { EnhancedStatCard } from '../../dashboard/components/SharedDashboardComponents';
+import UserProfileEnhanced from './UserProfileEnhanced';
+import apiService from '../../../services/api';
+
+// Animation variants for staggered wave effect
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { 
+    opacity: 0, 
+    y: 20,
+    scale: 0.95
+  },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.6,
+      ease: [0.25, 0.46, 0.45, 0.94]
+    }
+  }
+};
+
+const headerVariants = {
+  hidden: { 
+    opacity: 0, 
+    y: -30,
+    scale: 0.9
+  },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.8,
+      ease: [0.25, 0.46, 0.45, 0.94]
+    }
+  }
+};
+
+const statsVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.15,
+      delayChildren: 0.4
+    }
+  }
+};
+
+const statCardVariants = {
+  hidden: { 
+    opacity: 0, 
+    y: 30,
+    scale: 0.9
+  },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.7,
+      ease: [0.25, 0.46, 0.45, 0.94]
+    }
+  }
+};
+
+const chartVariants = {
+  hidden: { 
+    opacity: 0, 
+    x: -50,
+    scale: 0.95
+  },
+  visible: { 
+    opacity: 1, 
+    x: 0,
+    scale: 1,
+    transition: {
+      duration: 0.8,
+      ease: [0.25, 0.46, 0.45, 0.94]
+    }
+  }
+};
 
 interface AgencyAssignment {
   id: string;
@@ -97,7 +193,7 @@ const UserProfile: React.FC = () => {
     );
   }
 
-  if (!profile) {
+  if (!profile || !profile.user) {
     return (
       <div className="p-6">
         <div className="text-center text-gray-500">
@@ -109,112 +205,213 @@ const UserProfile: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            {UserProfileService.formatUserName(profile.user)}
-          </h1>
-          <p className="text-gray-600 mt-1">
-            {UserProfileService.formatRole(profile.user.role)} • {profile.user.email}
-          </p>
-        </div>
-        <button
-          onClick={refreshAll}
-          disabled={loading}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-        >
-          <ArrowPathIcon className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <EnhancedStatCard
-          title="Total Exchanges"
-          value={profile.stats.totalExchanges}
-          icon={DocumentTextIcon}
-          color="blue"
-          subtitle="All time"
-        />
-        
-        <EnhancedStatCard
-          title="Active Exchanges"
-          value={profile.stats.activeExchanges}
-          icon={ArrowTrendingUpIcon}
-          color="green"
-          subtitle="In progress"
-        />
-        
-        <EnhancedStatCard
-          title="System Actions"
-          value={profile.auditActivity?.totalActions || 0}
-          icon={BoltIcon}
-          color="purple"
-          subtitle="Total activity"
-        />
-        
-        <EnhancedStatCard
-          title="Recent Activity"
-          value={profile.auditActivity?.actionsLast30Days || 0}
-          icon={CalendarIcon}
-          color="yellow"
-          subtitle="Last 30 days"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Exchange Status Distribution */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center mb-4">
-            <ChartBarIcon className="h-6 w-6 text-gray-500 mr-3" />
-            <h3 className="text-lg font-semibold text-gray-900">Exchange Status</h3>
-          </div>
-          <div className="space-y-3">
-            {Object.entries(profile.statusDistribution).map(([status, count]) => (
-              <div key={status} className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className={`w-3 h-3 rounded-full mr-3 ${UserProfileService.getStatusColor(status).split(' ')[1]}`}></div>
-                  <span className="text-sm font-medium text-gray-900 capitalize">
-                    {status.replace('_', ' ')}
-                  </span>
-                </div>
-                <span className="text-sm text-gray-600">{count}</span>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Enhanced Header with gradient background */}
+        <div className="bg-white rounded-xl shadow-lg p-8 bg-gradient-to-r from-blue-50 via-white to-purple-50 border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                <UserIcon className="h-10 w-10 text-white" />
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent Exchanges */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center mb-4">
-            <DocumentTextIcon className="h-6 w-6 text-gray-500 mr-3" />
-            <h3 className="text-lg font-semibold text-gray-900">Recent Exchanges</h3>
-          </div>
-          <div className="space-y-3">
-            {(profile.recentExchanges || []).slice(0, 5).map((exchange) => (
-              <div key={exchange.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {exchange.name}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {UserProfileService.getTimePeriodDisplay(exchange.createdAt)}
-                  </p>
-                </div>
-                <div className="ml-4 flex-shrink-0">
-                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${UserProfileService.getStatusColor(exchange.status)}`}>
-                    {exchange.status.replace('_', ' ')}
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                  {UserProfileService.formatUserName(profile.user)}
+                </h1>
+                <div className="flex items-center space-x-3 mt-2">
+                  <span className="px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-medium rounded-full shadow-sm">
+                    {UserProfileService.formatRole(profile.user.role)}
+                  </span>
+                  <span className="text-gray-600 flex items-center">
+                    <span className="text-gray-400 mr-2">•</span>
+                    {profile.user.email}
                   </span>
                 </div>
               </div>
-            ))}
-            {(profile.recentExchanges || []).length === 0 && (
-              <p className="text-sm text-gray-500 text-center py-4">No recent exchanges</p>
-            )}
+            </div>
+            <button
+              onClick={refreshAll}
+              disabled={loading}
+              className="inline-flex items-center px-5 py-3 bg-white border border-gray-200 rounded-lg shadow-md text-sm font-medium text-gray-700 hover:shadow-lg hover:border-blue-300 transition-all duration-200 disabled:opacity-50"
+            >
+              <ArrowPathIcon className={`h-5 w-5 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh Data
+            </button>
           </div>
+        </div>
+
+        {/* Enhanced Stats Cards with gradients and animations */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <EnhancedStatCard
+              title="Total Exchanges"
+              value={profile.stats.totalExchanges}
+              icon={DocumentTextIcon}
+              color="blue"
+              subtitle="All time"
+            />
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <EnhancedStatCard
+              title="Active Exchanges"
+              value={profile.stats.activeExchanges}
+              icon={ArrowTrendingUpIcon}
+              color="green"
+              subtitle="In progress"
+            />
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+          >
+            <EnhancedStatCard
+              title="System Actions"
+              value={profile.auditActivity?.totalActions || 0}
+              icon={BoltIcon}
+              color="purple"
+              subtitle="Total activity"
+            />
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+          >
+            <EnhancedStatCard
+              title="Recent Activity"
+              value={profile.auditActivity?.actionsLast30Days || 0}
+              icon={CalendarIcon}
+              color="yellow"
+              subtitle="Last 30 days"
+            />
+          </motion.div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Enhanced Exchange Status Distribution */}
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+            className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow duration-300"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-blue-100 rounded-lg mr-3">
+                  <ChartBarIcon className="h-6 w-6 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800">Exchange Status</h3>
+              </div>
+              <span className="text-sm text-gray-500">{Object.values(profile.statusDistribution).reduce((a, b) => a + b, 0)} total</span>
+            </div>
+            <div className="space-y-4">
+              {Object.entries(profile.statusDistribution).map(([status, count]) => {
+                const total = Object.values(profile.statusDistribution).reduce((a, b) => a + b, 0);
+                const percentage = total > 0 ? (count / total) * 100 : 0;
+                return (
+                  <div key={status} className="group">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        <div className={`w-3 h-3 rounded-full mr-3 shadow-sm ${
+                          status === 'active' || status === 'in_progress' ? 'bg-green-500' :
+                          status === 'completed' ? 'bg-blue-500' :
+                          status === 'pending' || status === 'initiated' ? 'bg-yellow-500' :
+                          status === 'cancelled' || status === 'failed' ? 'bg-red-500' :
+                          'bg-gray-500'
+                        }`}></div>
+                        <span className="text-sm font-semibold text-gray-700 capitalize">
+                          {status.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <span className="text-sm font-bold text-gray-900">{count}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percentage}%` }}
+                        transition={{ duration: 1, delay: 0.5 }}
+                        className={`h-full rounded-full ${
+                          status === 'active' || status === 'in_progress' ? 'bg-gradient-to-r from-green-400 to-green-600' :
+                          status === 'completed' ? 'bg-gradient-to-r from-blue-400 to-blue-600' :
+                          status === 'pending' || status === 'initiated' ? 'bg-gradient-to-r from-yellow-400 to-yellow-600' :
+                          status === 'cancelled' || status === 'failed' ? 'bg-gradient-to-r from-red-400 to-red-600' :
+                          'bg-gradient-to-r from-gray-400 to-gray-600'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+
+          {/* Enhanced Recent Exchanges */}
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.6 }}
+            className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow duration-300"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-purple-100 rounded-lg mr-3">
+                  <DocumentTextIcon className="h-6 w-6 text-purple-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800">Recent Exchanges</h3>
+              </div>
+              <span className="text-sm text-gray-500">Latest 5</span>
+            </div>
+            <div className="space-y-3">
+              {(profile.recentExchanges || []).slice(0, 5).map((exchange, index) => (
+                <motion.div 
+                  key={exchange.id} 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.7 + (index * 0.1) }}
+                  className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg hover:from-blue-50 hover:to-purple-50 transition-all duration-200 cursor-pointer group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                      {exchange.name}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {UserProfileService.getTimePeriodDisplay(exchange.createdAt)}
+                    </p>
+                  </div>
+                  <div className="ml-4 flex-shrink-0">
+                    <span className={`inline-flex px-3 py-1.5 text-xs font-bold rounded-full shadow-sm ${
+                      exchange.status === 'active' || exchange.status === 'in_progress' ? 'bg-green-100 text-green-800 border border-green-200' :
+                      exchange.status === 'completed' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                      exchange.status === 'pending' || exchange.status === 'initiated' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                      exchange.status === 'cancelled' || exchange.status === 'failed' ? 'bg-red-100 text-red-800 border border-red-200' :
+                      'bg-gray-100 text-gray-800 border border-gray-200'
+                    }`}>
+                      {exchange.status.replace('_', ' ').toUpperCase()}
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
+              {(profile.recentExchanges || []).length === 0 && (
+                <div className="text-center py-8">
+                  <DocumentTextIcon className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500">No recent exchanges</p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+
         </div>
 
         {/* Activity Chart */}
@@ -270,7 +467,6 @@ const UserProfile: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
 
       {/* Exchange Type Distribution */}
       {Object.keys(profile.typeDistribution).length > 0 && (
@@ -424,8 +620,8 @@ const UserProfile: React.FC = () => {
         </div>
       )}
 
-      {/* Agency Assignments - Only for third party users */}
-      {profile.user.role === 'third_party' && (
+      {/* Agency Assignments - Only for agency users */}
+      {profile.user.role === 'agency' && (
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center">
@@ -491,8 +687,8 @@ const UserProfile: React.FC = () => {
                 <div className="flex items-center text-sm text-blue-700">
                   <EyeIcon className="h-4 w-4 mr-2" />
                   <span>
-                    You are assigned to <strong>{agencyAssignments.length}</strong> {agencyAssignments.length === 1 ? 'agency' : 'agencies'} 
-                    who can monitor your exchange performance and portfolio.
+                    You have <strong>{agencyAssignments.length}</strong> {agencyAssignments.length === 1 ? 'assignment' : 'assignments'} 
+                    for monitoring exchange performance and portfolio management.
                   </span>
                 </div>
               </div>
@@ -502,10 +698,10 @@ const UserProfile: React.FC = () => {
               <BuildingOfficeIcon className="mx-auto h-12 w-12 text-gray-400 mb-3" />
               <h4 className="text-sm font-medium text-gray-900 mb-2">No Agency Assignments</h4>
               <p className="text-sm text-gray-500">
-                You are not currently assigned to any agencies for performance monitoring.
+                You are not currently assigned to any performance monitoring tasks.
               </p>
               <p className="text-xs text-gray-400 mt-2">
-                Contact your administrator if you need to be assigned to an agency.
+                Contact your administrator if you need to be assigned to monitoring tasks.
               </p>
             </div>
           )}
@@ -534,6 +730,10 @@ const UserProfile: React.FC = () => {
           </div>
         </div>
       )}
+      
+      {/* Include the Enhanced User Profile component for exchange and third party assignments */}
+      <UserProfileEnhanced initialProfile={profile} />
+      </div>
     </div>
   );
 };

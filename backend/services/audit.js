@@ -5,6 +5,11 @@ class AuditService {
     try {
       console.log('📝 Creating audit log:', data.action);
       
+      if (!supabaseService.client) {
+        console.log('⚠️ Supabase client not available - skipping audit log');
+        return null;
+      }
+      
       if (!data.userId) {
         console.log('⚠️ Audit log skipped - no userId provided');
         return;
@@ -59,6 +64,11 @@ class AuditService {
   static async getAuditLogs(filters = {}) {
     try {
       console.log('📝 Querying audit logs with filters:', filters);
+      
+      if (!supabaseService.client) {
+        console.log('⚠️ Supabase client not available - returning empty audit logs');
+        return [];
+      }
       
       let query = supabaseService.client
         .from('audit_logs')
@@ -119,6 +129,11 @@ class AuditService {
   static async getAuditStats(filters = {}) {
     try {
       console.log('📊 Getting audit statistics');
+      
+      if (!supabaseService.client) {
+        console.log('⚠️ Supabase client not available - returning empty audit stats');
+        return { total: 0, actionStats: {}, entityStats: {} };
+      }
       
       let query = supabaseService.client
         .from('audit_logs')

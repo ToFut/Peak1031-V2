@@ -376,14 +376,52 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
     }
   };
 
-  // Enhanced Task Card Component - More informative and visually clear
+  // Simplified Task Card Component - Clean and functional
   const TaskCard: React.FC<{ task: Task; view: string }> = ({ task, view }) => {
     const priorityConfig = PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG] || PRIORITY_CONFIG.MEDIUM;
     const statusConfig = STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.PENDING;
-    const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'COMPLETED';
+    const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && !['COMPLETED', 'completed'].includes(task.status);
     const isSelected = selectedTasks.has(task.id);
-    const PriorityIcon = priorityConfig.icon;
     const StatusIcon = statusConfig.icon;
+    
+    // Get next status for quick progression
+    const getNextStatus = (currentStatus: string): string | null => {
+      const statusFlow: Record<string, string | null> = {
+        'pending': 'in_progress',
+        'PENDING': 'in_progress',
+        'in_progress': 'completed',
+        'IN_PROGRESS': 'completed',
+        'blocked': 'in_progress',
+        'BLOCKED': 'in_progress',
+        'review': 'completed',
+        'REVIEW': 'completed',
+        'completed': null,
+        'COMPLETED': null
+      };
+      return statusFlow[currentStatus] || null;
+    };
+    
+    const nextStatus = getNextStatus(task.status);
+    const nextStatusConfig = nextStatus ? STATUS_CONFIG[nextStatus as keyof typeof STATUS_CONFIG] : null;
+    
+    // Format assignee name
+    const getAssigneeName = () => {
+      if (task.assignedUser) {
+        return `${task.assignedUser.first_name || ''} ${task.assignedUser.last_name || ''}`.trim() || task.assignedUser.email;
+      }
+      if (task.assignedTo) {
+        return task.assignedTo; // Fallback to ID if no user object
+      }
+      return 'Unassigned';
+    };
+    
+    // Format creator name
+    const getCreatorName = () => {
+      if (task.created_by) {
+        return task.created_by;
+      }
+      return 'System';
+    };
 
     // Calculate time remaining or overdue
     const getDueDateInfo = () => {
@@ -456,7 +494,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
             )}
             <div className="flex items-center gap-4 text-sm text-gray-500">
               <div className="flex items-center gap-1">
-                <PriorityIcon className={`w-4 h-4 ${priorityConfig.textClass}`} />
+                <priorityConfig.icon className={`w-4 h-4 ${priorityConfig.textClass}`} />
                 <span className={priorityConfig.textClass}>{priorityConfig.label} Priority</span>
               </div>
               {dueDateInfo && (
@@ -541,7 +579,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
               }}
             />
             <div className={`p-2 rounded-lg ${priorityConfig.bgClass}`}>
-              <PriorityIcon className={`w-5 h-5 ${priorityConfig.textClass}`} />
+              <priorityConfig.icon className={`w-5 h-5 ${priorityConfig.textClass}`} />
             </div>
             <span className={`px-3 py-1 text-xs font-semibold rounded-full ${priorityConfig.bgClass} ${priorityConfig.textClass}`}>
               {priorityConfig.label}

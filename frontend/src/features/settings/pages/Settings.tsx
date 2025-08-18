@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import Layout from '../../../components/Layout';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
 import { AdminGPT, PracticePantherManager } from '../../admin/components';
 import { AuditLogFeed } from '../../admin/components/AuditLogFeed';
-import TemplateDocumentManager from '../../../pages/TemplateDocumentManager';
+import TemplateDocumentManager from '../../documents/pages/TemplateDocumentManager';
 
 const Settings: React.FC = () => {
   const [settings, setSettings] = useState<any>({});
@@ -88,9 +87,11 @@ const Settings: React.FC = () => {
       const response = await apiService.get('/account/activity-logs').catch(() => 
         apiService.get('/audit-logs')
       );
-      setActivityLogs(response?.logs || response || []);
+      const logs = response?.logs || response || [];
+      setActivityLogs(Array.isArray(logs) ? logs : []);
     } catch (err: any) {
       console.error('Error loading activity logs:', err);
+      setActivityLogs([]);
     } finally {
       setLoadingActivity(false);
     }
@@ -98,7 +99,7 @@ const Settings: React.FC = () => {
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-    if (tab === 'activity' && activityLogs.length === 0) {
+    if (tab === 'activity' && (Array.isArray(activityLogs) ? activityLogs : []).length === 0) {
       loadActivityLogs();
     }
   };
@@ -127,18 +128,15 @@ const Settings: React.FC = () => {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="bg-gray-200 rounded-lg h-96"></div>
-        </div>
-      </Layout>
+      <div className="animate-pulse">
+        <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+        <div className="bg-gray-200 rounded-lg h-96"></div>
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         </div>
@@ -416,7 +414,7 @@ const Settings: React.FC = () => {
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                       <p className="text-gray-500 mt-2">Loading activity logs...</p>
                     </div>
-                  ) : activityLogs.length === 0 ? (
+                  ) : (Array.isArray(activityLogs) ? activityLogs : []).length === 0 ? (
                     <div className="text-center py-12">
                       <div className="text-gray-400 mb-4">
                         <svg className="w-12 h-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -428,7 +426,7 @@ const Settings: React.FC = () => {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {activityLogs.slice(0, 20).map((log: any, index: number) => (
+                      {(Array.isArray(activityLogs) ? activityLogs : []).slice(0, 20).map((log: any, index: number) => (
                         <div key={log.id || index} className="bg-gray-50 rounded-lg p-4">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -462,7 +460,7 @@ const Settings: React.FC = () => {
                         </div>
                       ))}
                       
-                      {activityLogs.length > 20 && (
+                      {(Array.isArray(activityLogs) ? activityLogs : []).length > 20 && (
                         <div className="text-center pt-4">
                           <p className="text-sm text-gray-500">Showing last 20 activities</p>
                         </div>
@@ -526,7 +524,6 @@ const Settings: React.FC = () => {
           </div>
         </div>
       </div>
-    </Layout>
   );
 };
 

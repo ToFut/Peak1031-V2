@@ -152,7 +152,7 @@ const DebugChatInfo: React.FC = () => {
     }
     
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/test-messages/test`, {
+              const response = await fetch(`${process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5001'}/api/test-messages/test`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -234,7 +234,7 @@ const DebugChatInfo: React.FC = () => {
             <div><strong>Total Exchanges:</strong> {debugData.exchanges?.total || 0}</div>
             <div><strong>Selected Exchange:</strong> {selectedExchange ? `${selectedExchange.exchange_name} (${selectedExchange.id})` : 'None'}</div>
             <div><strong>Participants:</strong> {selectedExchange?.participants?.length || 0}</div>
-            <div><strong>API URL:</strong> {process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}</div>
+            <div><strong>API URL:</strong> {process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}</div>
           </div>
         </div>
 

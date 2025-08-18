@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 const { enforceRBAC } = require('../middleware/rbac');
 
 // Simple permission check function
@@ -28,6 +28,7 @@ const AuthService = require('../services/auth');
 const bcrypt = require('bcryptjs');
 const { transformToCamelCase, transformToSnakeCase } = require('../utils/caseTransform');
 const { Op } = require('sequelize');
+const supabaseService = require('../services/supabase');
 
 const router = express.Router();
 
@@ -368,6 +369,134 @@ router.get('/:userId/activities', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching user activities:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/users/:userId/exchanges
+ * Get exchanges for a specific user (admin only)
+ */
+router.get('/:userId/exchanges', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Get the user to determine their role
+    const user = await databaseService.getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let exchanges = [];
+    const userContactId = user.contact_id;
+
+    // Get exchanges based on user role
+    if (user.role === 'admin' || user.role === 'staff') {
+      exchanges = await databaseService.getExchanges({ limit: 100 });
+    } else if (user.role === 'client') {
+      if (userContactId) {
+        exchanges = await databaseService.getExchanges({
+          where: { client_id: userContactId },
+          limit: 100
+        });
+      }
+    } else if (user.role === 'coordinator') {
+      exchanges = await databaseService.getExchanges({
+        where: { coordinator_id: userId },
+        limit: 100
+      });
+    } else if (user.role === 'agency' || user.role === 'third_party') {
+      // Get exchanges through participations
+      if (userContactId) {
+        const exchangeParticipations = await databaseService.getExchangeParticipants({
+          where: { contact_id: userContactId }
+        });
+        const exchangeIds = exchangeParticipations.map(p => p.exchange_id);
+        if (exchangeIds.length > 0) {
+          exchanges = await databaseService.getExchanges({
+            where: { id: { in: exchangeIds } },
+            limit: 100
+          });
+        }
+      }
+    }
+
+    res.json({
+      data: exchanges,
+      total: exchanges.length
+    });
+  } catch (error) {
+    console.error('Error fetching user exchanges:', error);
+    res.status(500).json({ error: 'Failed to fetch user exchanges' });
+  }
+});
+
+/**
+ * GET /api/users/:userId/permissions
+ * Get permissions for a specific user (admin only)
+ */
+router.get('/:userId/permissions', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Get the user to determine their role
+    const user = await databaseService.getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Define permissions based on user role
+    const rolePermissions = {
+      admin: [
+        { resource: 'exchanges', action: 'read', granted: true },
+        { resource: 'exchanges', action: 'write', granted: true },
+        { resource: 'documents', action: 'read', granted: true },
+        { resource: 'documents', action: 'write', granted: true },
+        { resource: 'tasks', action: 'read', granted: true },
+        { resource: 'tasks', action: 'write', granted: true },
+        { resource: 'messages', action: 'read', granted: true },
+        { resource: 'messages', action: 'write', granted: true },
+        { resource: 'users', action: 'read', granted: true },
+        { resource: 'users', action: 'write', granted: true }
+      ],
+      coordinator: [
+        { resource: 'exchanges', action: 'read', granted: true },
+        { resource: 'exchanges', action: 'write', granted: true },
+        { resource: 'documents', action: 'read', granted: true },
+        { resource: 'documents', action: 'write', granted: true },
+        { resource: 'tasks', action: 'read', granted: true },
+        { resource: 'tasks', action: 'write', granted: true },
+        { resource: 'messages', action: 'read', granted: true },
+        { resource: 'messages', action: 'write', granted: true }
+      ],
+      client: [
+        { resource: 'exchanges', action: 'read', granted: true },
+        { resource: 'documents', action: 'read', granted: true },
+        { resource: 'messages', action: 'read', granted: true },
+        { resource: 'messages', action: 'write', granted: true },
+        { resource: 'tasks', action: 'read', granted: true }
+      ],
+      third_party: [
+        { resource: 'exchanges', action: 'read', granted: true },
+        { resource: 'documents', action: 'read', granted: true },
+        { resource: 'messages', action: 'read', granted: true }
+      ],
+      agency: [
+        { resource: 'exchanges', action: 'read', granted: true },
+        { resource: 'documents', action: 'read', granted: true },
+        { resource: 'messages', action: 'read', granted: true },
+        { resource: 'messages', action: 'write', granted: true }
+      ]
+    };
+
+    const permissions = rolePermissions[user.role] || [];
+
+    res.json({
+      data: permissions,
+      total: permissions.length
+    });
+  } catch (error) {
+    console.error('Error fetching user permissions:', error);
+    res.status(500).json({ error: 'Failed to fetch user permissions' });
   }
 });
 

@@ -91,6 +91,17 @@ const requireExchangePermission = (permission, requireRolePermission = true) => 
         });
       }
 
+      // If user has RBAC access but no participant record, grant access with role defaults
+      if (canAccess && !userParticipant) {
+        console.log(`✅ RBAC access granted for ${userRole} user ${req.user.email} to exchange ${exchangeId} - using role defaults`);
+        exchangePermissions = getDefaultPermissionsForRole(userRole);
+        req.exchangeId = exchangeId;
+        req.userParticipant = null;
+        req.exchangePermissions = exchangePermissions;
+        req.hasExchangePermission = (perm) => exchangePermissions[perm] === true;
+        return next();
+      }
+
       // Parse participant permissions
       let exchangePermissions = {};
       if (userParticipant && userParticipant.permissions) {

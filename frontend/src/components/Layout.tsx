@@ -220,7 +220,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
       },
       users: {
         name: ui.page_titles.users || 'Users',
-        href: '/admin/users',
+        href: '/users',
         icon: UsersIcon,
         iconSolid: UsersIconSolid,
         roles: ['admin']
@@ -270,7 +270,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
       },
       agencies: {
         name: 'Agency Management',
-        href: '/admin/agencies',
+        href: '/agencies',
         icon: BuildingOfficeIcon,
         iconSolid: BuildingOfficeIconSolid,
         roles: ['admin']

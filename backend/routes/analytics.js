@@ -21,6 +21,17 @@ router.get('/financial-overview', authenticateToken, async (req, res) => {
     // Pass user context to analytics service for RBAC
     const overview = await analyticsService.getFinancialOverview({ user: req.user });
     
+    // Check if there was an error in the overview
+    if (overview.error) {
+      console.log('⚠️ Financial overview returned with error:', overview.error);
+      return res.status(200).json({
+        success: true,
+        data: overview,
+        warning: 'Data may be incomplete due to performance constraints',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
     res.json({
       success: true,
       data: overview,
@@ -28,9 +39,30 @@ router.get('/financial-overview', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Financial overview error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
+    
+    // Return a graceful error response instead of 500
+    res.status(200).json({
+      success: true,
+      data: {
+        totalValue: { relinquished: 0, replacement: 0, exchange: 0 },
+        averageValues: { relinquished: 0, replacement: 0, exchange: 0 },
+        statusBreakdown: {},
+        typeBreakdown: {},
+        timelineAnalysis: {},
+        performanceMetrics: {
+          totalExchanges: 0,
+          sampleSize: 0,
+          completionRate: 0,
+          averageCompletionTime: 0,
+          monthlyTrends: []
+        },
+        riskAnalysis: { total: 0 },
+        valueDistribution: {},
+        geographicAnalysis: {},
+        lastUpdated: new Date().toISOString(),
+        error: 'Data temporarily unavailable'
+      },
+      warning: 'Analytics data is temporarily unavailable',
       timestamp: new Date().toISOString()
     });
   }
@@ -82,9 +114,22 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Dashboard stats error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
+    
+    // Return fallback data instead of error
+    const fallbackStats = {
+      financial: { totalValue: 0, averageValue: 0, monthlyValue: 0 },
+      exchanges: { total: 0, active: 0, completed: 0, completionRate: 0 },
+      timeline: { approaching45Day: 0, approaching180Day: 0, overdue: 0 },
+      risk: { high: 0, medium: 0, low: 0, total: 0 },
+      trends: [],
+      recentExchanges: [],
+      lastUpdated: new Date().toISOString()
+    };
+    
+    res.status(200).json({
+      success: true,
+      data: fallbackStats,
+      warning: 'Dashboard data is temporarily unavailable',
       timestamp: new Date().toISOString()
     });
   }

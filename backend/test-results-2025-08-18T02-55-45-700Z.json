@@ -1,0 +1,1312 @@
+{
+  "passed": 0,
+  "failed": 145,
+  "total": 145,
+  "details": [
+    {
+      "endpoint": "/api/health",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.051Z"
+    },
+    {
+      "endpoint": "/api",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.059Z"
+    },
+    {
+      "endpoint": "/api/debug/users",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.069Z"
+    },
+    {
+      "endpoint": "/api/debug/token",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.071Z"
+    },
+    {
+      "endpoint": "/api/auth/login",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.073Z"
+    },
+    {
+      "endpoint": "/api/auth/logout",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.076Z"
+    },
+    {
+      "endpoint": "/api/auth/profile",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.078Z"
+    },
+    {
+      "endpoint": "/api/contacts",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.082Z"
+    },
+    {
+      "endpoint": "/api/contacts",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.094Z"
+    },
+    {
+      "endpoint": "/api/contacts/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.097Z"
+    },
+    {
+      "endpoint": "/api/contacts/1",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.099Z"
+    },
+    {
+      "endpoint": "/api/contacts/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.102Z"
+    },
+    {
+      "endpoint": "/api/exchanges",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.106Z"
+    },
+    {
+      "endpoint": "/api/exchanges?page=1&limit=10",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.108Z"
+    },
+    {
+      "endpoint": "/api/exchanges/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.109Z"
+    },
+    {
+      "endpoint": "/api/exchanges",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.117Z"
+    },
+    {
+      "endpoint": "/api/exchanges/1",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.126Z"
+    },
+    {
+      "endpoint": "/api/exchanges/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.131Z"
+    },
+    {
+      "endpoint": "/api/exchanges/1/participants",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.135Z"
+    },
+    {
+      "endpoint": "/api/exchanges/1/tasks",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.136Z"
+    },
+    {
+      "endpoint": "/api/exchanges/1/documents",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.138Z"
+    },
+    {
+      "endpoint": "/api/tasks",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.142Z"
+    },
+    {
+      "endpoint": "/api/tasks?page=1&limit=10",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.145Z"
+    },
+    {
+      "endpoint": "/api/tasks/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.159Z"
+    },
+    {
+      "endpoint": "/api/tasks",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.163Z"
+    },
+    {
+      "endpoint": "/api/tasks/1",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.166Z"
+    },
+    {
+      "endpoint": "/api/tasks/1/status",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.171Z"
+    },
+    {
+      "endpoint": "/api/tasks/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.190Z"
+    },
+    {
+      "endpoint": "/api/tasks/exchange/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.193Z"
+    },
+    {
+      "endpoint": "/api/tasks/user/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.200Z"
+    },
+    {
+      "endpoint": "/api/tasks/statistics",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.203Z"
+    },
+    {
+      "endpoint": "/api/documents",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.205Z"
+    },
+    {
+      "endpoint": "/api/documents/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.214Z"
+    },
+    {
+      "endpoint": "/api/documents",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.223Z"
+    },
+    {
+      "endpoint": "/api/documents/1",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.227Z"
+    },
+    {
+      "endpoint": "/api/documents/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.229Z"
+    },
+    {
+      "endpoint": "/api/documents/templates",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.231Z"
+    },
+    {
+      "endpoint": "/api/documents/templates/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.233Z"
+    },
+    {
+      "endpoint": "/api/documents/templates",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.234Z"
+    },
+    {
+      "endpoint": "/api/messages",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.237Z"
+    },
+    {
+      "endpoint": "/api/messages/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.242Z"
+    },
+    {
+      "endpoint": "/api/messages",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.248Z"
+    },
+    {
+      "endpoint": "/api/messages/1",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.251Z"
+    },
+    {
+      "endpoint": "/api/messages/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.253Z"
+    },
+    {
+      "endpoint": "/api/messages/exchange/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.256Z"
+    },
+    {
+      "endpoint": "/api/messages/user/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.258Z"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.261Z"
+    },
+    {
+      "endpoint": "/api/notifications/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.264Z"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.266Z"
+    },
+    {
+      "endpoint": "/api/notifications/1/read",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.268Z"
+    },
+    {
+      "endpoint": "/api/notifications/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.270Z"
+    },
+    {
+      "endpoint": "/api/admin/users",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.272Z"
+    },
+    {
+      "endpoint": "/api/admin/statistics",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.285Z"
+    },
+    {
+      "endpoint": "/api/admin/audit-logs",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.290Z"
+    },
+    {
+      "endpoint": "/api/admin/system-health",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.293Z"
+    },
+    {
+      "endpoint": "/api/admin/users",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.295Z"
+    },
+    {
+      "endpoint": "/api/admin/users/1",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.297Z"
+    },
+    {
+      "endpoint": "/api/admin/users/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.299Z"
+    },
+    {
+      "endpoint": "/api/enterprise-exchanges",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.309Z"
+    },
+    {
+      "endpoint": "/api/enterprise-exchanges/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.348Z"
+    },
+    {
+      "endpoint": "/api/enterprise-exchanges",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.380Z"
+    },
+    {
+      "endpoint": "/api/enterprise-exchanges/1",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.384Z"
+    },
+    {
+      "endpoint": "/api/enterprise-exchanges/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.388Z"
+    },
+    {
+      "endpoint": "/api/account/profile",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.391Z"
+    },
+    {
+      "endpoint": "/api/account/profile",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.393Z"
+    },
+    {
+      "endpoint": "/api/account/password",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.399Z"
+    },
+    {
+      "endpoint": "/api/sync/status",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.417Z"
+    },
+    {
+      "endpoint": "/api/sync/start",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.420Z"
+    },
+    {
+      "endpoint": "/api/sync/stop",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.426Z"
+    },
+    {
+      "endpoint": "/api/sync/logs",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.432Z"
+    },
+    {
+      "endpoint": "/api/sync/contacts",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.439Z"
+    },
+    {
+      "endpoint": "/api/sync/exchanges",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.451Z"
+    },
+    {
+      "endpoint": "/api/sync-routes/status",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.456Z"
+    },
+    {
+      "endpoint": "/api/sync-routes/start",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.462Z"
+    },
+    {
+      "endpoint": "/api/sync-routes/stop",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.464Z"
+    },
+    {
+      "endpoint": "/api/sync-routes/logs",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.466Z"
+    },
+    {
+      "endpoint": "/api/exports",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.468Z"
+    },
+    {
+      "endpoint": "/api/exports/exchanges",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.470Z"
+    },
+    {
+      "endpoint": "/api/exports/contacts",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.473Z"
+    },
+    {
+      "endpoint": "/api/exports/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.488Z"
+    },
+    {
+      "endpoint": "/api/exports/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.494Z"
+    },
+    {
+      "endpoint": "/api/oauth/providers",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.504Z"
+    },
+    {
+      "endpoint": "/api/oauth/authorize",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.509Z"
+    },
+    {
+      "endpoint": "/api/oauth/callback",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.525Z"
+    },
+    {
+      "endpoint": "/api/oauth/tokens",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.530Z"
+    },
+    {
+      "endpoint": "/api/oauth/tokens/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.533Z"
+    },
+    {
+      "endpoint": "/api/exchange-participants",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.537Z"
+    },
+    {
+      "endpoint": "/api/exchange-participants/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.547Z"
+    },
+    {
+      "endpoint": "/api/exchange-participants",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.563Z"
+    },
+    {
+      "endpoint": "/api/exchange-participants/1",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.574Z"
+    },
+    {
+      "endpoint": "/api/exchange-participants/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.583Z"
+    },
+    {
+      "endpoint": "/api/documents/templates",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.588Z"
+    },
+    {
+      "endpoint": "/api/documents/templates/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.589Z"
+    },
+    {
+      "endpoint": "/api/documents/templates",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.590Z"
+    },
+    {
+      "endpoint": "/api/documents/templates/1",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.592Z"
+    },
+    {
+      "endpoint": "/api/documents/templates/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.593Z"
+    },
+    {
+      "endpoint": "/api/documents/templates/1/generate",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.596Z"
+    },
+    {
+      "endpoint": "/api/templates-enhanced",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.600Z"
+    },
+    {
+      "endpoint": "/api/templates-enhanced/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.601Z"
+    },
+    {
+      "endpoint": "/api/templates-enhanced",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.603Z"
+    },
+    {
+      "endpoint": "/api/templates-enhanced/1",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.604Z"
+    },
+    {
+      "endpoint": "/api/templates-enhanced/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.606Z"
+    },
+    {
+      "endpoint": "/api/template-documents",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.614Z"
+    },
+    {
+      "endpoint": "/api/template-documents/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.617Z"
+    },
+    {
+      "endpoint": "/api/template-documents",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.618Z"
+    },
+    {
+      "endpoint": "/api/template-documents/1",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.619Z"
+    },
+    {
+      "endpoint": "/api/template-documents/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.620Z"
+    },
+    {
+      "endpoint": "/api/messages-enhanced",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.621Z"
+    },
+    {
+      "endpoint": "/api/messages-enhanced/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.623Z"
+    },
+    {
+      "endpoint": "/api/messages-enhanced",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.625Z"
+    },
+    {
+      "endpoint": "/api/messages-enhanced/1",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.626Z"
+    },
+    {
+      "endpoint": "/api/messages-enhanced/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.627Z"
+    },
+    {
+      "endpoint": "/api/exchanges-updated",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.627Z"
+    },
+    {
+      "endpoint": "/api/exchanges-updated/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.628Z"
+    },
+    {
+      "endpoint": "/api/exchanges-updated",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.628Z"
+    },
+    {
+      "endpoint": "/api/exchanges-updated/1",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.629Z"
+    },
+    {
+      "endpoint": "/api/exchanges-updated/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.629Z"
+    },
+    {
+      "endpoint": "/api/mock/users",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.630Z"
+    },
+    {
+      "endpoint": "/api/mock/exchanges",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.631Z"
+    },
+    {
+      "endpoint": "/api/mock/tasks",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.631Z"
+    },
+    {
+      "endpoint": "/api/mock/documents",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.632Z"
+    },
+    {
+      "endpoint": "/api/mock/messages",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.634Z"
+    },
+    {
+      "endpoint": "/api/auth/supabase/login",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.637Z"
+    },
+    {
+      "endpoint": "/api/auth/supabase/register",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.642Z"
+    },
+    {
+      "endpoint": "/api/auth/supabase/logout",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.645Z"
+    },
+    {
+      "endpoint": "/api/auth/supabase/refresh",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.651Z"
+    },
+    {
+      "endpoint": "/api/supabase-exchanges",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.656Z"
+    },
+    {
+      "endpoint": "/api/supabase-exchanges/1",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.658Z"
+    },
+    {
+      "endpoint": "/api/supabase-exchanges",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.664Z"
+    },
+    {
+      "endpoint": "/api/supabase-exchanges/1",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.666Z"
+    },
+    {
+      "endpoint": "/api/supabase-exchanges/1",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.668Z"
+    },
+    {
+      "endpoint": "/api/auth/legacy/login",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.670Z"
+    },
+    {
+      "endpoint": "/api/auth/legacy/register",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.672Z"
+    },
+    {
+      "endpoint": "/api/auth/legacy/logout",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.673Z"
+    },
+    {
+      "endpoint": "/api/auth/legacy/refresh",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.677Z"
+    },
+    {
+      "endpoint": "/api/practice-partner/status",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.681Z"
+    },
+    {
+      "endpoint": "/api/practice-partner/sync",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.683Z"
+    },
+    {
+      "endpoint": "/api/practice-partner/contacts",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.684Z"
+    },
+    {
+      "endpoint": "/api/practice-partner/exchanges",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.686Z"
+    },
+    {
+      "endpoint": "/api/files",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.687Z"
+    },
+    {
+      "endpoint": "/api/files/test.pdf",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.689Z"
+    },
+    {
+      "endpoint": "/api/nonexistent",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.690Z"
+    },
+    {
+      "endpoint": "/api/invalid-endpoint",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.692Z"
+    },
+    {
+      "endpoint": "/api/unknown/123",
+      "method": "PUT",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.694Z"
+    },
+    {
+      "endpoint": "/api/missing/456",
+      "method": "DELETE",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-18T02:55:45.695Z"
+    }
+  ]
+}

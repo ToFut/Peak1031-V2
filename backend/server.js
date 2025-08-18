@@ -94,6 +94,9 @@ class PeakServer {
   }
 
   initializeMiddleware() {
+    // Trust proxy for rate limiting behind reverse proxy - only trust localhost
+    this.app.set('trust proxy', 'loopback');
+    
     // Security middleware
     this.app.use(helmet({
       contentSecurityPolicy: {
@@ -178,7 +181,10 @@ class PeakServer {
 
     // Health check endpoint
     this.app.get('/health', (req, res) => {
-      res.json({
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🏥 API health check');
+      }
+      res.json({ 
         status: 'healthy',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
@@ -328,6 +334,7 @@ class PeakServer {
     this.app.use('/api/settings', settingsRoutes);
     this.app.use('/api/user-profile', userProfileRoutes);
     this.app.use('/api/agencies', agencyRoutes);
+    this.app.use('/api/agency', agencyRoutes);
 
     this.app.use('/api/enterprise-exchanges', enterpriseExchangesRoutes);
     this.app.use('/api/account-management', accountManagementRoutes);

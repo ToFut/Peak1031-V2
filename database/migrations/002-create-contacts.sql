@@ -1,6 +1,7 @@
 -- Create contacts table
 CREATE TABLE contacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   pp_contact_id VARCHAR(100) UNIQUE NOT NULL,
   first_name VARCHAR(100),
   last_name VARCHAR(100),
@@ -15,6 +16,7 @@ CREATE TABLE contacts (
 );
 
 -- Create indexes
+CREATE INDEX idx_contacts_user_id ON contacts(user_id);
 CREATE INDEX idx_contacts_pp_contact_id ON contacts(pp_contact_id);
 CREATE INDEX idx_contacts_email ON contacts(email);
 CREATE INDEX idx_contacts_company ON contacts(company);

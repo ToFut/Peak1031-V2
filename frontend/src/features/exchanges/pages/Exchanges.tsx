@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { ExchangeList } from '../components/ExchangeList';
 import { useAuth } from '../../../hooks/useAuth';
 import { useAnalytics } from '../../../hooks/useAnalytics';
@@ -52,8 +53,13 @@ const Exchanges: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Clean Header */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        {/* Enhanced Header with animations */}
+        <motion.div 
+          className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-6 bg-gradient-to-r from-blue-50 via-white to-purple-50"
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+        >
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Exchanges</h1>
@@ -369,7 +375,7 @@ const Exchanges: React.FC = () => {
               )}
             </div>
           )}
-        </div>
+        </motion.div>
 
         {/* Clean Exchange List */}
         <ExchangeList 

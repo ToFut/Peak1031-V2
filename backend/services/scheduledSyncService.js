@@ -205,11 +205,11 @@ class ScheduledSyncService {
       
       // Use axios directly with updated_since parameter
       const axios = require('axios');
-      const token = await ppTokenManager.getStoredToken();
+      const token = await ppTokenManager.getValidAccessToken();
 
       const response = await axios.get('https://app.practicepanther.com/api/v2/matters', {
         headers: {
-          'Authorization': `Bearer ${token.access_token}`,
+          'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
         },
         params: {
@@ -230,6 +230,13 @@ class ScheduledSyncService {
 
     } catch (error) {
       console.error('❌ Incremental matter sync failed:', error.message);
+      
+      // Handle authentication errors gracefully
+      if (error.message?.includes('401') || error.message?.includes('Authorization')) {
+        console.log('⚠️ PracticePanther authentication failed - skipping sync until token is refreshed');
+        return; // Don't throw, just skip this sync
+      }
+      
       throw error;
     }
   }
@@ -241,11 +248,11 @@ class ScheduledSyncService {
 
       const axios = require('axios');
       const practicePartnerService = require('./practicePartnerService');
-      const token = await ppTokenManager.getStoredToken();
+      const token = await ppTokenManager.getValidAccessToken();
 
       const response = await axios.get('https://app.practicepanther.com/api/v2/accounts', {
         headers: {
-          'Authorization': `Bearer ${token.access_token}`,
+          'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
         },
         params: {
@@ -277,12 +284,12 @@ class ScheduledSyncService {
 
       const axios = require('axios');
       const practicePartnerService = require('./practicePartnerService');
-      const token = await ppTokenManager.getStoredToken();
+      const token = await ppTokenManager.getValidAccessToken();
 
       // Get only NEW tasks that are NOT completed
       const response = await axios.get('https://app.practicepanther.com/api/v2/tasks', {
         headers: {
-          'Authorization': `Bearer ${token.access_token}`,
+          'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
         },
         params: {

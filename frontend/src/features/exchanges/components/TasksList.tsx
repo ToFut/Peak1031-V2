@@ -6,9 +6,10 @@ import { formatDate, isOverdue } from '../../../utils/date.utils';
 interface TasksListProps {
   tasks: Task[];
   onTaskClick?: (task: Task) => void;
+  onTaskUpdate?: () => Promise<void>;
 }
 
-export const TasksList: React.FC<TasksListProps> = ({ tasks, onTaskClick }) => {
+export const TasksList: React.FC<TasksListProps> = ({ tasks, onTaskClick, onTaskUpdate }) => {
   const sortedTasks = [...tasks].sort((a, b) => {
     // Sort by status (pending first) then by due date
     if (a.status !== b.status) {

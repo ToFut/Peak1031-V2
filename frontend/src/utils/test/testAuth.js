@@ -8,7 +8,7 @@ export const validateCurrentToken = async () => {
 
   try {
     // Test token validity by making a simple API call
-    const response = await fetch(`${process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/auth/me`, {
+    const response = await fetch(`${process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5001'}/api/auth/me`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -49,7 +49,7 @@ export const testAuth = async () => {
       throw new Error('Test credentials required');
     }
     
-    const loginResponse = await fetch(`${process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/auth/login`, {
+    const loginResponse = await fetch(`${process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5001'}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -73,7 +73,7 @@ export const testAuth = async () => {
     }
     
     // Test API call
-          const contactsResponse = await fetch(`${process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/contacts`, {
+          const contactsResponse = await fetch(`${process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5001'}/api/contacts`, {
       headers: {
         'Authorization': `Bearer ${loginData.token}`,
         'Content-Type': 'application/json'

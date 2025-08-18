@@ -1,4 +1,5 @@
 const express = require('express');
+const { body, param, validationResult } = require('express-validator');
 const { createClient } = require('@supabase/supabase-js');
 const { transformToCamelCase, transformApiResponse } = require('../utils/caseTransform');
 const { enforceRBAC } = require('../middleware/rbac');
@@ -150,28 +151,48 @@ router.get('/', authenticateToken, async (req, res) => {
         if (participantsError) {
           console.warn('⚠️ Could not load participants:', participantsError.message);
         } else if (participants && participants.length > 0) {
-          // Get all unique contact_ids
+          // Get all unique contact_ids and user_ids
           const contactIds = [...new Set(participants.map(p => p.contact_id).filter(Boolean))];
+          const userIds = [...new Set(participants.map(p => p.user_id).filter(Boolean))];
+          
+          // Get both contacts and users
+          let contacts = [];
+          let users = [];
           
           if (contactIds.length > 0) {
-            // Get contact information (using people table, not contacts to avoid FK conflicts)
-            const { data: contacts, error: contactsError } = await supabase
-              .from('people')
+            // Get contact information from contacts table
+            const { data: contactsData, error: contactsError } = await supabase
+              .from('contacts')
               .select('id, first_name, last_name, email, role')
               .in('id', contactIds);
               
             if (contactsError) {
               console.warn('⚠️ Could not load contacts:', contactsError.message);
             } else {
-              // Manually join participants with contact data
-              exchangeParticipants = participants.map(participant => ({
-                ...participant,
-                contact: contacts?.find(c => c.id === participant.contact_id) || null
-              }));
+              contacts = contactsData || [];
             }
-          } else {
-            exchangeParticipants = participants;
           }
+          
+          if (userIds.length > 0) {
+            // Get user information
+            const { data: usersData, error: usersError } = await supabase
+              .from('users')
+              .select('id, first_name, last_name, email, role, is_active')
+              .in('id', userIds);
+              
+            if (usersError) {
+              console.warn('⚠️ Could not load users:', usersError.message);
+            } else {
+              users = usersData || [];
+            }
+          }
+          
+          // Manually join participants with contact and user data
+          exchangeParticipants = participants.map(participant => ({
+            ...participant,
+            contact: participant.contact_id ? contacts.find(c => c.id === participant.contact_id) || null : null,
+            user: participant.user_id ? users.find(u => u.id === participant.user_id) || null : null
+          }));
         }
       }
       
@@ -189,7 +210,7 @@ router.get('/', authenticateToken, async (req, res) => {
     } else {
       // For non-admin users, use RBAC service to get authorized exchanges
       console.log('🔒 Non-admin user - using RBAC filtering');
-      result = await rbacService.getExchangesForUser(req.user, {
+      const rbacResult = await rbacService.getExchangesForUser(req.user, {
         status: req.query.status,
         limit: parseInt(req.query.limit) || 50,
         orderBy: {
@@ -197,6 +218,77 @@ router.get('/', authenticateToken, async (req, res) => {
           ascending: req.query.sortOrder !== 'desc'
         }
       });
+      
+      // Now get participants for these exchanges with manual joins (same as admin)
+      const exchangeIds = rbacResult.data?.map(ex => ex.id) || [];
+      let exchangeParticipants = [];
+      
+      if (exchangeIds.length > 0) {
+        // Get raw participants
+        const { data: participants, error: participantsError } = await supabase
+          .from('exchange_participants')
+          .select('*')
+          .in('exchange_id', exchangeIds);
+          
+        if (participantsError) {
+          console.warn('⚠️ Could not load participants for RBAC users:', participantsError.message);
+        } else if (participants && participants.length > 0) {
+          // Get all unique contact_ids and user_ids
+          const contactIds = [...new Set(participants.map(p => p.contact_id).filter(Boolean))];
+          const userIds = [...new Set(participants.map(p => p.user_id).filter(Boolean))];
+          
+          // Get both contacts and users
+          let contacts = [];
+          let users = [];
+          
+          if (contactIds.length > 0) {
+            // Get contact information
+            const { data: contactsData, error: contactsError } = await supabase
+              .from('people')
+              .select('id, first_name, last_name, email, role')
+              .in('id', contactIds);
+              
+            if (contactsError) {
+              console.warn('⚠️ Could not load contacts:', contactsError.message);
+            } else {
+              contacts = contactsData || [];
+            }
+          }
+          
+          if (userIds.length > 0) {
+            // Get user information
+            const { data: usersData, error: usersError } = await supabase
+              .from('users')
+              .select('id, first_name, last_name, email, role, is_active')
+              .in('id', userIds);
+              
+            if (usersError) {
+              console.warn('⚠️ Could not load users:', usersError.message);
+            } else {
+              users = usersData || [];
+            }
+          }
+          
+          // Manually join participants with contact and user data
+          exchangeParticipants = participants.map(participant => ({
+            ...participant,
+            contact: participant.contact_id ? contacts.find(c => c.id === participant.contact_id) || null : null,
+            user: participant.user_id ? users.find(u => u.id === participant.user_id) || null : null
+          }));
+        }
+      }
+      
+      // Attach participants to each exchange
+      const exchangesWithParticipants = rbacResult.data?.map(exchange => ({
+        ...exchange,
+        exchange_participants: exchangeParticipants.filter(p => p.exchange_id === exchange.id),
+        exchangeParticipants: exchangeParticipants.filter(p => p.exchange_id === exchange.id)
+      })) || [];
+      
+      result = {
+        data: exchangesWithParticipants,
+        count: rbacResult.count
+      };
     }
     
     // Transform the response
@@ -886,6 +978,502 @@ router.get('/:id/tasks', async (req, res) => {
     console.error('Error fetching exchange tasks:', error);
     res.status(500).json({
       error: 'Failed to fetch tasks',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/exchanges/:id/assign-client
+ * Assign a client to an exchange
+ */
+router.put('/:id/assign-client', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  body('client_id').isUUID().withMessage('Client ID must be a valid UUID'),
+  authenticateToken
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { id } = req.params;
+    const { client_id } = req.body;
+
+    console.log(`🎯 Assigning client ${client_id} to exchange ${id}`);
+
+    // Verify that the client exists in either users or contacts table
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, email, first_name, last_name, role')
+      .eq('id', client_id)
+      .single();
+
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('id, email, first_name, last_name')
+      .eq('id', client_id)
+      .single();
+
+    if (!user && !contact) {
+      return res.status(400).json({
+        error: 'Invalid client',
+        message: 'Client ID does not exist in users or contacts table'
+      });
+    }
+
+    const clientInfo = user || contact;
+    console.log('📝 Assigning client:', clientInfo.email);
+
+    // Use exchange_participants table for client assignment, leaving exchanges table untouched
+    console.log('📝 Creating client assignment via exchange_participants table only');
+    
+    // Remove any existing client assignments for this exchange
+    await supabase
+      .from('exchange_participants')
+      .delete()
+      .eq('exchange_id', id)
+      .eq('participant_type', 'client');
+
+    // Create new client assignment in exchange_participants
+    const participantData = {
+      exchange_id: id,
+      participant_type: 'client',
+      role: 'client',
+      is_active: true,
+      assigned_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    if (user) {
+      participantData.user_id = client_id;
+    } else if (contact) {
+      participantData.contact_id = client_id;
+    }
+
+    const { data: participantResult, error: participantError } = await supabase
+      .from('exchange_participants')
+      .insert(participantData)
+      .select()
+      .single();
+
+    if (participantError) {
+      console.error('Failed to create participant record:', participantError);
+      return res.status(500).json({
+        error: 'Failed to assign client',
+        message: participantError.message
+      });
+    }
+
+    console.log('✅ Client assigned via exchange_participants table');
+
+    // Get the updated exchange data for response
+    const { data: updatedExchange } = await supabase
+      .from('exchanges')
+      .select()
+      .eq('id', id)
+      .single();
+
+    res.json({
+      success: true,
+      message: 'Client assigned successfully',
+      exchange: updatedExchange,
+      client: clientInfo,
+      participant: participantResult
+    });
+
+  } catch (error) {
+    console.error('Error assigning client:', error);
+    res.status(500).json({
+      error: 'Failed to assign client',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/exchanges/:id/assign-coordinator
+ * Assign a coordinator to an exchange with approval notification
+ */
+router.put('/:id/assign-coordinator', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  body('coordinator_id').isUUID().withMessage('Coordinator ID must be a valid UUID'),
+  authenticateToken
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { id } = req.params;
+    const { coordinator_id } = req.body;
+
+    console.log(`🎯 Assigning coordinator ${coordinator_id} to exchange ${id}`);
+
+    // Get exchange info
+    const { data: exchange, error: exchangeError } = await supabase
+      .from('exchanges')
+      .select('id, name, exchange_name')
+      .eq('id', id)
+      .single();
+
+    if (exchangeError || !exchange) {
+      return res.status(404).json({
+        error: 'Exchange not found',
+        message: exchangeError?.message || 'Exchange does not exist'
+      });
+    }
+
+    // Verify that the coordinator exists in either users or contacts table
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, email, first_name, last_name, role')
+      .eq('id', coordinator_id)
+      .single();
+
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('id, email, first_name, last_name')
+      .eq('id', coordinator_id)
+      .single();
+
+    if (!user && !contact) {
+      return res.status(400).json({
+        error: 'Invalid coordinator',
+        message: 'Coordinator ID does not exist in users or contacts table'
+      });
+    }
+
+    const coordinatorInfo = user || contact;
+    console.log('📝 Assigning coordinator:', coordinatorInfo.email);
+
+    // Remove any existing coordinator assignments for this exchange
+    await supabase
+      .from('exchange_participants')
+      .delete()
+      .eq('exchange_id', id)
+      .eq('participant_type', 'coordinator');
+
+    // Create new coordinator assignment in exchange_participants with pending approval
+    const participantData = {
+      exchange_id: id,
+      participant_type: 'coordinator',
+      role: 'coordinator',
+      is_active: false, // Start as inactive until approved
+      approval_status: 'pending',
+      assigned_by: req.user.id,
+      assigned_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    if (user) {
+      participantData.user_id = coordinator_id;
+    } else if (contact) {
+      participantData.contact_id = coordinator_id;
+    }
+
+    const { data: participantResult, error: participantError } = await supabase
+      .from('exchange_participants')
+      .insert(participantData)
+      .select()
+      .single();
+
+    if (participantError) {
+      console.error('Failed to create participant record:', participantError);
+      return res.status(500).json({
+        error: 'Failed to assign coordinator',
+        message: participantError.message
+      });
+    }
+
+    // Create approval token for the assignment
+    const crypto = require('crypto');
+    const approvalToken = crypto.randomBytes(32).toString('hex');
+    const approvalExpiry = new Date();
+    approvalExpiry.setDate(approvalExpiry.getDate() + 7); // 7 days to approve
+
+    // Store the approval request
+    const { data: approvalRequest, error: approvalError } = await supabase
+      .from('assignment_approvals')
+      .insert({
+        id: crypto.randomUUID(),
+        participant_id: participantResult.id,
+        exchange_id: id,
+        assignee_email: coordinatorInfo.email,
+        assignee_name: `${coordinatorInfo.first_name || ''} ${coordinatorInfo.last_name || ''}`.trim(),
+        assignment_type: 'coordinator',
+        approval_token: approvalToken,
+        expires_at: approvalExpiry.toISOString(),
+        status: 'pending',
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (approvalError) {
+      console.warn('Failed to create approval request:', approvalError);
+      // Continue without approval system if table doesn't exist
+    }
+
+    // Send notification email
+    try {
+      const notificationService = require('../services/notifications');
+      const exchangeName = exchange.name || exchange.exchange_name || 'Exchange';
+      const assignedBy = `${req.user.first_name || ''} ${req.user.last_name || ''}`.trim() || req.user.email;
+
+      const approvalUrl = `${process.env.FRONTEND_URL || 'https://peak1031-v2-8uus.vercel.app'}/approve-assignment/${approvalToken}`;
+
+      await notificationService.sendAssignmentApprovalEmail({
+        to: coordinatorInfo.email,
+        assigneeName: `${coordinatorInfo.first_name || ''} ${coordinatorInfo.last_name || ''}`.trim(),
+        exchangeName,
+        assignedBy,
+        role: 'Coordinator',
+        approvalUrl,
+        exchangeId: id
+      });
+
+      console.log('✅ Assignment approval email sent to:', coordinatorInfo.email);
+    } catch (emailError) {
+      console.warn('Failed to send assignment approval email:', emailError);
+      // Don't fail the assignment if email fails
+    }
+
+    console.log('✅ Coordinator assignment created, awaiting approval');
+
+    res.json({
+      success: true,
+      message: 'Coordinator assignment created. Approval email sent.',
+      exchange,
+      coordinator: coordinatorInfo,
+      participant: participantResult,
+      approvalToken: approvalRequest?.approval_token,
+      status: 'pending_approval'
+    });
+
+  } catch (error) {
+    console.error('Error assigning coordinator:', error);
+    res.status(500).json({
+      error: 'Failed to assign coordinator',
+      message: error.message
+    });
+  }
+});
+
+// Get assignment approval details
+router.get('/assignment-approval/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    
+    console.log(`🔍 Looking up assignment approval for token: ${token.substring(0, 8)}...`);
+    
+    // Get approval record with participant and exchange details
+    const { data: approval, error } = await supabase
+      .from('assignment_approvals')
+      .select(`
+        *,
+        exchange_participants:participant_id (
+          id,
+          exchange_id,
+          participant_type,
+          role,
+          approval_status,
+          assigned_by,
+          created_at,
+          exchanges:exchange_id (
+            id,
+            name
+          ),
+          users:assigned_by (
+            first_name,
+            last_name
+          )
+        )
+      `)
+      .eq('token', token)
+      .eq('status', 'pending')
+      .gt('expires_at', new Date().toISOString())
+      .single();
+    
+    if (error || !approval) {
+      console.log('❌ Assignment approval not found or expired:', error?.message);
+      return res.status(404).json({
+        success: false,
+        error: 'Assignment approval not found or has expired'
+      });
+    }
+    
+    const participant = approval.exchange_participants;
+    const exchange = participant.exchanges;
+    const assigner = participant.users;
+    
+    const assignmentDetails = {
+      id: approval.id,
+      exchangeId: exchange.id,
+      exchangeName: exchange.name,
+      role: participant.role,
+      assignedByName: `${assigner.first_name} ${assigner.last_name}`.trim() || 'Administrator',
+      assignedAt: participant.created_at,
+      status: participant.approval_status,
+      token: approval.token
+    };
+    
+    res.json({
+      success: true,
+      assignment: assignmentDetails
+    });
+
+  } catch (error) {
+    console.error('❌ Error getting assignment approval:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load assignment details',
+      message: error.message
+    });
+  }
+});
+
+// Approve assignment
+router.post('/assignment-approval/:token/approve', async (req, res) => {
+  try {
+    const { token } = req.params;
+    
+    console.log(`✅ Processing assignment approval for token: ${token.substring(0, 8)}...`);
+    
+    // Get approval record
+    const { data: approval, error } = await supabase
+      .from('assignment_approvals')
+      .select(`
+        *,
+        exchange_participants:participant_id (
+          id,
+          exchange_id
+        )
+      `)
+      .eq('token', token)
+      .eq('status', 'pending')
+      .gt('expires_at', new Date().toISOString())
+      .single();
+    
+    if (error || !approval) {
+      return res.status(404).json({
+        success: false,
+        error: 'Assignment approval not found or has expired'
+      });
+    }
+    
+    // Update participant to approved and active
+    const { error: participantError } = await supabase
+      .from('exchange_participants')
+      .update({
+        approval_status: 'approved',
+        is_active: true,
+        approved_at: new Date().toISOString()
+      })
+      .eq('id', approval.participant_id);
+    
+    if (participantError) {
+      throw new Error(`Failed to approve participant: ${participantError.message}`);
+    }
+    
+    // Update approval status
+    const { error: approvalError } = await supabase
+      .from('assignment_approvals')
+      .update({
+        status: 'approved',
+        approved_at: new Date().toISOString()
+      })
+      .eq('id', approval.id);
+    
+    if (approvalError) {
+      console.error('❌ Error updating approval status:', approvalError);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Assignment approved successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Error approving assignment:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to approve assignment',
+      message: error.message
+    });
+  }
+});
+
+// Decline assignment
+router.post('/assignment-approval/:token/decline', async (req, res) => {
+  try {
+    const { token } = req.params;
+    
+    console.log(`❌ Processing assignment decline for token: ${token.substring(0, 8)}...`);
+    
+    // Get approval record
+    const { data: approval, error } = await supabase
+      .from('assignment_approvals')
+      .select('*')
+      .eq('token', token)
+      .eq('status', 'pending')
+      .gt('expires_at', new Date().toISOString())
+      .single();
+    
+    if (error || !approval) {
+      return res.status(404).json({
+        success: false,
+        error: 'Assignment approval not found or has expired'
+      });
+    }
+    
+    // Update participant to declined
+    const { error: participantError } = await supabase
+      .from('exchange_participants')
+      .update({
+        approval_status: 'declined',
+        is_active: false,
+        declined_at: new Date().toISOString()
+      })
+      .eq('id', approval.participant_id);
+    
+    if (participantError) {
+      throw new Error(`Failed to decline participant: ${participantError.message}`);
+    }
+    
+    // Update approval status
+    const { error: approvalError } = await supabase
+      .from('assignment_approvals')
+      .update({
+        status: 'declined',
+        declined_at: new Date().toISOString()
+      })
+      .eq('id', approval.id);
+    
+    if (approvalError) {
+      console.error('❌ Error updating approval status:', approvalError);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Assignment declined successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Error declining assignment:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to decline assignment',
       message: error.message
     });
   }

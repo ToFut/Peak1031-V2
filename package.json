@@ -4,6 +4,7 @@
   "description": "Peak 1031 V1 Platform - Complete 1031 Exchange Management System",
   "main": "index.js",
   "scripts": {
+    "start": "npm run dev",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm start",

@@ -3,6 +3,7 @@ import StandardDashboard from './StandardDashboard';
 import { EnhancedStatCard } from './SharedDashboardComponents';
 import { ExchangeList } from '../../exchanges/components/ExchangeList';
 import { useDashboardData } from '../../../shared/hooks/useDashboardData';
+import AgencyClientPortfolio from './AgencyClientPortfolio';
 import {
   ChartBarIcon,
   DocumentTextIcon,
@@ -1111,6 +1112,8 @@ const StandardizedAgencyDashboard: React.FC = () => {
   // Render appropriate content based on active section
   const renderSectionContent = () => {
     switch (activeSection) {
+      case 'clients':
+        return <AgencyClientPortfolio />;
       case 'third-parties':
         return <ThirdPartiesContent thirdParties={mockThirdParties} onThirdPartySelect={setSelectedThirdParty} />;
       case 'exchanges':
@@ -1139,6 +1142,17 @@ const StandardizedAgencyDashboard: React.FC = () => {
             >
               <ChartBarIcon className="h-5 w-5 inline mr-2" />
               Overview
+            </button>
+            <button
+              onClick={() => setActiveSection('clients')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeSection === 'clients'
+                  ? 'border-orange-500 text-orange-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <UsersIcon className="h-5 w-5 inline mr-2" />
+              Clients
             </button>
             <button
               onClick={() => setActiveSection('third-parties')}

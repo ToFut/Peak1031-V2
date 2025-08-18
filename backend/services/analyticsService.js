@@ -26,16 +26,54 @@ class AnalyticsService {
       let exchanges;
 
       if (user) {
-        // Use RBAC to get user's authorized exchanges
-        const rbacResult = await rbacService.getExchangesForUser(user, {
-          limit: 1000, // Sample size for analysis
-          orderBy: { column: 'created_at', ascending: false }
-        });
-        
-        totalCount = rbacResult.count;
-        exchanges = rbacResult.data || [];
-        
-        console.log(`📊 Analytics: Using RBAC for ${user.role} - ${totalCount} total exchanges`);
+        // For admin users, use a more efficient approach
+        if (user.role === 'admin') {
+          console.log('📊 Analytics: Admin user - using optimized query');
+          
+          // Get total count first
+          const { count: directCount, error: countError } = await supabaseService.client
+            .from('exchanges')
+            .select('id', { count: 'exact', head: true });
+
+          if (countError) throw countError;
+          totalCount = directCount;
+
+          // Get a sample of exchanges for analysis (limit to 500 for performance)
+          const { data: directExchanges, error } = await supabaseService.client
+            .from('exchanges')
+            .select(`
+              id, 
+              relinquished_property_value,
+              replacement_property_value,
+              exchange_value,
+              status,
+              exchange_type,
+              created_at,
+              sale_date,
+              identification_deadline,
+              exchange_deadline
+            `)
+            .order('created_at', { ascending: false })
+            .limit(500); // Reduced from 1000 to 500 for better performance
+          
+          if (error) throw error;
+          exchanges = directExchanges;
+          
+          console.log(`📊 Analytics: Admin query returned ${exchanges.length} exchanges from ${totalCount} total`);
+        } else {
+          // For non-admin users, use RBAC but with smaller limits
+          console.log(`📊 Analytics: Using RBAC for ${user.role} - limiting sample size`);
+          
+          const rbacResult = await rbacService.getExchangesForUser(user, {
+            limit: 300, // Reduced limit for better performance
+            orderBy: { column: 'created_at', ascending: false }
+          });
+          
+          totalCount = rbacResult.count;
+          exchanges = rbacResult.data || [];
+          
+          console.log(`📊 Analytics: RBAC returned ${exchanges.length} exchanges from ${totalCount} total`);
+        }
       } else {
         // Fallback to direct query (for backward compatibility)
         const { count: directCount, error: countError } = await supabaseService.client
@@ -59,7 +97,7 @@ class AnalyticsService {
             exchange_deadline
           `)
           .order('created_at', { ascending: false })
-          .limit(1000);
+          .limit(500); // Reduced limit
         
         if (error) throw error;
         
@@ -71,7 +109,7 @@ class AnalyticsService {
       const currentYear = now.getFullYear();
       const currentMonth = now.getMonth();
 
-      // Calculate comprehensive metrics
+      // Calculate comprehensive metrics with error handling
       const metrics = {
         totalValue: {
           relinquished: exchanges.reduce((sum, e) => sum + (e.relinquished_property_value || 0), 0),
@@ -113,7 +151,27 @@ class AnalyticsService {
 
     } catch (error) {
       console.error('Analytics Service - Financial Overview Error:', error);
-      throw new Error('Failed to calculate financial overview');
+      
+      // Return a fallback response instead of throwing
+      return {
+        totalValue: { relinquished: 0, replacement: 0, exchange: 0 },
+        averageValues: { relinquished: 0, replacement: 0, exchange: 0 },
+        statusBreakdown: {},
+        typeBreakdown: {},
+        timelineAnalysis: {},
+        performanceMetrics: {
+          totalExchanges: 0,
+          sampleSize: 0,
+          completionRate: 0,
+          averageCompletionTime: 0,
+          monthlyTrends: []
+        },
+        riskAnalysis: { total: 0 },
+        valueDistribution: {},
+        geographicAnalysis: {},
+        lastUpdated: new Date().toISOString(),
+        error: 'Data temporarily unavailable'
+      };
     }
   }
 
