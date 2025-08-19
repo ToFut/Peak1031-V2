@@ -156,7 +156,7 @@ export function useAgencies(): UseAgenciesReturn {
     } catch (err: any) {
       setError(err.message || 'Failed to create agency');
       console.error('Error creating agency:', err);
-      throw err;
+      throw new Error(err.message || 'Failed to create agency');
     } finally {
       setLoading(false);
     }
@@ -189,7 +189,7 @@ export function useAgencies(): UseAgenciesReturn {
     } catch (err: any) {
       setError(err.message || 'Failed to update agency');
       console.error('Error updating agency:', err);
-      throw err;
+      throw new Error(err.message || 'Failed to update agency');
     } finally {
       setLoading(false);
     }
@@ -223,7 +223,7 @@ export function useAgencies(): UseAgenciesReturn {
     } catch (err: any) {
       setError(err.message || 'Failed to delete agency');
       console.error('Error deleting agency:', err);
-      throw err;
+      throw new Error(err.message || 'Failed to delete agency');
     } finally {
       setLoading(false);
     }
@@ -246,7 +246,7 @@ export function useAgencies(): UseAgenciesReturn {
     } catch (err: any) {
       setError(err.message || 'Failed to assign third parties');
       console.error('Error assigning third parties:', err);
-      throw err;
+      throw new Error(err.message || 'Failed to assign third parties');
     } finally {
       setLoading(false);
     }

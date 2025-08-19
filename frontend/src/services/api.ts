@@ -19,6 +19,7 @@ interface ApiOptions {
   forceRefresh?: boolean;
   lazyLoad?: boolean;
   etag?: string;
+  urgent?: boolean;
 }
 
 class ApiService {
@@ -377,6 +378,42 @@ class ApiService {
     }
   }
 
+  // Settings methods
+  async getSettings(): Promise<any> {
+    try {
+      const settings = await this.request<any>('/settings');
+      return settings;
+    } catch (error) {
+      console.error('Get settings error:', error);
+      throw error;
+    }
+  }
+
+  async updateSettings(settings: any): Promise<any> {
+    try {
+      const updatedSettings = await this.request<any>('/settings', {
+        method: 'PUT',
+        body: JSON.stringify(settings)
+      });
+      return updatedSettings;
+    } catch (error) {
+      console.error('Update settings error:', error);
+      throw error;
+    }
+  }
+
+  async updatePassword(currentPassword: string, newPassword: string): Promise<void> {
+    try {
+      await this.request('/settings/password', {
+        method: 'PUT',
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+    } catch (error) {
+      console.error('Update password error:', error);
+      throw error;
+    }
+  }
+
   async refreshToken(): Promise<void> {
     try {
       const refreshToken = localStorage.getItem('refreshToken');
@@ -418,7 +455,17 @@ class ApiService {
     if (options?.status) params.append('isActive', options.status === 'active' ? 'true' : 'false');
     
     const endpoint = `/users${params.toString() ? `?${params.toString()}` : ''}`;
-    return await this.request(endpoint);
+    const response = await this.request<any>(endpoint);
+    
+    // Handle both formats: array directly or object with data property
+    if (Array.isArray(response)) {
+      return response;
+    } else if (response && typeof response === 'object' && 'data' in response && Array.isArray((response as any).data)) {
+      return (response as any).data;
+    } else {
+      console.warn('Unexpected users response format:', response);
+      return [];
+    }
   }
 
 
@@ -484,8 +531,14 @@ class ApiService {
       }
     }
     
-    const endpoint = `/exchanges?limit=${limit}`;
+    const params = new URLSearchParams();
+    params.append('limit', limit);
     
+    if (options?.urgent) {
+      params.append('urgent', 'true');
+    }
+    
+    const endpoint = `/exchanges?${params.toString()}`;
     
     const response = await this.request<any>(endpoint, {}, false, options);
     // Handle both array response and paginated response
@@ -505,9 +558,19 @@ class ApiService {
     return await this.request(`/exchanges/${id}`);
   }
 
-  async getTasks(exchangeId?: string): Promise<Task[]> {
+  async getTasks(exchangeId?: string, options?: ApiOptions): Promise<Task[]> {
     console.log('🔍 API Service: Getting tasks, exchangeId:', exchangeId);
-    const response = await this.request<any>('/tasks');
+    
+    const params = new URLSearchParams();
+    if (exchangeId) {
+      params.append('exchangeId', exchangeId);
+    }
+    if (options?.urgent) {
+      params.append('urgent', 'true');
+    }
+    
+    const endpoint = `/tasks${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await this.request<any>(endpoint, {}, false, options);
     console.log('🔍 API Service: Raw tasks response:', response);
     const tasks = response?.tasks || (Array.isArray(response) ? response : []);
     console.log('🔍 API Service: Extracted tasks array:', tasks?.length, 'tasks');
@@ -797,17 +860,9 @@ class ApiService {
     });
   }
 
-  // Settings methods
-  async getSettings(): Promise<any> {
-    return await this.request('/settings');
-  }
 
-  async updateSettings(settings: any): Promise<any> {
-    return await this.request('/settings', {
-      method: 'PUT',
-      body: JSON.stringify(settings)
-    });
-  }
+
+
 
   // Notification Settings methods
   async getNotificationSettings(): Promise<any> {
@@ -995,8 +1050,27 @@ class ApiService {
     });
   }
 
+  // Agency Assignment Methods
+  async assignThirdPartyToAgency(agencyContactId: string, thirdPartyContactId: string, options?: {
+    can_view_performance?: boolean;
+    notes?: string;
+  }): Promise<any> {
+    return this.request<any>('/agencies/assign-third-party', {
+      method: 'POST',
+      body: JSON.stringify({
+        agency_contact_id: agencyContactId,
+        third_party_contact_id: thirdPartyContactId,
+        can_view_performance: options?.can_view_performance ?? true,
+        notes: options?.notes
+      })
+    });
+  }
+
+  async getAgencyAssignments(): Promise<any> {
+    return this.request<any>('/agencies/assignments');
+  }
+
   // Enterprise API Methods
-  // Enterprise Exchanges
   async getEnterpriseExchange(exchangeId: string): Promise<any> {
     return this.request<any>(`/enterprise-exchanges/${exchangeId}`);
   }
@@ -1186,6 +1260,10 @@ class ApiService {
     tasks: { total: number; pending: number; completed: number };
   }> {
     return this.request('/dashboard/overview');
+  }
+
+  async getCoordinatorDashboard(): Promise<any> {
+    return this.request('/admin/coordinator-dashboard');
   }
 
   /**
@@ -1970,8 +2048,12 @@ class ApiService {
       ...(options?.limit && { limit: options.limit.toString() })
     });
 
-    return await this.request(`/exchanges/${exchangeId}/tasks?${params}`);
+    const response = await this.request(`/exchanges/${exchangeId}/tasks?${params}`);
+    // Extract tasks array from response
+    return Array.isArray(response) ? response : ((response as any)?.tasks || []);
   }
+
+
 
 
 

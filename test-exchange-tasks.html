@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Exchange Tasks Test</title>
+</head>
+<body>
+    <h1>Exchange Tasks Test</h1>
+    <div id="results"></div>
+    
+    <script>
+        const exchangeId = 'ba7865ac-da20-404a-b609-804d15cb0467';
+        const backendUrl = 'http://localhost:5001';
+        
+        async function testExchangeTasks() {
+            const resultsDiv = document.getElementById('results');
+            
+            try {
+                // Test backend health
+                console.log('Testing backend health...');
+                const healthResponse = await fetch(`${backendUrl}/health`);
+                const healthData = await healthResponse.json();
+                console.log('Backend health:', healthData);
+                
+                // Test exchange tasks endpoint
+                console.log('Testing exchange tasks...');
+                const tasksResponse = await fetch(`${backendUrl}/api/exchanges/${exchangeId}/tasks`);
+                const tasksData = await tasksResponse.json();
+                console.log('Tasks response:', tasksData);
+                
+                resultsDiv.innerHTML = `
+                    <h2>Backend Health: ${healthData.status}</h2>
+                    <h2>Tasks Found: ${tasksData.tasks ? tasksData.tasks.length : 'No tasks array'}</h2>
+                    <h3>Active Tasks: ${tasksData.tasks ? tasksData.tasks.filter(t => t.status === 'pending' || t.status === 'PENDING').length : 0}</h3>
+                    <pre>${JSON.stringify(tasksData, null, 2)}</pre>
+                `;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                resultsDiv.innerHTML = `<h2>Error: ${error.message}</h2>`;
+            }
+        }
+        
+        testExchangeTasks();
+    </script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clear Cache & Redirect</title>
+    <title>Clear Cache & Refresh</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -15,124 +15,99 @@
         .container {
             background: white;
             padding: 30px;
-            border-radius: 8px;
+            border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        .button {
+        button {
             background: #007bff;
             color: white;
-            padding: 12px 24px;
             border: none;
-            border-radius: 4px;
+            padding: 12px 24px;
+            border-radius: 5px;
             cursor: pointer;
             margin: 10px 5px;
-            text-decoration: none;
-            display: inline-block;
+            font-size: 16px;
         }
-        .button:hover {
+        button:hover {
             background: #0056b3;
         }
         .success {
-            color: #28a745;
-            font-weight: bold;
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            display: none;
         }
-        .error {
-            color: #dc3545;
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🔄 Clear Cache & Access Valid User Profile</h1>
+        <h1>🔄 Clear Cache & Refresh</h1>
         
-        <p>The user profile you're trying to access doesn't exist in the database. This is likely due to cached data.</p>
-        
-        <div id="status"></div>
-        
-        <h3>Quick Actions:</h3>
-        <button class="button" onclick="clearCacheAndRedirect()">🧹 Clear Cache & Go to Admin Profile</button>
-        <br><br>
-        
-        <h4>Valid User Profiles:</h4>
-        <a href="http://localhost:3000/users/user-profile/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" class="button">👤 System Admin</a>
-        <a href="http://localhost:3000/users/user-profile/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" class="button">👤 John Davis (Coordinator)</a>
-        <a href="http://localhost:3000/users/user-profile/cccccccc-cccc-cccc-cccc-cccccccccccc" class="button">👤 Sarah Miller (Coordinator)</a>
-        <a href="http://localhost:3000/users/user-profile/dddddddd-dddd-dddd-dddd-dddddddddddd" class="button">👤 Michael Brown (Agency)</a>
-        <a href="http://localhost:3000/users/user-profile/eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" class="button">👤 Lisa Garcia (Agency)</a>
-        <a href="http://localhost:3000/users/user-profile/ffffffff-ffff-ffff-ffff-ffffffffffff" class="button">👤 Robert Johnson (Attorney)</a>
-        <a href="http://localhost:3000/users/user-profile/gggggggg-gggg-gggg-gggg-gggggggggggg" class="button">👤 Emily Chen (Paralegal)</a>
-        <a href="http://localhost:3000/users/user-profile/hhhhhhhh-hhhh-hhhh-hhhh-hhhhhhhhhhhh" class="button">👤 David Thompson (Broker)</a>
-        <a href="http://localhost:3000/users/user-profile/iiiiiiii-iiii-iiii-iiii-iiiiiiiiiiii" class="button">👤 Amy Wilson (Agent)</a>
-        <a href="http://localhost:3000/users/user-profile/jjjjjjjj-jjjj-jjjj-jjjj-jjjjjjjjjjjj" class="button">👤 James Peterson (Client)</a>
-        <a href="http://localhost:3000/users/user-profile/kkkkkkkk-kkkk-kkkk-kkkk-kkkkkkkkkkkk" class="button">👤 Maria Rodriguez (Client)</a>
-        <a href="http://localhost:3000/users/user-profile/llllllll-llll-llll-llll-llllllllllll" class="button">👤 William Anderson (Client)</a>
-        
-        <br><br>
-        <a href="http://localhost:3000/users" class="button">📋 View All Users</a>
-        
-        <h3>Manual Cache Clearing:</h3>
-        <p>If the buttons don't work, open your browser's Developer Console (F12) and run:</p>
-        <pre style="background: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto;">
-// Clear all user-related cache
-localStorage.removeItem('users-list');
-localStorage.removeItem('user-profile');
-localStorage.removeItem('exchanges-summary');
-localStorage.removeItem('cached-users');
-localStorage.removeItem('user-data');
-sessionStorage.clear();
+        <div class="info">
+            <strong>Issue:</strong> You're seeing the old "Task Management" section instead of the updated version with debug message.
+        </div>
 
-// Clear browser cache
-if (window.caches) {
-  caches.keys().then(names => {
-    names.forEach(name => caches.delete(name));
-  });
-}
-
-console.log('✅ Cache cleared!');
-window.location.href = 'http://localhost:3000/users/user-profile/550e8400-e29b-41d4-a716-446655440000';
-        </pre>
+        <h3>Step 1: Clear Browser Cache</h3>
+        <button onclick="clearCache()">🧹 Clear All Cache</button>
+        <button onclick="clearLocalStorage()">🗑️ Clear Local Storage</button>
+        
+        <h3>Step 2: Refresh Application</h3>
+        <button onclick="refreshApp()">🔄 Refresh Admin Dashboard</button>
+        <button onclick="hardRefresh()">💪 Hard Refresh (Ctrl+F5)</button>
+        
+        <h3>Step 3: Check for Debug Message</h3>
+        <p>After refreshing, look for this blue debug message in the Task Management section:</p>
+        <div style="background: #dbeafe; border: 1px solid #93c5fd; padding: 10px; border-radius: 5px; margin: 10px 0;">
+            🔍 DEBUG: Task Management section is rendering! ModernTaskUI should appear below.
+        </div>
+        
+        <div id="success" class="success">
+            ✅ Cache cleared successfully! Now refresh your admin dashboard.
+        </div>
     </div>
 
     <script>
-        function clearCacheAndRedirect() {
-            const status = document.getElementById('status');
-            status.innerHTML = '<p class="success">🧹 Clearing cache...</p>';
-            
-            try {
-                // Clear localStorage
-                localStorage.removeItem('users-list');
-                localStorage.removeItem('user-profile');
-                localStorage.removeItem('exchanges-summary');
-                localStorage.removeItem('cached-users');
-                localStorage.removeItem('user-data');
-                sessionStorage.clear();
-                
-                // Clear browser cache
-                if (window.caches) {
-                    caches.keys().then(names => {
-                        names.forEach(name => caches.delete(name));
-                    });
-                }
-                
-                status.innerHTML = '<p class="success">✅ Cache cleared! Redirecting to admin profile...</p>';
-                
-                // Redirect to valid admin profile
-                setTimeout(() => {
-                    window.location.href = 'http://localhost:3000/users/user-profile/550e8400-e29b-41d4-a716-446655440000';
-                }, 1000);
-                
-            } catch (error) {
-                status.innerHTML = '<p class="error">❌ Error clearing cache: ' + error.message + '</p>';
+        function clearCache() {
+            if ('caches' in window) {
+                caches.keys().then(function(names) {
+                    for (let name of names) {
+                        caches.delete(name);
+                    }
+                });
             }
+            showSuccess();
         }
         
-        // Auto-clear cache on page load
-        window.onload = function() {
-            console.log('🔄 Auto-clearing cache...');
-            localStorage.removeItem('users-list');
-            localStorage.removeItem('user-profile');
-            localStorage.removeItem('exchanges-summary');
-        };
+        function clearLocalStorage() {
+            localStorage.clear();
+            sessionStorage.clear();
+            showSuccess();
+        }
+        
+        function refreshApp() {
+            window.open('http://localhost:3000/dashboard', '_blank');
+        }
+        
+        function hardRefresh() {
+            window.open('http://localhost:3000/dashboard', '_blank');
+            alert('Please press Ctrl+F5 (or Cmd+Shift+R on Mac) in the new tab to force refresh!');
+        }
+        
+        function showSuccess() {
+            document.getElementById('success').style.display = 'block';
+            setTimeout(() => {
+                document.getElementById('success').style.display = 'none';
+            }, 3000);
+        }
     </script>
 </body>
 </html>

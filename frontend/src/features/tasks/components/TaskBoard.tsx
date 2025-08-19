@@ -1,6 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { Task, TaskStatus } from '../../../types';
-import { Clock, AlertTriangle, CheckCircle, User, Calendar, Star, Flag, ArrowRight } from 'lucide-react';
+import { Clock, AlertTriangle, CheckCircle, User, Calendar, Star, Flag, ArrowRight, ChevronDown } from 'lucide-react';
+
+interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
 
 interface TaskBoardProps {
   tasks: Task[];
@@ -9,6 +16,7 @@ interface TaskBoardProps {
   showExchangeInfo?: boolean;
   showPPInfo?: boolean;
   compact?: boolean;
+  users?: User[];
 }
 
 export const TaskBoard: React.FC<TaskBoardProps> = ({ 
@@ -17,9 +25,11 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   onTaskSelect,
   showExchangeInfo = true,
   showPPInfo = true,
-  compact = false
+  compact = false,
+  users = []
 }) => {
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
+  const [expandedTask, setExpandedTask] = useState<string | null>(null);
 
   const columns = [
     { 
@@ -87,13 +97,19 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
     }
   };
 
+  // Get user name by ID
+  const getUserName = (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    return user ? `${user.firstName} ${user.lastName}` : userId;
+  };
+
   // Memoize task statistics for performance
   const taskStats = useMemo(() => {
     const stats = {
-      pending: tasks.filter(t => t.status === 'PENDING').length,
-      inProgress: tasks.filter(t => t.status === 'IN_PROGRESS').length,
-      completed: tasks.filter(t => t.status === 'COMPLETED').length,
-      overdue: tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED').length
+      pending: tasks.filter(t => t.status === 'PENDING' || t.status === 'pending').length,
+      inProgress: tasks.filter(t => t.status === 'IN_PROGRESS' || t.status === 'in_progress').length,
+      completed: tasks.filter(t => t.status === 'COMPLETED' || t.status === 'completed').length,
+      overdue: tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'completed').length
     };
     return stats;
   }, [tasks]);
@@ -114,6 +130,12 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
       onTaskUpdate(draggedTask, { status });
     }
     setDraggedTask(null);
+  };
+
+  const handleQuickStatusChange = (taskId: string, newStatus: TaskStatus) => {
+    if (onTaskUpdate) {
+      onTaskUpdate(taskId, { status: newStatus });
+    }
   };
 
   const filteredTasks = (status: TaskStatus) => {
@@ -211,23 +233,26 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                   const priorityConfig = getPriorityConfig(task.priority);
                   const overdue = isOverdue(task);
                   const daysUntilDue = task.dueDate ? getDaysUntilDue(task.dueDate) : null;
+                  const isExpanded = expandedTask === task.id;
                   
                   return (
                     <div
                       key={task.id}
-                      className={`bg-white rounded-lg shadow-sm border transition-all hover:shadow-md cursor-pointer ${
+                      className={`bg-white rounded-lg shadow-sm border transition-all hover:shadow-md ${
                         overdue ? 'border-red-200 bg-red-50' : 'hover:border-gray-300'
                       } ${compact ? 'p-3' : 'p-4'}`}
                       draggable
                       onDragStart={(e) => handleDragStart(e, task.id)}
-                      onClick={() => onTaskSelect?.(task)}
                     >
                       {/* Task Header */}
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1 min-w-0">
-                          <h4 className={`font-medium text-gray-900 truncate ${
-                            compact ? 'text-sm' : 'text-base'
-                          }`}>
+                          <h4 
+                            className={`font-medium text-gray-900 truncate cursor-pointer ${
+                              compact ? 'text-sm' : 'text-base'
+                            }`}
+                            onClick={() => onTaskSelect?.(task)}
+                          >
                             {task.title}
                           </h4>
                           {/* Source indicators */}
@@ -252,11 +277,45 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                           </div>
                         </div>
                         
-                        <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
-                          priorityConfig.color
-                        }`}>
-                          <priorityConfig.icon className="w-3 h-3 mr-1" />
-                          {priorityConfig.label}
+                        <div className="flex items-center space-x-2">
+                          <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
+                            priorityConfig.color
+                          }`}>
+                            <priorityConfig.icon className="w-3 h-3 mr-1" />
+                            {priorityConfig.label}
+                          </div>
+                          
+                          {/* Quick Status Change Dropdown */}
+                          <div className="relative">
+                            <button
+                              onClick={() => setExpandedTask(isExpanded ? null : task.id)}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            >
+                              <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            </button>
+                            
+                            {isExpanded && (
+                              <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[120px]">
+                                <div className="py-1">
+                                  {columns.map(col => (
+                                    <button
+                                      key={col.id}
+                                      onClick={() => {
+                                        handleQuickStatusChange(task.id, col.id);
+                                        setExpandedTask(null);
+                                      }}
+                                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center ${
+                                        task.status === col.id ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
+                                      }`}
+                                    >
+                                      <col.icon className="w-4 h-4 mr-2" />
+                                      {col.title}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                       
@@ -306,7 +365,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                           </div>
                         )}
                         
-                        {/* Assigned to */}
+                        {/* Assigned to - Now shows user names */}
                         {(task.assignedUser || task.assignedTo || task.assigned_to) && (
                           <div className="flex items-center text-xs text-gray-500">
                             <User className="w-3 h-3 mr-1" />
@@ -314,7 +373,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                               Assigned: {
                                 task.assignedUser 
                                   ? `${task.assignedUser.first_name} ${task.assignedUser.last_name}`
-                                  : task.assignedTo || task.assigned_to
+                                  : getUserName(task.assignedTo || task.assigned_to || '')
                               }
                             </span>
                           </div>

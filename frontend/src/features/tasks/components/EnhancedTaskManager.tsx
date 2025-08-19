@@ -19,8 +19,13 @@ import {
   MagnifyingGlassIcon,
   CalendarDaysIcon,
   PencilIcon,
-  TrashIcon
+  TrashIcon,
+  UserGroupIcon,
+  BuildingOfficeIcon,
+  FlagIcon
 } from '@heroicons/react/24/outline';
+import { SearchableDropdown } from '../../../components/ui/SearchableDropdown';
+import { apiService } from '../../../services/api';
 
 const EnhancedTaskManager: React.FC<{ 
   exchangeId?: string; 
@@ -31,6 +36,117 @@ const EnhancedTaskManager: React.FC<{
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [compactView, setCompactView] = useState(true);
+  
+  // Task creation form state
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    priority: 'MEDIUM' as 'LOW' | 'MEDIUM' | 'HIGH',
+    exchange_id: exchangeId || '',
+    assigned_to: '',
+    due_date: ''
+  });
+  const [exchanges, setExchanges] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Load exchanges and users on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [exchangesResponse, usersResponse] = await Promise.all([
+          apiService.getExchanges(),
+          apiService.getUsers()
+        ]);
+
+        const exchangesData = (exchangesResponse as any)?.data || exchangesResponse;
+        const usersData = (usersResponse as any)?.data || usersResponse;
+
+        setExchanges(Array.isArray(exchangesData) ? exchangesData : []);
+        setUsers(Array.isArray(usersData) ? usersData : []);
+      } catch (error) {
+        console.error('Error loading data:', error);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Update form data when exchangeId prop changes
+  useEffect(() => {
+    if (exchangeId) {
+      setFormData(prev => ({ ...prev, exchange_id: exchangeId }));
+    }
+  }, [exchangeId]);
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.title.trim()) {
+      newErrors.title = 'Task title is required';
+    }
+
+    if (!formData.exchange_id) {
+      newErrors.exchange_id = 'Exchange is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const taskData = {
+        ...formData,
+        // If assigned_to is 'ALL', we'll handle this specially in the backend
+        assigned_to: formData.assigned_to === 'ALL' ? undefined : formData.assigned_to,
+        // Add metadata to indicate if this should notify all users
+        metadata: {
+          notify_all_users: formData.assigned_to === 'ALL'
+        }
+      };
+
+      const createdTask = await apiService.createTask(taskData);
+      
+      // Reset form
+      setFormData({
+        title: '',
+        description: '',
+        priority: 'MEDIUM',
+        exchange_id: exchangeId || '',
+        assigned_to: '',
+        due_date: ''
+      });
+      setErrors({});
+      setShowCreateModal(false);
+      
+      if (onTaskCreated) {
+        onTaskCreated();
+      }
+    } catch (error: any) {
+      console.error('Error creating task:', error);
+      setErrors({ submit: error.message || 'Failed to create task' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -169,61 +285,175 @@ const EnhancedTaskManager: React.FC<{
         </div>
       )}
 
-      {/* Simple Task Creation Modal */}
+      {/* Task Creation Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">Create Task</h3>
+          <div className="bg-white rounded-lg max-w-2xl w-full p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-medium text-gray-900">Create New Task</h3>
               <button 
                 onClick={() => setShowCreateModal(false)}
                 className="text-gray-400 hover:text-gray-600"
               >
-                ✕
+                <XMarkIcon className="w-6 h-6" />
               </button>
             </div>
-            <div className="space-y-4">
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Task Title */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Task Title
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Task Title *
                 </label>
                 <input
                   type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={formData.title}
+                  onChange={(e) => handleInputChange('title', e.target.value)}
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                    errors.title ? 'border-red-300' : 'border-gray-300'
+                  }`}
                   placeholder="Enter task title..."
                 />
+                {errors.title && (
+                  <p className="mt-1 text-sm text-red-600">{errors.title}</p>
+                )}
               </div>
+
+              {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Description
                 </label>
                 <textarea
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={formData.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
                   rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="Enter task description..."
                 />
               </div>
-              <div className="flex justify-end space-x-3">
+
+              {/* Exchange Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Exchange *
+                </label>
+                <SearchableDropdown
+                  options={[
+                    ...exchanges.map((exchange: any) => ({
+                      id: exchange.id,
+                      label: exchange.name,
+                      icon: BuildingOfficeIcon
+                    }))
+                  ]}
+                  value={formData.exchange_id}
+                  onChange={(value) => handleInputChange('exchange_id', value)}
+                  placeholder="Select exchange..."
+                  searchPlaceholder="Search exchanges..."
+                  disabled={!!exchangeId} // Disable if exchange is pre-selected
+                />
+                {errors.exchange_id && (
+                  <p className="mt-1 text-sm text-red-600">{errors.exchange_id}</p>
+                )}
+                {exchangeName && (
+                  <p className="mt-1 text-sm text-gray-500">
+                    Pre-selected: {exchangeName}
+                  </p>
+                )}
+              </div>
+
+              {/* User Assignment */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Assign To
+                </label>
+                <SearchableDropdown
+                  options={[
+                    { id: '', label: 'Unassigned', icon: UserGroupIcon },
+                    { id: 'ALL', label: 'All Users (Notify Everyone)', icon: UserGroupIcon },
+                    ...users.map((user: any) => ({
+                      id: user.id,
+                      label: `${user.firstName} ${user.lastName}`,
+                      icon: UserGroupIcon
+                    }))
+                  ]}
+                  value={formData.assigned_to}
+                  onChange={(value) => handleInputChange('assigned_to', value)}
+                  placeholder="Select assignee..."
+                  searchPlaceholder="Search users..."
+                />
+                {formData.assigned_to === 'ALL' && (
+                  <p className="mt-1 text-sm text-blue-600">
+                    This task will be visible to all users and they will be notified
+                  </p>
+                )}
+              </div>
+
+              {/* Priority */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Priority
+                </label>
+                <SearchableDropdown
+                  options={[
+                    { id: 'LOW', label: 'Low Priority', icon: FlagIcon },
+                    { id: 'MEDIUM', label: 'Medium Priority', icon: FlagIcon },
+                    { id: 'HIGH', label: 'High Priority', icon: ExclamationTriangleIcon }
+                  ]}
+                  value={formData.priority}
+                  onChange={(value) => handleInputChange('priority', value)}
+                  placeholder="Select priority..."
+                />
+              </div>
+
+              {/* Due Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Due Date
+                </label>
+                <div className="relative">
+                  <CalendarDaysIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="date"
+                    value={formData.due_date}
+                    onChange={(e) => handleInputChange('due_date', e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              {/* Submit Error */}
+              {errors.submit && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                  <p className="text-sm text-red-600">{errors.submit}</p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-3 pt-4">
                 <button
+                  type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    console.log('Task created');
-                    setShowCreateModal(false);
-                    if (onTaskCreated) {
-                      onTaskCreated();
-                    }
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  type="submit"
+                  disabled={loading}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
-                  Create Task
+                  {loading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <span>Create Task</span>
+                  )}
                 </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}

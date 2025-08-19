@@ -255,7 +255,7 @@ export const useChat = () => {
     } catch (err: any) {
       console.error('❌ useChat: Error sending file:', err);
       setError(err.message || 'Failed to send file');
-      throw err; // Re-throw so UI can handle it
+      throw new Error(err.message || 'Failed to send file'); // Re-throw so UI can handle it
     } finally {
       setSending(false);
     }

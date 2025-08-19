@@ -18,7 +18,10 @@ import {
   Squares2X2Icon,
   ListBulletIcon,
   FlagIcon,
-  UserCircleIcon
+  UserCircleIcon,
+  BuildingOfficeIcon,
+  ChevronDownIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
 interface Exchange {
@@ -27,20 +30,30 @@ interface Exchange {
   status: string;
 }
 
+interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
 const TasksPage: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEnhancedManager, setShowEnhancedManager] = useState(false);
   const [selectedExchange, setSelectedExchange] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchType, setSearchType] = useState<'all' | 'exchange' | 'user'>('all');
   const [exchangeSearchQuery, setExchangeSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [filterAssignee, setFilterAssignee] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [showExchangeDropdown, setShowExchangeDropdown] = useState(false);
   const { user } = useAuth();
 
   // Real-time task updates
@@ -63,20 +76,38 @@ const TasksPage: React.FC = () => {
     loadData();
   }, []);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.exchange-dropdown')) {
+        setShowExchangeDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Load both tasks and exchanges
-      const [tasksResponse, exchangesResponse] = await Promise.all([
+      // Load tasks, exchanges, and users
+      const [tasksResponse, exchangesResponse, usersResponse] = await Promise.all([
         apiService.getTasks(),
-        apiService.getExchanges()
+        apiService.getExchanges(),
+        apiService.getUsers()
       ]);
       
       setTasks(Array.isArray(tasksResponse) ? tasksResponse : []);
       const exchangesData = (exchangesResponse as any)?.data || exchangesResponse;
       setExchanges(Array.isArray(exchangesData) ? exchangesData : []);
+      const usersData = (usersResponse as any)?.data || usersResponse;
+      setUsers(Array.isArray(usersData) ? usersData : []);
     } catch (err: any) {
       console.error('Error loading data:', err);
       setError(err.message || 'Failed to load tasks and exchanges');
@@ -93,17 +124,46 @@ const TasksPage: React.FC = () => {
     );
   }, [exchanges, exchangeSearchQuery]);
 
-  // Get unique assignees for filter dropdown
+  // Get unique assignees with user names for filter dropdown
   const uniqueAssignees = useMemo(() => {
-    const assignees = new Set<string>();
+    const assignees = new Map<string, { id: string; name: string; email: string }>();
+    
     tasks.forEach(task => {
-      const assignee = task.assignedTo || task.assigned_to;
-      if (assignee) {
-        assignees.add(assignee);
+      const assigneeId = task.assignedTo || task.assigned_to;
+      if (assigneeId) {
+        const user = users.find(u => u.id === assigneeId);
+        if (user) {
+          assignees.set(assigneeId, {
+            id: assigneeId,
+            name: `${user.firstName} ${user.lastName}`,
+            email: user.email
+          });
+        } else {
+          // Fallback to ID if user not found
+          assignees.set(assigneeId, {
+            id: assigneeId,
+            name: assigneeId,
+            email: ''
+          });
+        }
       }
     });
-    return Array.from(assignees).sort();
-  }, [tasks]);
+    
+    return Array.from(assignees.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [tasks, users]);
+
+  // Get user name by ID
+  const getUserName = (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    return user ? `${user.firstName} ${user.lastName}` : userId;
+  };
+
+  // Get exchange name by ID
+  const getExchangeName = (exchangeId: string) => {
+    if (exchangeId === 'no-exchange') return 'Unassigned Tasks';
+    const exchange = exchanges.find(ex => ex.id === exchangeId);
+    return exchange?.name || `Exchange ${exchangeId}`;
+  };
 
   // Filter and group tasks
   const filteredAndGroupedTasks = useMemo(() => {
@@ -111,11 +171,23 @@ const TasksPage: React.FC = () => {
 
     // Filter by search query
     if (searchQuery) {
-      filtered = filtered.filter(task => 
-        task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (task.assignedTo || task.assigned_to || '').toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      filtered = filtered.filter(task => {
+        const searchLower = searchQuery.toLowerCase();
+        
+        // Search in task title and description
+        const titleMatch = task.title.toLowerCase().includes(searchLower);
+        const descMatch = task.description?.toLowerCase().includes(searchLower);
+        
+        // Search by exchange name
+        const exchangeMatch = searchType === 'all' || searchType === 'exchange' ? 
+          getExchangeName(task.exchange_id || '').toLowerCase().includes(searchLower) : false;
+        
+        // Search by user name
+        const userMatch = searchType === 'all' || searchType === 'user' ? 
+          getUserName(task.assignedTo || task.assigned_to || '').toLowerCase().includes(searchLower) : false;
+        
+        return titleMatch || descMatch || exchangeMatch || userMatch;
+      });
     }
 
     // Filter by exchange
@@ -159,7 +231,7 @@ const TasksPage: React.FC = () => {
     }, {} as Record<string, Task[]>);
 
     return grouped;
-  }, [tasks, searchQuery, selectedExchange, filterStatus, filterPriority, filterAssignee]);
+  }, [tasks, searchQuery, searchType, selectedExchange, filterStatus, filterPriority, filterAssignee, users, exchanges]);
 
   // Task statistics
   const taskStats = useMemo(() => {
@@ -189,12 +261,6 @@ const TasksPage: React.FC = () => {
   const handleTaskSelect = (task: Task) => {
     // TODO: Navigate to task details or open a modal
     console.log('Selected task:', task);
-  };
-
-  const getExchangeName = (exchangeId: string) => {
-    if (exchangeId === 'no-exchange') return 'Unassigned Tasks';
-    const exchange = exchanges.find(ex => ex.id === exchangeId);
-    return exchange?.name || `Exchange ${exchangeId}`;
   };
 
   const handleBulkAction = (action: string, taskIds: string[]) => {
@@ -241,37 +307,25 @@ const TasksPage: React.FC = () => {
       {/* Sidebar */}
       <div className="w-80 bg-white shadow-sm border-r border-gray-200 flex flex-col">
         {/* Header */}
-        <div className="p-6 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-gray-900 mb-4">Task Management</h1>
+        <div className="p-4 border-b border-gray-200">
+          <h1 className="text-lg font-bold text-gray-900 mb-3">Task Management</h1>
           
-          {/* Search */}
-          <div className="relative mb-4">
-            <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search tasks..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-          </div>
-
           {/* Quick Stats */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-yellow-50 p-3 rounded-lg">
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="bg-yellow-50 p-2 rounded-lg">
               <div className="flex items-center">
-                <ClockIcon className="w-4 h-4 text-yellow-600 mr-2" />
+                <ClockIcon className="w-3 h-3 text-yellow-600 mr-1" />
                 <div>
-                  <div className="text-sm font-semibold text-yellow-700">{taskStats.pending}</div>
+                  <div className="text-xs font-semibold text-yellow-700">{taskStats.pending}</div>
                   <div className="text-xs text-yellow-600">Pending</div>
                 </div>
               </div>
             </div>
-            <div className="bg-red-50 p-3 rounded-lg">
+            <div className="bg-red-50 p-2 rounded-lg">
               <div className="flex items-center">
-                <ExclamationTriangleIcon className="w-4 h-4 text-red-600 mr-2" />
+                <ExclamationTriangleIcon className="w-3 h-3 text-red-600 mr-1" />
                 <div>
-                  <div className="text-sm font-semibold text-red-700">{taskStats.overdue}</div>
+                  <div className="text-xs font-semibold text-red-700">{taskStats.overdue}</div>
                   <div className="text-xs text-red-600">Overdue</div>
                 </div>
               </div>
@@ -419,8 +473,8 @@ const TasksPage: React.FC = () => {
                     { id: 'all', label: 'All Assignees', icon: UserCircleIcon },
                     { id: '', label: 'Unassigned', icon: UserCircleIcon },
                     ...uniqueAssignees.map(assignee => ({
-                      id: assignee,
-                      label: assignee,
+                      id: assignee.id,
+                      label: assignee.name,
                       icon: UserCircleIcon
                     }))
                   ]}
@@ -434,39 +488,151 @@ const TasksPage: React.FC = () => {
             </div>
           )}
 
-          <button
-            onClick={() => setShowEnhancedManager(true)}
-            className="w-full mt-3 flex items-center justify-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            <PlusIcon className="w-4 h-4" />
-            <span>New Task</span>
-          </button>
+
         </div>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Content Header */}
-        <div className="bg-white px-6 py-4 border-b border-gray-200">
+        <div className="bg-white px-6 py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                {selectedExchange === 'all' ? 'All Tasks' : getExchangeName(selectedExchange)}
-              </h2>
-              <p className="text-sm text-gray-500">
-                {Object.values(filteredAndGroupedTasks).flat().length} tasks
-                {searchQuery && ` matching "${searchQuery}"`}
-              </p>
+            <div className="flex items-center space-x-3 flex-1">
+              {/* Exchange Filter Button */}
+              <div className="relative exchange-dropdown">
+                <button
+                  onClick={() => {
+                    console.log('Dropdown clicked, current state:', showExchangeDropdown);
+                    setShowExchangeDropdown(!showExchangeDropdown);
+                  }}
+                  className="flex items-center space-x-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors text-sm"
+                >
+                  <BuildingOfficeIcon className="w-4 h-4" />
+                  <span className="max-w-32 truncate">
+                    {selectedExchange === 'all' ? 'All Exchanges' : getExchangeName(selectedExchange)}
+                  </span>
+                  <ChevronDownIcon className="w-4 h-4" />
+                </button>
+                
+                {/* Exchange/User Dropdown */}
+                {showExchangeDropdown && (
+                  <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-10 max-h-96 overflow-y-auto">
+                    <div className="p-3">
+                      {/* Search within dropdown */}
+                      <div className="mb-3">
+                        <div className="relative">
+                          <MagnifyingGlassIcon className="w-4 h-4 absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="text"
+                            placeholder="Search exchanges..."
+                            value={exchangeSearchQuery}
+                            onChange={(e) => setExchangeSearchQuery(e.target.value)}
+                            className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+                      
+                      {/* All Exchanges option */}
+                      <button
+                        onClick={() => {
+                          setSelectedExchange('all');
+                          setShowExchangeDropdown(false);
+                          setExchangeSearchQuery('');
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                          selectedExchange === 'all' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
+                        }`}
+                      >
+                        📋 All Exchanges
+                      </button>
+                      
+                      {/* Divider */}
+                      <div className="border-t border-gray-200 my-2"></div>
+                      
+                      {/* Exchange list with better formatting */}
+                      <div className="space-y-1">
+                        {filteredExchanges.slice(0, 8).map(exchange => (
+                          <button
+                            key={exchange.id}
+                            onClick={() => {
+                              setSelectedExchange(exchange.id);
+                              setShowExchangeDropdown(false);
+                              setExchangeSearchQuery('');
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-md text-sm ${
+                              selectedExchange === exchange.id ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="truncate">{exchange.name}</span>
+                              <span className="text-xs text-gray-500 ml-2">
+                                {filteredAndGroupedTasks[exchange.id]?.length || 0} tasks
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                      
+                      {/* Show more indicator */}
+                      {filteredExchanges.length > 8 && (
+                        <div className="text-xs text-gray-500 px-3 py-2 mt-2 border-t border-gray-100">
+                          +{filteredExchanges.length - 8} more exchanges
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Search Field */}
+              <div className="flex-1 max-w-md">
+                <div className="relative">
+                  <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search tasks..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      console.log('Search query changed:', e.target.value);
+                      setSearchQuery(e.target.value);
+                    }}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
             </div>
             
-            <div className="flex items-center space-x-3">
+            {/* Right side actions */}
+            <div className="flex items-center space-x-2">
               <button
                 onClick={loadData}
-                className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm"
               >
+                <ArrowPathIcon className="w-4 h-4" />
                 <span>Refresh</span>
               </button>
+              
+              {/* New Task Button */}
+              <button
+                onClick={() => {
+                  console.log('New Task button clicked');
+                  setShowEnhancedManager(true);
+                }}
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
+              >
+                <PlusIcon className="w-4 h-4" />
+                <span>New Task</span>
+              </button>
             </div>
+          </div>
+          
+          {/* Task count and search info */}
+          <div className="mt-2">
+            <p className="text-sm text-gray-500">
+              {Object.values(filteredAndGroupedTasks).flat().length} tasks
+              {searchQuery && ` matching "${searchQuery}"`}
+              {selectedExchange !== 'all' && ` in ${getExchangeName(selectedExchange)}`}
+            </p>
           </div>
         </div>
 
@@ -490,6 +656,7 @@ const TasksPage: React.FC = () => {
                       onTaskSelect={handleTaskSelect}
                       showExchangeInfo={false}
                       compact={true}
+                      users={users}
                     />
                   </div>
                 </div>
@@ -502,6 +669,7 @@ const TasksPage: React.FC = () => {
               onTaskUpdate={handleTaskUpdate}
               onTaskSelect={handleTaskSelect}
               showExchangeInfo={false}
+              users={users}
             />
           )}
         </div>
@@ -521,11 +689,15 @@ const TasksPage: React.FC = () => {
               </button>
             </div>
             <div className="flex-1 overflow-hidden">
-              <EnhancedTaskManager onTaskCreated={() => {
-                console.log('Task created in EnhancedTaskManager');
-                setShowEnhancedManager(false);
-                loadData();
-              }} />
+              <EnhancedTaskManager 
+                exchangeId={selectedExchange !== 'all' ? selectedExchange : undefined}
+                exchangeName={selectedExchange !== 'all' ? getExchangeName(selectedExchange) : undefined}
+                onTaskCreated={() => {
+                  console.log('Task created in EnhancedTaskManager');
+                  setShowEnhancedManager(false);
+                  loadData();
+                }} 
+              />
             </div>
           </div>
         </div>

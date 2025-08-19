@@ -316,11 +316,11 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
           setCache(cacheKey, resultData);
 
           setStats(mappedStats);
-          setExchanges((overviewData as any).exchangesList || []);
-          setTasks((overviewData as any).tasksList || []);
-          setDocuments((overviewData as any).documentsList || []);
-          setMessages((overviewData as any).messagesList || []);
-          setUsers((overviewData as any).usersList || []);
+          setExchanges(Array.isArray((overviewData as any).exchangesList) ? (overviewData as any).exchangesList : []);
+          setTasks(Array.isArray((overviewData as any).tasksList) ? (overviewData as any).tasksList : []);
+          setDocuments(Array.isArray((overviewData as any).documentsList) ? (overviewData as any).documentsList : []);
+          setMessages(Array.isArray((overviewData as any).messagesList) ? (overviewData as any).messagesList : []);
+          setUsers(Array.isArray((overviewData as any).usersList) ? (overviewData as any).usersList : []);
           
           console.log('✅ Dashboard data loaded successfully:', {
             exchanges: mappedStats.exchanges.total,
@@ -350,6 +350,10 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
 
   // Role-based data filtering - memoized
   const filterExchangesByRole = useCallback((exchanges: any[], userRole: string): any[] => {
+    if (!Array.isArray(exchanges)) {
+      return [];
+    }
+    
     if (userRole === 'admin' || userRole === 'coordinator') {
       return exchanges; // Admin and coordinator see all
     }
@@ -361,6 +365,10 @@ export const useDashboardData = (options: UseDashboardDataOptions): UseDashboard
   }, []);
 
   const filterTasksByRole = useCallback((tasks: any[], userRole: string): any[] => {
+    if (!Array.isArray(tasks)) {
+      return [];
+    }
+    
     if (userRole === 'admin' || userRole === 'coordinator') {
       return tasks; // Admin and coordinator see all
     }

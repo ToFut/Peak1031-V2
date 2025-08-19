@@ -150,7 +150,7 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     console.log('📋 TASKS ROUTE: Getting tasks for', req.user?.email, 'Role:', req.user?.role);
     
-    const { page = 1, limit = 20, search, status, priority, exchangeId, assignedTo, sortBy = 'due_date', sortOrder = 'asc' } = req.query;
+    const { page = 1, limit = 20, search, status, priority, exchangeId, assignedTo, sortBy = 'due_date', sortOrder = 'asc', urgent } = req.query;
     
     // Direct Supabase query (simplified to avoid RBAC issues)
     let query = supabaseService.client.from('tasks').select(`
@@ -187,6 +187,13 @@ router.get('/', authenticateToken, async (req, res) => {
     
     if (assignedTo) {
       query = query.eq('assigned_to', assignedTo);
+    }
+    
+    // Filter for urgent tasks (due in next 2 days or overdue)
+    if (urgent === 'true') {
+      const now = new Date();
+      const twoDaysFromNow = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000));
+      query = query.lte('due_date', twoDaysFromNow.toISOString().split('T')[0]);
     }
 
     // Role-based filtering for all user types
@@ -496,6 +503,7 @@ router.post('/', authenticateToken, requireExchangePermission('create_tasks'), a
       assigned_to: req.body.assigned_to || req.body.assignedTo || null,
       due_date: req.body.due_date || req.body.dueDate || null,
       pp_data: req.body.pp_data || req.body.ppData || {},
+      // metadata: req.body.metadata || {}, // Temporarily removed - column doesn't exist in database
       created_by: req.user.id, // Add who created the task
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -664,6 +672,9 @@ router.post('/', authenticateToken, requireExchangePermission('create_tasks'), a
         timestamp: new Date().toISOString()
       };
 
+      // Check if this task should notify all users (metadata column doesn't exist yet)
+      const shouldNotifyAllUsers = false; // req.body.metadata?.notify_all_users || false;
+
       // 1. Emit to exchange room (for exchange-specific task lists)
       io.to(`exchange_${taskExchangeId}`).emit('task_created', taskEvent);
       console.log(`📡 Emitted to exchange room: exchange_${taskExchangeId}`);
@@ -679,23 +690,47 @@ router.post('/', authenticateToken, requireExchangePermission('create_tasks'), a
         console.log(`📡 Emitted to assignee dashboard: user_${data.assigned_to}`);
       }
 
-      // 4. Emit to all exchange participants for dashboard updates
-      try {
-        const databaseService = require('../services/database');
-        const participants = await databaseService.getExchangeParticipants({
-          where: { exchange_id: taskExchangeId }
-        });
-        
-        participants.forEach(participant => {
-          if (participant.user_id && participant.user_id !== req.user.id) {
-            io.to(`user_${participant.user_id}`).emit('task_created', taskEvent);
-            console.log(`📡 Emitted to participant dashboard: user_${participant.user_id}`);
-          }
-        });
+      // 4. Handle "ALL" users notification
+      if (shouldNotifyAllUsers) {
+        try {
+          // Get all active users in the system
+          const { data: allUsers, error: usersError } = await supabaseService.client
+            .from('users')
+            .select('id, email')
+            .eq('is_active', true);
 
-        console.log(`📡 Total real-time notifications sent: ${1 + (data.assigned_to ? 2 : 0) + participants.length}`);
-      } catch (participantError) {
-        console.error('⚠️ Failed to get exchange participants for real-time notifications:', participantError);
+          if (!usersError && allUsers) {
+            allUsers.forEach(user => {
+              if (user.id !== req.user.id) {
+                io.to(`user_${user.id}`).emit('task_created', taskEvent);
+                io.to(`user_${user.id}`).emit('task_assigned', taskEvent);
+                console.log(`📡 Emitted to all users: user_${user.id}`);
+              }
+            });
+            console.log(`📡 Notified all ${allUsers.length} users about the task`);
+          }
+        } catch (allUsersError) {
+          console.error('⚠️ Failed to notify all users:', allUsersError);
+        }
+      } else {
+        // 5. Emit to exchange participants only (if not notifying all users)
+        try {
+          const databaseService = require('../services/database');
+          const participants = await databaseService.getExchangeParticipants({
+            where: { exchange_id: taskExchangeId }
+          });
+          
+          participants.forEach(participant => {
+            if (participant.user_id && participant.user_id !== req.user.id) {
+              io.to(`user_${participant.user_id}`).emit('task_created', taskEvent);
+              console.log(`📡 Emitted to participant dashboard: user_${participant.user_id}`);
+            }
+          });
+
+          console.log(`📡 Total real-time notifications sent: ${1 + (data.assigned_to ? 2 : 0) + participants.length}`);
+        } catch (participantError) {
+          console.error('⚠️ Failed to get exchange participants for real-time notifications:', participantError);
+        }
       }
     } else {
       console.warn('⚠️ Socket.IO not available for real-time task creation notification');

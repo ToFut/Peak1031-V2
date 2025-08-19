@@ -65,7 +65,7 @@ const requireExchangePermission = (permission, requireRolePermission = true) => 
         if (!userParticipant && req.user.email) {
           // Get user's contact records to match with participants
           const { data: contacts } = await supabaseService.client
-            .from('people')
+            .from('contacts')
             .select('id')
             .eq('email', req.user.email);
             
@@ -253,8 +253,16 @@ const requireExchangePermission = (permission, requireRolePermission = true) => 
         exchangePermissions = getDefaultPermissionsForRole(userRole);
       }
 
-      // Check specific permission
-      const hasExchangePermission = exchangePermissions[permission] === true;
+      // Check specific permission - handle both array and object formats
+      let hasExchangePermission = false;
+      
+      if (Array.isArray(exchangePermissions)) {
+        // If permissions is an array, check if the permission is in the array
+        hasExchangePermission = exchangePermissions.includes(permission);
+      } else if (typeof exchangePermissions === 'object') {
+        // If permissions is an object, check if the permission is true
+        hasExchangePermission = exchangePermissions[permission] === true;
+      }
       
       if (!hasExchangePermission) {
         console.log(`❌ Exchange permission denied: ${req.user.email} lacks '${permission}' in exchange ${exchangeId}`);

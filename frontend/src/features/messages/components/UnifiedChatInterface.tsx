@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useChat } from '../hooks/useChat';
 import { useAuth } from '../../../hooks/useAuth';
 import { useSocket } from '../../../hooks/useSocket';
@@ -23,7 +24,9 @@ import {
   SparklesIcon,
   BoltIcon,
   HeartIcon,
-  ShieldCheckIcon
+  ShieldCheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
 import { 
   CheckIcon as CheckSolidIcon,
@@ -59,6 +62,7 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
   const { user } = useAuth();
   const { connectionStatus } = useSocket();
   const isConnected = connectionStatus === 'connected';
+  const navigate = useNavigate();
   const [newMessage, setNewMessage] = useState('');
   const [showParticipants, setShowParticipants] = useState(false);
   const [showParticipantsManager, setShowParticipantsManager] = useState(false);
@@ -68,6 +72,7 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
@@ -437,6 +442,48 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
     };
   };
 
+  // Format exchange name to E-XXXX format
+  const formatExchangeName = (exchange: any) => {
+    if (!exchange) return 'Unknown Exchange';
+    
+    // Try to extract numeric ID from various possible ID formats
+    let numericId = '';
+    if (exchange.id) {
+      // If ID is already numeric, use it
+      if (/^\d+$/.test(exchange.id)) {
+        numericId = exchange.id;
+      } else {
+        // Extract numbers from UUID or other formats
+        const numbers = exchange.id.replace(/\D/g, '');
+        if (numbers) {
+          numericId = numbers.slice(-4); // Use last 4 digits
+        }
+      }
+    }
+    
+    // If we couldn't get a numeric ID, create one from the exchange name
+    if (!numericId && exchange.exchange_name) {
+      const hash = exchange.exchange_name.split('').reduce((a: number, b: string) => {
+        a = ((a << 5) - a) + b.charCodeAt(0);
+        return a & a;
+      }, 0);
+      numericId = Math.abs(hash).toString().slice(-4);
+    }
+    
+    // Fallback to a random 4-digit number
+    if (!numericId) {
+      numericId = Math.floor(1000 + Math.random() * 9000).toString();
+    }
+    
+    return `E-${numericId}`;
+  };
+
+  // Navigate to exchange details page
+  const handleExchangeNameClick = (e: React.MouseEvent, exchange: any) => {
+    e.stopPropagation(); // Prevent triggering the parent onClick
+    navigate(`/exchanges/${exchange.id}`);
+  };
+
   // Get days until closing for an exchange
   const getDaysUntilClosing = (exchange: any) => {
     if (!exchange.completionDeadline && !exchange.completion_deadline) return null;
@@ -570,26 +617,59 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
     <div className="h-full flex bg-gradient-to-br from-gray-50 via-white to-blue-50 rounded-2xl shadow-2xl overflow-hidden border border-gray-200/50">
       {/* Enhanced Sidebar - Only show if not hidden and no specific exchangeId */}
       {!hideExchangeList && !exchangeId && (
-        <div className="w-96 bg-gradient-to-b from-gray-50 to-white border-r border-gray-200 flex flex-col">
+        <div className={`${sidebarCollapsed ? 'w-16' : 'w-80'} bg-gradient-to-b from-gray-50 to-white border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out`}>
         {/* Enhanced Sidebar Header */}
         <div className="p-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center">
-              <BoltIcon className="w-6 h-6 text-blue-600 mr-2" />
-              Conversations
-            </h2>
-            <button
-              onClick={() => loadExchanges()}
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Refresh"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
+            {!sidebarCollapsed ? (
+              <>
+                <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                  <BoltIcon className="w-6 h-6 text-blue-600 mr-2" />
+                  Conversations
+                </h2>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => loadExchanges()}
+                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Refresh conversations"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setSidebarCollapsed(true)}
+                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Collapse sidebar"
+                  >
+                    <ChevronLeftIcon className="w-5 h-5" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center space-y-2 w-full">
+                <button
+                  onClick={() => setSidebarCollapsed(false)}
+                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Expand sidebar"
+                >
+                  <ChevronRightIcon className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => loadExchanges()}
+                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Refresh conversations"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
           
           {/* Enhanced Search and Filter */}
+          {!sidebarCollapsed && (
           <div className="space-y-3">
             <div className="relative">
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -675,54 +755,94 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
               </button>
             </div>
           </div>
+          )}
         </div>
 
         {/* Enhanced Exchange List */}
         <div className="flex-1 overflow-y-auto">
           {filteredExchanges.length === 0 ? (
-            <div className="p-6 text-center">
-              <UserGroupIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-600 font-medium">No conversations found</p>
-              <p className="text-gray-400 text-sm mt-1">
-                {searchQuery ? 'Try a different search term' : 'You\'ll see your exchanges here'}
-              </p>
-              {statusFilter !== 'all' && (
-                <button
-                  onClick={() => setStatusFilter('all')}
-                  className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  Clear filters
-                </button>
+            <div className={`${sidebarCollapsed ? 'p-2' : 'p-6'} text-center`}>
+              {!sidebarCollapsed ? (
+                <>
+                  <UserGroupIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-600 font-medium">No conversations found</p>
+                  <p className="text-gray-400 text-sm mt-1">
+                    {searchQuery ? 'Try a different search term' : 'You\'ll see your exchanges here'}
+                  </p>
+                  {statusFilter !== 'all' && (
+                    <button
+                      onClick={() => setStatusFilter('all')}
+                      className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </>
+              ) : (
+                <UserGroupIcon className="w-8 h-8 text-gray-300 mx-auto" />
               )}
             </div>
           ) : (
-            <div className="p-2 space-y-1">
+            <div className={`${sidebarCollapsed ? 'p-1' : 'p-2'} space-y-1`}>
               {filteredExchanges.map((exchange) => {
                 const daysUntilClosing = getDaysUntilClosing(exchange);
                 return (
                   <div
                     key={exchange.id}
                     onClick={() => selectExchange(exchange)}
-                    className={`p-4 cursor-pointer rounded-xl transition-all duration-200 hover:scale-[1.02] ${
+                    className={`${sidebarCollapsed ? 'p-2' : 'p-4'} cursor-pointer rounded-xl transition-all duration-200 hover:scale-[1.02] ${
                       selectedExchange?.id === exchange.id
                         ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg transform scale-[1.02]'
                         : 'hover:bg-gray-50 border border-transparent hover:border-gray-200'
                     }`}
+                    title={sidebarCollapsed ? exchange.exchange_name : undefined}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <h3 className={`font-semibold truncate ${
+                    {sidebarCollapsed ? (
+                      // Collapsed view - show only E-XXXX and minimal info
+                      <div className="flex flex-col items-center space-y-1">
+                        <div 
+                          className={`text-xs font-bold cursor-pointer hover:underline ${
                             selectedExchange?.id === exchange.id ? 'text-white' : 'text-gray-900'
-                          }`}>
-                            {exchange.exchange_name}
-                          </h3>
-                          {exchange.unread_count > 0 && (
-                            <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium min-w-[20px] text-center animate-pulse">
-                              {exchange.unread_count > 99 ? '99+' : exchange.unread_count}
-                            </span>
-                          )}
+                          }`}
+                          onClick={(e) => handleExchangeNameClick(e, exchange)}
+                          title="Click to view exchange details"
+                        >
+                          {formatExchangeName(exchange)}
                         </div>
+                        {exchange.unread_count > 0 && (
+                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                        )}
+                        {daysUntilClosing !== null && daysUntilClosing <= 45 && daysUntilClosing > 0 && (
+                          <div className={`w-3 h-3 rounded-full ${
+                            daysUntilClosing <= 45 ? 'bg-red-400 animate-pulse' : 'bg-yellow-400'
+                          }`}></div>
+                        )}
+                      </div>
+                    ) : (
+                      // Expanded view - show full details
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <h3 
+                              className={`font-semibold truncate cursor-pointer hover:underline ${
+                                selectedExchange?.id === exchange.id ? 'text-white' : 'text-gray-900'
+                              }`}
+                              onClick={(e) => handleExchangeNameClick(e, exchange)}
+                              title="Click to view exchange details"
+                            >
+                              {formatExchangeName(exchange)}
+                            </h3>
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              selectedExchange?.id === exchange.id ? 'bg-blue-400 text-white' : 'bg-gray-100 text-gray-600'
+                            }`} title={exchange.exchange_name}>
+                              {exchange.exchange_name?.length > 20 ? `${exchange.exchange_name.substring(0, 20)}...` : exchange.exchange_name}
+                            </span>
+                            {exchange.unread_count > 0 && (
+                              <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium min-w-[20px] text-center animate-pulse">
+                                {exchange.unread_count > 99 ? '99+' : exchange.unread_count}
+                              </span>
+                            )}
+                          </div>
                         
                         <div className="flex items-center flex-wrap gap-2 mt-1">
                           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -751,7 +871,7 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
                           
                           <span className={`text-xs ${
                             selectedExchange?.id === exchange.id ? 'text-blue-100' : 'text-gray-500'
-                          }`}>
+                          }`} title="Includes exchange participants, coordinator, and client">
                             <UserGroupIcon className="w-3 h-3 inline mr-1" />
                             {exchange.participants.length}
                           </span>
@@ -791,8 +911,9 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
                             )}
                           </div>
                         )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}
@@ -845,6 +966,9 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
                         });
                         return selectedExchange.participants.length;
                       })()} participants • Secure chat
+                      <span className="ml-1 text-xs text-gray-400" title="Includes exchange participants, coordinator, and client">
+                        (all access)
+                      </span>
                     </p>
                   </div>
                 </div>
@@ -863,6 +987,17 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
                     <ShieldCheckIcon className="w-3 h-3" />
                     <span>Secure</span>
                   </div>
+                  
+                  {/* View Exchange Details Button */}
+                  <button
+                    onClick={() => navigate(`/exchanges/${selectedExchange.id}`)}
+                    className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200 hover:border-blue-300"
+                    title="View Exchange Details"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </button>
                   
                   {(user?.role === 'admin' || user?.role === 'coordinator') && (
                     <button
@@ -934,7 +1069,19 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
                     <SparklesIcon className="w-10 h-10 text-blue-500" />
                   </div>
                   <p className="text-xl font-semibold text-gray-900 mb-2">Start the conversation!</p>
-                  <p className="text-gray-500">Send your first message to begin collaborating with your team.</p>
+                  <p className="text-gray-500 mb-6">Send your first message to begin collaborating with your team.</p>
+                  
+                  {/* View Exchange Details Button */}
+                  <button
+                    onClick={() => navigate(`/exchanges/${selectedExchange.id}`)}
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
+                    title="View Exchange Details"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    View Exchange Details
+                  </button>
                 </div>
               ) : (
                 messages.map((message, index) => {

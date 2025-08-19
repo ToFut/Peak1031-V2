@@ -59,6 +59,11 @@ const Task = sequelize.define('Task', {
     allowNull: true,
     defaultValue: {}
   },
+  metadata: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    defaultValue: {}
+  },
   lastSyncAt: {
     type: DataTypes.DATE,
     allowNull: true

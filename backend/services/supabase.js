@@ -176,6 +176,52 @@ class SupabaseService {
     return await this.update('users', userData, { id });
   }
 
+  async updateUserPassword(id, currentPassword, newPassword) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      // First, get the user to verify current password
+      const { data: user, error: getUserError } = await this.client
+        .from('users')
+        .select('password_hash')
+        .eq('id', id)
+        .single();
+
+      if (getUserError || !user) {
+        throw new Error('User not found');
+      }
+
+      // Verify current password using bcrypt
+      const bcrypt = require('bcryptjs');
+      const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash);
+      
+      if (!isValidPassword) {
+        return false;
+      }
+
+      // Hash the new password
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+      // Update the password
+      const { error: updateError } = await this.client
+        .from('users')
+        .update({ password_hash: hashedPassword })
+        .eq('id', id);
+
+      if (updateError) {
+        console.error('❌ Supabase password update error:', updateError);
+        throw new Error('Failed to update password');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('❌ Supabase updateUserPassword error:', error);
+      throw error;
+    }
+  }
+
   async getExchanges(options = {}) {
     if (!this.client) {
       throw new Error('Supabase client not initialized');
@@ -578,20 +624,10 @@ class SupabaseService {
     try {
       const { where = {}, orderBy = { column: 'created_at', ascending: false }, limit } = options;
       
-      // Query messages with sender information
+      // Query messages without relationship (will fetch sender separately)
       let query = this.client
         .from('messages')
-        .select(`
-          *,
-          sender:users!sender_id(
-            id,
-            email,
-            first_name,
-            last_name,
-            role,
-            is_active
-          )
-        `);
+        .select('*');
 
       // Apply where conditions with column name conversion
       if (where.exchangeId) {
@@ -632,19 +668,32 @@ class SupabaseService {
       // Return messages with included relationships
       const messages = data || [];
       
-      // Transform messages and fetch attachments
+      // Transform messages and fetch sender information separately
       if (messages.length > 0) {
         const enrichedMessages = await Promise.all(messages.map(async (message) => {
-          // Ensure sender information is properly structured
-          if (message.sender) {
-            // Add users property for backward compatibility
-            message.users = message.sender;
-            // Ensure sender has the expected structure
-            if (!message.sender.first_name && !message.sender.last_name) {
-              console.warn('⚠️ Message sender missing name information:', message.sender);
+          // Fetch sender information separately
+          if (message.sender_id) {
+            try {
+              const { data: senderData, error: senderError } = await this.client
+                .from('users')
+                .select('id, email, first_name, last_name, role, is_active')
+                .eq('id', message.sender_id)
+                .single();
+                
+              if (!senderError && senderData) {
+                message.sender = senderData;
+                message.users = senderData; // Backward compatibility
+              } else {
+                console.warn('⚠️ Could not fetch sender for message:', message.id, senderError);
+                message.sender = { id: message.sender_id, email: 'Unknown', first_name: 'Unknown', last_name: 'User' };
+              }
+            } catch (err) {
+              console.warn('⚠️ Error fetching sender for message:', message.id, err);
+              message.sender = { id: message.sender_id, email: 'Unknown', first_name: 'Unknown', last_name: 'User' };
             }
           } else {
-            console.warn('⚠️ Message missing sender information:', message.id);
+            console.warn('⚠️ Message missing sender_id:', message.id);
+            message.sender = { id: null, email: 'Unknown', first_name: 'Unknown', last_name: 'User' };
           }
           
           // Handle attachments array
@@ -1229,6 +1278,28 @@ class SupabaseService {
       return data;
     } catch (error) {
       console.error('Error creating exchange participant:', error);
+      throw error;
+    }
+  }
+
+  async getExchangeParticipant(exchangeId, userId) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    try {
+      const { data, error } = await this.client
+        .from('exchange_participants')
+        .select('*')
+        .eq('exchange_id', exchangeId)
+        .eq('user_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "not found"
+
+      return data || null;
+    } catch (error) {
+      console.error('Error getting exchange participant:', error);
       throw error;
     }
   }

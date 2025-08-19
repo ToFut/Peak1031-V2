@@ -9,6 +9,9 @@ require('dotenv').config();
 
 const app = express();
 
+// Trust proxy configuration for rate limiting behind nginx
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 app.use(cors({
@@ -63,6 +66,7 @@ app.use('/api/messages', require('./routes/messages'));
 app.use('/api/sync', require('./routes/sync'));
 app.use('/api/oauth', require('./routes/oauth'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/user-audit', require('./routes/user-audit'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -437,6 +437,83 @@ async function getUserAuditSummary(userId, userRole) {
   }
 }
 
+/**
+ * GET /api/user-audit/activity-logs
+ * Get current user's activity logs (alias for my-activity for frontend compatibility)
+ */
+router.get('/activity-logs', authenticateToken, async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 50, 
+      action, 
+      entityType, 
+      startDate, 
+      endDate,
+      search 
+    } = req.query;
+
+    console.log(`📝 USER AUDIT: ${req.user.role} user ${req.user.email} requesting activity logs`);
+
+    // Base filter - user can only see their own activities
+    let filters = { userId: req.user.id };
+
+    // Apply additional filters
+    if (action) {
+      filters.action = action;
+    }
+    if (entityType) {
+      filters.entityType = entityType;
+    }
+    if (startDate) {
+      filters.created_at = { $gte: new Date(startDate) };
+    }
+    if (endDate) {
+      if (filters.created_at) {
+        filters.created_at.$lte = new Date(endDate);
+      } else {
+        filters.created_at = { $lte: new Date(endDate) };
+      }
+    }
+
+    // Get user's audit logs
+    const auditLogs = await AuditService.getAuditLogs({
+      ...filters,
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit)
+    });
+
+    // Apply search filter if provided
+    let filteredLogs = auditLogs;
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredLogs = auditLogs.filter(log => 
+        log.action?.toLowerCase().includes(searchLower) ||
+        log.entity_type?.toLowerCase().includes(searchLower) ||
+        log.details?.message?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Format response for frontend compatibility
+    res.json({
+      logs: filteredLogs,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: filteredLogs.length,
+        totalPages: Math.ceil(filteredLogs.length / parseInt(limit))
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching user activity logs:', error);
+    res.status(500).json({
+      error: 'Failed to fetch user activity logs',
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;
 
 

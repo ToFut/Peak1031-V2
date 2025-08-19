@@ -41,12 +41,14 @@
     "npm": ">=8.0.0"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.38.0",
+    "@supabase/supabase-js": "^2.55.0",
     "axios": "^1.11.0",
+    "bcryptjs": "^3.0.2",
     "colors": "^1.4.0",
     "dotenv": "^17.2.1",
     "form-data": "^4.0.4",
     "node-fetch": "^3.3.2",
+    "pg": "^8.16.3",
     "socket.io-client": "^4.7.5",
     "ws": "^8.18.0"
   }

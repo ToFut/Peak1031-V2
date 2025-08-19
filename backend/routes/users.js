@@ -32,7 +32,7 @@ const { Op } = require('sequelize');
 const router = express.Router();
 
 // Get all users with filtering and pagination
-router.get('/', authenticateToken, checkPermission(['admin', 'coordinator']), async (req, res) => {
+router.get('/', authenticateToken, checkPermission(['admin', 'coordinator', 'client']), async (req, res) => {
   try {
     const { 
       page = 1, 

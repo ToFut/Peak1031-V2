@@ -170,7 +170,16 @@ function requireRole(allowedRoles, options = {}) {
   
   return async (req, res, next) => {
     try {
+      console.log('🔐 requireRole middleware check:', {
+        userRole: req.user?.role,
+        allowedRoles: roles,
+        excludeAdmin: options.excludeAdmin,
+        path: req.path,
+        method: req.method
+      });
+      
       if (!req.user) {
+        console.log('❌ requireRole: No user found');
         return res.status(401).json({
           error: 'Authentication required',
           message: 'Please log in to access this resource'
@@ -179,25 +188,25 @@ function requireRole(allowedRoles, options = {}) {
 
       // Admin role has access to everything (unless explicitly excluded)
       if (req.user.role === 'admin' && !options.excludeAdmin) {
+        console.log('✅ requireRole: Admin access granted');
         return next();
       }
 
       // Check if user's role is in allowed roles
       if (!roles.includes(req.user.role)) {
-        // Log unauthorized access attempt
-        await AuditLog.create({
-          action: 'UNAUTHORIZED_ACCESS_ATTEMPT',
-          entity_type: 'endpoint',
-          entity_id: null,
+        console.log('❌ requireRole: User role not in allowed roles:', {
+          userRole: req.user.role,
+          allowedRoles: roles
+        });
+        
+        // Log unauthorized access attempt (commented out since AuditLog is not available)
+        console.log('🚨 Unauthorized access attempt:', {
           user_id: req.user.id,
           ip_address: req.ip,
-          user_agent: req.get('User-Agent'),
-          details: {
-            path: req.path,
-            method: req.method,
-            required_roles: roles,
-            user_role: req.user.role
-          }
+          path: req.path,
+          method: req.method,
+          required_roles: roles,
+          user_role: req.user.role
         });
 
         return res.status(403).json({
@@ -205,6 +214,8 @@ function requireRole(allowedRoles, options = {}) {
           message: `Access denied. Required role(s): ${roles.join(', ')}`
         });
       }
+      
+      console.log('✅ requireRole: User role authorized');
 
       next();
     } catch (error) {

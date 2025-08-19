@@ -121,10 +121,10 @@ export class UserProfileService {
       console.log('🔍 UserProfileService: Fetching profile for userId:', userId, 'endpoint:', endpoint);
       
       const response = await apiService.get(endpoint, { 
-        useCache: false, // Don't use cache for real-time data
-        cacheDuration: 1 * 60 * 1000, // 1 minute for offline fallback only
+        useCache: true, // Use cache for better performance
+        cacheDuration: 5 * 60 * 1000, // 5 minutes cache
         useFallback: true,
-        forceRefresh: true, // Always fetch fresh data
+        forceRefresh: false, // Don't force refresh every time
         lazyLoad: false,
         etag
       });
@@ -172,10 +172,10 @@ export class UserProfileService {
       const etag = this.etagCache.get(endpoint);
       
       const response = await apiService.get(endpoint, { 
-        useCache: false, // Don't use cache for real-time data
-        cacheDuration: 1 * 60 * 1000, // 1 minute for offline fallback only
+        useCache: true, // Use cache for better performance
+        cacheDuration: 5 * 60 * 1000, // 5 minutes cache
         useFallback: true,
-        forceRefresh: true, // Always fetch fresh data
+        forceRefresh: false, // Don't force refresh every time
         lazyLoad: false,
         etag
       });

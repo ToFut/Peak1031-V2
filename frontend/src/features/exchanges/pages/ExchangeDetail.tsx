@@ -34,7 +34,7 @@ import {
 import { ExchangeOverview } from '../components/ExchangeOverview';
 import { TasksList } from '../components/TasksList';
 import { DocumentsList } from '../components/DocumentsList';
-import { TaskCreateModal } from '../../tasks/components/TaskCreateModal';
+import TaskCreateModal from '../../tasks/components/TaskCreateModal';
 
 interface TabProps {
   exchange: Exchange;

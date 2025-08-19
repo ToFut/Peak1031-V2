@@ -94,6 +94,13 @@ const Users: React.FC = () => {
       // Handle both direct array and paginated response
       const usersData = response.users || response.data || response || [];
       
+      // Debug: Check for duplicate user IDs
+      const userIds = usersData.map((user: any) => user.id);
+      const duplicateIds = userIds.filter((id: string, index: number) => userIds.indexOf(id) !== index);
+      if (duplicateIds.length > 0) {
+        console.warn('⚠️ Duplicate user IDs found:', duplicateIds);
+      }
+      
       setUsers(usersData);
     } catch (err: any) {
       console.error('❌ Error loading users:', err);
@@ -123,6 +130,13 @@ const Users: React.FC = () => {
     
     return matchesSearch && matchesRole && matchesStatus;
   });
+
+  // Debug: Check for duplicate user IDs in filtered list
+  const filteredUserIds = filteredUserList.map((user: any) => user.id);
+  const duplicateFilteredIds = filteredUserIds.filter((id: string, index: number) => filteredUserIds.indexOf(id) !== index);
+  if (duplicateFilteredIds.length > 0) {
+    console.warn('⚠️ Duplicate user IDs in filtered list:', duplicateFilteredIds);
+  }
 
   // Don't load users if user is not admin
   if (!isAdmin()) {
@@ -542,9 +556,9 @@ const Users: React.FC = () => {
 
       {/* User Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {filteredUserList.map(user => (
+        {filteredUserList.map((user, index) => (
           <div
-            key={user.id}
+            key={`${user.id}-${index}`}
             className="bg-white rounded-xl shadow p-6 border flex flex-col hover:shadow-lg transition cursor-pointer relative"
             onClick={() => handleViewUserProfile(user)}
             tabIndex={0}

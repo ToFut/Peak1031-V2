@@ -218,18 +218,31 @@ class RBACService {
     // Admin can access all
     if (user.role === 'admin') return true;
 
-    // Check if user is a participant with proper permissions
+    // Check if user is a participant with proper permissions (check both user_id and contact_id)
     const { data: participant } = await supabaseService.client
       .from('exchange_participants')
       .select('id, role, permissions, is_active')
       .eq('exchange_id', exchangeId)
-      .eq('user_id', user.id)
+      .or(`user_id.eq.${user.id},contact_id.eq.${user.contact_id || user.id}`)
       .eq('is_active', true)
       .single();
 
     if (participant) {
       // User is a participant, they have basic access
       return true;
+    }
+
+    // For clients, also check if they are the client of the exchange
+    if (user.role === 'client') {
+      const { data: exchange } = await supabaseService.client
+        .from('exchanges')
+        .select('client_id')
+        .eq('id', exchangeId)
+        .single();
+      
+      if (exchange && (exchange.client_id === user.id || exchange.client_id === user.contact_id)) {
+        return true;
+      }
     }
 
     // Fall back to role-based check
@@ -250,27 +263,39 @@ class RBACService {
     const hasAccess = await this.canUserAccessExchange(user, exchangeId);
     if (!hasAccess) return false;
 
-    // Check participant permissions
+    // Check participant permissions (check both user_id and contact_id)
     const { data: participant } = await supabaseService.client
       .from('exchange_participants')
       .select('id, role, permissions')
       .eq('exchange_id', exchangeId)
-      .eq('user_id', user.id)
+      .or(`user_id.eq.${user.id},contact_id.eq.${user.contact_id || user.id}`)
       .eq('is_active', true)
       .single();
 
     if (participant && participant.permissions) {
-      let permissions = {};
-      try {
-        permissions = typeof participant.permissions === 'string' 
-          ? JSON.parse(participant.permissions) 
-          : participant.permissions;
-      } catch (error) {
-        console.error('Error parsing participant permissions:', error);
+      let permissions = participant.permissions;
+      
+      // Handle different permission formats
+      if (typeof permissions === 'string') {
+        try {
+          permissions = JSON.parse(permissions);
+        } catch (error) {
+          console.error('Error parsing participant permissions:', error);
+          permissions = {};
+        }
       }
 
-      // Check the specific permission
-      return permissions[permission] === true;
+      // If permissions is an array, check if the permission is in the array
+      if (Array.isArray(permissions)) {
+        return permissions.includes(permission);
+      }
+      
+      // If permissions is an object, check the boolean value
+      if (typeof permissions === 'object' && permissions !== null) {
+        return permissions[permission] === true;
+      }
+      
+      return false;
     }
 
     // If no participant permissions found, use role-based defaults

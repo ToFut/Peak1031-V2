@@ -24,7 +24,8 @@ import {
   ExclamationTriangleIcon,
   DocumentTextIcon,
   LinkIcon,
-  PhotoIcon
+  PhotoIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline';
 import {
   StarIcon as StarSolidIcon,
@@ -37,6 +38,22 @@ interface TaskDetailModalProps {
   onClose: () => void;
   onUpdate: (taskId: string, updates: Partial<Task>) => Promise<void>;
   onDelete?: (taskId: string) => Promise<void>;
+}
+
+interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role?: string;
+  assignmentId?: string;
+  name?: string;
+}
+
+interface Exchange {
+  id: string;
+  name: string;
+  status: string;
 }
 
 const PRIORITY_OPTIONS = [
@@ -64,6 +81,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [editMode, setEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'attachments'>('details');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [exchanges, setExchanges] = useState<Exchange[]>([]);
+  const [exchangeParticipants, setExchangeParticipants] = useState<User[]>([]);
+  const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -84,14 +106,53 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [attachments, setAttachments] = useState<any[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
 
+  // Get user name by ID
+  const getUserName = (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    return user ? `${user.firstName} ${user.lastName}` : userId;
+  };
+
+  // Get exchange name by ID
+  const getExchangeName = (exchangeId: string) => {
+    if (exchangeId === 'no-exchange') return 'Unassigned Tasks';
+    const exchange = exchanges.find(ex => ex.id === exchangeId);
+    return exchange?.name || `Exchange ${exchangeId}`;
+  };
+
+  // Load exchange participants if task has an exchange
+  const loadExchangeParticipants = async () => {
+    if (task.exchangeId || task.exchange_id) {
+      try {
+        const participants = await apiService.getExchangeParticipants(task.exchangeId || task.exchange_id || '');
+        setExchangeParticipants(Array.isArray(participants) ? participants : []);
+      } catch (error) {
+        console.error('Failed to load exchange participants:', error);
+        setExchangeParticipants([]);
+      }
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadTaskDetails();
+      loadExchangeParticipants();
     }
   }, [isOpen, task.id]);
 
   const loadTaskDetails = async () => {
     try {
+      // Load users and exchanges for assignment dropdown
+      const [usersResponse, exchangesResponse] = await Promise.all([
+        apiService.getUsers(),
+        apiService.getExchanges()
+      ]);
+      
+      const usersData = (usersResponse as any)?.data || usersResponse;
+      setUsers(Array.isArray(usersData) ? usersData : []);
+      
+      const exchangesData = (exchangesResponse as any)?.data || exchangesResponse;
+      setExchanges(Array.isArray(exchangesData) ? exchangesData : []);
+
       // Load comments, attachments, and activity
       // const [commentsRes, attachmentsRes, activityRes] = await Promise.all([
       //   apiService.getTaskComments(task.id),
@@ -290,6 +351,122 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   <span className="text-sm font-medium">{currentPriority.label}</span>
                   <ChevronDownIcon className="w-3 h-3" />
                 </button>
+
+              {/* Assignee Quick Change */}
+              <div className="relative group">
+                <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">
+                  <UserCircleIcon className="w-4 h-4" />
+                  <span className="text-sm font-medium">
+                    {formData.assignedTo ? getUserName(formData.assignedTo) : 'Unassigned'}
+                  </span>
+                  <ChevronDownIcon className="w-3 h-3" />
+                </button>
+                <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 max-h-60 overflow-y-auto">
+                  <div className="py-1">
+                    {/* Unassigned option */}
+                    <button
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, assignedTo: '' }));
+                        onUpdate(task.id, { assignedTo: '' });
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center"
+                    >
+                      <UserCircleIcon className="w-4 h-4 mr-2 text-gray-400" />
+                      <span className="text-gray-500">Unassigned</span>
+                    </button>
+                    
+                    {/* Exchange participants first */}
+                    {exchangeParticipants.length > 0 && (
+                      <>
+                        <div className="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-50">
+                          Exchange Participants
+                        </div>
+                        {(Array.isArray(exchangeParticipants) ? exchangeParticipants : []).map(participant => (
+                          <button
+                            key={participant.id}
+                            onClick={() => {
+                              const assigneeId = participant.id;
+                              setFormData(prev => ({ ...prev, assignedTo: assigneeId }));
+                              onUpdate(task.id, { assignedTo: assigneeId });
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center"
+                          >
+                            <UserCircleIcon className="w-4 h-4 mr-2 text-purple-500" />
+                            <div>
+                              <div className="font-medium">
+                                {participant.name || `${participant.firstName} ${participant.lastName}`}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {participant.role || 'Participant'}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </>
+                    )}
+                    
+                    {/* Assignment Options */}
+                    <div className="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-50">
+                      Assignment Options
+                    </div>
+                    <button
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, assignedTo: '' }));
+                        onUpdate(task.id, { assignedTo: '' });
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center"
+                    >
+                      <UserCircleIcon className="w-4 h-4 mr-2 text-gray-500" />
+                      <div>
+                        <div className="font-medium">Unassigned</div>
+                        <div className="text-xs text-gray-500">No assignment</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, assignedTo: 'ALL' }));
+                        onUpdate(task.id, { assignedTo: 'ALL', metadata: { notify_all_users: true } });
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center"
+                    >
+                      <UserGroupIcon className="w-4 h-4 mr-2 text-green-500" />
+                      <div>
+                        <div className="font-medium">All Users (Notify Everyone)</div>
+                        <div className="text-xs text-gray-500">Notify all users in the system</div>
+                      </div>
+                    </button>
+                    
+                    {/* All users */}
+                    {(Array.isArray(users) ? users : []).length > 0 && (
+                      <>
+                        <div className="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-50">
+                          All Users
+                        </div>
+                        {(Array.isArray(users) ? users : []).map(user => (
+                          <button
+                            key={user.id}
+                            onClick={() => {
+                              setFormData(prev => ({ ...prev, assignedTo: user.id }));
+                              onUpdate(task.id, { assignedTo: user.id });
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center"
+                          >
+                            <UserCircleIcon className="w-4 h-4 mr-2 text-blue-500" />
+                            <div>
+                              <div className="font-medium">
+                                {`${user.firstName} ${user.lastName}`}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {user.email} - {user.role}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
                 <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
                   {PRIORITY_OPTIONS.map(priority => (
                     <button
@@ -436,16 +613,100 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     Assigned To
                   </label>
                   {editMode ? (
-                    <input
-                      type="text"
-                      value={formData.assignedTo}
-                      onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      placeholder="Enter assignee..."
-                    />
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left flex items-center justify-between bg-white hover:bg-gray-50"
+                      >
+                        <span className={formData.assignedTo ? 'text-gray-900' : 'text-gray-500'}>
+                          {formData.assignedTo ? getUserName(formData.assignedTo) : 'Select assignee...'}
+                        </span>
+                        <ChevronDownIcon className="w-4 h-4 text-gray-400" />
+                      </button>
+                      
+                      {showAssigneeDropdown && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          <div className="py-1">
+                            {/* Unassigned option */}
+                            <button
+                              onClick={() => {
+                                setFormData(prev => ({ ...prev, assignedTo: '' }));
+                                setShowAssigneeDropdown(false);
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center"
+                            >
+                              <UserCircleIcon className="w-4 h-4 mr-2 text-gray-400" />
+                              <span className="text-gray-500">Unassigned</span>
+                            </button>
+                            
+                            {/* Exchange participants first */}
+                            {exchangeParticipants.length > 0 && (
+                              <>
+                                <div className="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-50">
+                                  Exchange Participants
+                                </div>
+                                                        {(Array.isArray(exchangeParticipants) ? exchangeParticipants : []).map(participant => (
+                          <button
+                            key={participant.id}
+                            onClick={() => {
+                              setFormData(prev => ({ 
+                                ...prev, 
+                                assignedTo: participant.id 
+                              }));
+                                      setShowAssigneeDropdown(false);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center"
+                                  >
+                                    <UserCircleIcon className="w-4 h-4 mr-2 text-purple-500" />
+                                    <div>
+                                      <div className="font-medium">
+                                        {participant.name || `${participant.firstName} ${participant.lastName}`}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {participant.role || 'Participant'}
+                                      </div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </>
+                            )}
+                            
+                            {/* All users */}
+                            {(Array.isArray(users) ? users : []).length > 0 && (
+                              <>
+                                <div className="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-50">
+                                  All Users
+                                </div>
+                                {(Array.isArray(users) ? users : []).map(user => (
+                                  <button
+                                    key={user.id}
+                                    onClick={() => {
+                                      setFormData(prev => ({ ...prev, assignedTo: user.id }));
+                                      setShowAssigneeDropdown(false);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center"
+                                  >
+                                    <UserCircleIcon className="w-4 h-4 mr-2 text-blue-500" />
+                                    <div>
+                                      <div className="font-medium">
+                                        {`${user.firstName} ${user.lastName}`}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {user.email} - {user.role}
+                                      </div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <p className="text-gray-900">
-                      {formData.assignedTo || 'Unassigned'}
+                      {formData.assignedTo ? getUserName(formData.assignedTo) : 'Unassigned'}
                     </p>
                   )}
                 </div>

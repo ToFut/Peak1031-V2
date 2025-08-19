@@ -9,7 +9,7 @@ import UnifiedChatInterface from '../features/messages/components/UnifiedChatInt
 import EnterpriseParticipantsManager from '../components/EnterpriseParticipantsManager';
 import EnhancedInvitationManager from '../features/exchanges/components/EnhancedInvitationManager';
 import { EnhancedDocumentManager } from '../features/documents/components';
-import { TaskCreateModal } from '../features/tasks/components/TaskCreateModal';
+import TaskCreateModal from '../features/tasks/components/TaskCreateModal';
 import { TaskBoard } from '../features/tasks/components/TaskBoard';
 import {
   ArrowLeft,
@@ -114,6 +114,7 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
   const [participants, setParticipants] = useState<ExchangeParticipant[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'tasks' | 'documents' | 'financial' | 'compliance' | 'chat' | 'timeline' | 'audit'>('overview');
@@ -156,53 +157,96 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
       return;
     }
 
-    try {
-      setLoading(true);
-      setError(null);
+          try {
+        setLoading(true);
+        setError(null);
 
-      console.log('Loading exchange details for ID:', id);
+        console.log('Loading exchange details for ID:', id);
+        console.log('About to make API calls...');
+        console.log('API base URL:', apiService.getBaseURL());
 
       // Try enterprise endpoints first, fallback to regular endpoints
-      let exchangeData, participantsData, tasksData, documentsData, auditData, timelineData, complianceData;
+      let exchangeData, participantsData, tasksData, auditData, timelineData, complianceData, usersData: any;
       
-      try {
-        // Try enterprise endpoints
-        [exchangeData, participantsData, tasksData, auditData, timelineData, complianceData] = await Promise.all([
-          apiService.get(`/enterprise-exchanges/${id}`).catch(() => apiService.get(`/exchanges/${id}`)),
-          apiService.get(`/exchanges/${id}/participants`),
-          apiService.get(`/exchanges/${id}/tasks`),
-          apiService.get(`/exchanges/${id}/audit-logs`),
-          apiService.get(`/enterprise-exchanges/${id}/timeline`).catch(() => []),
-          apiService.get(`/enterprise-exchanges/${id}/compliance`).catch(() => null)
-        ]);
-      } catch (error) {
-        // Fallback to regular endpoints
-        [exchangeData, participantsData, tasksData, auditData] = await Promise.all([
-          apiService.get(`/exchanges/${id}`),
-          apiService.get(`/exchanges/${id}/participants`),
-          apiService.get(`/exchanges/${id}/tasks`),
-          apiService.get(`/exchanges/${id}/audit-logs`)
-        ]);
-        timelineData = [];
-        complianceData = null;
-      }
+              try {
+          console.log('Making API calls to:', apiService.getBaseURL());
+          // Try enterprise endpoints
+          [exchangeData, participantsData, tasksData, auditData, timelineData, complianceData] = await Promise.all([
+            apiService.get(`/enterprise-exchanges/${id}`).catch((error) => {
+              console.log('Enterprise exchange failed, falling back to regular:', error.message);
+              return apiService.get(`/exchanges/${id}`);
+            }),
+            apiService.get(`/exchanges/${id}/participants`),
+            apiService.getTasksByExchange(id),
+            apiService.get(`/exchanges/${id}/audit-logs`),
+            apiService.get(`/enterprise-exchanges/${id}/timeline`).catch(() => []),
+            apiService.get(`/enterprise-exchanges/${id}/compliance`).catch(() => null)
+          ]);
+        } catch (error) {
+          // Fallback to regular endpoints
+          [exchangeData, participantsData, tasksData, auditData] = await Promise.all([
+            apiService.get(`/exchanges/${id}`),
+            apiService.get(`/exchanges/${id}/participants`),
+            apiService.getTasksByExchange(id),
+            apiService.get(`/exchanges/${id}/audit-logs`)
+          ]);
+          timelineData = [];
+          complianceData = null;
+        }
 
+        // Load users separately to avoid blocking main data
+        try {
+          console.log('Loading users...');
+          usersData = await apiService.getUsers();
+          console.log('Users loaded successfully:', usersData?.data?.length || usersData?.length || 0);
+        } catch (error) {
+          console.warn('Failed to load users, continuing without user data:', error);
+          usersData = [];
+        }
+
+      console.log('All API calls completed');
       console.log('Exchange details loaded successfully:', exchangeData);
       console.log('Tasks data received:', tasksData);
-      console.log('Tasks array:', tasksData?.tasks || tasksData || []);
+      console.log('Tasks data type:', typeof tasksData);
+      console.log('Tasks data is array:', Array.isArray(tasksData));
+      console.log('Tasks array length:', Array.isArray(tasksData) ? tasksData.length : 'N/A');
 
       setExchange(exchangeData);
       setParticipants(participantsData?.participants || participantsData || []);
-      setTasks(tasksData?.tasks || tasksData || []);
+      // Handle tasks data - getTasksByExchange returns array directly
+      const tasksArray = Array.isArray(tasksData) ? tasksData : [];
+      console.log('Final tasksArray:', tasksArray);
+      console.log('Final tasksArray length:', tasksArray.length);
+      console.log('Final tasksArray is array:', Array.isArray(tasksArray));
+      console.log('Setting tasks state with:', tasksArray.length, 'tasks');
+      console.log('About to set tasks state with:', tasksArray.length, 'tasks');
+      setTasks(tasksArray);
+      console.log('Tasks state set, should trigger re-render');
+      
+      // Add immediate verification
+      setTimeout(() => {
+        console.log('🔍 VERIFICATION: Tasks state after setState:', {
+          tasksLength: tasks.length,
+          isArray: Array.isArray(tasks),
+          sample: tasks.length > 0 ? tasks[0]?.title : 'None'
+        });
+      }, 100);
       
       setAuditLogs(auditData?.auditLogs || auditData || []);
       setTimeline(timelineData || []);
       setCompliance(complianceData);
+      // Handle both array and object responses for users
+      const usersArray = Array.isArray(usersData) ? usersData : (Array.isArray(usersData?.data) ? usersData.data : []);
+      console.log('Final usersArray:', usersArray);
+      console.log('Final usersArray length:', usersArray.length);
+      setUsers(usersArray);
 
     } catch (err: any) {
       console.error('Error loading exchange details:', err);
+      console.error('Error details:', err);
       setError(err.message || 'Failed to load exchange details');
     } finally {
+      console.log('Setting loading to false');
       setLoading(false);
     }
   }, [id]);
@@ -210,6 +254,10 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
   useEffect(() => {
     loadExchangeData();
   }, [loadExchangeData]);
+
+
+
+
 
   // Exchange stage calculation
   const getExchangeStage = useMemo(() => {
@@ -303,9 +351,9 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
     if (!exchange) return;
 
     const details = {
-      'admin': `Admin: View Full Exchange Details for ${exchange.name}\n- Exchange ID: ${exchange.id}\n- Status: ${exchange.status}\n- Progress: ${exchange.progress || 0}%\n- Value: $${exchange.exchangeValue?.toLocaleString()}\n- Active Tasks: ${Array.isArray(tasks) ? tasks.filter(t => t.status === 'PENDING').length : 0}`,
+      'admin': `Admin: View Full Exchange Details for ${exchange.name}\n- Exchange ID: ${exchange.id}\n- Status: ${exchange.status}\n- Progress: ${exchange.progress || 0}%\n- Value: $${exchange.exchangeValue?.toLocaleString()}\n- Active Tasks: ${Array.isArray(tasks) ? tasks.filter(t => t.status === 'PENDING' || t.status === 'pending').length : 0}`,
       'client': `Client: View My Exchange Details for ${exchange.name}\n- Your Exchange Progress: ${exchange.progress || 0}%\n- Next Deadline: ${exchange.identificationDeadline}\n- Payments Status: Up to date`,
-      'coordinator': `Coordinator: Manage Exchange for ${exchange.name}\n- Exchange Status: ${exchange.status}\n- Progress: ${exchange.progress || 0}%\n- Team Members: ${Array.isArray(participants) ? participants.length : 0}\n- Active Tasks: ${Array.isArray(tasks) ? tasks.filter(t => t.status === 'PENDING').length : 0}`,
+      'coordinator': `Coordinator: Manage Exchange for ${exchange.name}\n- Exchange Status: ${exchange.status}\n- Progress: ${exchange.progress || 0}%\n- Team Members: ${Array.isArray(participants) ? participants.length : 0}\n- Active Tasks: ${Array.isArray(tasks) ? tasks.filter(t => t.status === 'PENDING' || t.status === 'pending').length : 0}`,
       'third_party': `Third Party: View Assigned Exchange for ${exchange.name}\n- Service Status: Active\n- Billing Information: Current\n- Service Level: Premium\n- Next Review: ${exchange.identificationDeadline}`
     };
 
@@ -386,7 +434,7 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-8 space-y-8 max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -690,7 +738,7 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
           </div>
 
           {/* Tab Content */}
-          <div className="p-6">
+          <div className="p-8">
             {activeTab === 'overview' && (
               <div className="space-y-6">
                 {/* Quick Stats */}
@@ -709,7 +757,12 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-green-600">Active Tasks</p>
-                        <p className="text-2xl font-bold text-green-900">{Array.isArray(tasks) ? tasks.filter(t => t.status === 'PENDING').length : 0}</p>
+                        <p className="text-2xl font-bold text-green-900">
+                          {Array.isArray(tasks) ? tasks.filter(t => {
+                            const status = t.status?.toLowerCase();
+                            return status === 'pending' || status === 'in_progress' || status === 'in progress';
+                          }).length : 0}
+                        </p>
                       </div>
                       <CheckSquare className="w-8 h-8 text-green-600" />
                     </div>
@@ -818,7 +871,9 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
                 </div>
                 
                 {/* Modern TaskBoard Component */}
-                <div className="min-h-[600px]">
+                <div className="min-h-[800px]">
+  
+                  
                   {Array.isArray(tasks) && tasks.length > 0 ? (
                     <TaskBoard 
                       tasks={tasks}
@@ -841,6 +896,7 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
                       }}
                       showExchangeInfo={false}
                       compact={false}
+                      users={users}
                     />
                   ) : (
                     <div className="flex flex-col items-center justify-center py-20 text-gray-500">

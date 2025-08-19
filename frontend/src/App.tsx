@@ -160,6 +160,11 @@ const App: React.FC = () => {
                   <InvitationSignup />
                 </Suspense>
               } />
+              <Route path="/onboarding/invitation/:token" element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <InvitationSignup />
+                </Suspense>
+              } />
               <Route path="/auth/callback" element={
                 <Suspense fallback={<LoadingFallback />}>
                   <AuthCallback />

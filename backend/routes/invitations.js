@@ -172,7 +172,15 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
   body('invitations.*.email').isEmail().withMessage('Valid email is required'),
   body('invitations.*.role').isIn(['client', 'third_party', 'agency', 'coordinator']).withMessage('Invalid role'),
   body('invitations.*.method').isIn(['email', 'sms', 'both']).withMessage('Invalid invitation method'),
-  body('invitations.*.phone').optional({ checkFalsy: true }).isMobilePhone().withMessage('Valid phone number required for SMS'),
+  body('invitations.*.phone').optional({ checkFalsy: true }).custom((value) => {
+    if (!value) return true; // Allow empty/optional phone
+    // Basic phone validation - allow digits, spaces, dashes, parentheses, and +
+    const phoneRegex = /^[\+]?[\d\s\-\(\)]+$/;
+    if (!phoneRegex.test(value)) {
+      throw new Error('Invalid phone number format');
+    }
+    return true;
+  }).withMessage('Invalid phone number format'),
   body('invitations.*.firstName').optional().isString(),
   body('invitations.*.lastName').optional().isString(),
   body('message').optional().isString().isLength({ max: 500 }).withMessage('Message too long')
@@ -200,14 +208,27 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
     const userRole = req.user.role;
     const isCoordinator = exchange.coordinator_id === inviterId;
     
+    console.log('🔐 Authorization check:', {
+      userRole,
+      isCoordinator,
+      exchangeId,
+      inviterId,
+      exchangeCoordinatorId: exchange.coordinator_id
+    });
+    
     if (userRole !== 'admin' && !isCoordinator) {
+      console.log('❌ Authorization failed: User cannot invite to this exchange');
       return res.status(403).json({ error: 'Not authorized to send invitations for this exchange' });
     }
+    
+    console.log('✅ Authorization passed: User can invite to this exchange');
 
     const results = [];
     
     for (const invitation of invitations) {
       try {
+        console.log(`🔍 Processing invitation for ${invitation.email}...`);
+        
         // Check if user already exists
         const existingUser = await supabaseService.getUserByEmail(invitation.email);
         
@@ -466,12 +487,15 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
           });
           
         } else {
+          console.log(`📧 Creating invitation for new user: ${invitation.email}`);
+          
           // Create invitation for new user using Supabase Auth
           const crypto = require('crypto');
           const invitationId = uuidv4();
           const invitationToken = crypto.randomBytes(32).toString('hex');
           
           // Send invitation using Supabase Auth - PASS THE TOKEN WE GENERATED
+          console.log('📧 Calling invitation service...');
           const inviteResult = await invitationService.sendInvitation({
             email: invitation.email,
             phone: invitation.phone,
@@ -486,27 +510,36 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
             exchangeId: exchangeId,
             inviterId: inviterId
           });
+          console.log('📧 Invitation service result:', inviteResult);
 
           if (inviteResult.email.sent) {
+            console.log('📧 Invitation sent successfully, storing record...');
+            
             // Store invitation record for tracking
             const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
             
-            await supabaseService.insert('invitations', {
-              id: invitationId,
-              email: invitation.email,
-              phone: invitation.phone || null,
-              exchange_id: exchangeId,
-              role: invitation.role,
-              invited_by: inviterId,
-              invitation_token: invitationToken, // Use the properly generated token
-              expires_at: expiresAt.toISOString(),
-              status: 'pending',
-              first_name: invitation.firstName || null,
-              last_name: invitation.lastName || null,
-              custom_message: message || null,
-              created_at: new Date().toISOString()
-              // Remove supabase_user_id as it doesn't exist in the table
-            });
+            try {
+              await supabaseService.insert('invitations', {
+                id: invitationId,
+                email: invitation.email,
+                phone: invitation.phone || null,
+                exchange_id: exchangeId,
+                role: invitation.role,
+                invited_by: inviterId,
+                invitation_token: invitationToken, // Use the properly generated token
+                expires_at: expiresAt.toISOString(),
+                status: 'pending',
+                first_name: invitation.firstName || null,
+                last_name: invitation.lastName || null,
+                custom_message: message || null,
+                created_at: new Date().toISOString()
+                // Remove supabase_user_id as it doesn't exist in the table
+              });
+              console.log('✅ Invitation record stored successfully');
+            } catch (dbError) {
+              console.error('❌ Failed to store invitation record:', dbError);
+              throw dbError;
+            }
 
             // Generate invitation link
             const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -560,14 +593,16 @@ router.post('/:exchangeId/send', authenticateToken, requireRole(['admin', 'coord
           }
         }
         
-      } catch (error) {
-        console.error(`Error processing invitation for ${invitation.email}:`, error);
-        results.push({
-          email: invitation.email,
-          status: 'error',
-          message: error.message
-        });
-      }
+              } catch (error) {
+          console.error(`❌ Error processing invitation for ${invitation.email}:`, error);
+          console.error(`❌ Error details:`, error.message);
+          console.error(`❌ Error stack:`, error.stack);
+          results.push({
+            email: invitation.email,
+            status: 'error',
+            message: error.message
+          });
+        }
     }
 
     res.json({

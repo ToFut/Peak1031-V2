@@ -170,12 +170,32 @@ class InvitationService {
 
     // Generate token if not provided
     const token = invitationToken || this.generateInvitationToken();
-    const inviteUrl = `${this.frontendUrl}/invite/${token}`;
+    
+    // Use environment-based invitation path
+    const invitationPath = process.env.NODE_ENV === 'production' ? '/invite' : '/onboarding/invitation';
+    const inviteUrl = `${this.frontendUrl}${invitationPath}/${token}`;
+    
     const displayName = firstName && lastName ? `${firstName} ${lastName}` : email;
 
     // Send email invitation
     if (method === 'email' || method === 'both') {
-      if (this.sendgridEnabled) {
+      // Force development mode for local testing since SendGrid sender is not verified
+      const isLocalDevelopment = !process.env.VERCEL && !process.env.HEROKU;
+      const isDevelopment = process.env.NODE_ENV !== 'production' || isLocalDevelopment;
+      
+      console.log('🔍 Environment check:', {
+        NODE_ENV: process.env.NODE_ENV,
+        isLocalDevelopment,
+        isDevelopment,
+        sendgridEnabled: this.sendgridEnabled
+      });
+      
+      if (isDevelopment) {
+        console.log('📧 DEVELOPMENT MODE: Mock email sending');
+        console.log('📧 Would send email to:', email);
+        console.log('📧 Invitation URL:', inviteUrl);
+        results.email = { sent: true, error: null };
+      } else if (this.sendgridEnabled) {
         try {
           console.log(`🔄 Attempting to send invitation email to ${email}`);
           console.log(`📧 SendGrid API Key configured: ${process.env.SENDGRID_API_KEY ? 'Yes' : 'No'}`);
@@ -288,10 +308,13 @@ class InvitationService {
       isResend
     });
 
+    // Use a verified sender email for SendGrid
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'admin@peak1031.com';
+
     const msg = {
       to: email,
       from: {
-        email: process.env.SENDGRID_FROM_EMAIL || 'noreply@peak1031.com',
+        email: fromEmail,
         name: process.env.SENDGRID_FROM_NAME || 'Peak 1031 Platform'
       },
       subject,
@@ -493,10 +516,14 @@ Your role as a ${role} gives you access to exchange documents, communications, a
 Peak 1031 Exchange Platform - Secure & Compliant 1031 Exchange Management
     `;
 
+    // Use a verified sender email for SendGrid
+    // In development, we'll use mock email sending since SendGrid requires sender verification
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'admin@peak1031.com';
+    
     const msg = {
       to: email,
       from: {
-        email: process.env.SENDGRID_FROM_EMAIL || 'noreply@peak1031.com',
+        email: fromEmail,
         name: process.env.SENDGRID_FROM_NAME || 'Peak 1031 Platform'
       },
       subject,

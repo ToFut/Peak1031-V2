@@ -104,7 +104,7 @@ router.post('/:exchangeId/participants', authenticateToken, requireCanAddPartici
     const participantData = {
       exchange_id: exchangeId,
       role: role,
-      permissions: JSON.stringify(permissions || {})
+      permissions: permissions || {} // Store as object, not stringified
     };
     
     // Add either contact_id or user_id, not both
@@ -271,12 +271,18 @@ router.put('/:exchangeId/participants/:participantId/permissions', authenticateT
     }
 
     // Validate permissions object structure
-    const validPermissions = ['can_edit', 'can_delete', 'can_add_participants', 'can_upload_documents', 'can_send_messages'];
+    const validPermissions = [
+      'can_edit', 'can_delete', 'can_add_participants', 'can_upload_documents', 'can_send_messages',
+      'can_view_overview', 'can_view_messages', 'can_view_tasks', 'can_create_tasks', 'can_edit_tasks',
+      'can_assign_tasks', 'can_view_documents', 'can_edit_documents', 'can_delete_documents',
+      'can_view_participants', 'can_manage_participants', 'can_view_financial', 'can_edit_financial',
+      'can_view_timeline', 'can_edit_timeline', 'can_view_reports'
+    ];
     
-    if (typeof permissions !== 'object' || permissions === null) {
+    if (typeof permissions !== 'object' || permissions === null || Array.isArray(permissions)) {
       return res.status(400).json({
         error: 'Invalid permissions format',
-        message: 'Permissions must be an object'
+        message: 'Permissions must be an object (not an array)'
       });
     }
 
@@ -295,11 +301,11 @@ router.put('/:exchangeId/participants/:participantId/permissions', authenticateT
       }
     }
 
-    // Update participant permissions
+    // Update participant permissions - store as object, not string
     const { data: updatedParticipant, error: updateError } = await supabaseService.client
       .from('exchange_participants')
       .update({
-        permissions: JSON.stringify(permissions),
+        permissions: permissions, // Store as object directly, Supabase will handle JSON
         updated_at: new Date().toISOString()
       })
       .eq('id', participantId)

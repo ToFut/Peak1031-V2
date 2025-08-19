@@ -209,34 +209,40 @@ class ChatService {
             });
           }
 
-          // Add coordinator if exists
+          // Add coordinator if exists and not already included in participants
           if (exchange.coordinator && exchange.coordinator.id && exchange.coordinator.email) {
-            participants.push({
-              id: exchange.coordinator.id,
-              email: exchange.coordinator.email,
-              first_name: exchange.coordinator.first_name || '',
-              last_name: exchange.coordinator.last_name || '',
-              role: 'coordinator',
-              is_active: true,
-              two_fa_enabled: false,
-              created_at: exchange.coordinator.created_at || new Date().toISOString(),
-              updated_at: exchange.coordinator.updated_at || new Date().toISOString()
-            } as User);
+            const coordinatorAlreadyIncluded = participants.some(p => p.id === exchange.coordinator.id);
+            if (!coordinatorAlreadyIncluded) {
+              participants.push({
+                id: exchange.coordinator.id,
+                email: exchange.coordinator.email,
+                first_name: exchange.coordinator.first_name || '',
+                last_name: exchange.coordinator.last_name || '',
+                role: 'coordinator',
+                is_active: true,
+                two_fa_enabled: false,
+                created_at: exchange.coordinator.created_at || new Date().toISOString(),
+                updated_at: exchange.coordinator.updated_at || new Date().toISOString()
+              } as User);
+            }
           }
 
-          // Add client if exists
+          // Add client if exists and not already included in participants
           if (exchange.client && exchange.client.id && exchange.client.email) {
-            participants.push({
-              id: `contact_${exchange.client.id}`,
-              email: exchange.client.email,
-              first_name: exchange.client.first_name || '',
-              last_name: exchange.client.last_name || '',
-              role: 'client',
-              is_active: true,
-              two_fa_enabled: false,
-              created_at: exchange.client.created_at || new Date().toISOString(),
-              updated_at: exchange.client.updated_at || new Date().toISOString()
-            } as User);
+            const clientAlreadyIncluded = participants.some(p => p.id === `contact_${exchange.client.id}`);
+            if (!clientAlreadyIncluded) {
+              participants.push({
+                id: `contact_${exchange.client.id}`,
+                email: exchange.client.email,
+                first_name: exchange.client.first_name || '',
+                last_name: exchange.client.last_name || '',
+                role: 'client',
+                is_active: true,
+                two_fa_enabled: false,
+                created_at: exchange.client.created_at || new Date().toISOString(),
+                updated_at: exchange.client.updated_at || new Date().toISOString()
+              } as User);
+            }
           }
 
           const result = {

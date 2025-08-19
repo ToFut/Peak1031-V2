@@ -67,6 +67,7 @@ export interface Task {
     original_mentions?: string[];
     agent?: string;
     chat_command?: string;
+    notify_all_users?: boolean;
     [key: string]: any;
   };
 }

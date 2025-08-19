@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ModernTaskUI } from '../components/ModernTaskUI';
 import { TaskDetailModal } from '../components/TaskDetailModal';
-import { TaskCreateModal } from '../components/TaskCreateModal';
+import TaskCreateModal from '../components/TaskCreateModal';
 import { Task } from '../../../types';
 import { apiService } from '../../../services/api';
 import { PlusIcon } from '@heroicons/react/24/outline';
@@ -46,7 +46,7 @@ const ModernTasksPage: React.FC = () => {
   };
 
   return (
-    <div className="relative h-full">
+    <div className="relative h-full p-8 max-w-7xl mx-auto">
       {/* Floating Create Button */}
       <button
         onClick={() => setShowCreateModal(true)}

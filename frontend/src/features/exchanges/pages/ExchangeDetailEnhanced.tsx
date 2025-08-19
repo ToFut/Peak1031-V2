@@ -38,7 +38,7 @@ import {
 // Tab Components
 import { ExchangeOverview } from '../components/ExchangeOverview';
 import { ModernTaskUI } from '../../tasks/components/ModernTaskUI';
-import { TaskCreateModal } from '../../tasks/components/TaskCreateModal';
+import TaskCreateModal from '../../tasks/components/TaskCreateModal';
 import EnhancedInvitationManager from '../components/EnhancedInvitationManager';
 import { DocumentUploader } from '../../../components/shared';
 

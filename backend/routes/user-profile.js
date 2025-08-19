@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const databaseService = require('../services/database');
 const AuditService = require('../services/audit');
+
+// Simple in-memory cache for user profiles
+const userProfileCache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const { authenticateToken } = require('../middleware/auth');
 
 /**
@@ -341,6 +345,21 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
     const requestedUserId = req.params.userId;
     let targetUser = req.user; // Default to current user
     
+    // Check cache first
+    const cacheKey = `${requestedUserId || req.user.id}`;
+    const cachedData = userProfileCache.get(cacheKey);
+    const now = Date.now();
+    
+    if (cachedData && (now - cachedData.timestamp) < CACHE_DURATION) {
+      console.log('✅ Returning cached user profile data');
+      return res.json({
+        success: true,
+        data: cachedData.data,
+        cached: true,
+        timestamp: cachedData.timestamp
+      });
+    }
+    
     // If requesting another user's profile
     if (requestedUserId && requestedUserId !== req.user.id) {
       console.log('🔍 Admin requesting another user\'s profile');
@@ -480,9 +499,9 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
     console.log(`✅ Found ${exchanges.length} exchanges for user`);
     
     // Calculate exchange statistics
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const currentDate = new Date();
+    const thirtyDaysAgo = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const ninetyDaysAgo = new Date(currentDate.getTime() - 90 * 24 * 60 * 60 * 1000);
     
     const stats = {
       totalExchanges: exchanges.length,
@@ -514,7 +533,7 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
         exchangeType: ex.exchange_type
       }));
     
-    // Get message activity if user has exchanges
+    // Get message activity if user has exchanges (optimized)
     let messageStats = {
       totalMessages: 0,
       messagesLast30Days: 0,
@@ -523,30 +542,26 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
     
     if (exchanges.length > 0) {
       try {
-        // Get all messages for user's exchanges
-        const exchangeIds = exchanges.map(ex => ex.id);
-        let allMessages = [];
+        // Get all messages for user's exchanges in a single query
+        const exchangeIds = exchanges.slice(0, 10).map(ex => ex.id); // Limit to 10 exchanges for performance
         
-        // For performance, batch the message queries
-        for (const exchangeId of exchangeIds.slice(0, 20)) { // Limit to avoid timeouts
-          try {
-            const messages = await databaseService.getMessages({
-              where: { exchange_id: exchangeId },
-              limit: 100
-            });
-            allMessages = allMessages.concat(messages);
-          } catch (msgErr) {
-            console.warn(`Could not get messages for exchange ${exchangeId}:`, msgErr.message);
-          }
+        if (exchangeIds.length > 0) {
+          // Single query for all messages
+          const allMessages = await databaseService.client
+            .from('messages')
+            .select('*')
+            .in('exchange_id', exchangeIds)
+            .order('created_at', { ascending: false })
+            .limit(500); // Limit total messages
+          
+          messageStats = {
+            totalMessages: allMessages.data?.length || 0,
+            messagesLast30Days: (allMessages.data || []).filter(msg => 
+              new Date(msg.created_at) > thirtyDaysAgo
+            ).length,
+            avgMessagesPerExchange: exchanges.length > 0 ? Math.round((allMessages.data?.length || 0) / exchanges.length) : 0
+          };
         }
-        
-        messageStats = {
-          totalMessages: allMessages.length,
-          messagesLast30Days: allMessages.filter(msg => 
-            new Date(msg.created_at) > thirtyDaysAgo
-          ).length,
-          avgMessagesPerExchange: exchanges.length > 0 ? Math.round(allMessages.length / exchanges.length) : 0
-        };
       } catch (err) {
         console.warn('Could not calculate message stats:', err.message);
       }
@@ -565,36 +580,15 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
     try {
       console.log('🔍 Fetching audit logs for user:', userId);
       
-      // Get audit logs for this user (check both person_id and details.userId)
-      const auditLogs = await AuditService.getAuditLogs({
-        userId: userId,
-        limit: 200 // Get more logs for better analysis
-      });
-      
-      // Also get logs where userId is stored in details (newer format)
-      const auditLogsFromDetails = await databaseService.client
+      // Optimized audit logs query - single query with OR condition
+      const auditLogsResponse = await databaseService.client
         .from('audit_logs')
         .select('*')
-        .contains('details', { userId: userId })
+        .or(`user_id.eq.${userId},details->>userId.eq.${userId}`)
         .order('created_at', { ascending: false })
-        .limit(200);
+        .limit(100); // Reduced limit for performance
       
-      // Combine both sets of logs
-      let allAuditLogs = [...auditLogs];
-      if (auditLogsFromDetails.data) {
-        allAuditLogs = [...allAuditLogs, ...auditLogsFromDetails.data];
-      }
-      
-      // Remove duplicates based on id
-      const uniqueLogs = allAuditLogs.reduce((acc, log) => {
-        if (!acc.find(l => l.id === log.id)) {
-          acc.push(log);
-        }
-        return acc;
-      }, []);
-      
-      // Sort by created_at descending
-      uniqueLogs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      const uniqueLogs = auditLogsResponse.data || [];
       
       console.log(`✅ Found ${uniqueLogs.length} audit logs for user`);
       
@@ -683,7 +677,7 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
     // Monthly activity (last 12 months)
     const monthlyActivity = [];
     for (let i = 11; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
       const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
       const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
       
@@ -746,9 +740,17 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
     
     console.log('✅ User profile compiled successfully');
     
+    // Cache the result
+    userProfileCache.set(cacheKey, {
+      data: profile,
+      timestamp: now
+    });
+    
     res.json({
       success: true,
-      data: profile
+      data: profile,
+      cached: false,
+      timestamp: now
     });
     
   } catch (error) {

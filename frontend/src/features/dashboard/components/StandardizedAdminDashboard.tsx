@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import StandardDashboard from './StandardDashboard';
 import { useAnalytics } from '../../../hooks/useAnalytics';
 import { useDashboardData } from '../../../shared/hooks/useDashboardData';
-import { ModernTaskUI } from '../../tasks/components/ModernTaskUI';
 import {
   ChartBarIcon,
   UsersIcon,
@@ -448,22 +447,7 @@ const StandardizedAdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Modern Task Management */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Task Management</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Manage all system tasks with timeline, calendar, and kanban views
-          </p>
-        </div>
-        <div className="p-6">
-          <ModernTaskUI
-            initialView="timeline"
-            onTaskSelect={(task) => console.log('Task selected:', task)}
-            onCreateClick={() => console.log('Create task clicked')}
-          />
-        </div>
-      </div>
+
     </div>
   );
 

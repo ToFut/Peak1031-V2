@@ -1088,19 +1088,266 @@ const PermissionsModal: React.FC<PermissionsModalProps> = ({ participant, onClos
     can_delete: false,
     can_add_participants: false,
     can_upload_documents: false,
-    can_send_messages: false
+    can_send_messages: false,
+    can_view_overview: false,
+    can_view_messages: false,
+    can_view_tasks: false,
+    can_create_tasks: false,
+    can_edit_tasks: false,
+    can_assign_tasks: false,
+    can_view_documents: false,
+    can_edit_documents: false,
+    can_delete_documents: false,
+    can_view_participants: false,
+    can_manage_participants: false,
+    can_view_financial: false,
+    can_edit_financial: false,
+    can_view_timeline: false,
+    can_edit_timeline: false,
+    can_view_reports: false
   });
 
   useEffect(() => {
     if (participant.permissions) {
       try {
-        const parsed = typeof participant.permissions === 'string' 
+        let parsed = typeof participant.permissions === 'string' 
           ? JSON.parse(participant.permissions) 
           : participant.permissions;
-        setPermissions(parsed);
+        
+        // If permissions is an array (legacy format), convert to object
+        if (Array.isArray(parsed)) {
+          console.warn('Converting legacy array permissions to object format');
+          const permissionObject: Record<string, boolean> = {
+            can_edit: false,
+            can_delete: false,
+            can_add_participants: false,
+            can_upload_documents: false,
+            can_send_messages: false,
+            can_view_overview: false,
+            can_view_messages: false,
+            can_view_tasks: false,
+            can_create_tasks: false,
+            can_edit_tasks: false,
+            can_assign_tasks: false,
+            can_view_documents: false,
+            can_edit_documents: false,
+            can_delete_documents: false,
+            can_view_participants: false,
+            can_manage_participants: false,
+            can_view_financial: false,
+            can_edit_financial: false,
+            can_view_timeline: false,
+            can_edit_timeline: false,
+            can_view_reports: false
+          };
+          
+          // If it's an array of permission strings, set those to true
+          parsed.forEach((perm: any) => {
+            if (typeof perm === 'string' && permissionObject.hasOwnProperty(perm)) {
+              permissionObject[perm] = true;
+            }
+          });
+          
+          parsed = permissionObject;
+        }
+        
+        // Ensure we have all required permission keys
+        const fullPermissions = {
+          can_edit: false,
+          can_delete: false,
+          can_add_participants: false,
+          can_upload_documents: false,
+          can_send_messages: false,
+          can_view_overview: false,
+          can_view_messages: false,
+          can_view_tasks: false,
+          can_create_tasks: false,
+          can_edit_tasks: false,
+          can_assign_tasks: false,
+          can_view_documents: false,
+          can_edit_documents: false,
+          can_delete_documents: false,
+          can_view_participants: false,
+          can_manage_participants: false,
+          can_view_financial: false,
+          can_edit_financial: false,
+          can_view_timeline: false,
+          can_edit_timeline: false,
+          can_view_reports: false,
+          ...parsed // Override with actual permissions
+        };
+        
+        setPermissions(fullPermissions);
       } catch (error) {
         console.error('Error parsing permissions:', error);
+        // Set default permissions on error
+        setPermissions({
+          can_edit: false,
+          can_delete: false,
+          can_add_participants: false,
+          can_upload_documents: false,
+          can_send_messages: false,
+          can_view_overview: false,
+          can_view_messages: false,
+          can_view_tasks: false,
+          can_create_tasks: false,
+          can_edit_tasks: false,
+          can_assign_tasks: false,
+          can_view_documents: false,
+          can_edit_documents: false,
+          can_delete_documents: false,
+          can_view_participants: false,
+          can_manage_participants: false,
+          can_view_financial: false,
+          can_edit_financial: false,
+          can_view_timeline: false,
+          can_edit_timeline: false,
+          can_view_reports: false
+        });
       }
+    } else {
+      // No permissions set, use defaults based on role
+      const roleDefaults: Record<string, Record<string, boolean>> = {
+        admin: {
+          can_edit: true,
+          can_delete: true,
+          can_add_participants: true,
+          can_upload_documents: true,
+          can_send_messages: true,
+          can_view_overview: true,
+          can_view_messages: true,
+          can_view_tasks: true,
+          can_create_tasks: true,
+          can_edit_tasks: true,
+          can_assign_tasks: true,
+          can_view_documents: true,
+          can_edit_documents: true,
+          can_delete_documents: true,
+          can_view_participants: true,
+          can_manage_participants: true,
+          can_view_financial: true,
+          can_edit_financial: true,
+          can_view_timeline: true,
+          can_edit_timeline: true,
+          can_view_reports: true
+        },
+        coordinator: {
+          can_edit: true,
+          can_delete: false,
+          can_add_participants: true,
+          can_upload_documents: true,
+          can_send_messages: true,
+          can_view_overview: true,
+          can_view_messages: true,
+          can_view_tasks: true,
+          can_create_tasks: true,
+          can_edit_tasks: true,
+          can_assign_tasks: true,
+          can_view_documents: true,
+          can_edit_documents: true,
+          can_delete_documents: false,
+          can_view_participants: true,
+          can_manage_participants: true,
+          can_view_financial: true,
+          can_edit_financial: true,
+          can_view_timeline: true,
+          can_edit_timeline: true,
+          can_view_reports: true
+        },
+        client: {
+          can_edit: true,
+          can_delete: false,
+          can_add_participants: true,
+          can_upload_documents: true,
+          can_send_messages: true,
+          can_view_overview: true,
+          can_view_messages: true,
+          can_view_tasks: true,
+          can_create_tasks: true,
+          can_edit_tasks: true,
+          can_assign_tasks: true,
+          can_view_documents: true,
+          can_edit_documents: true,
+          can_delete_documents: false,
+          can_view_participants: true,
+          can_manage_participants: true,
+          can_view_financial: true,
+          can_edit_financial: true,
+          can_view_timeline: true,
+          can_edit_timeline: true,
+          can_view_reports: true
+        },
+        third_party: {
+          can_edit: false,
+          can_delete: false,
+          can_add_participants: false,
+          can_upload_documents: false,
+          can_send_messages: false,
+          can_view_overview: true,
+          can_view_messages: false,
+          can_view_tasks: false,
+          can_create_tasks: false,
+          can_edit_tasks: false,
+          can_assign_tasks: false,
+          can_view_documents: false,
+          can_edit_documents: false,
+          can_delete_documents: false,
+          can_view_participants: false,
+          can_manage_participants: false,
+          can_view_financial: false,
+          can_edit_financial: false,
+          can_view_timeline: false,
+          can_edit_timeline: false,
+          can_view_reports: false
+        },
+        agency: {
+          can_edit: false,
+          can_delete: false,
+          can_add_participants: false,
+          can_upload_documents: false,
+          can_send_messages: false,
+          can_view_overview: true,
+          can_view_messages: false,
+          can_view_tasks: false,
+          can_create_tasks: false,
+          can_edit_tasks: false,
+          can_assign_tasks: false,
+          can_view_documents: false,
+          can_edit_documents: false,
+          can_delete_documents: false,
+          can_view_participants: false,
+          can_manage_participants: false,
+          can_view_financial: false,
+          can_edit_financial: false,
+          can_view_timeline: false,
+          can_edit_timeline: false,
+          can_view_reports: false
+        }
+      };
+      
+      setPermissions(roleDefaults[participant.role] || {
+        can_edit: false,
+        can_delete: false,
+        can_add_participants: false,
+        can_upload_documents: false,
+        can_send_messages: false,
+        can_view_overview: false,
+        can_view_messages: false,
+        can_view_tasks: false,
+        can_create_tasks: false,
+        can_edit_tasks: false,
+        can_assign_tasks: false,
+        can_view_documents: false,
+        can_edit_documents: false,
+        can_delete_documents: false,
+        can_view_participants: false,
+        can_manage_participants: false,
+        can_view_financial: false,
+        can_edit_financial: false,
+        can_view_timeline: false,
+        can_edit_timeline: false,
+        can_view_reports: false
+      });
     }
   }, [participant]);
 

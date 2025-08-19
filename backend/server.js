@@ -94,6 +94,9 @@ class PeakServer {
   }
 
   initializeMiddleware() {
+    // Trust proxy configuration for rate limiting behind nginx
+    this.app.set('trust proxy', 1);
+    
     // Security middleware
     this.app.use(helmet({
       contentSecurityPolicy: {

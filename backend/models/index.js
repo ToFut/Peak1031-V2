@@ -53,7 +53,7 @@ function defineAssociations() {
     as: 'uploadedDocuments' 
   });
   User.hasMany(Message, { 
-    foreignKey: 'sender_id', 
+    foreignKey: 'senderId', 
     as: 'sentMessages' 
   });
   User.hasMany(AuditLog, { 
@@ -97,8 +97,22 @@ function defineAssociations() {
     as: 'exchangeDocuments' 
   });
   Exchange.hasMany(Message, { 
-    foreignKey: 'exchange_id', 
+    foreignKey: 'exchangeId', 
     as: 'messages' 
+  });
+
+  // Message associations
+  Message.belongsTo(User, { 
+    foreignKey: 'senderId', 
+    as: 'sender' 
+  });
+  Message.belongsTo(Exchange, { 
+    foreignKey: 'exchangeId', 
+    as: 'exchange' 
+  });
+  Message.belongsTo(Document, { 
+    foreignKey: 'attachmentId', 
+    as: 'attachment' 
   });
   Exchange.hasMany(ExchangeParticipant, { 
     foreignKey: 'exchange_id', 

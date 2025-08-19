@@ -15,7 +15,23 @@ const requireExchangePermission = (permissionType) => {
     'view_messages': 'can_view_messages',
     'edit': 'can_edit',
     'delete': 'can_delete',
-    'add_participants': 'can_add_participants'
+    'add_participants': 'can_add_participants',
+    'view_tasks': 'can_view_tasks',
+    'create_tasks': 'can_create_tasks',
+    'edit_tasks': 'can_edit_tasks',
+    'delete_tasks': 'can_delete_tasks',
+    'assign_tasks': 'can_assign_tasks',
+    'view_documents': 'can_view_documents',
+    'edit_documents': 'can_edit_documents',
+    'delete_documents': 'can_delete_documents',
+    'view_participants': 'can_view_participants',
+    'manage_participants': 'can_manage_participants',
+    'view_financial': 'can_view_financial',
+    'edit_financial': 'can_edit_financial',
+    'view_timeline': 'can_view_timeline',
+    'edit_timeline': 'can_edit_timeline',
+    'view_reports': 'can_view_reports',
+    'view_overview': 'can_view_overview'
   };
   
   const actualPermission = permissionMap[permissionType] || permissionType;

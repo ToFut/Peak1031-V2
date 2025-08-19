@@ -52,6 +52,25 @@ class DatabaseService {
     }
   }
 
+  async updateUserPassword(id, currentPassword, newPassword) {
+    if (this.useSupabase) {
+      return await supabaseService.updateUserPassword(id, currentPassword, newPassword);
+    } else {
+      const user = await User.findByPk(id);
+      if (!user) throw new Error('User not found');
+      
+      // Verify current password
+      const isValidPassword = await user.validatePassword(currentPassword);
+      if (!isValidPassword) {
+        return false;
+      }
+      
+      // Update password
+      await user.update({ passwordHash: newPassword });
+      return true;
+    }
+  }
+
   // Exchange operations
   async getExchanges(options = {}) {
     if (this.useSupabase) {
@@ -514,6 +533,29 @@ class DatabaseService {
     
     // SQLite fallback
     return await ExchangeParticipant.create(participantData);
+  }
+
+  async addExchangeParticipant(participantData) {
+    if (this.useSupabase) {
+      return await supabaseService.createExchangeParticipant(participantData);
+    }
+    
+    // SQLite fallback
+    return await ExchangeParticipant.create(participantData);
+  }
+
+  async getExchangeParticipant(exchangeId, userId) {
+    if (this.useSupabase) {
+      return await supabaseService.getExchangeParticipant(exchangeId, userId);
+    }
+    
+    // SQLite fallback
+    return await ExchangeParticipant.findOne({
+      where: {
+        exchange_id: exchangeId,
+        user_id: userId
+      }
+    });
   }
 
   async deleteExchangeParticipant(participantId) {

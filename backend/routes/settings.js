@@ -1,350 +1,152 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
 const databaseService = require('../services/database');
-const supabaseService = require('../services/supabase');
+const AuditService = require('../services/audit');
 
 const router = express.Router();
 
-// Get user settings
+/**
+ * GET /api/settings
+ * Get user settings and preferences
+ */
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    // Enhanced notification settings with categories and channels
-    const settings = {
-      user_id: req.user.id,
-      theme: 'light',
-      notifications: {
-        // Global notification settings
-        global: {
-          enabled: true,
-          sound: true,
-          browserNotifications: true
-        },
-        // Categorized notification settings
-        categories: {
-          tasks: {
-            enabled: true,
-            channels: {
-              email: true,
-              sms: false,
-              inApp: true,
-              browser: true
-            },
-            events: {
-              taskAssigned: true,
-              taskCompleted: true,
-              taskOverdue: true,
-              taskUpdated: true,
-              taskDeleted: true
-            }
-          },
-          messages: {
-            enabled: true,
-            channels: {
-              email: false,
-              sms: false,
-              inApp: true,
-              browser: true
-            },
-            events: {
-              newMessage: true,
-              messageMention: true,
-              messageReaction: true
-            }
-          },
-          documents: {
-            enabled: true,
-            channels: {
-              email: true,
-              sms: false,
-              inApp: true,
-              browser: true
-            },
-            events: {
-              documentUploaded: true,
-              documentDownloaded: false,
-              documentApproved: true,
-              documentRejected: true
-            }
-          },
-          exchanges: {
-            enabled: true,
-            channels: {
-              email: true,
-              sms: false,
-              inApp: true,
-              browser: true
-            },
-            events: {
-              exchangeCreated: true,
-              exchangeUpdated: true,
-              exchangeStatusChanged: true,
-              participantAdded: true,
-              participantRemoved: true
-            }
-          },
-          invitations: {
-            enabled: true,
-            channels: {
-              email: true,
-              sms: true,
-              inApp: true,
-              browser: true
-            },
-            events: {
-              invitationReceived: true,
-              invitationAccepted: true,
-              invitationDeclined: true
-            }
-          },
-          security: {
-            enabled: true,
-            channels: {
-              email: true,
-              sms: true,
-              inApp: true,
-              browser: true
-            },
-            events: {
-              loginAttempt: true,
-              passwordChanged: true,
-              twoFactorEnabled: true,
-              suspiciousActivity: true
-            }
-          },
-          system: {
-            enabled: true,
-            channels: {
-              email: false,
-              sms: false,
-              inApp: true,
-              browser: false
-            },
-            events: {
-              maintenanceScheduled: true,
-              systemUpdate: true,
-              featureAnnouncement: true
-            }
-          }
-        },
-        // Channel-specific settings
-        channels: {
-          email: {
-            enabled: true,
-            frequency: 'immediate', // immediate, daily, weekly
-            quietHours: {
-              enabled: false,
-              start: '22:00',
-              end: '08:00',
-              timezone: 'America/Los_Angeles'
-            }
-          },
-          sms: {
-            enabled: false,
-            frequency: 'immediate',
-            quietHours: {
-              enabled: true,
-              start: '22:00',
-              end: '08:00',
-              timezone: 'America/Los_Angeles'
-            }
-          },
-          inApp: {
-            enabled: true,
-            sound: true,
-            vibration: false,
-            autoClose: 5000
-          },
-          browser: {
-            enabled: true,
-            requireInteraction: false,
-            autoClose: 5000
-          }
-        }
-      },
-      dashboard: {
-        layout: 'default',
-        widgets: ['recent_exchanges', 'pending_tasks', 'notifications'],
-        compactView: false
-      },
-      preferences: {
-        language: 'en',
-        timezone: 'America/Los_Angeles',
-        date_format: 'MM/DD/YYYY',
-        time_format: '12h' // 12h or 24h
-      }
-    };
-
-    // Only log in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Returning enhanced notification settings for user:', req.user.email);
+    console.log('📋 Getting settings for user:', req.user.id);
+    
+    // Get user's current settings from database
+    const user = await databaseService.getUserById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found'
+      });
     }
 
-    res.json({
-      success: true,
-      data: settings
-    });
+    // Build settings object from user data
+    const settings = {
+      // Profile settings
+      firstName: user.first_name || user.firstName,
+      lastName: user.last_name || user.lastName,
+      email: user.email,
+      phone: user.phone,
+      
+      // Notification preferences (defaults to true if not set)
+      emailNotifications: user.email_notifications !== false,
+      pushNotifications: user.push_notifications !== false,
+      taskReminders: user.task_reminders !== false,
+      
+      // Application preferences
+      theme: user.theme || 'light',
+      language: user.language || 'en',
+      timezone: user.timezone || 'UTC',
+      
+      // Security settings
+      twoFactorEnabled: user.two_fa_enabled || user.twoFaEnabled || false,
+      
+      // Additional user preferences
+      dashboardLayout: user.dashboard_layout || 'default',
+      autoRefresh: user.auto_refresh !== false,
+      compactMode: user.compact_mode || false
+    };
 
+    console.log('✅ Settings retrieved successfully');
+    
+    res.json(settings);
+    
   } catch (error) {
-    console.error('Error in GET /settings:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error',
-      details: error.message 
+    console.error('❌ Error getting settings:', error);
+    res.status(500).json({
+      error: 'Failed to get settings',
+      message: error.message
     });
   }
 });
 
-// Update user settings
+/**
+ * PUT /api/settings
+ * Update user settings and preferences
+ */
 router.put('/', authenticateToken, async (req, res) => {
   try {
-    console.log('💾 Updating enhanced settings for user:', req.user.id);
-    console.log('Settings data:', req.body);
-
-    const { profile, preferences, security, notifications } = req.body;
+    console.log('📝 Updating settings for user:', req.user.id);
     
-    // Update user profile fields if provided
-    if (profile) {
-      const userUpdateData = {};
-      
-      if (profile.firstName) userUpdateData.first_name = profile.firstName;
-      if (profile.lastName) userUpdateData.last_name = profile.lastName;
-      if (profile.phone) userUpdateData.phone = profile.phone;
-      if (profile.company) userUpdateData.company = profile.company;
-      
-      // Only update if there's data to update
-      if (Object.keys(userUpdateData).length > 0) {
-        await databaseService.updateUser(req.user.id, userUpdateData);
-        console.log('✅ Updated user profile:', userUpdateData);
-      }
+    const updates = req.body;
+    
+    // Validate required fields
+    if (updates.email && !isValidEmail(updates.email)) {
+      return res.status(400).json({
+        error: 'Invalid email format'
+      });
     }
+
+    // Prepare update object for database
+    const updateData = {};
     
-    // Enhanced settings with notification categories
-    const updatedSettings = {
-      profile: {
-        firstName: profile?.firstName || req.user.first_name,
-        lastName: profile?.lastName || req.user.last_name,
-        email: req.user.email,
-        role: req.user.role,
-        phone: profile?.phone || req.user.phone,
-        company: profile?.company || req.user.company
-      },
-      notifications: notifications || {
-        global: {
-          enabled: true,
-          sound: true,
-          browserNotifications: true
-        },
-        categories: {
-          tasks: {
-            enabled: true,
-            channels: { email: true, sms: false, inApp: true, browser: true },
-            events: {
-              taskAssigned: true,
-              taskCompleted: true,
-              taskOverdue: true,
-              taskUpdated: true,
-              taskDeleted: true
-            }
-          },
-          messages: {
-            enabled: true,
-            channels: { email: false, sms: false, inApp: true, browser: true },
-            events: {
-              newMessage: true,
-              messageMention: true,
-              messageReaction: true
-            }
-          },
-          documents: {
-            enabled: true,
-            channels: { email: true, sms: false, inApp: true, browser: true },
-            events: {
-              documentUploaded: true,
-              documentDownloaded: false,
-              documentApproved: true,
-              documentRejected: true
-            }
-          },
-          exchanges: {
-            enabled: true,
-            channels: { email: true, sms: false, inApp: true, browser: true },
-            events: {
-              exchangeCreated: true,
-              exchangeUpdated: true,
-              exchangeStatusChanged: true,
-              participantAdded: true,
-              participantRemoved: true
-            }
-          },
-          invitations: {
-            enabled: true,
-            channels: { email: true, sms: true, inApp: true, browser: true },
-            events: {
-              invitationReceived: true,
-              invitationAccepted: true,
-              invitationDeclined: true
-            }
-          },
-          security: {
-            enabled: true,
-            channels: { email: true, sms: true, inApp: true, browser: true },
-            events: {
-              loginAttempt: true,
-              passwordChanged: true,
-              twoFactorEnabled: true,
-              suspiciousActivity: true
-            }
-          },
-          system: {
-            enabled: true,
-            channels: { email: false, sms: false, inApp: true, browser: false },
-            events: {
-              maintenanceScheduled: true,
-              systemUpdate: true,
-              featureAnnouncement: true
-            }
-          }
-        },
-        channels: {
-          email: {
-            enabled: true,
-            frequency: 'immediate',
-            quietHours: { enabled: false, start: '22:00', end: '08:00', timezone: 'America/Los_Angeles' }
-          },
-          sms: {
-            enabled: false,
-            frequency: 'immediate',
-            quietHours: { enabled: true, start: '22:00', end: '08:00', timezone: 'America/Los_Angeles' }
-          },
-          inApp: {
-            enabled: true,
-            sound: true,
-            vibration: false,
-            autoClose: 5000
-          },
-          browser: {
-            enabled: true,
-            requireInteraction: false,
-            autoClose: 5000
-          }
-        }
-      },
-      preferences: preferences || {
-        language: 'en',
-        timezone: 'America/Los_Angeles',
-        date_format: 'MM/DD/YYYY',
-        time_format: '12h'
-      },
-      security: security || {
-        twoFaEnabled: req.user.two_fa_enabled || false,
-        emailVerified: req.user.email_verified || false,
-        lastLogin: req.user.last_login,
-        sessionTimeout: 3600
+    // Profile fields
+    if (updates.firstName !== undefined) updateData.first_name = updates.firstName;
+    if (updates.lastName !== undefined) updateData.last_name = updates.lastName;
+    if (updates.email !== undefined) updateData.email = updates.email;
+    if (updates.phone !== undefined) updateData.phone = updates.phone;
+    
+    // Notification preferences
+    if (updates.emailNotifications !== undefined) updateData.email_notifications = updates.emailNotifications;
+    if (updates.pushNotifications !== undefined) updateData.push_notifications = updates.pushNotifications;
+    if (updates.taskReminders !== undefined) updateData.task_reminders = updates.taskReminders;
+    
+    // Application preferences
+    if (updates.theme !== undefined) updateData.theme = updates.theme;
+    if (updates.language !== undefined) updateData.language = updates.language;
+    if (updates.timezone !== undefined) updateData.timezone = updates.timezone;
+    
+    // Additional preferences
+    if (updates.dashboardLayout !== undefined) updateData.dashboard_layout = updates.dashboardLayout;
+    if (updates.autoRefresh !== undefined) updateData.auto_refresh = updates.autoRefresh;
+    if (updates.compactMode !== undefined) updateData.compact_mode = updates.compactMode;
+
+    // Update user in database
+    const updatedUser = await databaseService.updateUser(req.user.id, updateData);
+    
+    if (!updatedUser) {
+      return res.status(404).json({
+        error: 'User not found'
+      });
+    }
+
+    // Log the settings update
+    await AuditService.log({
+      action: 'SETTINGS_UPDATED',
+      userId: req.user.id,
+      resourceType: 'user',
+      resourceId: req.user.id,
+      details: {
+        updatedFields: Object.keys(updateData),
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
       }
+    });
+
+    console.log('✅ Settings updated successfully');
+    
+    // Return updated settings
+    const settings = {
+      firstName: updatedUser.first_name || updatedUser.firstName,
+      lastName: updatedUser.last_name || updatedUser.lastName,
+      email: updatedUser.email,
+      phone: updatedUser.phone,
+      emailNotifications: updatedUser.email_notifications !== false,
+      pushNotifications: updatedUser.push_notifications !== false,
+      taskReminders: updatedUser.task_reminders !== false,
+      theme: updatedUser.theme || 'light',
+      language: updatedUser.language || 'en',
+      timezone: updatedUser.timezone || 'UTC',
+      twoFactorEnabled: updatedUser.two_fa_enabled || updatedUser.twoFaEnabled || false,
+      dashboardLayout: updatedUser.dashboard_layout || 'default',
+      autoRefresh: updatedUser.auto_refresh !== false,
+      compactMode: updatedUser.compact_mode || false
     };
 
-    console.log('✅ Enhanced settings updated successfully');
-    res.json(updatedSettings);
+    res.json(settings);
+    
   } catch (error) {
     console.error('❌ Error updating settings:', error);
     res.status(500).json({
@@ -354,195 +156,110 @@ router.put('/', authenticateToken, async (req, res) => {
   }
 });
 
-// Get notification settings specifically
-router.get('/notifications', authenticateToken, async (req, res) => {
+/**
+ * GET /api/settings/activity-logs
+ * Get user's activity logs
+ */
+router.get('/activity-logs', authenticateToken, async (req, res) => {
   try {
-    console.log('🔔 Getting notification settings for user:', req.user.id);
+    console.log('📋 Getting activity logs for user:', req.user.id);
     
-    // Return the notification portion of settings
-    const notificationSettings = {
-      global: {
-        enabled: true,
-        sound: true,
-        browserNotifications: true
-      },
-      categories: {
-        tasks: {
-          enabled: true,
-          channels: { email: true, sms: false, inApp: true, browser: true },
-          events: {
-            taskAssigned: true,
-            taskCompleted: true,
-            taskOverdue: true,
-            taskUpdated: true,
-            taskDeleted: true
-          }
-        },
-        messages: {
-          enabled: true,
-          channels: { email: false, sms: false, inApp: true, browser: true },
-          events: {
-            newMessage: true,
-            messageMention: true,
-            messageReaction: true
-          }
-        },
-        documents: {
-          enabled: true,
-          channels: { email: true, sms: false, inApp: true, browser: true },
-          events: {
-            documentUploaded: true,
-            documentDownloaded: false,
-            documentApproved: true,
-            documentRejected: true
-          }
-        },
-        exchanges: {
-          enabled: true,
-          channels: { email: true, sms: false, inApp: true, browser: true },
-          events: {
-            exchangeCreated: true,
-            exchangeUpdated: true,
-            exchangeStatusChanged: true,
-            participantAdded: true,
-            participantRemoved: true
-          }
-        },
-        invitations: {
-          enabled: true,
-          channels: { email: true, sms: true, inApp: true, browser: true },
-          events: {
-            invitationReceived: true,
-            invitationAccepted: true,
-            invitationDeclined: true
-          }
-        },
-        security: {
-          enabled: true,
-          channels: { email: true, sms: true, inApp: true, browser: true },
-          events: {
-            loginAttempt: true,
-            passwordChanged: true,
-            twoFactorEnabled: true,
-            suspiciousActivity: true
-          }
-        },
-        system: {
-          enabled: true,
-          channels: { email: false, sms: false, inApp: true, browser: false },
-          events: {
-            maintenanceScheduled: true,
-            systemUpdate: true,
-            featureAnnouncement: true
-          }
-        }
-      },
-      channels: {
-        email: {
-          enabled: true,
-          frequency: 'immediate',
-          quietHours: { enabled: false, start: '22:00', end: '08:00', timezone: 'America/Los_Angeles' }
-        },
-        sms: {
-          enabled: false,
-          frequency: 'immediate',
-          quietHours: { enabled: true, start: '22:00', end: '08:00', timezone: 'America/Los_Angeles' }
-        },
-        inApp: {
-          enabled: true,
-          sound: true,
-          vibration: false,
-          autoClose: 5000
-        },
-        browser: {
-          enabled: true,
-          requireInteraction: false,
-          autoClose: 5000
-        }
+    const { page = 1, limit = 20 } = req.query;
+    
+    // Get user's activity logs
+    const logs = await AuditService.getAuditLogs({
+      userId: req.user.id,
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit),
+      orderBy: { column: 'created_at', ascending: false }
+    });
+
+    console.log('✅ Activity logs retrieved successfully');
+    
+    res.json({
+      logs: logs || [],
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: logs?.length || 0
       }
-    };
-
-    res.json({
-      success: true,
-      data: notificationSettings
     });
-  } catch (error) {
-    console.error('❌ Error getting notification settings:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to get notification settings',
-      message: error.message
-    });
-  }
-});
-
-// Update notification settings specifically
-router.put('/notifications', authenticateToken, async (req, res) => {
-  try {
-    console.log('🔔 Updating notification settings for user:', req.user.id);
-    console.log('Notification settings:', req.body);
-
-    const notificationSettings = req.body;
-
-    // Validate the notification settings structure
-    if (!notificationSettings.categories || !notificationSettings.channels) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid notification settings structure'
-      });
-    }
-
-    // Here you would typically save to database
-    // For now, we'll just return the updated settings
-    console.log('✅ Notification settings updated successfully');
-    res.json({
-      success: true,
-      data: notificationSettings,
-      message: 'Notification settings updated successfully'
-    });
-  } catch (error) {
-    console.error('❌ Error updating notification settings:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update notification settings',
-      message: error.message
-    });
-  }
-});
-
-// Get activity logs for current user
-router.get('/activity', authenticateToken, async (req, res) => {
-  try {
-    console.log('📊 Getting activity logs for user:', req.user.id);
     
-    // Get audit logs for this user
-    const logs = await databaseService.getAuditLogs({
-      where: { user_id: req.user.id },
-      orderBy: { column: 'created_at', ascending: false },
-      limit: 50
-    });
-
-    const activityLogs = logs.map(log => ({
-      id: log.id,
-      action: log.action,
-      entityType: log.entity_type,
-      entityId: log.entity_id,
-      timestamp: log.created_at,
-      ipAddress: log.ip_address,
-      userAgent: log.user_agent,
-      details: log.details
-    }));
-
-    console.log(`✅ Returning ${activityLogs.length} activity logs`);
-    res.json({ logs: activityLogs });
   } catch (error) {
     console.error('❌ Error getting activity logs:', error);
     res.status(500).json({
       error: 'Failed to get activity logs',
-      message: error.message,
-      logs: [] // Return empty array as fallback
+      message: error.message
     });
   }
 });
+
+/**
+ * PUT /api/settings/password
+ * Update user password
+ */
+router.put('/password', authenticateToken, async (req, res) => {
+  try {
+    console.log('🔐 Updating password for user:', req.user.id);
+    
+    const { currentPassword, newPassword } = req.body;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        error: 'Current password and new password are required'
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        error: 'New password must be at least 8 characters long'
+      });
+    }
+
+    // Verify current password and update to new password
+    const success = await databaseService.updateUserPassword(
+      req.user.id, 
+      currentPassword, 
+      newPassword
+    );
+
+    if (!success) {
+      return res.status(400).json({
+        error: 'Current password is incorrect'
+      });
+    }
+
+    // Log the password change
+    await AuditService.log({
+      action: 'PASSWORD_CHANGED',
+      userId: req.user.id,
+      resourceType: 'user',
+      resourceId: req.user.id,
+      details: {
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      }
+    });
+
+    console.log('✅ Password updated successfully');
+    
+    res.json({
+      message: 'Password updated successfully'
+    });
+    
+  } catch (error) {
+    console.error('❌ Error updating password:', error);
+    res.status(500).json({
+      error: 'Failed to update password',
+      message: error.message
+    });
+  }
+});
+
+// Helper function to validate email
+function isValidEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
 
 module.exports = router;

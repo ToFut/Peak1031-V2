@@ -177,6 +177,358 @@ router.get('/dashboard-stats', authenticateToken, requireRole(['admin']), async 
   }
 });
 
+// Get coordinator dashboard statistics
+router.get('/coordinator-dashboard', authenticateToken, requireRole(['coordinator', 'admin']), async (req, res) => {
+  try {
+    console.log('🚀 COORDINATOR DASHBOARD ENDPOINT HIT!');
+    console.log('📊 COORDINATOR DASHBOARD: Getting stats for', req.user?.email);
+    console.log('👤 User details:', { id: req.user?.id, role: req.user?.role, email: req.user?.email });
+    
+    const supabaseService = require('../services/supabase');
+    const userId = req.user.id;
+    
+    // Get exchanges managed by this coordinator
+    let managedExchanges = [];
+    let exchangeStats = {
+      total: 0,
+      pending: 0,
+      active: 0,
+      completed: 0,
+      urgent: 0,
+      overdue: 0
+    };
+    
+    if (supabaseService.client) {
+      try {
+        console.log('🔍 DEBUG - Querying exchanges for user ID:', userId);
+        console.log('🔍 DEBUG - Supabase client available:', !!supabaseService.client);
+        
+        // Get exchanges where user is coordinator or participant
+        // First, let's try a simpler approach - get exchanges where user is coordinator
+        const { data: coordinatorExchanges, error: coordinatorError } = await supabaseService.client
+          .from('exchanges')
+          .select(`
+            *,
+            client:client_id (
+              id,
+              first_name,
+              last_name,
+              email,
+              company
+            )
+          `)
+          .eq('coordinator_id', userId);
+        
+        console.log('🔍 DEBUG - Coordinator exchanges query:', {
+          error: coordinatorError?.message,
+          count: coordinatorExchanges?.length || 0
+        });
+        
+        // Then get exchanges where user is a participant
+        const { data: participantExchanges, error: participantError } = await supabaseService.client
+          .from('exchange_participants')
+          .select(`
+            exchange_id,
+            exchange:exchanges (
+              *,
+              client:client_id (
+                id,
+                first_name,
+                last_name,
+                email,
+                company
+              )
+            )
+          `)
+          .eq('user_id', userId);
+        
+        console.log('🔍 DEBUG - Participant exchanges query:', {
+          error: participantError?.message,
+          count: participantExchanges?.length || 0
+        });
+        
+        // Combine the results
+        let exchanges = coordinatorExchanges || [];
+        if (participantExchanges) {
+          const participantExchangeData = participantExchanges.map(p => p.exchange).filter(Boolean);
+          exchanges = [...exchanges, ...participantExchangeData];
+        }
+        
+        // Remove duplicates
+        const uniqueExchanges = exchanges.filter((exchange, index, self) => 
+          index === self.findIndex(e => e.id === exchange.id)
+        );
+        
+        console.log('🔍 DEBUG - Combined exchanges:', {
+          coordinatorCount: coordinatorExchanges?.length || 0,
+          participantCount: participantExchanges?.length || 0,
+          uniqueCount: uniqueExchanges.length
+        });
+        
+        // Let's also check what's in the exchange_participants table for this user
+        const { data: allParticipations, error: allParticipationsError } = await supabaseService.client
+          .from('exchange_participants')
+          .select('*')
+          .eq('user_id', userId)
+          .limit(10);
+        
+        console.log('🔍 DEBUG - All participations for user:', {
+          error: allParticipationsError?.message,
+          count: allParticipations?.length || 0,
+          sample: allParticipations?.slice(0, 3)
+        });
+        
+        exchanges = uniqueExchanges;
+        
+        console.log('🔍 DEBUG - Exchange query result:', {
+          error: coordinatorError?.message || participantError?.message,
+          exchangesCount: exchanges?.length || 0,
+          userId: userId
+        });
+        
+        // Let's also check if there are any exchanges at all
+        const { data: allExchanges, error: allExchangesError } = await supabaseService.client
+          .from('exchanges')
+          .select('id, exchange_number, name, coordinator_id')
+          .limit(5);
+        
+        console.log('🔍 DEBUG - All exchanges sample:', {
+          error: allExchangesError?.message,
+          count: allExchanges?.length || 0,
+          sample: allExchanges?.slice(0, 3).map(e => ({ id: e.id, name: e.name, coordinator_id: e.coordinator_id }))
+        });
+        
+        if (error) {
+          console.error('Error fetching coordinator exchanges:', error);
+        } else {
+          managedExchanges = exchanges || [];
+          
+          // Calculate exchange statistics
+          exchangeStats = {
+            total: managedExchanges.length,
+            pending: managedExchanges.filter(e => e.status === 'PENDING').length,
+            active: managedExchanges.filter(e => ['45D', '180D'].includes(e.status)).length,
+            completed: managedExchanges.filter(e => e.status === 'COMPLETED').length,
+            urgent: 0,
+            overdue: 0
+          };
+          
+          // Calculate urgent and overdue exchanges
+          const now = new Date();
+          const twoDaysFromNow = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000));
+          
+          managedExchanges.forEach(exchange => {
+            const idDeadline = exchange.identification_deadline ? new Date(exchange.identification_deadline) : null;
+            const compDeadline = exchange.completion_deadline ? new Date(exchange.completion_deadline) : null;
+            
+            if (idDeadline && idDeadline <= twoDaysFromNow) {
+              exchangeStats.urgent++;
+              if (idDeadline < now) exchangeStats.overdue++;
+            }
+            
+            if (compDeadline && compDeadline <= twoDaysFromNow) {
+              exchangeStats.urgent++;
+              if (compDeadline < now) exchangeStats.overdue++;
+            }
+          });
+        }
+      } catch (supabaseError) {
+        console.error('Error with Supabase exchange query:', supabaseError);
+      }
+    }
+    
+    // Get tasks for managed exchanges
+    let taskStats = {
+      total: 0,
+      pending: 0,
+      overdue: 0,
+      completed: 0,
+      urgent: 0
+    };
+    
+    let urgentTasks = [];
+    
+    if (supabaseService.client && managedExchanges.length > 0) {
+      try {
+        const exchangeIds = managedExchanges.map(e => e.id);
+        
+        const { data: tasks, error } = await supabaseService.client
+          .from('tasks')
+          .select(`
+            *,
+            assignee:assigned_to (
+              id,
+              first_name,
+              last_name,
+              email
+            ),
+            exchange:exchange_id (
+              id,
+              exchange_number,
+              name,
+              status
+            )
+          `)
+          .in('exchange_id', exchangeIds);
+        
+        if (error) {
+          console.error('Error fetching coordinator tasks:', error);
+        } else {
+          const allTasks = tasks || [];
+          
+          taskStats = {
+            total: allTasks.length,
+            pending: allTasks.filter(t => t.status === 'PENDING').length,
+            overdue: 0,
+            completed: allTasks.filter(t => t.status === 'COMPLETED').length,
+            urgent: 0
+          };
+          
+          // Calculate urgent and overdue tasks
+          const now = new Date();
+          const twoDaysFromNow = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000));
+          
+          allTasks.forEach(task => {
+            if (task.due_date) {
+              const dueDate = new Date(task.due_date);
+              if (dueDate <= twoDaysFromNow) {
+                taskStats.urgent++;
+                if (dueDate < now) taskStats.overdue++;
+              }
+            }
+          });
+          
+          // Get urgent tasks for display
+          urgentTasks = allTasks.filter(task => {
+            if (!task.due_date) return false;
+            const dueDate = new Date(task.due_date);
+            return dueDate <= twoDaysFromNow;
+          }).slice(0, 10); // Limit to 10 most urgent
+        }
+      } catch (supabaseError) {
+        console.error('Error with Supabase task query:', supabaseError);
+      }
+    }
+    
+    // Get recent messages for managed exchanges
+    let messageStats = {
+      unread: 0,
+      recent: 0
+    };
+    
+    let recentMessages = [];
+    
+    if (supabaseService.client && managedExchanges.length > 0) {
+      try {
+        const exchangeIds = managedExchanges.map(e => e.id);
+        
+        const { data: messages, error } = await supabaseService.client
+          .from('messages')
+          .select(`
+            *,
+            sender:sender_id (
+              id,
+              first_name,
+              last_name,
+              email
+            ),
+            exchange:exchange_id (
+              id,
+              exchange_number,
+              name
+            )
+          `)
+          .in('exchange_id', exchangeIds)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        if (error) {
+          console.error('Error fetching coordinator messages:', error);
+        } else {
+          const allMessages = messages || [];
+          
+          messageStats = {
+            unread: allMessages.filter(m => !m.read_by?.includes(userId)).length,
+            recent: allMessages.length
+          };
+          
+          recentMessages = allMessages;
+        }
+      } catch (supabaseError) {
+        console.error('Error with Supabase message query:', supabaseError);
+      }
+    }
+    
+    // Get client overview
+    let clientStats = {
+      total: 0,
+      active: 0
+    };
+    
+    if (managedExchanges.length > 0) {
+      const uniqueClients = new Set();
+      const activeClients = new Set();
+      
+      managedExchanges.forEach(exchange => {
+        if (exchange.client_id) {
+          uniqueClients.add(exchange.client_id);
+          if (['PENDING', '45D', '180D'].includes(exchange.status)) {
+            activeClients.add(exchange.client_id);
+          }
+        }
+      });
+      
+      clientStats = {
+        total: uniqueClients.size,
+        active: activeClients.size
+      };
+    }
+    
+    const dashboardData = {
+      stats: {
+        exchanges: exchangeStats,
+        tasks: taskStats,
+        messages: messageStats,
+        clients: clientStats
+      },
+      urgentTasks: urgentTasks,
+      recentMessages: recentMessages,
+      managedExchanges: managedExchanges.slice(0, 5), // Show 5 most recent
+      lastUpdated: new Date().toISOString()
+    };
+    
+    console.log('✅ Coordinator dashboard data prepared:', {
+      exchanges: exchangeStats.total,
+      tasks: taskStats.total,
+      messages: messageStats.recent,
+      clients: clientStats.total
+    });
+    
+    console.log('🔍 DEBUG - Raw data being sent:', {
+      exchangeStats,
+      taskStats,
+      messageStats,
+      clientStats,
+      urgentTasksCount: urgentTasks.length,
+      recentMessagesCount: recentMessages.length,
+      managedExchangesCount: managedExchanges.length
+    });
+    
+    res.json({
+      success: true,
+      data: dashboardData
+    });
+    
+  } catch (error) {
+    console.error('Error getting coordinator dashboard data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get coordinator dashboard data',
+      message: error.message
+    });
+  }
+});
+
 // Get all users (admin only)
 router.get('/users', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {

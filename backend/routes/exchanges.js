@@ -40,87 +40,175 @@ router.get('/:id/participants', [
 ], async (req, res) => {
   console.log('🎯 PARTICIPANTS ROUTE HIT:', req.params.id);
   try {
-    // Get exchange with participants using database service
-    const exchange = await databaseService.getExchangeById(req.params.id);
+    // Use direct Supabase query to get participants with user and contact data
+    const supabaseService = require('../services/supabase');
     
-    if (!exchange) {
-      return res.status(404).json({
-        error: 'Exchange not found'
+    const { data: participants, error } = await supabaseService.client
+      .from('exchange_participants')
+      .select(`
+        *,
+        users:user_id(id, email, first_name, last_name),
+        contacts:contact_id(id, email, first_name, last_name)
+      `)
+      .eq('exchange_id', req.params.id)
+      .eq('is_active', true);
+
+    if (error) {
+      console.error('Error fetching participants:', error);
+      return res.status(500).json({
+        error: 'Failed to fetch participants',
+        message: error.message
       });
     }
 
-    // Extract participants from exchange data
-    const participants = [];
-    
-    // Add exchange participants
-    if (exchange.exchangeParticipants && Array.isArray(exchange.exchangeParticipants)) {
-      exchange.exchangeParticipants.forEach(ep => {
-        if (ep.user) {
-          participants.push({
-            id: ep.user.id,
-            firstName: ep.user.first_name || '',
-            lastName: ep.user.last_name || '',
-            email: ep.user.email,
-            role: ep.role || 'participant',
-            participantId: ep.id,
-            userId: ep.user_id,
-            contactId: null
-          });
-        }
-        if (ep.contact) {
-          participants.push({
-            id: `contact_${ep.contact.id}`,
-            firstName: ep.contact.first_name || '',
-            lastName: ep.contact.last_name || '',
-            email: ep.contact.email,
-            role: ep.role || 'client',
-            participantId: ep.id,
-            userId: null,
-            contactId: ep.contact_id
-          });
-        }
-      });
-    }
+    // Transform participants data
+    const transformedParticipants = participants.map(p => {
+      const user = p.users;
+      const contact = p.contacts;
+      
+      if (user) {
+        return {
+          id: user.id,
+          firstName: user.first_name || '',
+          lastName: user.last_name || '',
+          email: user.email,
+          role: p.role || 'participant',
+          participantId: p.id,
+          userId: p.user_id,
+          contactId: p.contact_id
+        };
+      } else if (contact) {
+        return {
+          id: `contact_${contact.id}`,
+          firstName: contact.first_name || '',
+          lastName: contact.last_name || '',
+          email: contact.email,
+          role: p.role || 'client',
+          participantId: p.id,
+          userId: p.user_id,
+          contactId: p.contact_id
+        };
+      } else {
+        return {
+          id: p.id,
+          firstName: 'Unknown',
+          lastName: 'User',
+          email: 'unknown@example.com',
+          role: p.role || 'participant',
+          participantId: p.id,
+          userId: p.user_id,
+          contactId: p.contact_id
+        };
+      }
+    });
 
-    // Add coordinator if exists
-    if (exchange.coordinator) {
-      participants.push({
-        id: exchange.coordinator.id,
-        firstName: exchange.coordinator.first_name || '',
-        lastName: exchange.coordinator.last_name || '',
-        email: exchange.coordinator.email,
-        role: 'coordinator',
-        participantId: null,
-        userId: exchange.coordinator.id,
-        contactId: null
-      });
-    }
-
-    // Add client if exists
-    if (exchange.client) {
-      participants.push({
-        id: `contact_${exchange.client.id}`,
-        firstName: exchange.client.first_name || '',
-        lastName: exchange.client.last_name || '',
-        email: exchange.client.email,
-        role: 'client',
-        participantId: null,
-        userId: null,
-        contactId: exchange.client.id
-      });
-    }
-
-    console.log(`📊 Found ${participants.length} participants for exchange ${req.params.id}`);
+    console.log(`📊 Found ${transformedParticipants.length} participants for exchange ${req.params.id}`);
 
     res.json({
-      data: participants,
-      participants: participants // for backward compatibility
+      data: transformedParticipants,
+      participants: transformedParticipants // for backward compatibility
     });
 
   } catch (error) {
     console.error('Error fetching exchange participants:', error);
     res.status(500).json({
       error: 'Failed to fetch participants',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/exchanges/:id/participants
+ * Add participant to exchange
+ */
+router.post('/:id/participants', [
+  param('id').isUUID().withMessage('Exchange ID must be a valid UUID'),
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('role').isIn(['client', 'coordinator', 'third_party', 'agency']).withMessage('Valid role is required'),
+  authenticateToken
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { email, role } = req.body;
+    const exchangeId = req.params.id;
+
+    console.log('🎯 Adding participant to exchange:', { exchangeId, email, role });
+
+    // Check if exchange exists
+    const exchange = await databaseService.getExchangeById(exchangeId);
+    if (!exchange) {
+      return res.status(404).json({
+        error: 'Exchange not found'
+      });
+    }
+
+    // Check if user exists
+    const user = await databaseService.getUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+        message: `No user found with email: ${email}`
+      });
+    }
+
+    // Check if user is already a participant
+    const existingParticipant = await databaseService.getExchangeParticipant(exchangeId, user.id);
+    if (existingParticipant) {
+      return res.status(409).json({
+        error: 'User already a participant',
+        message: `${email} is already a participant in this exchange`
+      });
+    }
+
+    // Add participant to exchange
+    const participant = await databaseService.addExchangeParticipant({
+      exchange_id: exchangeId,
+      user_id: user.id,
+      role: role
+    });
+
+    console.log('✅ Participant added successfully:', participant);
+
+    // Log the action
+    await AuditService.log({
+      action: 'PARTICIPANT_ADDED',
+      entityType: 'exchange',
+      entityId: exchangeId,
+      userId: req.user.id,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: {
+        added_user_id: user.id,
+        added_user_email: email,
+        role: role
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Participant added successfully',
+      participant: {
+        id: participant.id,
+        userId: user.id,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        role: role
+      }
+    });
+
+  } catch (error) {
+    console.error('Error adding participant:', error);
+    res.status(500).json({
+      error: 'Failed to add participant',
       message: error.message
     });
   }
@@ -245,7 +333,8 @@ router.get('/', [
       client_id,
       sort_by = 'created_at',
       sort_order = 'desc',
-      include_inactive = 'false'
+      include_inactive = 'false',
+      urgent
     } = req.query;
 
     // Build where clause based on user role and filters
@@ -255,7 +344,8 @@ router.get('/', [
       search,
       coordinator_id,
       client_id,
-      include_inactive: include_inactive === 'true'
+      include_inactive: include_inactive === 'true',
+      urgent: urgent === 'true'
     });
     
     console.log('🔍 DEBUG: whereClause =', JSON.stringify(whereClause, null, 2));
@@ -1509,6 +1599,17 @@ async function buildExchangeWhereClause(user, filters) {
 
   if (filters.client_id) {
     whereClause.client_id = filters.client_id;
+  }
+
+  // Filter for urgent exchanges (deadlines in next 2 days or overdue)
+  if (filters.urgent) {
+    const now = new Date();
+    const twoDaysFromNow = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000));
+    
+    whereClause[Op.or] = [
+      { identification_deadline: { [Op.lte]: twoDaysFromNow } },
+      { completion_deadline: { [Op.lte]: twoDaysFromNow } }
+    ];
   }
 
   // Search functionality

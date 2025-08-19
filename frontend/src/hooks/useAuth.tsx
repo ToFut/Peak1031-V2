@@ -150,7 +150,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
     } catch (error: any) {
       console.error('❌ Login failed:', error);
-      throw error;
+      throw new Error(error.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -191,7 +191,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       setUser(null);
-      throw error;
+      throw new Error(error.message || 'Token refresh failed');
     }
   };
 
@@ -206,7 +206,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
     } catch (error: any) {
       console.error('❌ User update failed:', error);
-      throw error;
+      throw new Error(error.message || 'User update failed');
     }
   };
 
