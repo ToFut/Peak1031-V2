@@ -89,23 +89,23 @@ const UserProfile: React.FC = () => {
                   <p className="text-sm text-gray-600 mb-3">Try navigating to a valid user profile:</p>
                   <div className="space-x-2">
                     <a
-                      href="/users/user-profile/a189afb6-3f04-48fa-8b2e-21469130ea7b"
+                      href="/users/user-profile/550e8400-e29b-41d4-a716-446655440000"
                       className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
                     >
                       Admin Profile
                     </a>
-                    <a
-                      href="/users/user-profile/ebe86825-c9d3-48ea-865a-c545f4418179"
+                    <button
+                      onClick={() => window.location.href = '/users'}
                       className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
                     >
-                      Client Profile
-                    </a>
-                    <a
-                      href="/users/user-profile/d67cef47-5419-42c8-894d-f89403685e5b"
+                      View All Users
+                    </button>
+                    <button
+                      onClick={() => window.location.reload()}
                       className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-purple-700 bg-purple-100 hover:bg-purple-200"
                     >
-                      Agency Profile
-                    </a>
+                      Refresh Page
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -134,23 +134,23 @@ const UserProfile: React.FC = () => {
           <p className="text-sm text-gray-500 mb-6">Try navigating to a valid user profile:</p>
           <div className="space-x-2">
             <a
-              href="/users/user-profile/a189afb6-3f04-48fa-8b2e-21469130ea7b"
+              href="/users/user-profile/550e8400-e29b-41d4-a716-446655440000"
               className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
             >
               Admin Profile
             </a>
-            <a
-              href="/users/user-profile/ebe86825-c9d3-48ea-865a-c545f4418179"
+            <button
+              onClick={() => window.location.href = '/users'}
               className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
             >
-              Client Profile
-            </a>
-            <a
-              href="/users/user-profile/d67cef47-5419-42c8-894d-f89403685e5b"
+              View All Users
+            </button>
+            <button
+              onClick={() => window.location.reload()}
               className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-purple-700 bg-purple-100 hover:bg-purple-200"
             >
-              Agency Profile
-            </a>
+              Refresh Page
+            </button>
           </div>
         </div>
       </div>
