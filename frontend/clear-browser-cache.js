@@ -29,3 +29,4 @@ console.log('1. Hard refresh the page (Ctrl+Shift+R or Cmd+Shift+R)');
 console.log('2. If the error persists, try opening in an incognito/private window');
 console.log('3. Check the browser console for any remaining errors');
 
+

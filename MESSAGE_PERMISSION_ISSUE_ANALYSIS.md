@@ -169,3 +169,4 @@ To prevent this issue in the future:
 - `backend/middleware/exchangePermissions.js` - Permission middleware
 - `backend/services/rbacService.js` - RBAC service
 
+

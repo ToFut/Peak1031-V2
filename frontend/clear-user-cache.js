@@ -31,3 +31,4 @@ if (window.caches) {
 
 console.log('🎉 User cache cleared successfully!');
 console.log('🔄 Please refresh the page to reload fresh data.');
+

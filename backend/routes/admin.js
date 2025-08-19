@@ -208,14 +208,42 @@ router.get('/users', authenticateToken, requireRole(['admin']), async (req, res)
         // Combine both sets of users
         const users = [...peopleUsers, ...systemUsers];
         
+        // Debug: Log user structure to understand the issue
+        console.log('🔍 Debug: Users structure:', {
+          peopleUsersCount: peopleUsers.length,
+          systemUsersCount: systemUsers.length,
+          totalUsers: users.length,
+          sampleUser: users[0] ? {
+            id: users[0].id,
+            idType: typeof users[0].id,
+            hasId: !!users[0].id
+          } : 'No users found'
+        });
+        
         // Get contacts for each user (where user_id matches)
         const contactsMap = {};
         if (users.length > 0) {
           try {
+            // UUID validation function
+            const isValidUUID = (uuid) => {
+              const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+              return typeof uuid === 'string' && uuidRegex.test(uuid);
+            };
+            
             // Filter out users with invalid IDs and ensure we have valid UUIDs
             const validUserIds = users
-              .filter(u => u && u.id && typeof u.id === 'string' && u.id.length > 0)
+              .filter(u => u && u.id && isValidUUID(u.id))
               .map(u => u.id);
+            
+            // Debug: Log invalid IDs that were filtered out
+            const invalidUsers = users.filter(u => u && u.id && !isValidUUID(u.id));
+            if (invalidUsers.length > 0) {
+              console.log('⚠️ Found users with invalid UUIDs:', invalidUsers.map(u => ({
+                id: u.id,
+                idType: typeof u.id,
+                email: u.email
+              })));
+            }
             
             if (validUserIds.length > 0) {
               const contacts = await supabaseService.select('contacts', {
@@ -231,6 +259,9 @@ router.get('/users', authenticateToken, requireRole(['admin']), async (req, res)
               }
               contactsMap[contact.id].push(contact);
             });
+            } else {
+              console.log('⚠️ No valid user IDs found for contact lookup');
+            }
           } catch (contactError) {
             console.log('⚠️ Could not fetch contacts:', contactError.message);
           }
