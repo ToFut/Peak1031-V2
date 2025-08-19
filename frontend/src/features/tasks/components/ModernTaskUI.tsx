@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Task, TaskStatus } from '../../../types';
+import { Task, TaskStatus, TaskPriority } from '../../../types';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
 import {
@@ -32,6 +32,12 @@ interface ModernTaskUIProps {
   initialView?: 'grid' | 'list' | 'kanban' | 'timeline';
   onTaskSelect?: (task: Task) => void;
   onCreateClick?: () => void;
+}
+
+interface Exchange {
+  id: string;
+  name: string;
+  status: string;
 }
 
 // Priority and Status configurations
@@ -166,9 +172,11 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
 }) => {
   // const { user } = useAuth(); // Unused variable
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState(initialView);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedExchange, setSelectedExchange] = useState<string>('all');
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
@@ -191,14 +199,56 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
   const loadTasks = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('🔍 ModernTaskUI: Loading tasks...', { exchangeId });
-      const response = await apiService.getTasks(exchangeId);
-      console.log('🔍 ModernTaskUI: Raw API response:', response);
-      const tasksArray = Array.isArray(response) ? response : [];
-      console.log('🔍 ModernTaskUI: Setting tasks:', tasksArray.length, 'tasks');
-      setTasks(tasksArray);
+      console.log('🔍 ModernTaskUI: Loading tasks and exchanges...', { exchangeId });
+      
+      let tasksArray = [];
+      let exchangesData = [];
+      
+      if (exchangeId) {
+        // Load exchange-specific tasks
+        console.log('🔍 ModernTaskUI: Loading tasks for specific exchange:', exchangeId);
+        try {
+          const response = await apiService.getTasksByExchange(exchangeId);
+          console.log('🔍 ModernTaskUI: Exchange tasks response:', response);
+          tasksArray = Array.isArray(response) ? response : [];
+        } catch (exchangeError) {
+          console.error('❌ ModernTaskUI: Error loading exchange tasks:', exchangeError);
+          // Fallback to general tasks endpoint
+          try {
+            const fallbackResponse = await apiService.getTasks();
+            console.log('🔍 ModernTaskUI: Fallback tasks response:', fallbackResponse);
+            tasksArray = Array.isArray(fallbackResponse) ? fallbackResponse : [];
+          } catch (fallbackError) {
+            console.error('❌ ModernTaskUI: Fallback also failed:', fallbackError);
+            tasksArray = [];
+          }
+        }
+      } else {
+        // Load all tasks and exchanges
+        const [tasksResponse, exchangesResponse] = await Promise.all([
+          apiService.getTasks(),
+          apiService.getExchanges()
+        ]);
+        
+        console.log('🔍 ModernTaskUI: All tasks response:', tasksResponse);
+        tasksArray = Array.isArray(tasksResponse) ? tasksResponse : [];
+        
+        exchangesData = (exchangesResponse as any)?.data || exchangesResponse;
+        setExchanges(Array.isArray(exchangesData) ? exchangesData : []);
+      }
+      
+      // Normalize status and priority for consistent display
+      const normalizedTasks = tasksArray.map(task => ({
+        ...task,
+        status: (typeof task.status === 'string' ? task.status.toUpperCase() : task.status) as TaskStatus,
+        priority: (typeof task.priority === 'string' ? task.priority.toUpperCase() : task.priority) as TaskPriority
+      }));
+      
+      console.log('🔍 ModernTaskUI: Setting normalized tasks:', normalizedTasks.length, 'tasks');
+      setTasks(normalizedTasks as Task[]);
     } catch (error) {
       console.error('❌ ModernTaskUI: Failed to load tasks:', error);
+      setTasks([]);
     } finally {
       setLoading(false);
     }
@@ -213,11 +263,17 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
   const processedTasks = useMemo(() => {
     let filtered = [...tasks];
 
+    // Filter by exchange selection
+    if (selectedExchange !== 'all') {
+      filtered = filtered.filter(task => task.exchangeId === selectedExchange || task.exchange_id === selectedExchange);
+    }
+
     // Search
     if (searchQuery) {
       filtered = filtered.filter(task =>
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (task.assignedTo || task.assigned_to || '').toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
@@ -229,7 +285,9 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
       filtered = filtered.filter(task => task.priority === filters.priority);
     }
     if (filters.assignee !== 'all') {
-      filtered = filtered.filter(task => task.assignedTo === filters.assignee);
+      filtered = filtered.filter(task => 
+        (task.assignedTo || task.assigned_to) === filters.assignee
+      );
     }
     // TODO: Add starred property to Task type
     // if (filters.starred) {
@@ -259,7 +317,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
     });
 
     return filtered;
-  }, [tasks, searchQuery, filters, sortBy, sortOrder]);
+  }, [tasks, searchQuery, selectedExchange, filters, sortBy, sortOrder]);
 
   // Group tasks for kanban view - normalize status for grouping
   const groupedTasks = useMemo(() => {
@@ -469,10 +527,10 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
                   <span className={dueDateInfo.urgent ? 'font-medium' : ''}>{dueDateInfo.text}</span>
                 </div>
               )}
-              {task.assignedTo && (
+              {(task.assignedTo || task.assigned_to) && (
                 <div className="flex items-center gap-1">
                   <UserCircleIcon className="w-4 h-4" />
-                  <span>Assigned</span>
+                  <span>Assigned: {task.assignedTo || task.assigned_to}</span>
                 </div>
               )}
             </div>
@@ -482,10 +540,10 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
             <span className={`px-3 py-1 text-sm font-medium rounded-full ${statusConfig.bgClass} ${statusConfig.textClass}`}>
               {statusConfig.label}
             </span>
-            {task.assignedTo && (
+            {(task.assignedTo || task.assigned_to) && (
               <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
                 <span className="text-sm font-medium text-purple-600">
-                  {task.assignedTo.charAt(0).toUpperCase()}
+                  {(task.assignedTo || task.assigned_to || '').charAt(0).toUpperCase()}
                 </span>
               </div>
             )}
@@ -605,14 +663,14 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
         {/* Footer with assignee and actions */}
         <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-100">
           <div className="flex items-center gap-3">
-            {task.assignedTo && (
+            {(task.assignedTo || task.assigned_to) && (
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
                   <span className="text-sm font-medium text-purple-600">
-                    {task.assignedTo.charAt(0).toUpperCase()}
+                    {(task.assignedTo || task.assigned_to || '').charAt(0).toUpperCase()}
                   </span>
                 </div>
-                <span className="text-sm text-gray-600">Assigned</span>
+                <span className="text-sm text-gray-600">Assigned: {task.assignedTo || task.assigned_to}</span>
               </div>
             )}
             {(task as any).tags?.slice(0, 2).map((tag: string) => (
@@ -899,10 +957,10 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
                                     <PriorityIcon className={`w-4 h-4 ${priorityConfig.textClass}`} />
                                     <span>{priorityConfig.label} Priority</span>
                                   </div>
-                                  {task.assignedTo && (
+                                  {(task.assignedTo || task.assigned_to) && (
                                     <div className="flex items-center gap-1">
                                       <UserCircleIcon className="w-4 h-4" />
-                                      <span>Assigned to {task.assignedTo}</span>
+                                      <span>Assigned to {task.assignedTo || task.assigned_to}</span>
                                     </div>
                                   )}
                                 </div>
@@ -932,6 +990,24 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
               <div className="flex items-center gap-2 sm:gap-4">
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Tasks</h1>
+                
+                {/* Exchange Selector - Show only if we have exchanges */}
+                {!exchangeId && exchanges.length > 0 && (
+                  <div className="hidden lg:flex items-center gap-2">
+                    <select
+                      value={selectedExchange}
+                      onChange={(e) => setSelectedExchange(e.target.value)}
+                      className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    >
+                      <option value="all">All Exchanges</option>
+                      {exchanges.map(exchange => (
+                        <option key={exchange.id} value={exchange.id}>
+                          {exchange.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 
                 {/* Quick Stats - Hidden on mobile, shown on sm+ */}
                 <div className="hidden sm:flex items-center gap-2 lg:gap-3">

@@ -3,6 +3,7 @@ import StandardDashboard from './StandardDashboard';
 import { EnhancedStatCard } from './SharedDashboardComponents';
 import { ExchangeList } from '../../exchanges/components/ExchangeList';
 import { useDashboardData } from '../../../shared/hooks/useDashboardData';
+import { ModernTaskUI } from '../../tasks/components/ModernTaskUI';
 import {
   ChartBarIcon,
   DocumentTextIcon,
@@ -1117,6 +1118,26 @@ const StandardizedAgencyDashboard: React.FC = () => {
         return <ExchangesContent thirdParties={mockThirdParties} selectedThirdParty={selectedThirdParty} onThirdPartySelect={setSelectedThirdParty} />;
       case 'analytics':
         return <AgencyAnalyticsContent thirdParties={mockThirdParties} />;
+      case 'tasks':
+        return (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">Agency Task Management</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Manage tasks across all third parties and exchanges with timeline and calendar views
+                </p>
+              </div>
+              <div className="p-6">
+                <ModernTaskUI
+                  initialView="timeline"
+                  onTaskSelect={(task) => console.log('Task selected:', task)}
+                  onCreateClick={() => console.log('Create task clicked')}
+                />
+              </div>
+            </div>
+          </div>
+        );
       default:
         return <AgencyOverviewContent thirdParties={mockThirdParties} />;
     }
@@ -1172,6 +1193,17 @@ const StandardizedAgencyDashboard: React.FC = () => {
             >
               <ChartPieIcon className="h-5 w-5 inline mr-2" />
               Analytics
+            </button>
+            <button
+              onClick={() => setActiveSection('tasks')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeSection === 'tasks'
+                  ? 'border-orange-500 text-orange-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <CalendarIcon className="h-5 w-5 inline mr-2" />
+              Tasks
             </button>
           </nav>
         </div>

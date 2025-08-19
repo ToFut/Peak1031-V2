@@ -14,7 +14,6 @@ import './services/templateService';
 import Messages from './features/messages/pages/Messages';
 import Exchanges from './features/exchanges/pages/Exchanges';
 import ExchangeDetailEnhanced from './features/exchanges/pages/ExchangeDetailEnhanced';
-import Tasks from './features/tasks/pages/Tasks';
 import ModernTasksPage from './features/tasks/pages/ModernTasksPage';
 import Contacts from './features/contacts/pages/Contacts';
 import Documents from './features/documents/pages/Documents';
@@ -235,6 +234,20 @@ const App: React.FC = () => {
                   <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client', 'third_party', 'agency']}>
                     <Layout>
                       <RouteErrorBoundary routeName="Tasks">
+                        <ModernTasksPage />
+                      </RouteErrorBoundary>
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+
+              {/* Modern Tasks with Timeline/Calendar - Available to all authenticated users */}
+              <Route 
+                path="/modern-tasks" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client', 'third_party', 'agency']}>
+                    <Layout>
+                      <RouteErrorBoundary routeName="ModernTasks">
                         <ModernTasksPage />
                       </RouteErrorBoundary>
                     </Layout>

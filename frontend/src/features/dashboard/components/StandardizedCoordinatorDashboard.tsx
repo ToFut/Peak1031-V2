@@ -3,6 +3,7 @@ import StandardDashboard from './StandardDashboard';
 import { EnhancedStatCard } from './SharedDashboardComponents';
 import { TaskBoard } from '../../tasks/components/TaskBoard';
 import { ExchangeList } from '../../exchanges/components/ExchangeList';
+import { ModernTaskUI } from '../../tasks/components/ModernTaskUI';
 // import KanbanTaskBoard from '../../../components/dashboard/KanbanTaskBoard';
 import {
   ChartBarIcon,
@@ -48,59 +49,20 @@ const CoordinatorTabContent: React.FC<CoordinatorTabContentProps> = ({ activeTab
       case 'tasks':
         return (
           <div className="space-y-6">
-            {/* Task Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <EnhancedStatCard
-                title="Pending Tasks"
-                value={24}
-                subtitle="Across all exchanges"
-                icon={ClockIcon}
-                color="yellow"
-                trend="up"
-                trendValue="+5 this week"
-              />
-              <EnhancedStatCard
-                title="Overdue Tasks"
-                value={3}
-                subtitle="Require immediate attention"
-                icon={CheckCircleIcon}
-                color="red"
-                urgent={true}
-                trend="down"
-                trendValue="-2 from yesterday"
-              />
-              <EnhancedStatCard
-                title="Completed Today"
-                value={12}
-                subtitle="Tasks finished"
-                icon={TrophyIcon}
-                color="green"
-                trend="up"
-                trendValue="+4 from yesterday"
-              />
-              <EnhancedStatCard
-                title="Team Workload"
-                value="78%"
-                subtitle="Average capacity"
-                icon={UsersIcon}
-                color="blue"
-                trend="neutral"
-                trendValue="Stable"
-              />
-            </div>
-
-            {/* Kanban Board */}
+            {/* Modern Task UI with Timeline/Calendar */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
               <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Task Kanban Board</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Task Management</h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Drag and drop tasks to update their status
+                  Manage tasks with timeline, calendar, and kanban views
                 </p>
               </div>
               <div className="p-6">
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-gray-500">Kanban Task Board - Coming Soon</p>
-                </div>
+                <ModernTaskUI
+                  initialView="timeline"
+                  onTaskSelect={(task) => console.log('Task selected:', task)}
+                  onCreateClick={() => console.log('Create task clicked')}
+                />
               </div>
             </div>
           </div>

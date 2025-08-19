@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import StandardDashboard from './StandardDashboard';
 import { EnhancedStatCard } from './SharedDashboardComponents';
 import { ExchangeList } from '../../exchanges/components/ExchangeList';
+import { ModernTaskUI } from '../../tasks/components/ModernTaskUI';
 import {
   ChartBarIcon,
   DocumentTextIcon,
@@ -81,6 +82,27 @@ const ThirdPartyTabContent: React.FC<ThirdPartyTabContentProps> = ({ activeTab, 
                   <p>Protected documents will appear here when available.</p>
                   <p className="text-sm mt-2">Contact your coordinator for document access.</p>
                 </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'tasks':
+        return (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">My Tasks</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Tasks assigned to you with timeline and calendar views
+                </p>
+              </div>
+              <div className="p-6">
+                <ModernTaskUI
+                  initialView="timeline"
+                  onTaskSelect={(task) => console.log('Task selected:', task)}
+                  onCreateClick={() => console.log('Create task clicked')}
+                />
               </div>
             </div>
           </div>

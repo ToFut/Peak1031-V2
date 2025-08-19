@@ -4,6 +4,7 @@ import { EnhancedStatCard } from './SharedDashboardComponents';
 import UnifiedChatInterface from '../../messages/components/UnifiedChatInterface';
 import { ExchangeList } from '../../exchanges/components/ExchangeList';
 import { TaskBoard } from '../../tasks/components/TaskBoard';
+import { ModernTaskUI } from '../../tasks/components/ModernTaskUI';
 import {
   ChartBarIcon,
   DocumentTextIcon,
@@ -51,14 +52,14 @@ const ClientTabContent: React.FC<ClientTabContentProps> = ({ activeTab, role }) 
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">My Tasks</h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Tasks assigned to you and upcoming deadlines
+                  Manage your tasks with timeline, calendar, and kanban views
                 </p>
               </div>
               <div className="p-6">
-                <TaskBoard 
-                  tasks={[]} 
-                  showExchangeInfo={false}
-                  compact={true}
+                <ModernTaskUI
+                  initialView="timeline"
+                  onTaskSelect={(task) => console.log('Task selected:', task)}
+                  onCreateClick={() => console.log('Create task clicked')}
                 />
               </div>
             </div>
