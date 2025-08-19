@@ -285,4 +285,72 @@ router.post('/verify-2fa', authenticateToken, [
   }
 });
 
+// Setup SMS 2FA
+router.post('/setup-sms-2fa', authenticateToken, [
+  body('phoneNumber').isMobilePhone().withMessage('Valid phone number required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { phoneNumber } = req.body;
+    const result = await AuthService.setupSmsTwoFactor(req.user.id, phoneNumber);
+    res.json(result);
+  } catch (error) {
+    console.error('SMS 2FA setup error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Send SMS 2FA code
+router.post('/send-sms-2fa', authenticateToken, async (req, res) => {
+  try {
+    const result = await AuthService.sendSmsTwoFactorCode(req.user.id);
+    res.json(result);
+  } catch (error) {
+    console.error('Send SMS 2FA error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Verify SMS 2FA code
+router.post('/verify-sms-2fa', authenticateToken, [
+  body('code').isLength({ min: 6, max: 6 }).withMessage('6-digit code required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { code } = req.body;
+    const result = await AuthService.verifySmsTwoFactor(req.user.id, code);
+    res.json(result);
+  } catch (error) {
+    console.error('Verify SMS 2FA error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Disable SMS 2FA
+router.post('/disable-sms-2fa', authenticateToken, [
+  body('password').isLength({ min: 1 }).withMessage('Password required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { password } = req.body;
+    const result = await AuthService.disableSmsTwoFactor(req.user.id, password);
+    res.json(result);
+  } catch (error) {
+    console.error('Disable SMS 2FA error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

@@ -668,6 +668,158 @@ class AuthService {
       throw error;
     }
   }
+
+  // SMS 2FA Methods
+  static async setupSmsTwoFactor(userId, phoneNumber) {
+    try {
+      const user = await databaseService.getUserById(userId);
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Update user's phone number and enable SMS 2FA
+      await databaseService.updateUser(userId, {
+        phone: phoneNumber,
+        two_fa_enabled: true,
+        two_fa_type: 'sms' // Add SMS type
+      });
+
+      // Send initial verification code
+      const result = await this.sendSmsTwoFactorCode(userId);
+      
+      return {
+        success: true,
+        message: 'SMS 2FA setup initiated. Please verify your phone number.',
+        phoneNumber: phoneNumber
+      };
+    } catch (error) {
+      console.error('SMS 2FA setup error:', error);
+      throw error;
+    }
+  }
+
+  static async sendSmsTwoFactorCode(userId) {
+    try {
+      const user = await databaseService.getUserById(userId);
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      if (!user.phone) {
+        throw new Error('Phone number not set');
+      }
+
+      // Generate 6-digit code
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Store code in database with expiration (10 minutes)
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      
+      // Store verification code (you might need to create a table for this)
+      // For now, we'll use a simple approach with user table
+      await databaseService.updateUser(userId, {
+        two_fa_secret: code, // Temporarily store code here
+        two_fa_expires_at: expiresAt
+      });
+
+      // Send SMS via Twilio
+      const NotificationService = require('./notifications');
+      const notificationService = new NotificationService();
+      
+      const smsResult = await notificationService.sendTwoFactorCode(user.phone, code);
+      
+      if (!smsResult.success) {
+        throw new Error('Failed to send SMS code');
+      }
+
+      return {
+        success: true,
+        message: 'Verification code sent to your phone',
+        expiresIn: '10 minutes'
+      };
+    } catch (error) {
+      console.error('Send SMS 2FA code error:', error);
+      throw error;
+    }
+  }
+
+  static async verifySmsTwoFactor(userId, code) {
+    try {
+      const user = await databaseService.getUserById(userId);
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      if (!user.two_fa_enabled || user.two_fa_type !== 'sms') {
+        throw new Error('SMS 2FA not enabled');
+      }
+
+      // Check if code is expired
+      if (user.two_fa_expires_at && new Date() > new Date(user.two_fa_expires_at)) {
+        throw new Error('Verification code expired');
+      }
+
+      // Verify code
+      if (user.two_fa_secret !== code) {
+        throw new Error('Invalid verification code');
+      }
+
+      // Clear the code after successful verification
+      await databaseService.updateUser(userId, {
+        two_fa_secret: null,
+        two_fa_expires_at: null
+      });
+
+      return {
+        success: true,
+        message: 'SMS 2FA verified successfully'
+      };
+    } catch (error) {
+      console.error('Verify SMS 2FA error:', error);
+      throw error;
+    }
+  }
+
+  static async disableSmsTwoFactor(userId, password) {
+    try {
+      const user = await databaseService.getUserById(userId);
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Verify password
+      const isValidPassword = await this.verifyPassword(user.password_hash, password);
+      if (!isValidPassword) {
+        throw new Error('Invalid password');
+      }
+
+      // Disable SMS 2FA
+      await databaseService.updateUser(userId, {
+        two_fa_enabled: false,
+        two_fa_type: null,
+        two_fa_secret: null,
+        two_fa_expires_at: null
+      });
+
+      return {
+        success: true,
+        message: 'SMS 2FA disabled successfully'
+      };
+    } catch (error) {
+      console.error('Disable SMS 2FA error:', error);
+      throw error;
+    }
+  }
+
+  static async verifyPassword(passwordHash, password) {
+    try {
+      const bcrypt = require('bcryptjs');
+      return await bcrypt.compare(password, passwordHash);
+    } catch (error) {
+      console.error('Password verification error:', error);
+      return false;
+    }
+  }
 }
 
 module.exports = AuthService; 
