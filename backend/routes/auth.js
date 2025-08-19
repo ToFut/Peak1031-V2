@@ -182,14 +182,12 @@ router.post('/reset-password', [
 // Get current user
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const user = await AuthService.getUserById(req.user.id);
-    if (!user) {
+    const profile = await AuthService.getUserProfile(req.user.id);
+    if (!profile) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Transform user object to camelCase
-    const transformedUser = transformToCamelCase(user);
-    res.json(transformedUser);
+    res.json(profile);
   } catch (error) {
     console.error('Error in /me route:', error);
     res.status(500).json({ error: error.message });
@@ -287,16 +285,19 @@ router.post('/verify-2fa', authenticateToken, [
 
 // Setup SMS 2FA
 router.post('/setup-sms-2fa', authenticateToken, [
-  body('phoneNumber').isMobilePhone().withMessage('Valid phone number required')
+  body('phoneNumber').isLength({ min: 10 }).withMessage('Valid phone number required')
 ], async (req, res) => {
   try {
+    console.log('📱 SMS 2FA setup route hit');
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
     const { phoneNumber } = req.body;
+    console.log('📱 Setting up SMS 2FA for user:', req.user.id, 'phone:', phoneNumber);
     const result = await AuthService.setupSmsTwoFactor(req.user.id, phoneNumber);
+    console.log('📱 SMS 2FA setup result:', result);
     res.json(result);
   } catch (error) {
     console.error('SMS 2FA setup error:', error);
