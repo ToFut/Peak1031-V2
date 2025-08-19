@@ -362,14 +362,14 @@ router.get('/:userId?', authenticateToken, async (req, res) => {
         console.log('🔍 Target user fetched:', targetUser);
         
         if (!targetUser) {
-          console.log('❌ Target user not found in database');
+          console.log('❌ Target user not found in database (checked both users and people tables)');
           return res.status(404).json({
             success: false,
             error: 'User not found',
-            message: `The requested user (ID: ${requestedUserId}) does not exist in the database. This may be due to cached data or a deleted user. Please refresh the page to reload fresh data.`
+            message: `The requested user (ID: ${requestedUserId}) does not exist in the database. This user may have been deleted or the ID may be invalid. Please refresh the page to reload fresh data.`
           });
         }
-        console.log('✅ Target user found:', targetUser.email || targetUser.firstName || 'No email/name');
+        console.log('✅ Target user found:', targetUser.email || targetUser.firstName || 'No email/name', 'Table:', targetUser.table || 'unknown');
       } catch (err) {
         console.error('❌ Error fetching target user:', err);
         return res.status(500).json({

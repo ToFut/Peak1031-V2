@@ -133,14 +133,25 @@ class SupabaseService {
   }
 
   async getUserById(id) {
-    // Use only users table
+    // Check both users table and people table (like admin endpoint)
     try {
+      // First try users table
       const users = await this.select('users', { where: { id } });
       if (users && users.length > 0) {
-        return users[0];
+        return { ...users[0], table: 'users' };
       }
     } catch (userError) {
       console.log('⚠️ Could not query users table with id:', userError.message);
+    }
+    
+    try {
+      // Then try people table
+      const people = await this.select('people', { where: { id } });
+      if (people && people.length > 0) {
+        return { ...people[0], table: 'people' };
+      }
+    } catch (peopleError) {
+      console.log('⚠️ Could not query people table with id:', peopleError.message);
     }
     
     return null;
