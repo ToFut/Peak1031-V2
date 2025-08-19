@@ -21,7 +21,7 @@ import Documents from './features/documents/pages/Documents';
 import Users from './features/users/pages/Users';
 import Reports from './features/reports/pages/Reports';
 import Settings from './features/settings/pages/Settings';
-import Profile from './features/settings/pages/Profile';
+import Profile from './features/profile/pages/Profile';
 import UserProfile from './features/users/pages/UserProfile';
 import Preferences from './features/settings/pages/Preferences';
 import AuthTest from './features/auth/pages/AuthTest';
