@@ -583,7 +583,7 @@ class SupabaseService {
         .from('messages')
         .select(`
           *,
-          sender:users!messages_sender_id_fkey(
+          sender:users!sender_id(
             id,
             email,
             first_name,

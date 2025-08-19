@@ -17,3 +17,4 @@ WHERE is_active IS NULL;
 
 -- Add comment
 COMMENT ON COLUMN exchange_participants.is_active IS 'Whether this participant record is active (true) or inactive (false)';
+

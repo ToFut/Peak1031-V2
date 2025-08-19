@@ -168,3 +168,4 @@ To prevent this issue in the future:
 - `database/migrations/030-add-is-active-to-exchange-participants.sql` - Database fix
 - `backend/middleware/exchangePermissions.js` - Permission middleware
 - `backend/services/rbacService.js` - RBAC service
+
