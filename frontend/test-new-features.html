@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test New Features</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .test-link { display: block; margin: 10px 0; padding: 10px; background: #f0f0f0; text-decoration: none; color: #333; border-radius: 5px; }
+        .test-link:hover { background: #e0e0e0; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test New Features</h1>
+    
+    <div class="status success">
+        ✅ Frontend and Backend are running
+    </div>
+    
+    <h2>🔗 Test New Routes:</h2>
+    
+    <a href="http://localhost:3000/profile" class="test-link" target="_blank">
+        👤 Profile Page - User Profile Management
+    </a>
+    
+    <a href="http://localhost:3000/preferences" class="test-link" target="_blank">
+        ⚙️ Preferences Page - User Settings
+    </a>
+    
+    <a href="http://localhost:3000/settings" class="test-link" target="_blank">
+        🔧 Settings Page - Application Settings
+    </a>
+    
+    <a href="http://localhost:3000/tasks" class="test-link" target="_blank">
+        📋 Tasks Page - ModernTaskUI with Calendar
+    </a>
+    
+    <h2>🎯 Quick Navigation:</h2>
+    
+    <a href="http://localhost:3000" class="test-link" target="_blank">
+        🏠 Main Dashboard
+    </a>
+    
+    <a href="http://localhost:3000/users" class="test-link" target="_blank">
+        👥 Users Management
+    </a>
+    
+    <h2>🔍 Troubleshooting:</h2>
+    
+    <div class="status">
+        <strong>If pages look the same:</strong>
+        <ul>
+            <li>Clear browser cache (Ctrl+F5 or Cmd+Shift+R)</li>
+            <li>Check browser console for errors</li>
+            <li>Try incognito/private browsing mode</li>
+            <li>Verify you're logged in as admin</li>
+        </ul>
+    </div>
+    
+    <script>
+        // Test if the pages are accessible
+        const testUrls = [
+            'http://localhost:3000/profile',
+            'http://localhost:3000/preferences',
+            'http://localhost:3000/settings',
+            'http://localhost:3000/tasks'
+        ];
+        
+        testUrls.forEach(url => {
+            fetch(url)
+                .then(response => {
+                    if (response.ok) {
+                        console.log(`✅ ${url} is accessible`);
+                    } else {
+                        console.log(`❌ ${url} returned ${response.status}`);
+                    }
+                })
+                .catch(error => {
+                    console.log(`❌ ${url} error: ${error.message}`);
+                });
+        });
+    </script>
+</body>
+</html>

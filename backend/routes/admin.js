@@ -212,11 +212,17 @@ router.get('/users', authenticateToken, requireRole(['admin']), async (req, res)
         const contactsMap = {};
         if (users.length > 0) {
           try {
-            const contacts = await supabaseService.select('contacts', {
-              where: {
-                id: { in: users.map(u => u.id) }
-              }
-            });
+            // Filter out users with invalid IDs and ensure we have valid UUIDs
+            const validUserIds = users
+              .filter(u => u && u.id && typeof u.id === 'string' && u.id.length > 0)
+              .map(u => u.id);
+            
+            if (validUserIds.length > 0) {
+              const contacts = await supabaseService.select('contacts', {
+                where: {
+                  id: { in: validUserIds }
+                }
+              });
             
             // Group contacts by id (not user_id since contacts table uses id field)
             contacts.forEach(contact => {

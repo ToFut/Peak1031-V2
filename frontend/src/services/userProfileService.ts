@@ -118,6 +118,8 @@ export class UserProfileService {
       const endpoint = userId ? `/user-profile/${userId}` : '/user-profile';
       const etag = this.etagCache.get(endpoint);
       
+      console.log('🔍 UserProfileService: Fetching profile for userId:', userId, 'endpoint:', endpoint);
+      
       const response = await apiService.get(endpoint, { 
         useCache: false, // Don't use cache for real-time data
         cacheDuration: 1 * 60 * 1000, // 1 minute for offline fallback only
@@ -127,17 +129,34 @@ export class UserProfileService {
         etag
       });
       
+      console.log('🔍 UserProfileService: Raw response:', response);
+      
       // The API service already unwraps the response, so we get the data directly
       if (!response) {
         throw new Error('Failed to load user profile');
       }
+      
+      // Check if response has the expected structure
+      if (response.success === false) {
+        throw new Error(response.message || 'Failed to load user profile');
+      }
+      
+      // Handle both direct data and wrapped response
+      const profileData = response.data || response;
+      
+      if (!profileData || !profileData.user) {
+        console.error('🔍 UserProfileService: Invalid profile data structure:', profileData);
+        throw new Error('Invalid profile data structure');
+      }
+      
+      console.log('🔍 UserProfileService: Profile data extracted:', profileData.user);
       
       // Store ETag for future requests
       if (response.etag) {
         this.etagCache.set(endpoint, response.etag);
       }
       
-      return response;
+      return profileData;
     } catch (error) {
       console.error('Error fetching user profile:', error);
       throw error;
