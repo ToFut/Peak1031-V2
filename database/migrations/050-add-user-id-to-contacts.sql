@@ -14,3 +14,4 @@ END $$;
 
 -- Create index if it doesn't exist
 CREATE INDEX IF NOT EXISTS idx_contacts_user_id ON contacts(user_id);
+

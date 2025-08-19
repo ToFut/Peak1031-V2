@@ -37,11 +37,11 @@ import ForgotPassword from './features/auth/pages/ForgotPassword';
 import ResetPassword from './features/auth/pages/ResetPassword';
 
 // Lazy load heavy components for better performance
-const AdminDashboard = lazy(() => import(/* webpackChunkName: "admin-dashboard" */ './features/dashboard/components/StandardizedAdminDashboard'));
-const ClientDashboard = lazy(() => import(/* webpackChunkName: "client-dashboard" */ './features/dashboard/components/StandardizedClientDashboard'));
-const CoordinatorDashboard = lazy(() => import(/* webpackChunkName: "coordinator-dashboard" */ './features/dashboard/components/StandardizedCoordinatorDashboard'));
-const ThirdPartyDashboard = lazy(() => import(/* webpackChunkName: "thirdparty-dashboard" */ './features/dashboard/components/StandardizedThirdPartyDashboard'));
-const AgencyDashboard = lazy(() => import(/* webpackChunkName: "agency-dashboard" */ './features/dashboard/components/StandardizedAgencyDashboard'));
+import AdminDashboard from './features/dashboard/components/StandardizedAdminDashboard';
+import ClientDashboard from './features/dashboard/components/StandardizedClientDashboard';
+import CoordinatorDashboard from './features/dashboard/components/StandardizedCoordinatorDashboard';
+import ThirdPartyDashboard from './features/dashboard/components/StandardizedThirdPartyDashboard';
+import AgencyDashboard from './features/dashboard/components/StandardizedAgencyDashboard';
 const InvitationSignup = lazy(() => import(/* webpackChunkName: "invitation" */ './pages/InvitationSignup'));
 const AuthCallback = lazy(() => import(/* webpackChunkName: "auth-callback" */ './pages/AuthCallback'));
 
@@ -228,11 +228,11 @@ const App: React.FC = () => {
                 } 
               />
 
-              {/* Tasks - Available to core users */}
+              {/* Tasks - Available to all authenticated users */}
               <Route 
                 path="/tasks" 
                 element={
-                  <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client']}>
+                  <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client', 'third_party', 'agency']}>
                     <Layout>
                       <RouteErrorBoundary routeName="Tasks">
                         <ModernTasksPage />

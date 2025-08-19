@@ -19,7 +19,8 @@ import {
   PlusIcon,
   EyeIcon,
   PencilIcon,
-  TrashIcon
+  TrashIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
 import {
   SparklesIcon
@@ -526,13 +527,6 @@ export const StandardDashboard: React.FC<{
     </div>
   );
 };
-
-// Heroicon imports that might be missing
-const ChevronRightIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-  </svg>
-);
 
 // Simple MetricCard component to replace missing import
 const MetricCard: React.FC<{

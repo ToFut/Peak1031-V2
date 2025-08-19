@@ -47,8 +47,8 @@ class ApiService {
           baseUrl = `${window.location.protocol}//${window.location.hostname}/api`;
         }
       } else {
-        // Development fallback
-        baseUrl = 'https://peak1031-production.up.railway.app/api';
+        // Development fallback - use localhost backend
+        baseUrl = 'http://localhost:5001/api';
       }
     }
     
@@ -507,10 +507,14 @@ class ApiService {
 
   async getTasks(exchangeId?: string): Promise<Task[]> {
     const endpoint = exchangeId ? `/tasks/exchange/${exchangeId}` : '/tasks';
+    console.log('🔍 API Service: Requesting tasks from endpoint:', endpoint);
     const response = await this.request(endpoint) as any;
+    console.log('🔍 API Service: Raw tasks response:', response);
     // Backend returns { success: true, tasks: [...], total: number, ... }
     // Extract just the tasks array
-    return response?.tasks || (Array.isArray(response) ? response : []);
+    const tasks = response?.tasks || (Array.isArray(response) ? response : []);
+    console.log('🔍 API Service: Extracted tasks array:', tasks?.length, 'tasks');
+    return tasks;
   }
 
   async getMessages(exchangeId?: string): Promise<Message[]> {

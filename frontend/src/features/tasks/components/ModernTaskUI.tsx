@@ -191,10 +191,14 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
   const loadTasks = useCallback(async () => {
     try {
       setLoading(true);
+      console.log('🔍 ModernTaskUI: Loading tasks...', { exchangeId });
       const response = await apiService.getTasks(exchangeId);
-      setTasks(Array.isArray(response) ? response : []);
+      console.log('🔍 ModernTaskUI: Raw API response:', response);
+      const tasksArray = Array.isArray(response) ? response : [];
+      console.log('🔍 ModernTaskUI: Setting tasks:', tasksArray.length, 'tasks');
+      setTasks(tasksArray);
     } catch (error) {
-      console.error('Failed to load tasks:', error);
+      console.error('❌ ModernTaskUI: Failed to load tasks:', error);
     } finally {
       setLoading(false);
     }
