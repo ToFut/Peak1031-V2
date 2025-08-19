@@ -1314,29 +1314,169 @@ router.delete('/generated/:documentId', authenticateToken, requireDocumentAccess
   }
 });
 
-// Get document versions (placeholder implementation)
+// Get document versions
 router.get('/:documentId/versions', authenticateToken, requireDocumentAccess('view'), async (req, res) => {
   try {
     const { documentId } = req.params;
-    
-    // For now, return empty versions array since versioning is not implemented
-    // In the future, this would query a document_versions table
     console.log(`📄 Getting versions for document: ${documentId}`);
     
-    // Placeholder response that matches the expected format
-    const versions = [];
+    // First verify the document exists
+    const { data: document, error: docError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('id', documentId)
+      .single();
     
-    // Could implement actual versioning later by:
-    // 1. Creating a document_versions table
-    // 2. Storing multiple versions of the same document
-    // 3. Linking versions via a parent document ID
+    if (docError || !document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    // Get all versions for this document (including the original)
+    const { data: versions, error: versionsError } = await supabase
+      .from('document_versions')
+      .select(`
+        *,
+        uploaded_by_user:users!uploaded_by(first_name, last_name, email)
+      `)
+      .eq('document_id', documentId)
+      .order('version_number', { ascending: false });
+    
+    if (versionsError) {
+      console.error('❌ Error fetching document versions:', versionsError);
+      // If table doesn't exist, return empty array with appropriate message
+      if (versionsError.code === '42P01') {
+        return res.json({
+          versions: [],
+          message: 'Document versioning table not yet created in database'
+        });
+      }
+      throw versionsError;
+    }
+    
+    // Format versions for frontend consumption
+    const formattedVersions = versions.map(version => ({
+      id: version.id,
+      version: version.version_number,
+      fileName: version.original_filename,
+      uploadedBy: version.uploaded_by_user ? 
+        `${version.uploaded_by_user.first_name} ${version.uploaded_by_user.last_name}` : 
+        'Unknown User',
+      uploadedAt: version.created_at,
+      size: version.file_size,
+      changes: version.change_description || 'No description provided'
+    }));
     
     res.json({
-      versions,
-      message: 'Document versioning is not yet implemented'
+      versions: formattedVersions,
+      total: formattedVersions.length
     });
   } catch (error) {
     console.error('❌ Error fetching document versions:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create new document version
+router.post('/:documentId/versions', authenticateToken, requireDocumentAccess('edit'), upload.single('file'), async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const { changeDescription } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided for new version' });
+    }
+    
+    console.log(`📄 Creating new version for document: ${documentId}`);
+    
+    // Get the original document
+    const { data: originalDoc, error: docError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('id', documentId)
+      .single();
+    
+    if (docError || !originalDoc) {
+      return res.status(404).json({ error: 'Original document not found' });
+    }
+    
+    // Get the highest version number for this document
+    const { data: latestVersion, error: versionError } = await supabase
+      .from('document_versions')
+      .select('version_number')
+      .eq('document_id', documentId)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .single();
+    
+    const nextVersionNumber = latestVersion ? (latestVersion.version_number + 1) : 1;
+    
+    // Upload new file version
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const fileExtension = path.extname(req.file.originalname);
+    const storedFilename = `${uniqueSuffix}${fileExtension}`;
+    const supabaseFilePath = `exchanges/${originalDoc.exchange_id}/versions/${storedFilename}`;
+    
+    try {
+      await supabaseService.uploadFile('documents', supabaseFilePath, req.file.buffer, {
+        contentType: req.file.mimetype
+      });
+    } catch (uploadError) {
+      console.error('❌ Failed to upload new version:', uploadError);
+      return res.status(500).json({ error: 'Failed to upload new document version' });
+    }
+    
+    // Create version record
+    const { data: newVersion, error: createError } = await supabase
+      .from('document_versions')
+      .insert({
+        document_id: documentId,
+        version_number: nextVersionNumber,
+        original_filename: req.file.originalname,
+        stored_filename: storedFilename,
+        file_path: supabaseFilePath,
+        file_size: req.file.size,
+        mime_type: req.file.mimetype,
+        uploaded_by: req.user.id,
+        change_description: changeDescription || null,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (createError) {
+      console.error('❌ Failed to create version record:', createError);
+      return res.status(500).json({ error: 'Failed to create version record' });
+    }
+    
+    // Log the version creation
+    await AuditService.log({
+      action: 'DOCUMENT_VERSION_CREATED',
+      resourceType: 'document',
+      resourceId: documentId,
+      userId: req.user.id,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: {
+        versionNumber: nextVersionNumber,
+        fileName: req.file.originalname,
+        changeDescription: changeDescription
+      }
+    });
+    
+    res.status(201).json({
+      message: 'Document version created successfully',
+      version: {
+        id: newVersion.id,
+        version: nextVersionNumber,
+        fileName: req.file.originalname,
+        uploadedBy: `${req.user.first_name} ${req.user.last_name}`,
+        uploadedAt: newVersion.created_at,
+        size: req.file.size,
+        changes: changeDescription
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error creating document version:', error);
     res.status(500).json({ error: error.message });
   }
 });

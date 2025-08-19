@@ -118,7 +118,9 @@ export const AuditLogFeed: React.FC = () => {
       }));
 
       setPosts(processedPosts);
-      setUsers(usersResponse || []);
+      // Ensure users is always an array
+      const usersData = Array.isArray(usersResponse) ? usersResponse : [];
+      setUsers(usersData);
     } catch (error) {
       console.error('Failed to load feed data:', error);
     } finally {
@@ -281,7 +283,7 @@ export const AuditLogFeed: React.FC = () => {
       let match;
       while ((match = mentionRegex.exec(newComment)) !== null) {
         const fullName = match[1];
-        const mentionedUser = users.find(u => 
+        const mentionedUser = (Array.isArray(users) ? users : []).find(u => 
           `${u.first_name} ${u.last_name}`.toLowerCase() === fullName.toLowerCase()
         );
         if (mentionedUser) {
@@ -355,7 +357,7 @@ export const AuditLogFeed: React.FC = () => {
     return colors[severity as keyof typeof colors] || 'border-l-gray-500 bg-gray-50';
   };
 
-  const filteredUsers = users.filter(u => 
+  const filteredUsers = (Array.isArray(users) ? users : []).filter(u => 
     mentionQuery ? 
       `${u.first_name} ${u.last_name}`.toLowerCase().includes(mentionQuery.toLowerCase()) :
       true

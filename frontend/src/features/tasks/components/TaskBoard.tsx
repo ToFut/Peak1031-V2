@@ -307,11 +307,15 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                         )}
                         
                         {/* Assigned to */}
-                        {task.assignedUser && (
+                        {(task.assignedUser || task.assignedTo || task.assigned_to) && (
                           <div className="flex items-center text-xs text-gray-500">
                             <User className="w-3 h-3 mr-1" />
                             <span>
-                              Assigned: {task.assignedUser.first_name} {task.assignedUser.last_name}
+                              Assigned: {
+                                task.assignedUser 
+                                  ? `${task.assignedUser.first_name} ${task.assignedUser.last_name}`
+                                  : task.assignedTo || task.assigned_to
+                              }
                             </span>
                           </div>
                         )}

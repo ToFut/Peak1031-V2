@@ -139,7 +139,7 @@ const UserDirectory: React.FC<UserDirectoryProps> = ({
     return `${Math.floor(diffDays / 365)} years ago`;
   };
 
-  const filteredUsers = users.filter(user => {
+  const filteredUsers = (Array.isArray(users) ? users : []).filter(user => {
     const matchesSearch = searchTerm === '' || 
       user.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||

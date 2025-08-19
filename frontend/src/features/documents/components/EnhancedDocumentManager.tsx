@@ -32,6 +32,7 @@ import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { DocumentUploader } from '../../../components/shared';
+import { SearchableDropdown } from '../../../components/ui/SearchableDropdown';
 
 interface DocumentVersion {
   id: string;
@@ -558,48 +559,53 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
               
               {/* Conditional Selectors */}
               {filterBy === 'user' && (
-                <select
+                <SearchableDropdown
+                  options={(Array.isArray(users) ? users : []).map(user => ({
+                    id: user.id,
+                    label: user.name || user.email,
+                    subtitle: `Role: ${user.role}`,
+                    icon: UserIcon
+                  }))}
                   value={selectedUserId}
-                  onChange={(e) => setSelectedUserId(e.target.value)}
-                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select User</option>
-                  {users.map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.name || user.email} ({user.role})
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedUserId}
+                  placeholder="Select User"
+                  searchPlaceholder="Search users..."
+                  emptyMessage="No users found"
+                  className="text-sm"
+                />
               )}
               
               {filterBy === 'exchange' && (
-                <select
+                <SearchableDropdown
+                  options={exchanges.map(exchange => ({
+                    id: exchange.id,
+                    label: exchange.name || exchange.exchangeName,
+                    subtitle: exchange.client ? `${exchange.client.first_name} ${exchange.client.last_name}` : 'No client assigned',
+                    icon: BuildingOfficeIcon
+                  }))}
                   value={selectedExchangeId}
-                  onChange={(e) => setSelectedExchangeId(e.target.value)}
-                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Exchange</option>
-                  {exchanges.map(exchange => (
-                    <option key={exchange.id} value={exchange.id}>
-                      {exchange.name || exchange.exchangeName}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedExchangeId}
+                  placeholder="Select Exchange"
+                  searchPlaceholder="Search exchanges..."
+                  emptyMessage="No exchanges found"
+                  className="text-sm"
+                />
               )}
               
               {filterBy === 'thirdparty' && (
-                <select
+                <SearchableDropdown
+                  options={(Array.isArray(users) ? users : []).filter(u => u.role === 'third_party').map(user => ({
+                    id: user.id,
+                    label: user.name || user.email,
+                    icon: UserIcon
+                  }))}
                   value={selectedUserId}
-                  onChange={(e) => setSelectedUserId(e.target.value)}
-                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Third Party</option>
-                  {users.filter(u => u.role === 'third_party').map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.name || user.email}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedUserId}
+                  placeholder="Select Third Party"
+                  searchPlaceholder="Search third parties..."
+                  emptyMessage="No third parties found"
+                  className="text-sm"
+                />
               )}
             </div>
           </div>
@@ -609,18 +615,23 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
         {!isAdmin() && (isClient() || isCoordinator()) && exchanges && exchanges.length > 0 && (
           <div className="flex items-center space-x-4">
             <label className="text-sm font-medium text-gray-700">Select Exchange:</label>
-            <select
+            <SearchableDropdown
+              options={[
+                { id: '', label: 'All My Exchanges', icon: BuildingOfficeIcon },
+                ...exchanges.map(exchange => ({
+                  id: exchange.id,
+                  label: exchange.name || exchange.exchangeName,
+                  subtitle: exchange.client ? `${exchange.client.first_name} ${exchange.client.last_name}` : 'No client assigned',
+                  icon: BuildingOfficeIcon
+                }))
+              ]}
               value={selectedExchangeId || exchangeId || ''}
-              onChange={(e) => setSelectedExchangeId(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All My Exchanges</option>
-              {exchanges.map(exchange => (
-                <option key={exchange.id} value={exchange.id}>
-                  {exchange.name || exchange.exchangeName}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedExchangeId}
+              placeholder="Select Exchange"
+              searchPlaceholder="Search exchanges..."
+              emptyMessage="No exchanges found"
+              className="text-sm"
+            />
           </div>
         )}
 
@@ -636,17 +647,19 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
             />
           </div>
           
-          <select
+          <SearchableDropdown
+            options={categories.map(category => ({
+              id: category,
+              label: category.charAt(0).toUpperCase() + category.slice(1),
+              icon: DocumentTextIcon
+            }))}
             value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {categories.map(category => (
-              <option key={category} value={category}>
-                {category.charAt(0).toUpperCase() + category.slice(1)}
-              </option>
-            ))}
-          </select>
+            onChange={setSelectedCategory}
+            placeholder="Select Category"
+            searchPlaceholder="Search categories..."
+            emptyMessage="No categories found"
+            className="text-sm"
+          />
 
           <button
             onClick={handleAdvancedSearch}

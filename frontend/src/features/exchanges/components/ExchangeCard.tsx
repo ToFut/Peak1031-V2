@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Exchange } from '../../../types';
 import { useNavigate } from 'react-router-dom';
+import { DeadlineWarning } from './DeadlineWarning';
 import {
   Calendar,
   Clock,
@@ -244,6 +245,14 @@ export const ExchangeCard: React.FC<ExchangeCardProps> = ({
               </div>
             )}
           </div>
+          
+          {/* Deadline Warning */}
+          <DeadlineWarning
+            identificationDeadline={exchange.identificationDeadline}
+            exchangeDeadline={exchange.completionDeadline}
+            status={exchange.status}
+            compact={true}
+          />
         </div>
         
         {/* Key Metrics Snapshot */}

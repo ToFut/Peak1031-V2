@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Task, TaskStatus, TaskPriority } from '../../../types';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
+import { SearchableDropdown } from '../../../components/ui/SearchableDropdown';
 import {
   XMarkIcon,
   CalendarIcon,
@@ -449,17 +450,18 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Initial Status
                   </label>
-                  <select
+                  <SearchableDropdown
+                    options={STATUS_OPTIONS.map(status => ({
+                      id: status.value,
+                      label: status.label,
+                      icon: status.icon
+                    }))}
                     value={formData.status}
-                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as TaskStatus }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                  >
-                    {STATUS_OPTIONS.map(status => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setFormData(prev => ({ ...prev, status: value as TaskStatus }))}
+                    placeholder="Select status..."
+                    searchPlaceholder="Search status..."
+                    emptyMessage="No status options found"
+                  />
                 </div>
               </div>
             </div>
@@ -472,24 +474,24 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Exchange {exchanges.length > 0 && <span className="text-red-500">*</span>}
                 </label>
-                <select
+                <SearchableDropdown
+                  options={exchanges.map(exchange => ({
+                    id: exchange.id,
+                    label: exchange.exchange_number || exchange.exchangeNumber || exchange.name || exchange.exchangeName || `Exchange ${exchange.id.slice(0, 8)}`,
+                    subtitle: exchange.client ? `${exchange.client.first_name} ${exchange.client.last_name}` : 'No client assigned',
+                    icon: BuildingOfficeIcon
+                  }))}
                   value={formData.exchangeId}
-                  onChange={(e) => setFormData(prev => ({ 
+                  onChange={(value) => setFormData(prev => ({ 
                     ...prev, 
-                    exchangeId: e.target.value,
+                    exchangeId: value,
                     assignedTo: '' // Clear assignee when exchange changes
                   }))}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 ${
-                    errors.exchangeId ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                >
-                  <option value="">Select an exchange...</option>
-                  {exchanges.map(exchange => (
-                    <option key={exchange.id} value={exchange.id}>
-                      {exchange.exchange_number || exchange.exchangeNumber || exchange.name || exchange.exchangeName || `Exchange ${exchange.id.slice(0, 8)}`}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select an exchange..."
+                  searchPlaceholder="Search exchanges..."
+                  emptyMessage="No exchanges found"
+                  error={!!errors.exchangeId}
+                />
                 {errors.exchangeId && (
                   <p className="mt-1 text-sm text-red-600">{errors.exchangeId}</p>
                 )}
@@ -516,29 +518,26 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Assign To
                   </label>
-                  <div className="relative">
-                    <UserCircleIcon className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <select
-                      value={formData.assignedTo}
-                      onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                      disabled={!formData.exchangeId}
-                    >
-                      <option value="">
-                        {!formData.exchangeId 
-                          ? 'Select an exchange first' 
-                          : exchangeParticipants.length === 0 
-                            ? 'No participants found' 
-                            : 'Select a participant'}
-                      </option>
-                      {exchangeParticipants.map(participant => (
-                        <option key={participant.id} value={participant.assignmentId}>
-                          {participant.name || participant.email || 'Unknown User'}
-                          {participant.role ? ` (${participant.role})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <SearchableDropdown
+                    options={exchangeParticipants.map(participant => ({
+                      id: participant.assignmentId,
+                      label: participant.name || participant.email || 'Unknown User',
+                      subtitle: participant.role ? `Role: ${participant.role}` : undefined,
+                      icon: UserCircleIcon
+                    }))}
+                    value={formData.assignedTo}
+                    onChange={(value) => setFormData(prev => ({ ...prev, assignedTo: value }))}
+                    placeholder={
+                      !formData.exchangeId 
+                        ? 'Select an exchange first' 
+                        : exchangeParticipants.length === 0 
+                          ? 'No participants found' 
+                          : 'Select a participant'
+                    }
+                    searchPlaceholder="Search participants..."
+                    emptyMessage="No participants found"
+                    disabled={!formData.exchangeId}
+                  />
                   {!formData.exchangeId && (
                     <p className="mt-1 text-sm text-gray-500">
                       Please select an exchange to see available participants

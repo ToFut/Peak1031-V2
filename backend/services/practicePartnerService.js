@@ -572,16 +572,17 @@ class PracticePartnerService {
   transformTask(ppTask) {
     return {
       pp_task_id: ppTask.id.toString(),
-      title: ppTask.name || ppTask.description || 'Unnamed Task',
-      description: ppTask.description || null,
+      title: ppTask.name || ppTask.subject || ppTask.description || 'Unnamed Task',
+      description: ppTask.description || ppTask.notes || null,
       status: this.mapTaskStatus(ppTask.status),
       priority: this.mapTaskPriority(ppTask.priority),
-      exchange_id: ppTask.matter_id ? this.findExchangeByPPId(ppTask.matter_id) : null,
-      assigned_to: ppTask.assigned_to ? this.findUserByPPId(ppTask.assigned_to) : null,
+      // Note: exchange_id and assigned_to will be resolved in syncTask method
+      matter_ref_id: ppTask.matter_id || ppTask.matter_ref?.id || null,
+      assigned_to_pp_id: ppTask.assigned_to || ppTask.assigned_to_users?.[0] || null,
       due_date: ppTask.due_date || null,
       completed_at: ppTask.completed_at || null,
       pp_data: ppTask,
-      last_sync_at: new Date().toISOString(),
+      pp_synced_at: new Date().toISOString(),
       created_at: ppTask.created_at || new Date().toISOString(),
       updated_at: ppTask.updated_at || new Date().toISOString()
     };
@@ -746,12 +747,28 @@ class PracticePartnerService {
   }
 
   /**
-   * Find existing user by PP ID (placeholder - we don't sync users from PP)
+   * Find existing user by PP ID
    */
   async findUserByPPId(ppUserId) {
-    // For now, return null as we don't sync users from PP
-    // Users are managed internally
-    return null;
+    try {
+      // First try to find by pp_user_id
+      const { data, error } = await this.supabase
+        .from('users')
+        .select('id')
+        .eq('pp_user_id', ppUserId.toString())
+        .single();
+
+      if (error || !data) {
+        // Try to find by email if PP provides it
+        // This is a fallback mechanism
+        return null;
+      }
+
+      return data.id;
+    } catch (error) {
+      console.error('Error finding user by PP ID:', error);
+      return null;
+    }
   }
 
   /**
@@ -1243,9 +1260,24 @@ class PracticePartnerService {
       const taskData = this.transformTask(ppTask);
       
       // Resolve exchange_id if we have pp_matter_id
-      if (ppTask.matter_id) {
-        taskData.exchange_id = await this.findExchangeByPPId(ppTask.matter_id);
+      if (taskData.matter_ref_id) {
+        taskData.exchange_id = await this.findExchangeByPPId(taskData.matter_ref_id);
+        if (!taskData.exchange_id) {
+          console.log(`⚠️ No exchange found for PP matter ID: ${taskData.matter_ref_id}`);
+        }
       }
+      
+      // Resolve assigned_to user if we have PP user ID
+      if (taskData.assigned_to_pp_id) {
+        taskData.assigned_to = await this.findUserByPPId(taskData.assigned_to_pp_id);
+        if (!taskData.assigned_to) {
+          console.log(`⚠️ No user found for PP user ID: ${taskData.assigned_to_pp_id}`);
+        }
+      }
+      
+      // Clean up temporary fields
+      delete taskData.matter_ref_id;
+      delete taskData.assigned_to_pp_id;
       
       // Check if task exists
       const { data: existing } = await this.supabase
@@ -1342,6 +1374,7 @@ class PracticePartnerService {
           response = await this.fetchMatters(params);
         } else if (syncType === 'tasks') {
           response = await this.fetchTasks(params);
+          console.log(`📋 Fetched ${response.results?.length || 0} tasks from PracticePanther`);
         } else {
           throw new Error(`Unknown sync type: ${syncType}`);
         }

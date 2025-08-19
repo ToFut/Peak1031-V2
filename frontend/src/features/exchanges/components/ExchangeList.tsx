@@ -7,6 +7,7 @@ import { useExchanges } from '../hooks/useExchanges';
 import { useSmartExchanges } from '../../../hooks/useSmartExchanges';
 import { useAnalytics } from '../../../hooks/useAnalytics';
 import { ExchangeCard } from './ExchangeCard';
+import { DeadlineWarning } from './DeadlineWarning';
 import ModernDropdown from './ModernDropdown';
 import { VirtualizedList } from './VirtualizedList';
 import {
@@ -28,7 +29,8 @@ import {
   ChevronRight,
   RotateCcw,
   Sparkles,
-  BarChart3
+  BarChart3,
+  MapPin
 } from 'lucide-react';
 
 interface ExchangeListProps {
@@ -194,6 +196,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
   const [valueMinFilter, setValueMinFilter] = useState('');
   const [valueMaxFilter, setValueMaxFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [propertyAddressFilter, setPropertyAddressFilter] = useState('');
   const [showFilterChips, setShowFilterChips] = useState(false);
 
   // View toggle state
@@ -242,6 +245,12 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
       const matchesValueMin = !valueMinFilter || (exchange.exchangeValue && exchange.exchangeValue >= parseFloat(valueMinFilter));
       const matchesValueMax = !valueMaxFilter || (exchange.exchangeValue && exchange.exchangeValue <= parseFloat(valueMaxFilter));
       
+      const matchesPropertyAddress = !propertyAddressFilter || 
+        exchange.relinquishedPropertyAddress?.toLowerCase().includes(propertyAddressFilter.toLowerCase()) ||
+        exchange.replacementProperties?.some((prop: any) => 
+          prop.address?.toLowerCase().includes(propertyAddressFilter.toLowerCase())
+        );
+      
       const matchesDate = !dateFilter || (() => {
         const exchangeDate = new Date(exchange.createdAt || exchange.identificationDeadline || '');
         const now = new Date();
@@ -266,9 +275,9 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
         }
       })();
 
-      return matchesSearch && matchesStatus && matchesType && matchesValueMin && matchesValueMax && matchesDate;
+      return matchesSearch && matchesStatus && matchesType && matchesValueMin && matchesValueMax && matchesDate && matchesPropertyAddress;
     });
-  }, [exchanges, searchTerm, statusFilter, typeFilter, valueMinFilter, valueMaxFilter, dateFilter]);
+  }, [exchanges, searchTerm, statusFilter, typeFilter, valueMinFilter, valueMaxFilter, dateFilter, propertyAddressFilter]);
 
   // Memoize event handlers
   const handleExchangeClick = useCallback((exchange: Exchange) => {
@@ -295,12 +304,13 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
     setValueMinFilter('');
     setValueMaxFilter('');
     setDateFilter('');
+    setPropertyAddressFilter('');
   }, []);
 
   // Memoize active filters check
   const hasActiveFilters = useMemo(() => {
-    return searchTerm || statusFilter || typeFilter || valueMinFilter || valueMaxFilter || dateFilter;
-  }, [searchTerm, statusFilter, typeFilter, valueMinFilter, valueMaxFilter, dateFilter]);
+    return searchTerm || statusFilter || typeFilter || valueMinFilter || valueMaxFilter || dateFilter || propertyAddressFilter;
+  }, [searchTerm, statusFilter, typeFilter, valueMinFilter, valueMaxFilter, dateFilter, propertyAddressFilter]);
 
   if (loading) {
     return (
@@ -488,6 +498,18 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
                   />
                 </div>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={propertyAddressFilter}
+                    onChange={(e) => setPropertyAddressFilter(e.target.value)}
+                    placeholder="Filter by property address..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  />
+                </div>
+              </div>
             </div>
           )}
 
@@ -528,6 +550,13 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
                   label="Date"
                   value={dateOptions.find(opt => opt.value === dateFilter)?.label || dateFilter}
                   onRemove={() => setDateFilter('')}
+                />
+              )}
+              {propertyAddressFilter && (
+                <FilterChip
+                  label="Property"
+                  value={propertyAddressFilter}
+                  onRemove={() => setPropertyAddressFilter('')}
                 />
               )}
               
@@ -679,6 +708,9 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Deadline Status
+                  </th>
                   <th scope="col" className="relative px-6 py-3">
                     <span className="sr-only">Edit</span>
                   </th>
@@ -695,6 +727,14 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${exchange.exchangeValue ? (exchange.exchangeValue / 1000000).toFixed(1) + 'M' : 'N/A'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{exchange.progress}%</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(exchange.createdAt || exchange.identificationDeadline || '').toLocaleDateString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <DeadlineWarning
+                        identificationDeadline={exchange.identificationDeadline}
+                        exchangeDeadline={exchange.completionDeadline}
+                        status={exchange.status}
+                        compact={true}
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <a href="#" className="text-blue-600 hover:text-blue-900">View</a>
                     </td>

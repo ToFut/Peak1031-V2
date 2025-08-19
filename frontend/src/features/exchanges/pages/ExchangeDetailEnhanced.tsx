@@ -31,12 +31,14 @@ import {
   Flag,
   Gauge,
   Settings,
-  UserPlus
+  UserPlus,
+  X
 } from 'lucide-react';
 
 // Tab Components
 import { ExchangeOverview } from '../components/ExchangeOverview';
 import { ModernTaskUI } from '../../tasks/components/ModernTaskUI';
+import { TaskCreateModal } from '../../tasks/components/TaskCreateModal';
 import EnhancedInvitationManager from '../components/EnhancedInvitationManager';
 import { DocumentUploader } from '../../../components/shared';
 
@@ -762,6 +764,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
   // Tasks are now managed by EnhancedTaskManager component
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showUserManagement, setShowUserManagement] = useState(false);
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   
   // Define functions before using them in useEffect
   const loadDocuments = useCallback(async () => {
@@ -1397,6 +1400,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
               <ModernTaskUI 
                 exchangeId={exchange.id}
                 initialView="kanban"
+                onCreateClick={() => setShowCreateTaskModal(true)}
               />
             )}
             {activeTab === 'all-details' && <AllDetailsView />}
@@ -1457,6 +1461,34 @@ const ExchangeDetailEnhanced: React.FC = () => {
             loadParticipants();
           }}
         />
+      )}
+
+      {/* Task Creation Modal */}
+      {showCreateTaskModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Create New Task</h3>
+              <button 
+                onClick={() => setShowCreateTaskModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <TaskCreateModal 
+                isOpen={showCreateTaskModal}
+                exchangeId={exchange.id}
+                onClose={() => setShowCreateTaskModal(false)}
+                onTaskCreated={(task) => {
+                  setShowCreateTaskModal(false);
+                  // The ModernTaskUI component will automatically refresh
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </Layout>
   );

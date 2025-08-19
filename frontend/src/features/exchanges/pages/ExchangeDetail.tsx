@@ -344,7 +344,8 @@ const ExchangeDetail: React.FC = () => {
       setLoadingTasks(true);
       const response = await apiService.getTasksByExchange(id);
       console.log('📋 Exchange tasks loaded:', response);
-      setTasks(response.tasks || []);
+      // The API returns the tasks array directly, not wrapped in a 'tasks' property
+      setTasks(Array.isArray(response) ? response : []);
     } catch (error) {
       console.error('Error loading exchange tasks:', error);
       setTasks([]);

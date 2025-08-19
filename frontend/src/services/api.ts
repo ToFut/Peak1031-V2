@@ -506,12 +506,9 @@ class ApiService {
   }
 
   async getTasks(exchangeId?: string): Promise<Task[]> {
-    const endpoint = exchangeId ? `/tasks/exchange/${exchangeId}` : '/tasks';
-    console.log('🔍 API Service: Requesting tasks from endpoint:', endpoint);
-    const response = await this.request(endpoint) as any;
+    console.log('🔍 API Service: Getting tasks, exchangeId:', exchangeId);
+    const response = await this.request<any>('/tasks');
     console.log('🔍 API Service: Raw tasks response:', response);
-    // Backend returns { success: true, tasks: [...], total: number, ... }
-    // Extract just the tasks array
     const tasks = response?.tasks || (Array.isArray(response) ? response : []);
     console.log('🔍 API Service: Extracted tasks array:', tasks?.length, 'tasks');
     return tasks;
@@ -1965,14 +1962,7 @@ class ApiService {
     priority?: string;
     assignedTo?: string;
     limit?: number;
-  }): Promise<{
-    tasks: any[];
-    pagination: {
-      total: number;
-      page: number;
-      limit: number;
-    };
-  }> {
+  }): Promise<any[]> {
     const params = new URLSearchParams({
       ...(options?.status && { status: options.status }),
       ...(options?.priority && { priority: options.priority }),
@@ -1980,7 +1970,7 @@ class ApiService {
       ...(options?.limit && { limit: options.limit.toString() })
     });
 
-    return await this.request(`/tasks/exchange/${exchangeId}?${params}`);
+    return await this.request(`/exchanges/${exchangeId}/tasks?${params}`);
   }
 
 

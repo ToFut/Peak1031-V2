@@ -548,4 +548,247 @@ router.post('/template', authenticateToken, requireRole(['admin']), [
   }
 });
 
+/**
+ * POST /api/notifications/batch
+ * Create multiple notifications in batch (admin only)
+ */
+router.post('/batch', authenticateToken, requireRole(['admin']), [
+  body('notifications').isArray({ min: 1, max: 100 }).withMessage('Notifications must be an array with 1-100 items'),
+  body('notifications.*.userId').isUUID().withMessage('Each notification must have a valid user ID'),
+  body('notifications.*.category').isIn(['system', 'task', 'document', 'exchange', 'message', 'participant', 'deadline', 'status', 'security', 'info']).withMessage('Invalid category'),
+  body('notifications.*.title').isLength({ min: 1, max: 255 }).withMessage('Title is required and must be less than 255 characters'),
+  body('notifications.*.message').isLength({ min: 1 }).withMessage('Message is required'),
+  body('notifications.*.priority').optional().isIn(['low', 'medium', 'high', 'urgent']).withMessage('Invalid priority')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { notifications } = req.body;
+    const results = {
+      successful: [],
+      failed: [],
+      totalProcessed: notifications.length
+    };
+
+    // Process notifications in batch
+    for (let i = 0; i < notifications.length; i++) {
+      const notificationData = {
+        ...notifications[i],
+        sourceUserId: req.user.id,
+        organizationId: req.user.organization_id
+      };
+
+      try {
+        const result = await notificationService.createNotification(notificationData);
+        
+        if (result.success) {
+          results.successful.push({
+            index: i,
+            notificationId: result.notification.id,
+            userId: notifications[i].userId
+          });
+        } else {
+          results.failed.push({
+            index: i,
+            userId: notifications[i].userId,
+            error: result.error
+          });
+        }
+      } catch (error) {
+        results.failed.push({
+          index: i,
+          userId: notifications[i].userId,
+          error: error.message
+        });
+      }
+    }
+
+    // Log the batch operation
+    await AuditService.log({
+      action: 'NOTIFICATION_BATCH_CREATED',
+      userId: req.user.id,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: { 
+        totalCount: notifications.length,
+        successfulCount: results.successful.length,
+        failedCount: results.failed.length
+      }
+    });
+
+    res.status(201).json({
+      success: results.failed.length === 0,
+      message: `Batch notification completed: ${results.successful.length} successful, ${results.failed.length} failed`,
+      results
+    });
+
+  } catch (error) {
+    console.error('Error creating batch notifications:', error);
+    res.status(500).json({
+      error: 'Failed to create batch notifications',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/notifications/templates
+ * Get available notification templates (admin only)
+ */
+router.get('/templates', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const templates = await notificationService.getNotificationTemplates();
+    
+    res.json({
+      templates: templates.map(template => ({
+        id: template.id,
+        name: template.name,
+        category: template.category,
+        title: template.title_template,
+        message: template.message_template,
+        variables: template.variables ? JSON.parse(template.variables) : [],
+        isActive: template.is_active,
+        createdAt: template.created_at,
+        updatedAt: template.updated_at
+      }))
+    });
+
+  } catch (error) {
+    console.error('Error fetching notification templates:', error);
+    res.status(500).json({
+      error: 'Failed to fetch notification templates',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/notifications/templates
+ * Create a new notification template (admin only)
+ */
+router.post('/templates', authenticateToken, requireRole(['admin']), [
+  body('name').isLength({ min: 1, max: 100 }).withMessage('Template name is required and must be less than 100 characters'),
+  body('category').isIn(['system', 'task', 'document', 'exchange', 'message', 'participant', 'deadline', 'status', 'security', 'info']).withMessage('Invalid category'),
+  body('titleTemplate').isLength({ min: 1, max: 255 }).withMessage('Title template is required and must be less than 255 characters'),
+  body('messageTemplate').isLength({ min: 1 }).withMessage('Message template is required'),
+  body('variables').optional().isArray().withMessage('Variables must be an array'),
+  body('priority').optional().isIn(['low', 'medium', 'high', 'urgent']).withMessage('Invalid priority')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const templateData = {
+      name: req.body.name,
+      category: req.body.category,
+      titleTemplate: req.body.titleTemplate,
+      messageTemplate: req.body.messageTemplate,
+      variables: req.body.variables || [],
+      priority: req.body.priority || 'medium',
+      createdBy: req.user.id
+    };
+
+    const result = await notificationService.createNotificationTemplate(templateData);
+
+    if (!result.success) {
+      return res.status(400).json({
+        error: 'Failed to create notification template',
+        details: result.error
+      });
+    }
+
+    // Log the action
+    await AuditService.log({
+      action: 'NOTIFICATION_TEMPLATE_CREATED',
+      userId: req.user.id,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      details: { 
+        templateName: req.body.name,
+        category: req.body.category
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      template: result.template
+    });
+
+  } catch (error) {
+    console.error('Error creating notification template:', error);
+    res.status(500).json({
+      error: 'Failed to create notification template',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/notifications/digest
+ * Get notification digest for user (for batched delivery)
+ */
+router.get('/digest', authenticateToken, [
+  query('frequency').isIn(['hourly', 'daily', 'weekly']).withMessage('Invalid frequency'),
+  query('categories').optional().isString().withMessage('Categories must be a comma-separated string')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { frequency, categories } = req.query;
+    const categoryList = categories ? categories.split(',') : null;
+
+    const digest = await notificationService.getNotificationDigest(
+      req.user.id, 
+      frequency, 
+      categoryList
+    );
+
+    res.json({
+      digest: {
+        period: digest.period,
+        summary: digest.summary,
+        notifications: digest.notifications.map(notification => ({
+          id: notification.id,
+          category: notification.category,
+          title: notification.title,
+          message: notification.message,
+          priority: notification.priority,
+          timestamp: notification.created_at,
+          actionUrl: notification.action_url,
+          actionLabel: notification.action_label
+        })),
+        stats: {
+          totalCount: digest.totalCount,
+          byCategory: digest.byCategory,
+          byPriority: digest.byPriority
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching notification digest:', error);
+    res.status(500).json({
+      error: 'Failed to fetch notification digest',
+      details: error.message
+    });
+  }
+});
+
 module.exports = router;

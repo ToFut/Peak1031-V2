@@ -5,6 +5,7 @@ import EnhancedTaskManager from '../components/EnhancedTaskManager';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
 import { useRealTimeTasks } from '../../../hooks/useRealTimeTasks';
+import { SearchableDropdown } from '../../../components/ui/SearchableDropdown';
 import { 
   Cog6ToothIcon, 
   XMarkIcon, 
@@ -15,7 +16,9 @@ import {
   ClockIcon,
   ExclamationTriangleIcon,
   Squares2X2Icon,
-  ListBulletIcon
+  ListBulletIcon,
+  FlagIcon,
+  UserCircleIcon
 } from '@heroicons/react/24/outline';
 
 interface Exchange {
@@ -33,8 +36,10 @@ const TasksPage: React.FC = () => {
   const [selectedExchange, setSelectedExchange] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
   const [searchQuery, setSearchQuery] = useState('');
+  const [exchangeSearchQuery, setExchangeSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [filterAssignee, setFilterAssignee] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const { user } = useAuth();
 
@@ -80,6 +85,26 @@ const TasksPage: React.FC = () => {
     }
   };
 
+  // Filter exchanges based on search
+  const filteredExchanges = useMemo(() => {
+    if (!exchangeSearchQuery) return exchanges;
+    return exchanges.filter(exchange => 
+      exchange.name.toLowerCase().includes(exchangeSearchQuery.toLowerCase())
+    );
+  }, [exchanges, exchangeSearchQuery]);
+
+  // Get unique assignees for filter dropdown
+  const uniqueAssignees = useMemo(() => {
+    const assignees = new Set<string>();
+    tasks.forEach(task => {
+      const assignee = task.assignedTo || task.assigned_to;
+      if (assignee) {
+        assignees.add(assignee);
+      }
+    });
+    return Array.from(assignees).sort();
+  }, [tasks]);
+
   // Filter and group tasks
   const filteredAndGroupedTasks = useMemo(() => {
     let filtered = tasks;
@@ -88,7 +113,8 @@ const TasksPage: React.FC = () => {
     if (searchQuery) {
       filtered = filtered.filter(task => 
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (task.assignedTo || task.assigned_to || '').toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
@@ -107,6 +133,21 @@ const TasksPage: React.FC = () => {
       filtered = filtered.filter(task => task.priority === filterPriority);
     }
 
+    // Filter by assignee
+    if (filterAssignee !== 'all') {
+      if (filterAssignee === '') {
+        // Show unassigned tasks
+        filtered = filtered.filter(task => 
+          !task.assignedTo && !task.assigned_to
+        );
+      } else {
+        // Show tasks assigned to specific person
+        filtered = filtered.filter(task => 
+          (task.assignedTo || task.assigned_to) === filterAssignee
+        );
+      }
+    }
+
     // Group by exchange
     const grouped = filtered.reduce((acc, task) => {
       const exchangeId = task.exchange_id || 'no-exchange';
@@ -118,7 +159,7 @@ const TasksPage: React.FC = () => {
     }, {} as Record<string, Task[]>);
 
     return grouped;
-  }, [tasks, searchQuery, selectedExchange, filterStatus, filterPriority]);
+  }, [tasks, searchQuery, selectedExchange, filterStatus, filterPriority, filterAssignee]);
 
   // Task statistics
   const taskStats = useMemo(() => {
@@ -240,6 +281,20 @@ const TasksPage: React.FC = () => {
 
         {/* Exchange List */}
         <div className="flex-1 overflow-y-auto p-4">
+          {/* Exchange Search */}
+          <div className="mb-4">
+            <div className="relative">
+              <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search exchanges..."
+                value={exchangeSearchQuery}
+                onChange={(e) => setExchangeSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
             <button
               onClick={() => setSelectedExchange('all')}
@@ -253,7 +308,7 @@ const TasksPage: React.FC = () => {
               </span>
             </button>
             
-            {exchanges.map(exchange => {
+            {filteredExchanges.map(exchange => {
               const exchangeTasks = filteredAndGroupedTasks[exchange.id] || [];
               return (
                 <button
@@ -284,6 +339,13 @@ const TasksPage: React.FC = () => {
                   {filteredAndGroupedTasks['no-exchange'].length}
                 </span>
               </button>
+            )}
+
+            {/* No exchanges found message */}
+            {exchangeSearchQuery && filteredExchanges.length === 0 && (
+              <div className="text-center py-4 text-gray-500 text-sm">
+                No exchanges found matching "{exchangeSearchQuery}"
+              </div>
             )}
           </div>
         </div>
@@ -319,30 +381,55 @@ const TasksPage: React.FC = () => {
             <div className="space-y-3 border-t pt-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                <select
+                <SearchableDropdown
+                  options={[
+                    { id: 'all', label: 'All Status', icon: ClockIcon },
+                    { id: 'PENDING', label: 'Pending', icon: ClockIcon },
+                    { id: 'IN_PROGRESS', label: 'In Progress', icon: ExclamationTriangleIcon },
+                    { id: 'COMPLETED', label: 'Completed', icon: CheckIcon }
+                  ]}
                   value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="w-full text-sm border border-gray-300 rounded px-2 py-1"
-                >
-                  <option value="all">All Status</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="IN_PROGRESS">In Progress</option>
-                  <option value="COMPLETED">Completed</option>
-                </select>
+                  onChange={setFilterStatus}
+                  placeholder="Select status..."
+                  searchPlaceholder="Search status..."
+                  className="text-sm"
+                />
               </div>
               
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Priority</label>
-                <select
+                <SearchableDropdown
+                  options={[
+                    { id: 'all', label: 'All Priority', icon: FlagIcon },
+                    { id: 'HIGH', label: 'High Priority', icon: ExclamationTriangleIcon },
+                    { id: 'MEDIUM', label: 'Medium Priority', icon: FlagIcon },
+                    { id: 'LOW', label: 'Low Priority', icon: FlagIcon }
+                  ]}
                   value={filterPriority}
-                  onChange={(e) => setFilterPriority(e.target.value)}
-                  className="w-full text-sm border border-gray-300 rounded px-2 py-1"
-                >
-                  <option value="all">All Priority</option>
-                  <option value="HIGH">High</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="LOW">Low</option>
-                </select>
+                  onChange={setFilterPriority}
+                  placeholder="Select priority..."
+                  searchPlaceholder="Search priority..."
+                  className="text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Assigned To</label>
+                <SearchableDropdown
+                  options={[
+                    { id: 'all', label: 'All Assignees', icon: UserCircleIcon },
+                    { id: '', label: 'Unassigned', icon: UserCircleIcon },
+                    ...uniqueAssignees.map(assignee => ({
+                      id: assignee,
+                      label: assignee,
+                      icon: UserCircleIcon
+                    }))
+                  ]}
+                  value={filterAssignee}
+                  onChange={setFilterAssignee}
+                  placeholder="Select assignee..."
+                  searchPlaceholder="Search assignees..."
+                  className="text-sm"
+                />
               </div>
             </div>
           )}

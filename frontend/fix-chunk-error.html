@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Chunk Loading Error</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 30px;
+        }
+        .success {
+            color: #155724;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .error {
+            color: #721c24;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .steps {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .steps ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .steps li {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Fix Chunk Loading Error</h1>
+        <p>This page will help you clear browser caches that are causing the "client-dashboard.chunk.js" loading error.</p>
+        
+        <div class="steps">
+            <h3>What's happening?</h3>
+            <p>The error occurs because your browser is trying to load a JavaScript chunk that no longer exists. This typically happens when:</p>
+            <ul>
+                <li>The development server was restarted</li>
+                <li>Code was modified and chunks were regenerated</li>
+                <li>Browser cache contains stale references</li>
+            </ul>
+        </div>
+
+        <button onclick="clearCaches()">Clear Browser Caches</button>
+        <button onclick="location.reload()">Refresh Page</button>
+        
+        <div id="status"></div>
+        
+        <div class="steps">
+            <h3>Manual Steps (if automatic clearing doesn't work):</h3>
+            <ol>
+                <li><strong>Hard Refresh:</strong> Press <code>Ctrl+Shift+R</code> (Windows/Linux) or <code>Cmd+Shift+R</code> (Mac)</li>
+                <li><strong>Clear Browser Data:</strong> Open browser settings → Privacy → Clear browsing data</li>
+                <li><strong>Incognito Mode:</strong> Try opening the app in an incognito/private window</li>
+                <li><strong>Disable Extensions:</strong> Temporarily disable browser extensions that might interfere</li>
+            </ol>
+        </div>
+        
+        <div class="steps">
+            <h3>For Developers:</h3>
+            <p>If the issue persists, try these commands in your terminal:</p>
+            <pre><code># Stop the development server
+pkill -f "react-scripts start"
+
+# Clear build cache
+rm -rf build
+rm -rf node_modules/.cache
+
+# Restart the server
+npm start</code></pre>
+        </div>
+    </div>
+
+    <script>
+        async function clearCaches() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = '<div class="success">🔄 Clearing caches...</div>';
+            
+            try {
+                // Clear localStorage and sessionStorage
+                localStorage.clear();
+                sessionStorage.clear();
+                
+                // Clear service workers
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                    }
+                }
+                
+                // Clear cache storage
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    for (let name of cacheNames) {
+                        await caches.delete(name);
+                    }
+                }
+                
+                statusDiv.innerHTML = '<div class="success">✅ Caches cleared successfully! Now refresh your main application page.</div>';
+                
+                // Auto-refresh after 3 seconds
+                setTimeout(() => {
+                    window.location.href = 'http://localhost:3000';
+                }, 3000);
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">❌ Error clearing caches: ${error.message}</div>`;
+            }
+        }
+        
+        // Auto-clear on page load
+        window.addEventListener('load', () => {
+            setTimeout(clearCaches, 1000);
+        });
+    </script>
+</body>
+</html>

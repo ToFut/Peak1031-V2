@@ -58,20 +58,26 @@ class DatabaseService {
       // Pass includeParticipants option to Supabase service
       return await supabaseService.getExchanges(options);
     } else {
+      const includeArray = [
+        { model: User, as: 'coordinator' },
+        { model: Contact, as: 'client' }
+      ];
+      
+      // Add participants if requested
+      if (options.includeParticipants) {
+        includeArray.push({
+          model: ExchangeParticipant, 
+          as: 'exchangeParticipants',
+          include: [
+            { model: User, as: 'user', attributes: { exclude: ['password_hash', 'two_fa_secret'] } },
+            { model: Contact, as: 'contact' }
+          ]
+        });
+      }
+      
       return await Exchange.findAll({
         ...options,
-        include: [
-          { model: User, as: 'coordinator' },
-          { model: Contact, as: 'client' },
-          { 
-            model: ExchangeParticipant, 
-            as: 'exchangeParticipants',
-            include: [
-              { model: User, as: 'user', attributes: { exclude: ['password_hash', 'two_fa_secret'] } },
-              { model: Contact, as: 'contact' }
-            ]
-          }
-        ]
+        include: includeArray
       });
     }
   }
@@ -83,7 +89,15 @@ class DatabaseService {
       return await Exchange.findByPk(id, {
         include: [
           { model: User, as: 'coordinator' },
-          { model: Contact, as: 'client' }
+          { model: Contact, as: 'client' },
+          {
+            model: ExchangeParticipant,
+            as: 'exchangeParticipants',
+            include: [
+              { model: User, as: 'user', attributes: { exclude: ['password_hash', 'two_fa_secret'] } },
+              { model: Contact, as: 'contact' }
+            ]
+          }
         ]
       });
     }

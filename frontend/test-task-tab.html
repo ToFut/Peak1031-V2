@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Tab Debug</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 30px;
+        }
+        .success {
+            color: #155724;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .error {
+            color: #721c24;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Task Tab Debug</h1>
+        <p>This page helps debug the task tab issue in the exchange page.</p>
+        
+        <div>
+            <h3>Test API Endpoints</h3>
+            <button onclick="testExchangeTasks()">Test Exchange Tasks API</button>
+            <button onclick="testGeneralTasks()">Test General Tasks API</button>
+            <button onclick="testBackendHealth()">Test Backend Health</button>
+        </div>
+        
+        <div id="results"></div>
+        
+        <div>
+            <h3>Next Steps</h3>
+            <ol>
+                <li>Click the test buttons above to verify API endpoints</li>
+                <li>Check the browser console for any errors</li>
+                <li>If APIs work, the issue might be in the React component</li>
+                <li>Try opening the exchange page in an incognito window</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        const EXCHANGE_ID = '38d7bdc0-c453-4517-9e4b-a26155bafcff';
+        const BACKEND_URL = 'http://localhost:3001';
+        
+        function showResult(message, isError = false) {
+            const resultsDiv = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = isError ? 'error' : 'success';
+            div.innerHTML = `<strong>${isError ? '❌ Error:' : '✅ Success:'}</strong> ${message}`;
+            resultsDiv.appendChild(div);
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        async function testBackendHealth() {
+            clearResults();
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/health`);
+                const data = await response.json();
+                showResult(`Backend health check: ${JSON.stringify(data, null, 2)}`);
+            } catch (error) {
+                showResult(`Backend health check failed: ${error.message}`, true);
+            }
+        }
+        
+        async function testExchangeTasks() {
+            clearResults();
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/exchanges/${EXCHANGE_ID}/tasks`, {
+                    headers: {
+                        'Authorization': 'Bearer test'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                showResult(`Exchange tasks API response: ${JSON.stringify(data, null, 2)}`);
+            } catch (error) {
+                showResult(`Exchange tasks API failed: ${error.message}`, true);
+            }
+        }
+        
+        async function testGeneralTasks() {
+            clearResults();
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/tasks`, {
+                    headers: {
+                        'Authorization': 'Bearer test'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                showResult(`General tasks API response: ${JSON.stringify(data, null, 2)}`);
+            } catch (error) {
+                showResult(`General tasks API failed: ${error.message}`, true);
+            }
+        }
+        
+        // Auto-test on page load
+        window.addEventListener('load', () => {
+            setTimeout(testBackendHealth, 1000);
+        });
+    </script>
+</body>
+</html>

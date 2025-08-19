@@ -1274,11 +1274,14 @@ const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
             {selectedExchange.participants.map((participant) => (
               <div key={participant.id} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
-                  {participant.first_name?.[0]}{participant.last_name?.[0]}
+                  {(participant.first_name?.[0] || participant.firstName?.[0] || '') + (participant.last_name?.[0] || participant.lastName?.[0] || '') || '?'}
                 </div>
                 <div className="flex-1">
                   <p className="font-medium text-gray-900">
-                    {participant.first_name || participant.firstName || ''} {participant.last_name || participant.lastName || ''}
+                    {participant.first_name || participant.firstName || participant.last_name || participant.lastName 
+                      ? `${participant.first_name || participant.firstName || ''} ${participant.last_name || participant.lastName || ''}`.trim()
+                      : 'Unknown User'
+                    }
                   </p>
                   <p className="text-sm text-gray-500 capitalize">{participant.role}</p>
                 </div>

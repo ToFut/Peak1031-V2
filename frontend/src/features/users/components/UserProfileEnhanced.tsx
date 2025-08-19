@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   UserIcon, 
   ChartBarIcon, 
-  DocumentTextIcon, 
+  DocumentTextIcon,
   ChatBubbleLeftRightIcon,
   CalendarIcon,
   ArrowTrendingUpIcon,
@@ -215,7 +215,7 @@ const UserProfileEnhanced: React.FC<UserProfileEnhancedProps> = ({ initialProfil
   const [selectedThirdPartyId, setSelectedThirdPartyId] = useState<string>('');
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
-  
+
   // Enhanced exchange assignment state
   const [exchangeSearchTerm, setExchangeSearchTerm] = useState('');
   const [exchangeStatusFilter, setExchangeStatusFilter] = useState('all');
@@ -254,7 +254,7 @@ const UserProfileEnhanced: React.FC<UserProfileEnhancedProps> = ({ initialProfil
             <div className="space-y-3">
               <div className="h-8 bg-gray-200 rounded w-64 animate-pulse"></div>
               <div className="h-4 bg-gray-200 rounded w-48 animate-pulse"></div>
-            </div>
+          </div>
             <div className="h-10 bg-gray-200 rounded-lg w-24 animate-pulse"></div>
           </motion.div>
 
@@ -450,7 +450,7 @@ const UserProfileEnhanced: React.FC<UserProfileEnhancedProps> = ({ initialProfil
             variants={containerVariants}
           >
             {Object.entries(profile.statusDistribution as Record<string, number>).map(([status, count], index) => (
-              <motion.div 
+            <motion.div
                 key={status} 
                 className="flex items-center justify-between"
                 variants={itemVariants}
@@ -466,10 +466,10 @@ const UserProfileEnhanced: React.FC<UserProfileEnhancedProps> = ({ initialProfil
               </motion.div>
             ))}
           </motion.div>
-        </motion.div>
+            </motion.div>
 
         {/* Recent Exchanges */}
-        <motion.div 
+            <motion.div
           className="bg-white rounded-lg shadow-sm border p-6"
           variants={chartVariants}
         >
@@ -477,7 +477,7 @@ const UserProfileEnhanced: React.FC<UserProfileEnhancedProps> = ({ initialProfil
             <DocumentTextIcon className="h-6 w-6 text-gray-500 mr-3" />
             <h3 className="text-lg font-semibold text-gray-900">Recent Exchanges</h3>
           </div>
-          <motion.div 
+            <motion.div
             className="space-y-3"
             variants={containerVariants}
           >
@@ -515,7 +515,7 @@ const UserProfileEnhanced: React.FC<UserProfileEnhancedProps> = ({ initialProfil
               >
                 <DocumentTextIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                 <p>No recent exchanges</p>
-              </motion.div>
+            </motion.div>
             )}
           </motion.div>
         </motion.div>

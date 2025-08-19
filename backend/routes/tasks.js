@@ -189,9 +189,9 @@ router.get('/', authenticateToken, async (req, res) => {
       query = query.eq('assigned_to', assignedTo);
     }
 
-    // Simple role-based filtering
-    if (req.user.role === 'client') {
-      // Get client's exchanges through exchange_participants table
+    // Role-based filtering for all user types
+    if (req.user.role === 'client' || req.user.role === 'third_party' || req.user.role === 'agency') {
+      // Get exchanges through exchange_participants table
       const { data: participantExchanges } = await supabaseService.client
         .from('exchange_participants')
         .select('exchange_id')
@@ -201,10 +201,37 @@ router.get('/', authenticateToken, async (req, res) => {
       if (participantExchanges?.length) {
         const exchangeIds = participantExchanges.map(e => e.exchange_id);
         query = query.in('exchange_id', exchangeIds);
+        console.log(`📋 ${req.user.role} user ${req.user.email} filtering tasks for ${exchangeIds.length} exchanges`);
       } else {
+        console.log(`📋 ${req.user.role} user ${req.user.email} has no assigned exchanges`);
         return res.json({ success: true, tasks: [], total: 0, page: parseInt(page), limit: parseInt(limit), hasMore: false });
       }
+    } else if (req.user.role === 'coordinator') {
+      // Coordinator sees tasks for exchanges they manage
+      const { data: coordExchanges } = await supabaseService.client
+        .from('exchanges')
+        .select('id')
+        .eq('coordinator_id', req.user.id);
+      
+      if (coordExchanges?.length) {
+        const exchangeIds = coordExchanges.map(e => e.id);
+        query = query.in('exchange_id', exchangeIds);
+        console.log(`📋 Coordinator ${req.user.email} filtering tasks for ${exchangeIds.length} managed exchanges`);
+      } else {
+        // Also check if coordinator is assigned through participants
+        const { data: participantExchanges } = await supabaseService.client
+          .from('exchange_participants')
+          .select('exchange_id')
+          .eq('user_id', req.user.id)
+          .eq('is_active', true);
+        
+        if (participantExchanges?.length) {
+          const exchangeIds = participantExchanges.map(e => e.exchange_id);
+          query = query.in('exchange_id', exchangeIds);
+        }
+      }
     }
+    // Admin sees all tasks (no filtering needed)
 
     // Apply sorting and pagination
     query = query
@@ -295,7 +322,13 @@ router.get('/exchange/:exchangeId', authenticateToken, requireExchangePermission
       });
     }
 
-    res.json(data || []);
+    // Return consistent format with the main tasks endpoint
+    res.json({
+      success: true,
+      tasks: transformToCamelCase(data || []),
+      total: data?.length || 0,
+      exchangeId: exchangeId
+    });
   } catch (error) {
     console.error('Error fetching tasks for exchange:', error);
     res.status(500).json({ 

@@ -349,8 +349,8 @@ class SupabaseService {
         let coordinator = null;
         if (data.coordinator_id) {
           const { data: coordData } = await this.client
-            .from('contacts')
-            .select('id, first_name, last_name, email')
+            .from('users')
+            .select('id, first_name, last_name, email, role')
             .eq('id', data.coordinator_id)
             .single();
           coordinator = coordData;
@@ -358,7 +358,15 @@ class SupabaseService {
 
         const { data: participants } = await this.client
           .from('exchange_participants')
-          .select('id, role, permissions, user_id, contact_id')
+          .select(`
+            id, 
+            role, 
+            permissions, 
+            user_id, 
+            contact_id,
+            user:user_id(id, first_name, last_name, email, role),
+            contact:contact_id(id, first_name, last_name, email)
+          `)
           .eq('exchange_id', data.id);
 
         return {
@@ -559,10 +567,20 @@ class SupabaseService {
     try {
       const { where = {}, orderBy = { column: 'created_at', ascending: false }, limit } = options;
       
-      // Query messages without problematic joins
+      // Query messages with sender information
       let query = this.client
         .from('messages')
-        .select('*');
+        .select(`
+          *,
+          sender:users!messages_sender_id_fkey(
+            id,
+            email,
+            first_name,
+            last_name,
+            role,
+            is_active
+          )
+        `);
 
       // Apply where conditions with column name conversion
       if (where.exchangeId) {
@@ -606,9 +624,16 @@ class SupabaseService {
       // Transform messages and fetch attachments
       if (messages.length > 0) {
         const enrichedMessages = await Promise.all(messages.map(async (message) => {
-          // Add users property for backward compatibility
+          // Ensure sender information is properly structured
           if (message.sender) {
+            // Add users property for backward compatibility
             message.users = message.sender;
+            // Ensure sender has the expected structure
+            if (!message.sender.first_name && !message.sender.last_name) {
+              console.warn('⚠️ Message sender missing name information:', message.sender);
+            }
+          } else {
+            console.warn('⚠️ Message missing sender information:', message.id);
           }
           
           // Handle attachments array

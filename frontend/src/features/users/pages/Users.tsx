@@ -111,7 +111,7 @@ const Users: React.FC = () => {
   }, [isAdmin, loadUsers]);
 
   // Filter users based on all criteria
-  const filteredUserList = users.filter(user => {
+  const filteredUserList = (Array.isArray(users) ? users : []).filter(user => {
     const matchesSearch = !userSearch || 
     user.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
     user.first_name?.toLowerCase().includes(userSearch.toLowerCase()) ||

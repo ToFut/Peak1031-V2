@@ -40,46 +40,81 @@ router.get('/:id/participants', [
 ], async (req, res) => {
   console.log('🎯 PARTICIPANTS ROUTE HIT:', req.params.id);
   try {
-    // Get exchange participants with user details
-    const { createClient } = require('@supabase/supabase-js');
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    // Get exchange with participants using database service
+    const exchange = await databaseService.getExchangeById(req.params.id);
     
-    const { data: participants, error } = await supabase
-      .from('exchange_participants')
-      .select(`
-        *,
-        user:user_id(id, first_name, last_name, email, role),
-        contact:contact_id(id, first_name, last_name, email)
-      `)
-      .eq('exchange_id', req.params.id)
-      .eq('is_active', true);
-
-    if (error) throw error;
-
-    console.log(`📊 Found ${participants?.length || 0} participants for exchange ${req.params.id}`);
-    console.log('Raw participants:', JSON.stringify(participants?.slice(0, 2), null, 2));
-
-    // Format the response - handle both user_id and contact_id cases
-    const formattedParticipants = (participants || [])
-      .filter(p => p.user || p.contact)
-      .map(p => {
-        const user = p.user || p.contact;
-        return {
-          id: user.id,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          email: user.email,
-          role: p.role,
-          participantId: p.id,
-          // Include the original IDs for proper task assignment
-          userId: p.user_id,
-          contactId: p.contact_id
-        };
+    if (!exchange) {
+      return res.status(404).json({
+        error: 'Exchange not found'
       });
+    }
+
+    // Extract participants from exchange data
+    const participants = [];
+    
+    // Add exchange participants
+    if (exchange.exchangeParticipants && Array.isArray(exchange.exchangeParticipants)) {
+      exchange.exchangeParticipants.forEach(ep => {
+        if (ep.user) {
+          participants.push({
+            id: ep.user.id,
+            firstName: ep.user.first_name || '',
+            lastName: ep.user.last_name || '',
+            email: ep.user.email,
+            role: ep.role || 'participant',
+            participantId: ep.id,
+            userId: ep.user_id,
+            contactId: null
+          });
+        }
+        if (ep.contact) {
+          participants.push({
+            id: `contact_${ep.contact.id}`,
+            firstName: ep.contact.first_name || '',
+            lastName: ep.contact.last_name || '',
+            email: ep.contact.email,
+            role: ep.role || 'client',
+            participantId: ep.id,
+            userId: null,
+            contactId: ep.contact_id
+          });
+        }
+      });
+    }
+
+    // Add coordinator if exists
+    if (exchange.coordinator) {
+      participants.push({
+        id: exchange.coordinator.id,
+        firstName: exchange.coordinator.first_name || '',
+        lastName: exchange.coordinator.last_name || '',
+        email: exchange.coordinator.email,
+        role: 'coordinator',
+        participantId: null,
+        userId: exchange.coordinator.id,
+        contactId: null
+      });
+    }
+
+    // Add client if exists
+    if (exchange.client) {
+      participants.push({
+        id: `contact_${exchange.client.id}`,
+        firstName: exchange.client.first_name || '',
+        lastName: exchange.client.last_name || '',
+        email: exchange.client.email,
+        role: 'client',
+        participantId: null,
+        userId: null,
+        contactId: exchange.client.id
+      });
+    }
+
+    console.log(`📊 Found ${participants.length} participants for exchange ${req.params.id}`);
 
     res.json({
-      data: formattedParticipants,
-      participants: formattedParticipants // for backward compatibility
+      data: participants,
+      participants: participants // for backward compatibility
     });
 
   } catch (error) {
@@ -248,17 +283,15 @@ router.get('/', [
       }
     ];
 
-    // Add participant data for admin/staff
-    if (['admin', 'staff', 'coordinator'].includes(req.user.role)) {
-      includeArray.push({
-        model: ExchangeParticipant,
-        as: 'exchangeParticipants',
-        include: [
-          { model: Contact, as: 'contact', attributes: ['id', 'first_name', 'last_name', 'email'] },
-          { model: User, as: 'user', attributes: ['id', 'first_name', 'last_name', 'email'] }
-        ]
-      });
-    }
+    // Add participant data for all users (needed for chat functionality)
+    includeArray.push({
+      model: ExchangeParticipant,
+      as: 'exchangeParticipants',
+      include: [
+        { model: Contact, as: 'contact', attributes: ['id', 'first_name', 'last_name', 'email'] },
+        { model: User, as: 'user', attributes: ['id', 'first_name', 'last_name', 'email'] }
+      ]
+    });
 
     // Calculate offset for pagination
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -275,8 +308,8 @@ router.get('/', [
       limit: parseInt(limit),
       offset: offset,
       orderBy: { column: sort_by, ascending: sort_order === 'asc' },
-      // Include participants for admin/staff/coordinator roles
-      includeParticipants: ['admin', 'staff', 'coordinator'].includes(req.user.role)
+      // Include participants for all users (needed for chat functionality)
+      includeParticipants: true
     });
     
     console.log('🔍 DEBUG: databaseService returned exchanges:', exchanges?.length || 0);
@@ -284,8 +317,8 @@ router.get('/', [
     // For now, we'll get count separately since our service doesn't support findAndCountAll yet
     const allExchanges = await databaseService.getExchanges({ 
       where: whereClause,
-      // Include participants for admin/staff/coordinator roles for consistent count
-      includeParticipants: ['admin', 'staff', 'coordinator'].includes(req.user.role)
+      // Include participants for all users for consistent count
+      includeParticipants: true
     });
     
     console.log('🔍 DEBUG: Total count query returned:', allExchanges?.length || 0);
