@@ -4,6 +4,8 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 const supabaseService = require('../services/supabase');
 const supabase = supabaseService.client;
 
+
+
 // Get Kevin's Friday Metrics - comprehensive business intelligence
 router.get('/friday-metrics', authenticateToken, requireRole(['admin', 'coordinator']), async (req, res) => {
   try {
@@ -53,45 +55,44 @@ router.get('/friday-metrics', authenticateToken, requireRole(['admin', 'coordina
 
     const amountFundedMTD = mtdFunding.reduce((sum, ex) => sum + (parseFloat(ex.exchange_value) || 0), 0);
 
-    // 4. Incoming Funds Next 7 Days - Gross Sales Price
+    // 4. Incoming Funds Next 7 Days - Using exchange_value as proxy for gross sales
     const { data: incoming7Days, error: incoming7Error } = await supabase
       .from('exchanges')
-      .select('id, exchange_number, gross_sales_price, closing_date, property_address, client_name')
-      .gte('closing_date', now.toISOString())
-      .lte('closing_date', next7Days.toISOString())
-      .not('gross_sales_price', 'is', null)
-      .order('gross_sales_price', { ascending: false });
+      .select('id, exchange_number, exchange_value, sale_date, name')
+      .gte('sale_date', now.toISOString())
+      .lte('sale_date', next7Days.toISOString())
+      .not('exchange_value', 'is', null)
+      .order('exchange_value', { ascending: false });
 
     if (incoming7Error) throw incoming7Error;
 
-    const incomingGross = incoming7Days.reduce((sum, ex) => sum + (parseFloat(ex.gross_sales_price) || 0), 0);
+    const incomingGross = incoming7Days.reduce((sum, ex) => sum + (parseFloat(ex.exchange_value) || 0), 0);
     const incomingNet = incomingGross * 0.6; // 60% of gross as specified
 
-    // 5. Outgoing Funds - Scheduled Closeouts, Closings, and EMDs - Next 7 Days
+    // 5. Outgoing Funds - Using exchange_value for active exchanges nearing completion
     const { data: outgoing7Days, error: outgoing7Error } = await supabase
       .from('exchanges')
-      .select('id, exchange_number, purchase_price, closing_date, emd_amount, status')
-      .gte('closing_date', now.toISOString())
-      .lte('closing_date', next7Days.toISOString())
-      .in('status', ['closing', 'closeout_scheduled', 'pending_emd'])
-      .not('purchase_price', 'is', null);
+      .select('id, exchange_number, exchange_value, exchange_deadline, status')
+      .gte('exchange_deadline', now.toISOString())
+      .lte('exchange_deadline', next7Days.toISOString())
+      .in('status', ['active', 'pending', 'completed'])
+      .not('exchange_value', 'is', null);
 
     if (outgoing7Error) throw outgoing7Error;
 
     const outgoingFunds = outgoing7Days.reduce((sum, ex) => {
-      const purchase = parseFloat(ex.purchase_price) || 0;
-      const emd = parseFloat(ex.emd_amount) || 0;
-      return sum + purchase + emd;
+      const exchangeValue = parseFloat(ex.exchange_value) || 0;
+      return sum + (exchangeValue * 0.8); // Estimate 80% of exchange value as outgoing funds
     }, 0);
 
     // 6. Three Largest Files Incoming in Next 30 Days
     const { data: largest30Days, error: largest30Error } = await supabase
       .from('exchanges')
-      .select('id, exchange_number, gross_sales_price, closing_date, property_address, client_name, coordinator_name')
-      .gte('closing_date', now.toISOString())
-      .lte('closing_date', next30Days.toISOString())
-      .not('gross_sales_price', 'is', null)
-      .order('gross_sales_price', { ascending: false })
+      .select('id, exchange_number, exchange_value, exchange_deadline, name')
+      .gte('exchange_deadline', now.toISOString())
+      .lte('exchange_deadline', next30Days.toISOString())
+      .not('exchange_value', 'is', null)
+      .order('exchange_value', { ascending: false })
       .limit(3);
 
     if (largest30Error) throw largest30Error;
@@ -99,12 +100,12 @@ router.get('/friday-metrics', authenticateToken, requireRole(['admin', 'coordina
     // Format the three largest files with proper exchange number format
     const largestFiles = largest30Days.map(ex => ({
       exchangeNumber: `E-${ex.exchange_number || ex.id}`,
-      grossSalesPrice: parseFloat(ex.gross_sales_price),
-      closingDate: ex.closing_date,
-      propertyAddress: ex.property_address,
-      clientName: ex.client_name,
-      coordinator: ex.coordinator_name,
-      daysUntilClosing: Math.ceil((new Date(ex.closing_date) - now) / (1000 * 60 * 60 * 24))
+      grossSalesPrice: parseFloat(ex.exchange_value),
+      closingDate: ex.exchange_deadline,
+      propertyAddress: 'N/A', // Not available in current schema
+      clientName: ex.name || 'N/A',
+      coordinator: 'N/A', // Not available in current schema
+      daysUntilClosing: Math.ceil((new Date(ex.exchange_deadline) - now) / (1000 * 60 * 60 * 24))
     }));
 
     // If database is empty but connected, return demo data
@@ -143,19 +144,19 @@ router.get('/friday-metrics', authenticateToken, requireRole(['admin', 'coordina
           numberOfDeals: incoming7Days.length,
           deals: incoming7Days.map(ex => ({
             exchangeNumber: `E-${ex.exchange_number || ex.id}`,
-            amount: parseFloat(ex.gross_sales_price),
-            closingDate: ex.closing_date,
-            propertyAddress: ex.property_address,
-            clientName: ex.client_name
+            amount: parseFloat(ex.exchange_value),
+            closingDate: ex.sale_date,
+            propertyAddress: 'N/A',
+            clientName: ex.name || 'N/A'
           }))
         },
         outgoingFunds: {
           total: outgoingFunds,
           numberOfTransactions: outgoing7Days.length,
           breakdown: {
-            closings: outgoing7Days.filter(ex => ex.status === 'closing').length,
-            closeouts: outgoing7Days.filter(ex => ex.status === 'closeout_scheduled').length,
-            emds: outgoing7Days.filter(ex => ex.status === 'pending_emd').length
+            closings: outgoing7Days.filter(ex => ex.status === 'completed').length,
+            closeouts: outgoing7Days.filter(ex => ex.status === 'active').length,
+            emds: outgoing7Days.filter(ex => ex.status === 'pending').length
           }
         }
       },
@@ -163,7 +164,7 @@ router.get('/friday-metrics', authenticateToken, requireRole(['admin', 'coordina
       summary: {
         netCashFlow7Days: incomingNet - outgoingFunds,
         totalActiveExchanges: mtdExchanges.length + (lastMonthExchanges?.length || 0),
-        requiresAttention: incoming7Days.filter(ex => !ex.gross_sales_price || ex.gross_sales_price === 0).length
+        requiresAttention: incoming7Days.filter(ex => !ex.exchange_value || ex.exchange_value === 0).length
       }
     };
 
