@@ -255,8 +255,54 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
   const [propertyAddressFilter, setPropertyAddressFilter] = useState('');
   const [showFilterChips, setShowFilterChips] = useState(false);
 
-  // View toggle state
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  // View toggle state with localStorage persistence
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
+    const saved = localStorage.getItem(`exchange_view_mode_${user?.id}`);
+    return (saved as 'grid' | 'table') || 'grid';
+  });
+
+  // Save view mode to localStorage
+  const handleViewModeChange = useCallback((mode: 'grid' | 'table') => {
+    setViewMode(mode);
+    localStorage.setItem(`exchange_view_mode_${user?.id}`, mode);
+  }, [user?.id]);
+
+  // Customizable field selection
+  const [selectedFields, setSelectedFields] = useState<string[]>(() => {
+    const saved = localStorage.getItem(`exchange_fields_${user?.id}`);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    return ['name', 'status', 'client', 'value', 'deadline45', 'created'];
+  });
+
+  const [showFieldSelector, setShowFieldSelector] = useState(false);
+
+  // Available fields for customization
+  const AVAILABLE_FIELDS = [
+    { key: 'name', label: 'Exchange Name', default: true },
+    { key: 'status', label: 'Status', default: true },
+    { key: 'client', label: 'Client', default: true },
+    { key: 'coordinator', label: 'Coordinator', default: false },
+    { key: 'value', label: 'Exchange Value', default: true },
+    { key: 'deadline45', label: '45-Day Deadline', default: true },
+    { key: 'deadline180', label: '180-Day Deadline', default: false },
+    { key: 'priority', label: 'Priority', default: false },
+    { key: 'tags', label: 'Tags', default: false },
+    { key: 'created', label: 'Created Date', default: true },
+    { key: 'propertyAddress', label: 'Property Address', default: false },
+    { key: 'escrowOfficer', label: 'Escrow Officer', default: false },
+    { key: 'notes', label: 'Comments', default: false },
+    { key: 'tasks', label: 'Task Count', default: false },
+    { key: 'proceeds', label: 'Proceeds', default: false },
+    { key: 'ppData', label: 'PP Details', default: false }
+  ];
+
+  // Save selected fields to localStorage
+  const saveSelectedFields = useCallback((fields: string[]) => {
+    setSelectedFields(fields);
+    localStorage.setItem(`exchange_fields_${user?.id}`, JSON.stringify(fields));
+  }, [user?.id]);
 
   // Memoize filter options
   const statusOptions = useMemo(() => [
@@ -287,7 +333,16 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
 
 
   // Memoize event handlers
-  const handleExchangeClick = useCallback((exchange: Exchange) => {
+  const handleExchangeClick = useCallback((exchange: Exchange, event?: React.MouseEvent) => {
+    // Check for new tab modifiers (Ctrl/Cmd+Click or Middle Click)
+    if (event && (event.ctrlKey || event.metaKey || event.button === 1)) {
+      event.preventDefault();
+      if (exchange.id) {
+        window.open(`/exchanges/${exchange.id}`, '_blank');
+      }
+      return;
+    }
+    
     if (onExchangeSelect) {
       onExchangeSelect(exchange);
     } else {
@@ -468,10 +523,22 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
             />
 
             <button
-              onClick={() => setViewMode(prev => prev === 'grid' ? 'table' : 'grid')}
+              onClick={() => handleViewModeChange(viewMode === 'grid' ? 'table' : 'grid')}
               className="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
             >
               {viewMode === 'grid' ? <Grid3X3 className="w-4 h-4" /> : <Table className="w-4 h-4" />}
+            </button>
+
+            <button
+              onClick={() => setShowFieldSelector(!showFieldSelector)}
+              className="inline-flex items-center gap-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+              title="Customize visible fields"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                  d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+              Fields
             </button>
 
             <button
@@ -484,6 +551,59 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
           </div>
 
           {/* Collapsible Advanced Filters */}
+          {/* Field Selector Modal */}
+          {showFieldSelector && (
+            <div className="border border-gray-200 rounded-lg p-4 mb-4 bg-white shadow-sm">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Customize Display Fields</h3>
+                <button
+                  onClick={() => setShowFieldSelector(false)}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {AVAILABLE_FIELDS.map(field => (
+                  <label key={field.key} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                    <input
+                      type="checkbox"
+                      checked={selectedFields.includes(field.key)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          saveSelectedFields([...selectedFields, field.key]);
+                        } else {
+                          saveSelectedFields(selectedFields.filter(f => f !== field.key));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">{field.label}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    const defaults = AVAILABLE_FIELDS.filter(f => f.default).map(f => f.key);
+                    saveSelectedFields(defaults);
+                  }}
+                  className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+                >
+                  Reset to Defaults
+                </button>
+                <button
+                  onClick={() => setShowFieldSelector(false)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          )}
+
           {showFilterChips && (
             <div className="border-t border-gray-200 pt-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -589,6 +709,29 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
         </div>
       )}
 
+      {/* Exchange Count & Pagination Info */}
+      {exchanges.length > 0 && (
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-3 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+            <div className="flex items-center gap-4">
+              <span className="text-gray-700">
+                Showing <span className="font-bold text-blue-700">{exchanges.length.toLocaleString()}</span> of <span className="font-bold text-blue-700">{(pagination?.total || exchanges.length).toLocaleString()}</span> exchanges
+              </span>
+              {hasActiveFilters && (
+                <span className="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full border border-blue-300">
+                  <Filter className="w-3 h-3" />
+                  Filtered
+                </span>
+              )}
+            </div>
+            {pagination && pagination.totalPages > 1 && (
+              <span className="text-gray-600 text-sm">
+                Page <span className="font-semibold">{pagination.currentPage}</span> of <span className="font-semibold">{pagination.totalPages}</span>
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Exchange Grid/Table */}
       {viewMode === 'grid' ? (
@@ -652,33 +795,33 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
                 <div
                   key={exchange.id}
                   className="border-b border-gray-200 p-4 hover:bg-gray-50 cursor-pointer flex items-center justify-between"
-                  onClick={() => handleExchangeClick(exchange)}
+                  onClick={(e) => handleExchangeClick(exchange, e)}
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {exchange.name || exchange.id}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {exchange.status}
-                      </p>
-                    </div>
-                    <div className="mt-1 flex items-center text-sm text-gray-500">
-                      <span>{exchange.client?.firstName} {exchange.client?.lastName}</span>
-                      {exchange.exchangeValue && (
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {exchange.name || exchange.id}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {exchange.status}
+                        </p>
+                      </div>
+                      <div className="mt-1 flex items-center text-sm text-gray-500">
+                        <span>{exchange.client?.firstName} {exchange.client?.lastName}</span>
+                        {exchange.exchangeValue && (
+                          <span className="ml-4">
+                            ${(exchange.exchangeValue / 1000000).toFixed(1)}M
+                          </span>
+                        )}
                         <span className="ml-4">
-                          ${(exchange.exchangeValue / 1000000).toFixed(1)}M
+                          {(exchange as any).lifecycle_stage || exchange.status || 'N/A'}
                         </span>
-                      )}
-                      <span className="ml-4">
-                        {(exchange as any).lifecycle_stage || exchange.status || 'N/A'}
-                      </span>
-                      <span className="ml-4 text-xs">
-                        #{index + 1}
-                      </span>
+                        <span className="ml-4 text-xs">
+                          #{index + 1}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
               )}
             />
           </div>
@@ -764,7 +907,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
         <div className="bg-white rounded-lg shadow border p-4">
           <div className="flex items-center justify-between">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <p className="text-sm text-gray-700">
+            <p className="text-sm text-gray-700">
                 Showing <span className="font-semibold">{exchanges.length.toLocaleString()}</span> of <span className="font-semibold">{(pagination?.total || exchanges.length).toLocaleString()}</span> exchanges
               </p>
               {hasActiveFilters && (
