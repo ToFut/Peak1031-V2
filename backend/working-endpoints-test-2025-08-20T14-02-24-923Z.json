@@ -1,0 +1,92 @@
+{
+  "passed": 1,
+  "failed": 8,
+  "total": 9,
+  "details": [
+    {
+      "endpoint": "/api/health",
+      "method": "GET",
+      "status": 200,
+      "success": true,
+      "response": {
+        "status": "healthy",
+        "api": "online",
+        "timestamp": "2025-08-20T14:02:24.017Z"
+      },
+      "error": null,
+      "timestamp": "2025-08-20T14:02:24.020Z"
+    },
+    {
+      "endpoint": "/api",
+      "method": "GET",
+      "status": 404,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 404",
+      "timestamp": "2025-08-20T14:02:24.024Z"
+    },
+    {
+      "endpoint": "/api/debug/users",
+      "method": "GET",
+      "status": 404,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 404",
+      "timestamp": "2025-08-20T14:02:24.026Z"
+    },
+    {
+      "endpoint": "/api/debug/token",
+      "method": "GET",
+      "status": 404,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 404",
+      "timestamp": "2025-08-20T14:02:24.027Z"
+    },
+    {
+      "endpoint": "/api/auth/login",
+      "method": "POST",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-20T14:02:24.857Z"
+    },
+    {
+      "endpoint": "/api/auth/logout",
+      "method": "POST",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-20T14:02:24.865Z"
+    },
+    {
+      "endpoint": "/api/contacts",
+      "method": "GET",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-20T14:02:24.870Z"
+    },
+    {
+      "endpoint": "/api/exchanges",
+      "method": "GET",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-20T14:02:24.873Z"
+    },
+    {
+      "endpoint": "/api/exchanges?page=1&limit=10",
+      "method": "GET",
+      "status": 401,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 401",
+      "timestamp": "2025-08-20T14:02:24.879Z"
+    }
+  ]
+}

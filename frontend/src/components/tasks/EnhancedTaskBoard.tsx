@@ -29,25 +29,15 @@ import {
   DocumentTextIcon,
   LightBulbIcon,
   EyeIcon,
-  FunnelIcon as FilterIcon
+  FunnelIcon as FilterIcon,
+  ArrowPathIcon as RotateCcwIcon
 } from '@heroicons/react/24/outline';
 import { useEnhancedTasks } from '../../hooks/useEnhancedTasks';
+import { Task as AppTask } from '../../types';
 import { SmartTaskCreationModal } from './SmartTaskCreationModal';
 import { TaskDetailModal } from './TaskDetailModal';
 
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority: 'critical' | 'high' | 'medium' | 'low';
-  category: string;
-  assigned_to?: string;
-  assignee_name?: string;
-  due_date?: string;
-  created_at: string;
-  metadata?: any;
-}
+type Task = AppTask;
 
 interface TaskColumn {
   id: string;
@@ -107,7 +97,8 @@ const TaskCard: React.FC<{
     general: ExclamationTriangleIcon
   };
 
-  const CategoryIcon = categoryIcons[task.category] || ExclamationTriangleIcon;
+  const categoryKey = (task.category || 'general') as keyof typeof categoryIcons;
+  const CategoryIcon = categoryIcons[categoryKey] || ExclamationTriangleIcon;
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'completed';
   const hasAutoActions = task.metadata?.auto_actions?.length > 0;
 
@@ -116,6 +107,9 @@ const TaskCard: React.FC<{
     ? `${task.title.substring(0, 50)}...` 
     : task.title;
 
+  // Normalize priority to match our color map keys
+  const priorityKey = (task.priority ? String(task.priority).toLowerCase() : '') as keyof typeof priorityColors;
+
   return (
     <div
       ref={setNodeRef}
@@ -123,7 +117,7 @@ const TaskCard: React.FC<{
       {...attributes}
       {...listeners}
       className={`bg-white rounded-lg border-l-4 shadow-sm hover:shadow-lg transition-all duration-200 cursor-grab active:cursor-grabbing group ${
-        priorityColors[task.priority] || 'border-l-gray-300 bg-gray-50'
+        priorityColors[priorityKey] || 'border-l-gray-300 bg-gray-50'
       } ${isOverdue ? 'ring-2 ring-red-400 ring-opacity-50' : ''} ${
         compact ? 'p-3' : 'p-4'
       }`}
@@ -133,12 +127,12 @@ const TaskCard: React.FC<{
         <div className="flex items-center space-x-2 min-w-0 flex-1">
           <CategoryIcon className={`${compact ? 'h-3 w-3' : 'h-4 w-4'} text-gray-500 flex-shrink-0`} />
           <span className={`px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0 ${
-            task.priority === 'critical' ? 'bg-red-100 text-red-800' :
-            task.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-            task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+            priorityKey === 'critical' ? 'bg-red-100 text-red-800' :
+            priorityKey === 'high' ? 'bg-orange-100 text-orange-800' :
+            priorityKey === 'medium' ? 'bg-yellow-100 text-yellow-800' :
             'bg-green-100 text-green-800'
           }`}>
-            {compact ? task.priority[0].toUpperCase() : task.priority}
+            {compact ? (priorityKey[0]?.toUpperCase() || '') : (priorityKey || '')}
           </span>
         </div>
         
@@ -184,43 +178,76 @@ const TaskCard: React.FC<{
       )}
 
       {/* Footer Info */}
-      <div className={`flex items-center justify-between text-gray-500 ${compact ? 'text-xs' : 'text-xs'}`}>
-        <div className="flex items-center space-x-2 min-w-0 flex-1">
-          {task.assignee_name && !compact && (
-            <div className="flex items-center space-x-1">
-              <UserIcon className="h-3 w-3 flex-shrink-0" />
-              <span className="truncate">{task.assignee_name}</span>
-            </div>
-          )}
-          
-          {task.due_date && (
-            <div className={`flex items-center space-x-1 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
-              <ClockIcon className="h-3 w-3 flex-shrink-0" />
-              <span>
-                {compact 
-                  ? new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                  : new Date(task.due_date).toLocaleDateString()
-                }
-                {isOverdue && !compact && ' (Overdue)'}
-              </span>
-            </div>
-          )}
+      <div className={`space-y-1 text-gray-500 ${compact ? 'text-xs' : 'text-xs'}`}>
+        {/* Due Date */}
+        {task.due_date && (
+          <div className={`flex items-center space-x-1 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
+            <ClockIcon className="h-3 w-3 flex-shrink-0" />
+            <span>
+              Due {compact 
+                ? new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : new Date(task.due_date).toLocaleDateString()
+              }
+              {isOverdue && <span className="font-medium ml-1">(Overdue)</span>}
+            </span>
+          </div>
+        )}
+        
+        {/* Assignee */}
+        <div className="flex items-center space-x-1">
+          <UserIcon className="h-3 w-3 flex-shrink-0" />
+          <span className="truncate font-medium">
+            {task.assignee_name || 
+             (task.assignee?.first_name || task.assignee?.last_name ? `${task.assignee.first_name || ''} ${task.assignee.last_name || ''}`.trim() : '') ||
+             (task.assignedUser?.firstName || task.assignedUser?.lastName ? `${task.assignedUser.firstName || ''} ${task.assignedUser.lastName || ''}`.trim() : '') ||
+             'Unassigned'}
+          </span>
         </div>
+
+        {/* Exchange - only show if not compact */}
+        {!compact && (
+          <div className="flex items-center space-x-1 text-blue-600">
+            <DocumentTextIcon className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate text-xs">
+              {(task.exchange as any)?.exchange_number || (task.exchange as any)?.name || `Exchange ${(task as any).exchange_id || task.exchangeId || 'Unknown'}`}
+            </span>
+          </div>
+        )}
 
         {/* AI indicator */}
         {task.metadata?.confidence_score && (
-          <div className="flex items-center space-x-1 flex-shrink-0">
-            <SparklesIcon className="h-3 w-3 text-blue-500" />
-            <span className="text-xs text-blue-600">
-              {Math.round(task.metadata.confidence_score * 100)}%
+          <div className="flex items-center space-x-1 text-blue-500 mt-1">
+            <SparklesIcon className="h-3 w-3" />
+            <span className="text-xs">
+              AI: {Math.round(task.metadata.confidence_score * 100)}%
             </span>
           </div>
         )}
       </div>
 
-      {/* Quick Complete Button - only visible on hover */}
+      {/* Quick Actions - visible on hover */}
       {task.status !== 'completed' && (
-        <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity space-y-2">
+          {/* Rollover Button - shown for tasks with due dates */}
+          {task.due_date && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onQuickAction?.(task, 'rollover');
+              }}
+              className={`w-full py-1.5 px-2 text-xs rounded transition-colors flex items-center justify-center space-x-1 border ${
+                isOverdue 
+                  ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200 animate-pulse' 
+                  : 'bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200'
+              }`}
+              title={isOverdue ? "Rollover overdue task to today" : "Rollover task to today"}
+            >
+              <RotateCcwIcon className="h-3 w-3" />
+              <span className="font-medium">Rollover to Today</span>
+            </button>
+          )}
+          
+          {/* Complete Button */}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -381,6 +408,22 @@ export const EnhancedTaskBoard: React.FC<EnhancedTaskBoardProps> = ({
           });
         } catch (error) {
           console.error('Failed to complete task:', error);
+        }
+        break;
+      case 'rollover':
+        try {
+          // Rollover task to today
+          await updateTask(task.id, {
+            due_date: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
+            metadata: {
+              ...task.metadata,
+              rolled_over: true,
+              roll_over_date: new Date().toISOString(),
+              original_due_date: task.due_date
+            }
+          });
+        } catch (error) {
+          console.error('Failed to rollover task:', error);
         }
         break;
       case 'view':

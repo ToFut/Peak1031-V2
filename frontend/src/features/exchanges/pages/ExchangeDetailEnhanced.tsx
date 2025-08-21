@@ -6,6 +6,7 @@ import { apiService } from '../../../services/api';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { useSocket } from '../../../hooks/useSocket';
 import Layout from '../../../components/Layout';
+import { formatExchangeNumber, getExchangeDisplayName } from '../../../utils/exchangeFormatters';
 import UnifiedChatInterface from '../../messages/components/UnifiedChatInterface';
 import { ExchangeDocuments } from '../components/ExchangeDocuments';
 import { ExchangeUserManagement } from '../../../components/admin/ExchangeUserManagement';
@@ -32,15 +33,18 @@ import {
   Gauge,
   Settings,
   UserPlus,
-  X
+  X,
+  ExternalLink
 } from 'lucide-react';
 
 // Tab Components
 import { ExchangeOverview } from '../components/ExchangeOverview';
+import { ExchangeTimeline } from '../components/ExchangeTimeline';
 import { ModernTaskUI } from '../../tasks/components/ModernTaskUI';
 import TaskCreateModal from '../../tasks/components/TaskCreateModal';
 import EnhancedInvitationManager from '../components/EnhancedInvitationManager';
-import { DocumentUploader } from '../../../components/shared';
+import { EnhancedDocumentUploader } from '../../../components/shared/EnhancedDocumentUploader';
+import { ExchangeQuickActions } from '../components/ExchangeQuickActions';
 
 interface TabProps {
   exchange: Exchange;
@@ -519,7 +523,7 @@ const KeyMetrics: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
     },
     {
       label: 'Progress',
-      value: exchange.progress || getFieldValue('completionPercentage') || 0,
+      value: exchange?.progress || 0,
       type: 'percentage',
       icon: Gauge,
       color: 'text-blue-600',
@@ -765,6 +769,44 @@ const ExchangeDetailEnhanced: React.FC = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showUserManagement, setShowUserManagement] = useState(false);
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
+  
+  // Calculate exchange progress based on timeline
+  const calculateExchangeProgress = (exchange: Exchange | null): number => {
+    if (!exchange) return 0;
+    
+    // Check if completed
+    const status = exchange.status as string;
+    if (status === 'COMPLETED' || status === 'Completed' || status === 'CLOSED') {
+      return 100;
+    }
+    
+    // If there's a stored progress value, use it
+    if (exchange.progress !== undefined && exchange.progress !== null) {
+      return exchange.progress;
+    }
+    
+    // Otherwise, calculate timeline-based progress
+    const today = new Date();
+    const startDate = new Date(exchange.startDate || exchange.createdAt || '');
+    const deadline180 = new Date(exchange.completionDeadline || exchange.exchangeDeadline || '');
+    
+    if (!exchange.completionDeadline && !exchange.exchangeDeadline) {
+      return 0; // No deadline means we can't calculate progress
+    }
+    
+    // For overdue exchanges, still show actual progress, not 100%
+    // This helps distinguish between overdue and completed
+    const totalDays = Math.abs(deadline180.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+    const daysElapsed = Math.abs(today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+    
+    // Cap at 99% for overdue exchanges that aren't marked complete
+    if (today > deadline180) {
+      return Math.min(99, Math.round((daysElapsed / totalDays) * 100));
+    }
+    
+    const calculatedProgress = Math.min((daysElapsed / totalDays) * 100, 100);
+    return Math.round(calculatedProgress);
+  };
   
   // Define functions before using them in useEffect
   const loadDocuments = useCallback(async () => {
@@ -1157,6 +1199,16 @@ const ExchangeDetailEnhanced: React.FC = () => {
               <div className="flex items-center gap-3">
                 <StatusIndicator status={exchange.status} daysRemaining={daysUntilClosing || undefined} />
                 
+                {/* Open in New Tab Button */}
+                <button
+                  onClick={() => window.open(`/exchanges/${exchange.id}`, '_blank')}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm"
+                  title="Open this exchange in a new tab"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span className="hidden sm:inline">Open in New Tab</span>
+                </button>
+
                 {/* Manage Users Button - Only visible to admin/coordinator */}
                 {(isAdmin() || isCoordinator()) && (
                   <button
@@ -1177,9 +1229,31 @@ const ExchangeDetailEnhanced: React.FC = () => {
             
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                  {exchange.name || `Exchange #${exchange.exchangeNumber}`}
-                </h1>
+                {/* Prominent Exchange Number Display */}
+                <div className="flex items-start gap-4 mb-3">
+                  <div className={`text-white px-4 py-2 rounded-lg ${
+                    ((exchange.status as string) === 'COMPLETED' || (exchange.status as string) === 'Completed') 
+                      ? 'bg-green-600' 
+                      : calculateExchangeProgress(exchange) === 100
+                      ? 'bg-red-600'
+                      : 'bg-blue-600'
+                  }`}>
+                    <span className="text-2xl font-bold">
+                      {((exchange.status as string) === 'COMPLETED' || (exchange.status as string) === 'Completed') && '✓ '}
+                      {formatExchangeNumber(exchange.exchangeNumber || exchange.id)}
+                    </span>
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">
+                      {exchange.name || getExchangeDisplayName(exchange)}
+                    </h1>
+                    <p className="text-sm text-gray-500">
+                      {((exchange.status as string) === 'COMPLETED' || (exchange.status as string) === 'Completed') && 'Completed Exchange • '}
+                      {calculateExchangeProgress(exchange) === 100 && (exchange.status as string) !== 'COMPLETED' && (exchange.status as string) !== 'Completed' && 'Overdue Exchange • '}
+                      Exchange ID: {exchange.id}
+                    </p>
+                  </div>
+                </div>
                 
                 <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-4">
                   {/* Google-style Participant Display */}
@@ -1208,14 +1282,26 @@ const ExchangeDetailEnhanced: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Simple Progress Bar */}
-                <div className="bg-gray-100 rounded-full h-2 mb-2">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${exchange.progress || 0}%` }}
-                  ></div>
+                {/* Progress indicator */}
+                <div className="mt-2">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          ((exchange.status as string) === 'COMPLETED' || (exchange.status as string) === 'Completed')
+                            ? 'bg-green-600'
+                            : calculateExchangeProgress(exchange) >= 99
+                            ? 'bg-red-600'
+                            : 'bg-blue-600'
+                        }`}
+                        style={{ width: `${calculateExchangeProgress(exchange)}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-sm text-gray-600 font-medium">
+                      {calculateExchangeProgress(exchange)}%
+                    </span>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-600">{exchange.progress || 0}% complete</p>
               </div>
             </div>
           </div>
@@ -1230,9 +1316,19 @@ const ExchangeDetailEnhanced: React.FC = () => {
               <p className="text-lg font-semibold text-gray-900">
                 {(() => {
                   const days = getDaysUntil(exchange.identificationDeadline);
-                  return days === null ? 'N/A' : days < 0 ? 'Overdue' : `${days} days`;
+                  return days === null ? 'N/A' : days < 0 ? `Overdue ${Math.abs(days)} days` : `${days} days`;
                 })()}
               </p>
+              {exchange.identificationDeadline && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {new Date(exchange.identificationDeadline).toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </p>
+              )}
             </div>
 
             <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -1243,9 +1339,19 @@ const ExchangeDetailEnhanced: React.FC = () => {
               <p className="text-lg font-semibold text-gray-900">
                 {(() => {
                   const days = getDaysUntil(exchange.completionDeadline);
-                  return days === null ? 'N/A' : days < 0 ? 'Overdue' : `${days} days`;
+                  return days === null ? 'N/A' : days < 0 ? `Overdue ${Math.abs(days)} days` : `${days} days`;
                 })()}
               </p>
+              {exchange.completionDeadline && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {new Date(exchange.completionDeadline).toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </p>
+              )}
             </div>
 
             <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -1271,9 +1377,31 @@ const ExchangeDetailEnhanced: React.FC = () => {
                 <span className="text-sm text-gray-600">Progress</span>
                 <Gauge className="w-4 h-4 text-blue-600" />
               </div>
-              <p className="text-lg font-semibold text-gray-900">{exchange.progress || 0}%</p>
+              <p className="text-lg font-semibold text-gray-900">{calculateExchangeProgress(exchange)}%</p>
             </div>
           </div>
+
+          {/* Full Timeline Display */}
+          <div className="mb-6">
+            <ExchangeTimeline
+              startDate={exchange.startDate || exchange.createdAt}
+              identificationDeadline={exchange.identificationDeadline}
+              completionDeadline={exchange.completionDeadline || exchange.exchangeDeadline}
+              status={exchange.status}
+              compact={false}
+            />
+          </div>
+
+          {/* Quick Actions - Context-aware buttons based on status */}
+          {exchange.status !== 'COMPLETED' && exchange.status !== 'Completed' && (
+            <ExchangeQuickActions
+              exchange={exchange}
+              participants={participants}
+              onRefresh={loadExchange}
+              onShowUpload={() => setShowUploadModal(true)}
+              onCreateTask={() => setShowCreateTaskModal(true)}
+            />
+          )}
 
           {/* Simplified Information Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1425,9 +1553,10 @@ const ExchangeDetailEnhanced: React.FC = () => {
                           ✕
                         </button>
                       </div>
-                      <DocumentUploader 
+                      <EnhancedDocumentUploader 
                         exchangeId={exchange.id}
                         onUploadSuccess={handleDocumentUploadSuccess}
+                        showPinProtection={true}
                       />
                     </div>
                   </div>

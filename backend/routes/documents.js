@@ -109,28 +109,35 @@ router.get('/', authenticateToken, async (req, res) => {
     
     const { page = 1, limit = 20, search, category, exchangeId, pinRequired, sortBy = 'created_at', sortOrder = 'DESC' } = req.query;
     
-    // First get the exchanges the user can access
-    const userExchanges = await rbacService.getExchangesForUser(req.user, {
-      includeParticipant: true
-    });
+    let allowedExchangeIds = [];
     
-    const allowedExchangeIds = userExchanges.data.map(e => e.id);
-    
-    console.log(`📊 RBAC Result for ${req.user.role} user ${req.user.email}:`);
-    console.log(`   - User exchanges found: ${userExchanges.data.length}`);
-    console.log(`   - Allowed exchange IDs: [${allowedExchangeIds.join(', ')}]`);
-    
-    if (allowedExchangeIds.length === 0 && req.user.role !== 'admin') {
-      // User has no assigned exchanges
-      return res.json({
-        data: [],
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total: 0,
-          totalPages: 0
-        }
+    // Skip expensive RBAC loading for admin users since they have access to everything
+    if (req.user.role !== 'admin') {
+      // First get the exchanges the user can access
+      const userExchanges = await rbacService.getExchangesForUser(req.user, {
+        includeParticipant: true
       });
+      
+      allowedExchangeIds = userExchanges.data.map(e => e.id);
+      
+      console.log(`📊 RBAC Result for ${req.user.role} user ${req.user.email}:`);
+      console.log(`   - User exchanges found: ${userExchanges.data.length}`);
+      console.log(`   - Allowed exchange IDs: [${allowedExchangeIds.join(', ')}]`);
+      
+      if (allowedExchangeIds.length === 0) {
+        // User has no assigned exchanges
+        return res.json({
+          data: [],
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: 0,
+            totalPages: 0
+          }
+        });
+      }
+    } else {
+      console.log(`📊 Admin user ${req.user.email} - skipping RBAC exchange loading for performance`);
     }
     
     let query = supabase.from('documents').select('*', { count: 'exact' });
@@ -206,6 +213,183 @@ router.get('/', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error in GET /documents:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get document statistics
+router.get('/stats', authenticateToken, async (req, res) => {
+  try {
+    console.log('📊 DOCUMENTS STATS: Getting statistics for', req.user?.email, 'Role:', req.user?.role);
+    
+    let allowedExchangeIds = [];
+    
+    // Skip expensive RBAC loading for admin users since they have access to everything
+    if (req.user.role !== 'admin') {
+      // Get user's accessible exchanges
+      const userExchanges = await rbacService.getExchangesForUser(req.user, {
+        includeParticipant: true
+      });
+      
+      allowedExchangeIds = userExchanges.data.map(e => e.id);
+      
+      if (allowedExchangeIds.length === 0) {
+        return res.json({
+          totalDocuments: 0,
+          totalFolders: 0,
+          totalCategories: 0,
+          recentDocuments: 0
+        });
+      }
+    } else {
+      console.log(`📊 Admin user ${req.user.email} - skipping RBAC exchange loading for stats performance`);
+    }
+
+    // Get document counts
+    let documentsQuery = supabase
+      .from('documents')
+      .select('id, created_at, category', { count: 'exact' });
+
+    if (req.user.role !== 'admin') {
+      documentsQuery = documentsQuery.in('exchange_id', allowedExchangeIds);
+    }
+
+    const { count: totalDocuments, error: docsError } = await documentsQuery;
+    
+    if (docsError) throw docsError;
+
+    // Get recent documents (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    let recentQuery = supabase
+      .from('documents')
+      .select('id', { count: 'exact' })
+      .gte('created_at', sevenDaysAgo.toISOString());
+
+    if (req.user.role !== 'admin') {
+      recentQuery = recentQuery.in('exchange_id', allowedExchangeIds);
+    }
+
+    const { count: recentDocuments, error: recentError } = await recentQuery;
+    
+    if (recentError) throw recentError;
+
+    // Get unique categories
+    let categoriesQuery = supabase
+      .from('documents')
+      .select('category');
+
+    if (req.user.role !== 'admin') {
+      categoriesQuery = categoriesQuery.in('exchange_id', allowedExchangeIds);
+    }
+
+    const { data: categories, error: catError } = await categoriesQuery;
+    
+    if (catError) throw catError;
+
+    const uniqueCategories = new Set(categories?.map(doc => doc.category).filter(Boolean) || []);
+
+    // Get folder count (if folders table exists)
+    let totalFolders = 0;
+    try {
+      const { count: folderCount, error: folderError } = await supabase
+        .from('folders')
+        .select('id', { count: 'exact' });
+      
+      if (!folderError && folderCount !== null) {
+        totalFolders = folderCount;
+      }
+    } catch (error) {
+      console.log('Folders table not available, using 0');
+    }
+
+    res.json({
+      totalDocuments: totalDocuments || 0,
+      totalFolders: totalFolders,
+      totalCategories: uniqueCategories.size,
+      recentDocuments: recentDocuments || 0
+    });
+  } catch (error) {
+    console.error('Error getting document stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get document statistics for specific exchange
+router.get('/exchange/:exchangeId/stats', authenticateToken, async (req, res) => {
+  try {
+    const { exchangeId } = req.params;
+    console.log('📊 EXCHANGE DOCUMENTS STATS: Getting statistics for exchange', exchangeId, 'User:', req.user?.email);
+    
+    // Verify user has access to this exchange (optimize for admin users)
+    if (req.user.role !== 'admin') {
+      const userExchanges = await rbacService.getExchangesForUser(req.user, {
+        includeParticipant: true
+      });
+      
+      const allowedExchangeIds = userExchanges.data.map(e => e.id);
+      
+      if (!allowedExchangeIds.includes(exchangeId)) {
+        return res.status(403).json({ error: 'Access denied to this exchange' });
+      }
+    } else {
+      console.log(`📊 Admin user ${req.user.email} - skipping RBAC check for exchange ${exchangeId} stats`);
+    }
+
+    // Get document counts for this exchange
+    const { count: totalDocuments, error: docsError } = await supabase
+      .from('documents')
+      .select('id, created_at, category', { count: 'exact' })
+      .eq('exchange_id', exchangeId);
+    
+    if (docsError) throw docsError;
+
+    // Get recent documents (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const { count: recentDocuments, error: recentError } = await supabase
+      .from('documents')
+      .select('id', { count: 'exact' })
+      .eq('exchange_id', exchangeId)
+      .gte('created_at', sevenDaysAgo.toISOString());
+    
+    if (recentError) throw recentError;
+
+    // Get unique categories for this exchange
+    const { data: categories, error: catError } = await supabase
+      .from('documents')
+      .select('category')
+      .eq('exchange_id', exchangeId);
+    
+    if (catError) throw catError;
+
+    const uniqueCategories = new Set(categories?.map(doc => doc.category).filter(Boolean) || []);
+
+    // Get folder count for this exchange
+    let totalFolders = 0;
+    try {
+      const { count: folderCount, error: folderError } = await supabase
+        .from('folders')
+        .select('id', { count: 'exact' })
+        .eq('exchange_id', exchangeId);
+      
+      if (!folderError && folderCount !== null) {
+        totalFolders = folderCount;
+      }
+    } catch (error) {
+      console.log('Folders table not available, using 0');
+    }
+
+    res.json({
+      totalDocuments: totalDocuments || 0,
+      totalFolders: totalFolders,
+      totalCategories: uniqueCategories.size,
+      recentDocuments: recentDocuments || 0
+    });
+  } catch (error) {
+    console.error('Error getting exchange document stats:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -337,16 +521,50 @@ router.get('/exchange/:exchangeId', authenticateToken, requireExchangePermission
 });
 
 // Upload document
-router.post('/', authenticateToken, requireExchangePermission('upload_documents'), upload.single('file'), async (req, res) => {
+router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
   try {
+    console.log('📤 DOCUMENT UPLOAD REQUEST:', {
+      user: req.user?.email,
+      role: req.user?.role,
+      hasFile: !!req.file,
+      fileName: req.file?.originalname,
+      bodyKeys: Object.keys(req.body),
+      exchangeId: req.body.exchangeId,
+      category: req.body.category
+    });
+
     if (!req.file) {
+      console.log('❌ DOCUMENT UPLOAD: No file in request');
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
     const { exchangeId, category, description, pinRequired, pin, folderId } = req.body;
     
     if (!exchangeId) {
+      console.log('❌ DOCUMENT UPLOAD: No exchangeId provided');
       return res.status(400).json({ error: 'Exchange ID is required' });
+    }
+
+    // Check exchange permission manually after file parsing
+    const rbacService = require('../services/rbacService');
+    const hasAccess = await rbacService.canUserAccessExchange(req.user, exchangeId);
+    if (!hasAccess) {
+      console.log(`❌ DOCUMENT UPLOAD: Access denied for ${req.user.role} user ${req.user.email} to exchange ${exchangeId}`);
+      return res.status(403).json({
+        error: 'Insufficient permissions',
+        code: 'PERMISSION_DENIED',
+        message: 'You do not have permission to upload documents to this exchange'
+      });
+    }
+
+    const hasUploadPermission = await rbacService.checkExchangePermission(req.user, exchangeId, 'can_upload_documents');
+    if (!hasUploadPermission && req.user.role !== 'admin') {
+      console.log(`❌ DOCUMENT UPLOAD: Upload permission denied for ${req.user.role} user ${req.user.email} on exchange ${exchangeId}`);
+      return res.status(403).json({
+        error: 'Insufficient permissions',
+        code: 'PERMISSION_DENIED',
+        message: 'You do not have permission to upload documents to this exchange'
+      });
     }
 
     // Generate unique filename

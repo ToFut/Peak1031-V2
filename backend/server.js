@@ -41,6 +41,7 @@ const exchangeParticipantsRoutes = require('./routes/exchange-participants');
 const templateManagementRoutes = require('./routes/template-management');
 const adminGPTRoutes = require('./routes/admin-gpt');
 const reportsRoutes = require('./routes/reports');
+const mobileReportsRoutes = require('./routes/mobile-reports');
 const enhancedQueryRoutes = require('./routes/enhanced-query');
 const ppTokenAdminRoutes = require('./routes/pp-token-admin');
 const ppDataRoutes = require('./routes/pp-data-api');
@@ -56,6 +57,7 @@ const settingsRoutes = require('./routes/settings');
 const userProfileRoutes = require('./routes/user-profile');
 const performanceRoutes = require('./routes/performance');
 const agencyRoutes = require('./routes/agencies');
+const metricsRoutes = require('./routes/metrics');
 
 // Enterprise routes
 const enterpriseExchangesRoutes = require('./routes/enterprise-exchanges');
@@ -68,6 +70,9 @@ const auditLogsRoutes = require('./routes/audit-logs');
 // Import services
 const MessageService = require('./services/messages');
 const AuditService = require('./services/audit');
+
+// Import task rollover cron job
+const { initializeTaskRollover } = require('./cronJobs/taskRollover');
 
 class PeakServer {
   constructor() {
@@ -316,6 +321,7 @@ class PeakServer {
     this.app.use('/api/templates', templateManagementRoutes);
     this.app.use('/api/admin-gpt', adminGPTRoutes);
     this.app.use('/api/reports', reportsRoutes);
+    this.app.use('/api/mobile-reports', mobileReportsRoutes);
     this.app.use('/api/enhanced-query', enhancedQueryRoutes);
     this.app.use('/api/pp-token-admin', ppTokenAdminRoutes);
     this.app.use('/api/pp-data', ppDataRoutes);
@@ -328,6 +334,7 @@ class PeakServer {
     
     this.app.use('/api/dashboard', dashboardRoutes);
     this.app.use('/api/analytics', analyticsRoutes);
+    this.app.use('/api/metrics', metricsRoutes);
     this.app.use('/api/settings', settingsRoutes);
     this.app.use('/api/user-profile', userProfileRoutes);
     this.app.use('/api/agencies', agencyRoutes);
@@ -707,6 +714,17 @@ class PeakServer {
           }
         } catch (error) {
           console.error('⚠️ Failed to start scheduled sync:', error.message);
+        }
+        
+        // Initialize task rollover cron job
+        try {
+          // Make Socket.IO globally available for task rollover notifications
+          global.io = this.io;
+          
+          initializeTaskRollover();
+          console.log('✅ Task rollover cron job initialized');
+        } catch (error) {
+          console.error('⚠️ Failed to initialize task rollover:', error.message);
         }
       });
 

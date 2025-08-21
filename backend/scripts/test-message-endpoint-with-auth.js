@@ -64,3 +64,5 @@ async function testMessageEndpointWithAuth() {
 
 // Run the test
 testMessageEndpointWithAuth().catch(console.error);
+
+

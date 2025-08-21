@@ -66,7 +66,12 @@ app.use('/api/messages', require('./routes/messages'));
 app.use('/api/sync', require('./routes/sync'));
 app.use('/api/oauth', require('./routes/oauth'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/metrics', require('./routes/metrics'));
+app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/mobile-reports', require('./routes/mobile-reports'));
 app.use('/api/user-audit', require('./routes/user-audit'));
+app.use('/api/security-audit', require('./routes/security-audit'));
+app.use('/api', require('./routes/exchangePermissions'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

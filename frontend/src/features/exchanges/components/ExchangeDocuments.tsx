@@ -14,6 +14,7 @@ import {
   User,
   ChevronDown
 } from 'lucide-react';
+import { EnhancedDocumentUploader } from '../../../components/shared/EnhancedDocumentUploader';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
 import { usePermissions } from '../../../hooks/usePermissions';
@@ -183,13 +184,13 @@ export const ExchangeDocuments: React.FC<ExchangeDocumentsProps> = ({
                 <span>Generate from Template</span>
               </button>
             )}
-            <button
-              onClick={onUploadClick}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              <Upload className="w-4 h-4" />
-              <span>Upload Document</span>
-            </button>
+            <EnhancedDocumentUploader
+              exchangeId={exchangeId}
+              onUploadSuccess={onRefresh}
+              compact={true}
+              showPinProtection={true}
+              className="inline-flex"
+            />
           </div>
         </div>
       </div>

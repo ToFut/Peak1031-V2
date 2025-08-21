@@ -121,6 +121,9 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
 
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Debug: Check if we're on problematic pages
+  const isProblematicPage = location.pathname === '/settings' || location.pathname === '/reports';
 
   const [sidebarOpen, setSidebarOpen] = useState(true); // Start open by default
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -144,6 +147,14 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved ? JSON.parse(saved) : false;
+  });
+
+  // Debug: Log layout state
+  console.log('🔍 Layout Debug:', {
+    pathname: location.pathname,
+    isProblematicPage,
+    sidebarOpen,
+    isDesktopSidebarCollapsed
   });
 
   // Save sidebar collapsed state to localStorage
@@ -535,12 +546,18 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
         />
       )}
 
-      {/* Sidebar - Fixed and non-scrollable */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-white shadow-xl transform transition-all duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:flex-shrink-0 border-r border-gray-200 ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-      } ${
-        isDesktopSidebarCollapsed ? 'lg:w-16' : 'lg:w-64'
-      }`}>
+      {/* Sidebar - Simplified positioning */}
+      <div 
+        id="main-sidebar"
+        data-testid="main-sidebar"
+        className={`
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          ${isDesktopSidebarCollapsed ? 'lg:w-16' : 'lg:w-64'}
+          fixed inset-y-0 left-0 z-50 w-72 sm:w-80 
+          lg:sticky lg:top-0 lg:left-auto lg:z-auto lg:h-screen 
+          bg-white shadow-xl transform transition-all duration-300 ease-in-out 
+          lg:flex-shrink-0 border-r border-gray-200
+        `}>
         {/* Sidebar Header */}
         <div className="flex items-center justify-between h-16 px-3 sm:px-4 border-b border-gray-200 bg-white">
           <div className="flex items-center min-w-0 flex-1">
@@ -608,7 +625,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
         </DelayedTooltipWrapper>
 
         {/* Navigation */}
-        <nav className="flex-1 px-2 sm:px-4 py-4 sm:py-6 overflow-y-auto lg:overflow-y-visible">
+        <nav className="flex-1 px-2 sm:px-4 py-4 sm:py-6 overflow-y-auto">
           <div className="space-y-1 sm:space-y-2">
             {getNavigation().map((item) => {
               const Icon = isCurrentPath(item.href) ? item.iconSolid : item.icon;
@@ -740,9 +757,7 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
       </div>
 
       {/* Main content */}
-      <div className={`flex-1 min-w-0 transition-all duration-300 ease-in-out ${
-        isDesktopSidebarCollapsed ? 'lg:ml-16' : 'lg:ml-0'
-      }`}>
+      <div className={`flex-1 min-w-0 transition-all duration-300 ease-in-out`}>
         {/* Top navigation */}
         <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
           <div className="flex justify-between items-center px-3 sm:px-6 py-3 sm:py-4 min-h-[56px] sm:min-h-[64px]">

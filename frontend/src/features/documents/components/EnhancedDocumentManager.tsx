@@ -31,7 +31,7 @@ import {
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
 import { usePermissions } from '../../../hooks/usePermissions';
-import { DocumentUploader } from '../../../components/shared';
+import { EnhancedDocumentUploader } from '../../../components/shared/EnhancedDocumentUploader';
 import { SearchableDropdown } from '../../../components/ui/SearchableDropdown';
 
 interface DocumentVersion {
@@ -467,12 +467,13 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
               )}
               Folders
             </button>
-            <DocumentUploader
+            <EnhancedDocumentUploader
               exchangeId={selectedExchangeId || exchangeId}
               onUploadSuccess={() => {
                 loadDocuments(); // Refresh the document list
               }}
               compact={true}
+              showPinProtection={true}
             />
           </div>
         </div>

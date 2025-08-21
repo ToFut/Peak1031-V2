@@ -38,3 +38,5 @@ console.log('🧪 Testing URL:', testUrl);
 
 // Note: This would need to be run in the browser context to actually test the connection
 console.log('✅ Configuration test complete');
+
+

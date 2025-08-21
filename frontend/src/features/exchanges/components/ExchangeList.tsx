@@ -147,6 +147,61 @@ const ExchangeStats: React.FC<{ exchanges: Exchange[]; total?: number }> = React
 
 ExchangeStats.displayName = 'ExchangeStats';
 
+// Timeline Badge Component
+const getTimelineBadge = (exchange: Exchange) => {
+  const { timelineStatus, days_remaining } = exchange as any;
+  
+  if (!timelineStatus) return null;
+
+  let text = '';
+  let icon = <Clock className="h-3 w-3" />;
+  let colorClass = 'bg-gray-100 text-gray-800';
+
+  switch (timelineStatus) {
+    case 'OVERDUE_45':
+      text = 'Overdue 45-Day';
+      icon = <AlertTriangle className="h-3 w-3" />;
+      colorClass = 'bg-red-100 text-red-800';
+      break;
+    case 'OVERDUE_180':
+      text = 'Overdue 180-Day';
+      icon = <AlertTriangle className="h-3 w-3" />;
+      colorClass = 'bg-red-100 text-red-800';
+      break;
+    case 'CRITICAL_45':
+      text = `${days_remaining || 0} days to 45-Day`;
+      colorClass = 'bg-red-100 text-red-800';
+      break;
+    case 'CRITICAL_180':
+      text = `${days_remaining || 0} days to 180-Day`;
+      colorClass = 'bg-red-100 text-red-800';
+      break;
+    case 'WARNING_45':
+      text = `${days_remaining || 0} days to 45-Day`;
+      colorClass = 'bg-yellow-100 text-yellow-800';
+      break;
+    case 'WARNING_180':
+      text = `${days_remaining || 0} days to 180-Day`;
+      colorClass = 'bg-yellow-100 text-yellow-800';
+      break;
+    case 'COMPLETED':
+      text = 'Completed';
+      icon = <CheckCircle className="h-3 w-3" />;
+      colorClass = 'bg-green-100 text-green-800';
+      break;
+    default:
+      text = 'On Track';
+      colorClass = 'bg-green-100 text-green-800';
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
+      {icon}
+      {text}
+    </span>
+  );
+};
+
 // Main ExchangeList Component - Memoized
 export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({ 
   title = "Exchanges", 
@@ -183,6 +238,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
     hasNext,
     hasPrevious,
     loadMore,
+    previousPage = () => {}, // Fallback if not provided
     refresh: refreshExchanges,
     setFilters: setSmartFilters,
     clearFilters,
@@ -229,55 +285,6 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
     { value: 'year', label: 'This Year' }
   ], []);
 
-  // Memoize filtered exchanges to prevent unnecessary re-computations
-  const filteredExchanges = useMemo(() => {
-    return (exchanges || []).filter((exchange: Exchange) => {
-      const matchesSearch = !searchTerm || 
-        exchange.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        exchange.exchangeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        exchange.client?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        exchange.client?.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        exchange.exchangeNumber?.toString().includes(searchTerm);
-
-      const matchesStatus = !statusFilter || exchange.status === statusFilter;
-      const matchesType = !typeFilter || exchange.exchangeType === typeFilter;
-      
-      const matchesValueMin = !valueMinFilter || (exchange.exchangeValue && exchange.exchangeValue >= parseFloat(valueMinFilter));
-      const matchesValueMax = !valueMaxFilter || (exchange.exchangeValue && exchange.exchangeValue <= parseFloat(valueMaxFilter));
-      
-      const matchesPropertyAddress = !propertyAddressFilter || 
-        exchange.relinquishedPropertyAddress?.toLowerCase().includes(propertyAddressFilter.toLowerCase()) ||
-        exchange.replacementProperties?.some((prop: any) => 
-          prop.address?.toLowerCase().includes(propertyAddressFilter.toLowerCase())
-        );
-      
-      const matchesDate = !dateFilter || (() => {
-        const exchangeDate = new Date(exchange.createdAt || exchange.identificationDeadline || '');
-        const now = new Date();
-        
-        switch (dateFilter) {
-          case 'today':
-            return exchangeDate.toDateString() === now.toDateString();
-          case 'week':
-            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            return exchangeDate >= weekAgo;
-          case 'month':
-            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            return exchangeDate >= monthAgo;
-          case 'quarter':
-            const quarterAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-            return exchangeDate >= quarterAgo;
-          case 'year':
-            const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-            return exchangeDate >= yearAgo;
-          default:
-            return true;
-        }
-      })();
-
-      return matchesSearch && matchesStatus && matchesType && matchesValueMin && matchesValueMax && matchesDate && matchesPropertyAddress;
-    });
-  }, [exchanges, searchTerm, statusFilter, typeFilter, valueMinFilter, valueMaxFilter, dateFilter, propertyAddressFilter]);
 
   // Memoize event handlers
   const handleExchangeClick = useCallback((exchange: Exchange) => {
@@ -369,7 +376,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
           <div>
             <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
             <p className="text-gray-600 text-sm mt-1">
-              {filteredExchanges.length} of {pagination?.total || exchanges.length} exchanges
+              Showing {exchanges.length} of {pagination?.total || exchanges.length} exchanges
               {user?.role === 'admin' && (pagination?.total || exchanges.length) >= 100 && (
                 <span className="ml-2 text-green-600 text-xs font-medium bg-green-100 px-2 py-1 rounded-full">
                   Admin View
@@ -436,8 +443,19 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Search exchanges..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className={`w-full pl-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
+                      hasActiveFilters ? 'pr-20 border-blue-300 bg-blue-50/30' : 'pr-4 border-gray-300'
+                    }`}
                   />
+                  {/* Filter Indicator */}
+                  {hasActiveFilters && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+                      <div className="flex items-center gap-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-2 py-1 rounded-full text-xs font-medium shadow-sm">
+                        <Filter className="w-3 h-3" />
+                        <span>Active</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -574,7 +592,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
 
       {/* Exchange Grid/Table */}
       {viewMode === 'grid' ? (
-        filteredExchanges.length === 0 ? (
+        exchanges.length === 0 ? (
           <div className="bg-white rounded-lg shadow border p-12 text-center">
             <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No Exchanges Found</h3>
@@ -615,19 +633,19 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
               </button>
             )}
           </div>
-        ) : filteredExchanges.length > 100 && user?.role === 'admin' ? (
+        ) : exchanges.length > 100 && user?.role === 'admin' ? (
           // Use virtualized rendering for admin users with large datasets
           <div className="bg-white rounded-lg shadow border">
             <div className="p-4 border-b">
               <h3 className="text-lg font-semibold text-gray-900">
-                All System Exchanges ({filteredExchanges.length} total)
+                All System Exchanges ({exchanges.length} total)
                 <span className="ml-2 text-sm text-green-600 bg-green-100 px-2 py-1 rounded-full">
                   Virtualized for Performance
                 </span>
               </h3>
             </div>
             <VirtualizedList
-              items={filteredExchanges}
+              items={exchanges}
               itemHeight={80}
               containerHeight={600}
               renderItem={(exchange, index) => (
@@ -666,7 +684,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredExchanges.map((exchange) => (
+            {exchanges.map((exchange) => (
               <ExchangeCard
                 key={exchange.id}
                 exchange={exchange}
@@ -709,7 +727,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
                     Date
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Deadline Status
+                    Timeline
                   </th>
                   <th scope="col" className="relative px-6 py-3">
                     <span className="sr-only">Edit</span>
@@ -717,7 +735,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredExchanges.map((exchange) => (
+                {exchanges.map((exchange) => (
                   <tr key={exchange.id} onClick={() => handleExchangeClick(exchange)} className="hover:bg-gray-100 cursor-pointer">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{exchange.exchangeNumber}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{exchange.name}</td>
@@ -728,12 +746,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{exchange.progress}%</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(exchange.createdAt || exchange.identificationDeadline || '').toLocaleDateString()}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <DeadlineWarning
-                        identificationDeadline={exchange.identificationDeadline}
-                        exchangeDeadline={exchange.completionDeadline}
-                        status={exchange.status}
-                        compact={true}
-                      />
+                      {getTimelineBadge(exchange)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <a href="#" className="text-blue-600 hover:text-blue-900">View</a>
@@ -746,21 +759,67 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
         </div>
       )}
 
-      {/* Footer */}
-      {filteredExchanges.length > 0 && (
+      {/* Footer with Pagination Controls */}
+      {exchanges.length > 0 && (
         <div className="bg-white rounded-lg shadow border p-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-700">
-              Showing {filteredExchanges.length} of {exchanges.length} exchanges
-            </p>
-            {!filters.limit && exchanges.length >= 10 && (
-              <Link
-                to="/exchanges"
-                className="text-sm text-blue-600 hover:text-blue-500 font-medium"
-              >
-                View all exchanges →
-              </Link>
-            )}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <p className="text-sm text-gray-700">
+                Showing <span className="font-semibold">{exchanges.length.toLocaleString()}</span> of <span className="font-semibold">{(pagination?.total || exchanges.length).toLocaleString()}</span> exchanges
+              </p>
+              {hasActiveFilters && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full border border-blue-200">
+                    <Filter className="w-3 h-3 inline mr-1" />
+                    Filtered
+                  </span>
+                  <button
+                    onClick={clearAllFilters}
+                    className="text-xs text-gray-500 hover:text-gray-700 underline"
+                  >
+                    Clear all
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Previous Button */}
+              {hasPrevious && (
+                <button
+                  onClick={dataSource.previousPage}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm"
+                  disabled={loading}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Previous
+                </button>
+              )}
+              
+              {/* Page Info */}
+              {pagination && pagination.totalPages > 1 && (
+                <span className="text-sm text-gray-600 px-2">
+                  Page {pagination.currentPage} of {pagination.totalPages}
+                </span>
+              )}
+              
+              {/* Next/Load More Button */}
+              {hasNext && (
+                <button
+                  onClick={loadMore}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>Loading...</>
+                  ) : (
+                    <>
+                      Load More
+                      <ChevronRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

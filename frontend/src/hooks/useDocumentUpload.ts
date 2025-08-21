@@ -9,7 +9,7 @@ interface UseDocumentUploadReturn {
   selectedCategory: string;
   setSelectedCategory: (category: string) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
-  uploadDocument: (file: File, description?: string) => Promise<boolean>;
+  uploadDocument: (file: File, description?: string, options?: { pinRequired?: boolean; pin?: string }) => Promise<boolean>;
   resetUpload: () => void;
 }
 
@@ -23,7 +23,7 @@ export function useDocumentUpload(
   const [selectedCategory, setSelectedCategory] = useState('general');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const uploadDocument = useCallback(async (file: File, description?: string): Promise<boolean> => {
+  const uploadDocument = useCallback(async (file: File, description?: string, options?: { pinRequired?: boolean; pin?: string }): Promise<boolean> => {
     if (!file || !exchangeId) return false;
 
     try {
@@ -34,14 +34,18 @@ export function useDocumentUpload(
         fileName: file.name,
         exchangeId,
         category: selectedCategory,
-        description
+        description,
+        pinRequired: options?.pinRequired || false
       });
 
       const result = await documentUploadService.uploadDocument(
         file,
         exchangeId,
         selectedCategory,
-        description
+        description,
+        undefined, // folderId
+        options?.pinRequired,
+        options?.pin
       );
       
       if (result) {

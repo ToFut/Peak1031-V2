@@ -470,16 +470,52 @@ class PracticePartnerService {
     console.log('📄 PP: Fetching matters...', params);
     
     try {
-      const response = await this.client.get('/matters', { params });
+      // Set small batch size and shorter timeout for matters
+      const requestParams = {
+        per_page: Math.min(params.per_page || 10, 10), // Max 10 matters per request
+        page: params.page || 1,
+        ...params
+      };
       
-      console.log(`✅ PP: Fetched ${Object.values(response.data)?.length || 0} matters`);
+      // Use shorter timeout for matters due to PP API performance issues
+      const response = await this.client.get('/matters', { 
+        params: requestParams,
+        timeout: 20000 // 20 second timeout
+      });
+      
+      const matters = Array.isArray(response.data) ? response.data : Object.values(response.data) || [];
+      console.log(`✅ PP: Fetched ${matters.length} matters (page ${requestParams.page})`);
       
       return {
-        results: Object.values(response.data) || [],
-        hasMore: false || false,
-        nextPageUrl: null || null
+        results: matters,
+        hasMore: matters.length >= requestParams.per_page, // Assume more if we got full page
+        nextPageUrl: matters.length >= requestParams.per_page ? `/matters?page=${requestParams.page + 1}&per_page=${requestParams.per_page}` : null,
+        currentPage: requestParams.page,
+        perPage: requestParams.per_page
       };
     } catch (error) {
+      if (error.code === 'ECONNABORTED') {
+        console.error('❌ PP: Matters API timeout - trying with even smaller batch...');
+        
+        // Retry with smaller batch if timeout
+        if (params.per_page > 5) {
+          console.log('🔄 PP: Retrying matters with smaller batch size...');
+          return await this.fetchMatters({
+            ...params,
+            per_page: 5 // Even smaller batch
+          });
+        }
+        
+        // If still timing out with small batch, return empty with error
+        console.error('❌ PP: Matters API consistently timing out - skipping this batch');
+        return {
+          results: [],
+          hasMore: false,
+          nextPageUrl: null,
+          error: 'Timeout - PP API performance issue'
+        };
+      }
+      
       console.error('❌ PP: Error fetching matters:', error.message);
       throw error;
     }

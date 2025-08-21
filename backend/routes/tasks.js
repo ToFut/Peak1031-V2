@@ -49,6 +49,15 @@ try {
 
 const router = express.Router();
 
+// Import task rollover service
+let taskRolloverService;
+try {
+  taskRolloverService = require('../services/taskRolloverService');
+  console.log('✅ Task rollover service loaded successfully');
+} catch (error) {
+  console.error('❌ Failed to load task rollover service:', error.message);
+}
+
 // Test endpoint to verify database connection
 router.get('/test', authenticateToken, async (req, res) => {
   try {
@@ -1195,6 +1204,131 @@ router.get('/:id/auto-complete', authenticateToken, async (req, res) => {
       success: false, 
       error: 'Failed to get auto-complete actions',
       details: error.message 
+    });
+  }
+});
+
+// Task Rollover Endpoints
+// ===========================
+
+// Get rollover status and statistics
+router.get('/rollover/status', authenticateToken, enforceRBAC(['admin', 'coordinator']), async (req, res) => {
+  try {
+    if (!taskRolloverService) {
+      return res.status(503).json({
+        success: false,
+        error: 'Task rollover service not available'
+      });
+    }
+
+    const stats = await taskRolloverService.getRolloverStatistics();
+    
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error getting rollover status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get rollover status',
+      details: error.message
+    });
+  }
+});
+
+// Trigger manual rollover (admin only)
+router.post('/rollover/trigger', authenticateToken, enforceRBAC(['admin']), async (req, res) => {
+  try {
+    if (!taskRolloverService) {
+      return res.status(503).json({
+        success: false,
+        error: 'Task rollover service not available'
+      });
+    }
+
+    const { dryRun = false } = req.body;
+    
+    console.log(`📋 Manual task rollover triggered by ${req.user.email} (dry run: ${dryRun})`);
+    
+    const result = await taskRolloverService.rolloverTasks({
+      dryRun,
+      userId: req.user.id
+    });
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error triggering rollover:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to trigger rollover',
+      details: error.message
+    });
+  }
+});
+
+// Rollover specific tasks
+router.post('/rollover/tasks', authenticateToken, enforceRBAC(['admin', 'coordinator']), async (req, res) => {
+  try {
+    if (!taskRolloverService) {
+      return res.status(503).json({
+        success: false,
+        error: 'Task rollover service not available'
+      });
+    }
+
+    const { taskIds } = req.body;
+    
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Task IDs array is required'
+      });
+    }
+    
+    console.log(`📋 Manual rollover of ${taskIds.length} tasks by ${req.user.email}`);
+    
+    const result = await taskRolloverService.rolloverSpecificTasks(taskIds, req.user.id);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error rolling over specific tasks:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to rollover specific tasks',
+      details: error.message
+    });
+  }
+});
+
+// Get rollover history for a task
+router.get('/rollover/history/:taskId', authenticateToken, async (req, res) => {
+  try {
+    if (!taskRolloverService) {
+      return res.status(503).json({
+        success: false,
+        error: 'Task rollover service not available'
+      });
+    }
+
+    const history = await taskRolloverService.getTaskRolloverHistory(req.params.taskId);
+    
+    res.json({
+      success: true,
+      data: history
+    });
+  } catch (error) {
+    console.error('Error getting task rollover history:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get rollover history',
+      details: error.message
     });
   }
 });

@@ -36,12 +36,12 @@ class PermissionService {
    */
   async checkPermission(userId, exchangeId, permissionType) {
     try {
-      // First check if user is a participant
+      // First check if user is a participant (check both user_id and contact_id)
       const { data: participant, error: participantError } = await supabaseService.client
         .from('exchange_participants')
         .select('id, role, permissions')
         .eq('exchange_id', exchangeId)
-        .eq('user_id', userId)
+        .or(`user_id.eq.${userId},contact_id.eq.${userId}`)
         .eq('is_active', true)
         .single();
 
@@ -129,7 +129,7 @@ class PermissionService {
       const { data: participant, error: participantError } = await supabaseService.client
         .from('exchange_participants')
         .select('*')
-        .eq('user_id', userId)
+        .or(`user_id.eq.${userId},contact_id.eq.${userId}`)
         .eq('exchange_id', exchangeId)
         .eq('is_active', true)
         .single();
@@ -430,12 +430,12 @@ class PermissionService {
         return false;
       }
 
-      // Check if user is a participant with document permissions
+      // Check if user is a participant with document permissions (check both user_id and contact_id)
       const { data: participant } = await supabaseService.client
         .from('exchange_participants')
-        .select('permissions')
+        .select('permissions, user_id, contact_id')
         .eq('exchange_id', document.exchange_id)
-        .eq('user_id', userId)
+        .or(`user_id.eq.${userId},contact_id.eq.${userId}`)
         .eq('is_active', true)
         .single();
 

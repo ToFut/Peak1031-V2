@@ -51,7 +51,8 @@ const DebugPanel: React.FC = () => {
       
       // Test 4: Backend health check
       try {
-        const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/health`);
+        const base = (process.env.REACT_APP_API_URL || 'http://localhost:5001/api').replace('5002', '5001');
+        const response = await fetch(`${base}/health`);
         results.backend = {
           status: response.ok ? '✅ Online' : '❌ Offline',
           statusCode: response.status

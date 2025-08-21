@@ -280,14 +280,39 @@ class SupabaseService {
 
       // Apply where conditions
       if (where && Object.keys(where).length > 0) {
-        Object.keys(where).forEach(key => {
-          if (key === 'id' && where[key].in) {
-            // Handle IN clause for id
-            query = query.in('id', where[key].in);
-          } else {
-            query = query.eq(key, where[key]);
+        console.log('🔍 Supabase getExchanges where clause:', JSON.stringify(where, null, 2));
+        
+        // Handle Op.or conditions
+        if (where.or) {
+          const orConditions = where.or.map(condition => {
+            // Convert Sequelize Op conditions to Supabase format
+            if (condition.id && condition.id.in) {
+              return `id.in.(${condition.id.in.join(',')})`;
+            } else if (condition.client_id) {
+              return `client_id.eq.${condition.client_id}`;
+            } else if (condition.coordinator_id) {
+              return `coordinator_id.eq.${condition.coordinator_id}`;
+            }
+            return null;
+          }).filter(Boolean);
+          
+          if (orConditions.length > 0) {
+            query = query.or(orConditions.join(','));
           }
-        });
+        } else {
+          // Handle simple conditions
+          Object.keys(where).forEach(key => {
+            if (key === 'id' && where[key] && where[key].in) {
+              // Handle IN clause for id
+              query = query.in('id', where[key].in);
+            } else if (key === 'id' && where[key] === null) {
+              // Handle null id (no exchanges)
+              query = query.eq('id', '00000000-0000-0000-0000-000000000000'); // Impossible UUID
+            } else if (where[key] !== undefined && where[key] !== null) {
+              query = query.eq(key, where[key]);
+            }
+          });
+        }
       }
 
       // Apply ordering

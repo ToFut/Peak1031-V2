@@ -57,6 +57,12 @@ export interface Task {
   updated_at?: string; // snake_case compatibility
   exchange?: Exchange;
   assignedUser?: User;
+  assignee?: {
+    first_name?: string;
+    last_name?: string;
+    id?: string;
+  }; // Direct assignee object
+  assignee_name?: string; // Pre-formatted assignee name
   created_by?: string; // Creator user ID
   createdByUser?: User; // Creator user object
   source?: 'chat' | 'practice_panther' | 'manual'; // Task source
@@ -68,6 +74,9 @@ export interface Task {
     agent?: string;
     chat_command?: string;
     notify_all_users?: boolean;
+    rolled_over?: boolean;
+    roll_over_date?: string;
+    original_due_date?: string;
     [key: string]: any;
   };
 }

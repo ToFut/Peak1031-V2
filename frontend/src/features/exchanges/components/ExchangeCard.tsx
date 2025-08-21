@@ -10,6 +10,7 @@ import {
   Building2,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   TrendingUp,
   MoreVertical,
   MessageSquare,
@@ -20,9 +21,63 @@ import {
   Briefcase,
   MapPin,
   Activity,
-  Star,
-  AlertTriangle
+  Star
 } from 'lucide-react';
+
+// Timeline Badge Component
+const getTimelineBadge = (exchange: Exchange) => {
+  const { timelineStatus, days_remaining } = exchange as any;
+  
+  if (!timelineStatus) return null;
+
+  let text = '';
+  let icon = <Clock className="h-3 w-3" />;
+  let colorClass = 'bg-gray-100 text-gray-800';
+
+  switch (timelineStatus) {
+    case 'OVERDUE_45':
+      text = 'Overdue 45-Day';
+      icon = <AlertTriangle className="h-3 w-3" />;
+      colorClass = 'bg-red-100 text-red-800';
+      break;
+    case 'OVERDUE_180':
+      text = 'Overdue 180-Day';
+      icon = <AlertTriangle className="h-3 w-3" />;
+      colorClass = 'bg-red-100 text-red-800';
+      break;
+    case 'CRITICAL_45':
+      text = `${days_remaining || 0} days to 45-Day`;
+      colorClass = 'bg-red-100 text-red-800';
+      break;
+    case 'CRITICAL_180':
+      text = `${days_remaining || 0} days to 180-Day`;
+      colorClass = 'bg-red-100 text-red-800';
+      break;
+    case 'WARNING_45':
+      text = `${days_remaining || 0} days to 45-Day`;
+      colorClass = 'bg-yellow-100 text-yellow-800';
+      break;
+    case 'WARNING_180':
+      text = `${days_remaining || 0} days to 180-Day`;
+      colorClass = 'bg-yellow-100 text-yellow-800';
+      break;
+    case 'COMPLETED':
+      text = 'Completed';
+      icon = <CheckCircle className="h-3 w-3" />;
+      colorClass = 'bg-green-100 text-green-800';
+      break;
+    default:
+      text = 'On Track';
+      colorClass = 'bg-green-100 text-green-800';
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
+      {icon}
+      {text}
+    </span>
+  );
+};
 
 interface ExchangeCardProps {
   exchange: Exchange;
@@ -246,13 +301,8 @@ export const ExchangeCard: React.FC<ExchangeCardProps> = ({
             )}
           </div>
           
-          {/* Deadline Warning */}
-          <DeadlineWarning
-            identificationDeadline={exchange.identificationDeadline}
-            exchangeDeadline={exchange.completionDeadline}
-            status={exchange.status}
-            compact={true}
-          />
+          {/* Timeline Badge */}
+          {getTimelineBadge(exchange)}
         </div>
         
         {/* Key Metrics Snapshot */}

@@ -131,7 +131,9 @@ class DocumentUploadService {
     exchangeId: string,
     category: string,
     description?: string,
-    folderId?: string
+    folderId?: string,
+    pinRequired?: boolean,
+    pin?: string
   ): Promise<DocumentUploadResult> {
     console.log('📄 DocumentUploadService: Uploading document', {
       fileName: file.name,
@@ -144,7 +146,9 @@ class DocumentUploadService {
     return this.uploadFile(file, exchangeId, {
       category,
       description,
-      folderId
+      folderId,
+      pinRequired,
+      pin
     });
   }
 

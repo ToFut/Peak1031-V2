@@ -49,6 +49,10 @@ const requireExchangePermission = (permissionType) => {
       }
 
       if (!exchangeId) {
+        console.log('❌ PERMISSION CHECK: No exchangeId found in req.params, req.body, or req.query');
+        console.log('   - req.params:', Object.keys(req.params));
+        console.log('   - req.body keys:', Object.keys(req.body || {}));
+        console.log('   - req.query keys:', Object.keys(req.query || {}));
         return res.status(400).json({
           error: 'Exchange ID required',
           code: 'EXCHANGE_ID_REQUIRED'

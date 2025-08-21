@@ -307,8 +307,16 @@ router.get('/', [
   query('status').optional().isIn(['PENDING', '45D', '180D', 'COMPLETED', 'TERMINATED', 'ON_HOLD']),
   query('priority').optional().isIn(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
   query('search').optional().isLength({ min: 1, max: 100 }),
+  query('searchTerm').optional().isLength({ min: 1, max: 100 }),
+  query('exchangeType').optional().isIn(['LIKE_KIND', 'REVERSE', 'BUILD_TO_SUIT', 'CONSTRUCTION', 'SIMULTANEOUS', 'DELAYED', 'IMPROVEMENT']),
+  query('minValue').optional().isNumeric(),
+  query('maxValue').optional().isNumeric(),
+  query('propertyAddress').optional().isLength({ min: 1, max: 200 }),
+  query('dateRange').optional().isIn(['today', 'week', 'month', 'quarter', 'year']),
   query('sort_by').optional().isIn(['name', 'status', 'created_at', 'start_date', 'priority']),
-  query('sort_order').optional().isIn(['asc', 'desc'])
+  query('sortBy').optional().isIn(['name', 'status', 'created_at', 'start_date', 'priority', 'exchange_value']),
+  query('sort_order').optional().isIn(['asc', 'desc']),
+  query('sortOrder').optional().isIn(['asc', 'desc'])
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -329,19 +337,36 @@ router.get('/', [
       status,
       priority,
       search,
+      searchTerm,
+      exchangeType,
+      minValue,
+      maxValue,
+      propertyAddress,
+      dateRange,
       coordinator_id,
       client_id,
       sort_by = 'created_at',
+      sortBy,
       sort_order = 'desc',
+      sortOrder,
       include_inactive = 'false',
       urgent
     } = req.query;
+    
+    // Use sortBy/sortOrder if provided (from frontend), otherwise fallback to sort_by/sort_order
+    const finalSortBy = sortBy || sort_by;
+    const finalSortOrder = sortOrder || sort_order;
 
     // Build where clause based on user role and filters
     const whereClause = await buildExchangeWhereClause(req.user, {
       status,
       priority,
-      search,
+      search: search || searchTerm,
+      exchangeType,
+      minValue,
+      maxValue,
+      propertyAddress,
+      dateRange,
       coordinator_id,
       client_id,
       include_inactive: include_inactive === 'true',
@@ -386,21 +411,35 @@ router.get('/', [
     // Calculate offset for pagination
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    // Use database service instead of direct Sequelize
-    console.log('🔍 DEBUG: Calling databaseService.getExchanges with:', {
-      where: whereClause,
-      limit: parseInt(limit),
-      offset: offset
-    });
-    
-    const exchanges = await databaseService.getExchanges({
-      where: whereClause,
-      limit: parseInt(limit),
-      offset: offset,
-      orderBy: { column: sort_by, ascending: sort_order === 'asc' },
-      // Include participants for all users (needed for chat functionality)
-      includeParticipants: true
-    });
+    // Use RBAC service for admin users to ensure proper access
+    let exchanges;
+    if (req.user && req.user.role === 'admin') {
+      console.log('🔒 Using RBAC service for admin user');
+      const rbacService = require('../services/rbacService');
+      const rbacResult = await rbacService.getExchangesForUser(req.user, {
+        limit: parseInt(limit),
+        offset: offset,
+        orderBy: { column: finalSortBy, ascending: finalSortOrder === 'asc' }
+      });
+      exchanges = rbacResult.data || [];
+      console.log(`🔒 RBAC service returned ${exchanges.length} exchanges for admin`);
+    } else {
+      // Use database service for non-admin users
+      console.log('🔍 DEBUG: Calling databaseService.getExchanges with:', {
+        where: whereClause,
+        limit: parseInt(limit),
+        offset: offset
+      });
+      
+      exchanges = await databaseService.getExchanges({
+        where: whereClause,
+        limit: parseInt(limit),
+        offset: offset,
+        orderBy: { column: finalSortBy, ascending: finalSortOrder === 'asc' },
+        // Include participants for all users (needed for chat functionality)
+        includeParticipants: true
+      });
+    }
     
     console.log('🔍 DEBUG: databaseService returned exchanges:', exchanges?.length || 0);
 
@@ -433,15 +472,19 @@ router.get('/', [
     // Calculate pagination metadata
     const totalPages = Math.ceil(count / parseInt(limit));
 
-    res.json(transformToCamelCase({
+    res.json({
+      success: true,
       exchanges: enhancedExchanges,
+      total: count,
+      page: parseInt(page),
+      limit: parseInt(limit),
       pagination: {
-        current_page: parseInt(page),
-        total_pages: totalPages,
-        total_items: count,
-        items_per_page: parseInt(limit),
-        has_next: parseInt(page) < totalPages,
-        has_previous: parseInt(page) > 1
+        currentPage: parseInt(page),
+        totalPages: totalPages,
+        totalItems: count,
+        itemsPerPage: parseInt(limit),
+        hasNext: parseInt(page) < totalPages,
+        hasPrevious: parseInt(page) > 1
       },
       filters_applied: {
         status,
@@ -452,7 +495,7 @@ router.get('/', [
         sort_by,
         sort_order
       }
-    }));
+    });
 
   } catch (error) {
     console.error('Error fetching exchanges:', error);
@@ -1617,8 +1660,66 @@ async function buildExchangeWhereClause(user, filters) {
     whereClause[Op.or] = [
       { name: { [Op.iLike]: `%${filters.search}%` } },
       { exchange_number: { [Op.iLike]: `%${filters.search}%` } },
-      { notes: { [Op.iLike]: `%${filters.search}%` } }
+      { notes: { [Op.iLike]: `%${filters.search}%` } },
+      { relinquished_property_address: { [Op.iLike]: `%${filters.search}%` } }
     ];
+  }
+  
+  // Exchange type filter
+  if (filters.exchangeType) {
+    whereClause.exchange_type = filters.exchangeType;
+  }
+  
+  // Value range filters
+  if (filters.minValue || filters.maxValue) {
+    whereClause.exchange_value = {};
+    if (filters.minValue) {
+      whereClause.exchange_value[Op.gte] = parseFloat(filters.minValue);
+    }
+    if (filters.maxValue) {
+      whereClause.exchange_value[Op.lte] = parseFloat(filters.maxValue);
+    }
+  }
+  
+  // Property address filter
+  if (filters.propertyAddress) {
+    whereClause[Op.or] = [
+      { relinquished_property_address: { [Op.iLike]: `%${filters.propertyAddress}%` } }
+    ];
+  }
+  
+  // Date range filter
+  if (filters.dateRange) {
+    const now = new Date();
+    let dateFilter = {};
+    
+    switch (filters.dateRange) {
+      case 'today':
+        const todayStart = new Date(now.setHours(0, 0, 0, 0));
+        const todayEnd = new Date(now.setHours(23, 59, 59, 999));
+        dateFilter = { [Op.between]: [todayStart, todayEnd] };
+        break;
+      case 'week':
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        dateFilter = { [Op.gte]: weekAgo };
+        break;
+      case 'month':
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        dateFilter = { [Op.gte]: monthAgo };
+        break;
+      case 'quarter':
+        const quarterAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        dateFilter = { [Op.gte]: quarterAgo };
+        break;
+      case 'year':
+        const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        dateFilter = { [Op.gte]: yearAgo };
+        break;
+    }
+    
+    if (Object.keys(dateFilter).length > 0) {
+      whereClause.created_at = dateFilter;
+    }
   }
 
   return whereClause;

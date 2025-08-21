@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   CheckCircle, 
   Clock, 
@@ -10,7 +11,11 @@ import {
   Filter,
   Search,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  RotateCcw,
+  ExternalLink,
+  MessageSquare,
+  Building2
 } from 'lucide-react';
 import { Task, TaskStatus } from '../../types';
 import { formatDate, isOverdue } from '../../utils/date.utils';
@@ -20,6 +25,7 @@ export interface TaskManagerProps {
   exchangeId?: string;
   onTaskClick?: (task: Task) => void;
   onTaskUpdate?: (taskId: string, updates: Partial<Task>) => void;
+  onTaskRollover?: (taskId: string) => void;
   onCreateTask?: () => void;
   showCreateButton?: boolean;
   compact?: boolean;
@@ -33,6 +39,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
   exchangeId,
   onTaskClick,
   onTaskUpdate,
+  onTaskRollover,
   onCreateTask,
   showCreateButton = true,
   compact = false,
@@ -40,10 +47,12 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
   allowStatusChange = true,
   className = ''
 }) => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['PENDING', 'IN_PROGRESS']));
+  const [rolloverLoading, setRolloverLoading] = useState<Set<string>>(new Set());
 
   // Filter tasks based on search and filters
   const filteredTasks = tasks.filter(task => {
@@ -143,6 +152,73 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
   const handleStatusChange = async (task: Task, newStatus: string) => {
     if (onTaskUpdate) {
       await onTaskUpdate(task.id, { status: newStatus as TaskStatus });
+    }
+  };
+
+  const handleRollover = async (task: Task) => {
+    if (!onTaskRollover) return;
+    
+    setRolloverLoading(prev => {
+      const newSet = new Set(prev);
+      newSet.add(task.id);
+      return newSet;
+    });
+    
+    try {
+      await onTaskRollover(task.id);
+    } catch (error) {
+      console.error('Failed to rollover task:', error);
+    } finally {
+      setRolloverLoading(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(task.id);
+        return newSet;
+      });
+    }
+  };
+
+  // Helper function to get assignee display name
+  const getAssigneeName = (task: Task) => {
+    // Try pre-formatted name first
+    if (task.assignee_name) {
+      return task.assignee_name;
+    }
+    
+    // Try assignee object
+    if (task.assignee?.first_name || task.assignee?.last_name) {
+      return `${task.assignee.first_name || ''} ${task.assignee.last_name || ''}`.trim();
+    }
+    
+    // Try assignedUser object  
+    if (task.assignedUser?.firstName || task.assignedUser?.lastName) {
+      return `${task.assignedUser.firstName || ''} ${task.assignedUser.lastName || ''}`.trim();
+    }
+    
+    return 'Unassigned';
+  };
+
+  // Helper function to get exchange name
+  const getExchangeName = (task: Task) => {
+    if (task.exchange) {
+      return (task.exchange as any).exchange_number || (task.exchange as any).name || `Exchange ${task.exchange.id}`;
+    }
+    return `Exchange ${task.exchange_id || task.exchangeId || 'Unknown'}`;
+  };
+
+  // Navigation helpers
+  const handleExchangeClick = (task: Task, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (task.exchange_id || task.exchangeId) {
+      const id = task.exchange_id || task.exchangeId;
+      navigate(`/exchanges/${id}`);
+    }
+  };
+
+  const handleChatClick = (task: Task, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (task.exchange_id || task.exchangeId) {
+      const id = task.exchange_id || task.exchangeId;
+      navigate(`/messages?exchangeId=${id}`);
     }
   };
 
@@ -309,7 +385,8 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                               <p className="text-sm text-gray-600 mb-2">{task.description}</p>
                             )}
 
-                            <div className="flex items-center space-x-4 text-xs text-gray-500">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-gray-500">
+                              {/* Due Date */}
                               {task.dueDate && (
                                 <div className={`flex items-center space-x-1 ${
                                   overdue ? 'text-red-600 font-medium' : ''
@@ -320,29 +397,76 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                                 </div>
                               )}
                               
-                              {task.assignedUser && (
-                                <div className="flex items-center space-x-1">
-                                  <User className="w-3 h-3" />
-                                  <span>{task.assignedUser.firstName} {task.assignedUser.lastName}</span>
-                                </div>
-                              )}
+                              {/* Assignee */}
+                              <div className="flex items-center space-x-1">
+                                <User className="w-3 h-3" />
+                                <span className="font-medium">{getAssigneeName(task)}</span>
+                              </div>
+
+                              {/* Exchange with actions */}
+                              <div className="flex items-center space-x-2">
+                                <Building2 className="w-3 h-3" />
+                                <button
+                                  onClick={(e) => handleExchangeClick(task, e)}
+                                  className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                                  title="Open Exchange"
+                                >
+                                  {getExchangeName(task)}
+                                </button>
+                                <button
+                                  onClick={(e) => handleChatClick(task, e)}
+                                  className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50"
+                                  title="Open Chat"
+                                >
+                                  <MessageSquare className="w-3 h-3" />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
 
-                        {allowStatusChange && task.status !== 'COMPLETED' && (
-                          <select
-                            value={task.status}
-                            onChange={(e) => handleStatusChange(task, e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="ml-4 text-xs border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          >
-                            <option value="PENDING">Pending</option>
-                            <option value="IN_PROGRESS">In Progress</option>
-                            <option value="COMPLETED">Completed</option>
-                            <option value="CANCELLED">Cancelled</option>
-                          </select>
-                        )}
+                        <div className="flex items-center space-x-2 ml-4">
+                          {/* Rollover button for all tasks with due dates */}
+                          {task.dueDate && onTaskRollover && task.status !== 'COMPLETED' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRollover(task);
+                              }}
+                              disabled={rolloverLoading.has(task.id)}
+                              className={`flex items-center space-x-1 px-3 py-1.5 text-xs border rounded-md transition-colors disabled:opacity-50 ${
+                                overdue 
+                                  ? 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200 animate-pulse' 
+                                  : 'bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200'
+                              }`}
+                              title={overdue ? "Rollover overdue task to today" : "Rollover task to today"}
+                            >
+                              {rolloverLoading.has(task.id) ? (
+                                <div className={`w-3 h-3 border rounded-full animate-spin ${
+                                  overdue ? 'border-red-600 border-t-transparent' : 'border-orange-600 border-t-transparent'
+                                }`} />
+                              ) : (
+                                <RotateCcw className="w-3 h-3" />
+                              )}
+                              <span className="font-medium">Rollover</span>
+                            </button>
+                          )}
+
+                          {/* Status change dropdown */}
+                          {allowStatusChange && task.status !== 'COMPLETED' && (
+                            <select
+                              value={task.status}
+                              onChange={(e) => handleStatusChange(task, e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[100px]"
+                            >
+                              <option value="PENDING">Pending</option>
+                              <option value="IN_PROGRESS">In Progress</option>
+                              <option value="COMPLETED">Completed</option>
+                              <option value="CANCELLED">Cancelled</option>
+                            </select>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );

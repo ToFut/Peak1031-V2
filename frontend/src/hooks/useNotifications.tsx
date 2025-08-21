@@ -43,7 +43,8 @@ export const useNotifications = () => {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5002'}/api/notifications`, {
+      const base = (process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5001').replace('5002', '5001');
+      const response = await fetch(`${base}/api/notifications`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -63,7 +64,8 @@ export const useNotifications = () => {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5002'}/api/notifications/${notificationId}/read`, {
+      const base = (process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5001').replace('5002', '5001');
+      const response = await fetch(`${base}/api/notifications/${notificationId}/read`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`

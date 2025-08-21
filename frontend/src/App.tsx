@@ -19,7 +19,12 @@ import ModernTasksPage from './features/tasks/pages/ModernTasksPage';
 import Contacts from './features/contacts/pages/Contacts';
 import Documents from './features/documents/pages/Documents';
 import Users from './features/users/pages/Users';
-import Reports from './features/reports/pages/Reports';
+import { ResponsiveReportViewer } from './features/reports/components/ResponsiveReportViewer';
+import StandardizedAdminDashboard from "./features/dashboard/components/StandardizedAdminDashboard";
+import StandardizedClientDashboard from "./features/dashboard/components/StandardizedClientDashboard";
+import StandardizedCoordinatorDashboard from "./features/dashboard/components/StandardizedCoordinatorDashboard";
+import StandardizedThirdPartyDashboard from "./features/dashboard/components/StandardizedThirdPartyDashboard";
+import StandardizedAgencyDashboard from "./features/dashboard/components/StandardizedAgencyDashboard";
 import Settings from './features/settings/pages/Settings';
 import Profile from './features/profile/pages/Profile';
 import UserProfile from './features/users/pages/UserProfile';
@@ -37,11 +42,11 @@ import ForgotPassword from './features/auth/pages/ForgotPassword';
 import ResetPassword from './features/auth/pages/ResetPassword';
 
 // Lazy load heavy components for better performance
-import AdminDashboard from './features/dashboard/components/StandardizedAdminDashboard';
-import ClientDashboard from './features/dashboard/components/StandardizedClientDashboard';
-import CoordinatorDashboard from './features/dashboard/components/StandardizedCoordinatorDashboard';
-import ThirdPartyDashboard from './features/dashboard/components/StandardizedThirdPartyDashboard';
-import AgencyDashboard from './features/dashboard/components/StandardizedAgencyDashboard';
+// import AdminDashboard from './features/dashboard/components/StandardizedAdminDashboard';
+// import ClientDashboard from './features/dashboard/components/StandardizedClientDashboard';
+// import CoordinatorDashboard from './features/dashboard/components/StandardizedCoordinatorDashboard';
+// import ThirdPartyDashboard from './features/dashboard/components/StandardizedThirdPartyDashboard';
+// import AgencyDashboard from './features/dashboard/components/StandardizedAgencyDashboard';
 const InvitationSignup = lazy(() => import(/* webpackChunkName: "invitation" */ './pages/InvitationSignup'));
 const AuthCallback = lazy(() => import(/* webpackChunkName: "auth-callback" */ './pages/AuthCallback'));
 
@@ -86,48 +91,23 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
   return <>{children}</>;
 };
 
-// Dashboard Route Component
+// Dashboard Route Component - select per role
 const DashboardRoute: React.FC = () => {
   const { user } = useAuth();
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // Route to appropriate dashboard based on user role
+  if (!user) return null;
   switch (user.role) {
     case 'admin':
-      return (
-        <RouteErrorBoundary routeName="AdminDashboard">
-          <AdminDashboard />
-        </RouteErrorBoundary>
-      );
-    case 'coordinator':
-      return (
-        <RouteErrorBoundary routeName="CoordinatorDashboard">
-          <CoordinatorDashboard />
-        </RouteErrorBoundary>
-      );
+      return <StandardizedAdminDashboard />;
     case 'client':
-      return (
-        <RouteErrorBoundary routeName="ClientDashboard">
-          <ClientDashboard />
-        </RouteErrorBoundary>
-      );
+      return <StandardizedClientDashboard />;
+    case 'coordinator':
+      return <StandardizedCoordinatorDashboard />;
     case 'third_party':
-      return (
-        <RouteErrorBoundary routeName="ThirdPartyDashboard">
-          <ThirdPartyDashboard />
-        </RouteErrorBoundary>
-      );
+      return <StandardizedThirdPartyDashboard />;
     case 'agency':
-      return (
-        <RouteErrorBoundary routeName="AgencyDashboard">
-          <AgencyDashboard />
-        </RouteErrorBoundary>
-      );
+      return <StandardizedAgencyDashboard />;
     default:
-      return <Navigate to="/login" replace />;
+      return <StandardizedClientDashboard />;
   }
 };
 
@@ -172,8 +152,7 @@ const App: React.FC = () => {
               } />
               
               {/* Protected Routes */}
-              <Route 
-                path="/" 
+              <Route path="/" 
                 element={
                   <ProtectedRoute>
                     <Navigate to="/dashboard" replace />
@@ -181,22 +160,16 @@ const App: React.FC = () => {
                 } 
               />
               
-              <Route 
-                path="/dashboard" 
+              <Route path="/dashboard" 
                 element={
                   <ProtectedRoute>
-                    <Layout>
-                      <RouteErrorBoundary routeName="Dashboard">
-                        <DashboardRoute />
-                      </RouteErrorBoundary>
-                    </Layout>
+                    <DashboardRoute />
                   </ProtectedRoute>
                 } 
               />
 
               {/* Messages - Available to most users */}
-              <Route 
-                path="/messages" 
+              <Route path="/messages" 
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client', 'agency', 'third_party']}>
                     <Layout>
@@ -209,8 +182,7 @@ const App: React.FC = () => {
               />
 
               {/* Exchanges - Available to all authenticated users */}
-              <Route 
-                path="/exchanges" 
+              <Route path="/exchanges" 
                 element={
                   <ProtectedRoute>
                     <Layout>
@@ -222,8 +194,7 @@ const App: React.FC = () => {
                 } 
               />
               
-              <Route 
-                path="/exchanges/:id" 
+              <Route path="/exchanges/:id" 
                 element={
                   <ProtectedRoute>
                     <RouteErrorBoundary routeName="ExchangeDetails">
@@ -234,8 +205,7 @@ const App: React.FC = () => {
               />
 
               {/* Tasks - Available to all authenticated users */}
-              <Route 
-                path="/tasks" 
+              <Route path="/tasks" 
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client', 'third_party', 'agency']}>
                     <Layout>
@@ -248,8 +218,7 @@ const App: React.FC = () => {
               />
 
               {/* Contacts - Available to all authenticated users */}
-              <Route 
-                path="/contacts" 
+              <Route path="/contacts" 
                 element={
                   <ProtectedRoute>
                     <Layout>
@@ -262,8 +231,7 @@ const App: React.FC = () => {
               />
 
               {/* Documents - Available to all authenticated users */}
-              <Route 
-                path="/documents" 
+              <Route path="/documents" 
                 element={
                   <ProtectedRoute>
                     <Layout>
@@ -276,8 +244,7 @@ const App: React.FC = () => {
               />
 
               {/* Users - Admin only */}
-              <Route 
-                path="/admin/users" 
+              <Route path="/admin/users" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
@@ -289,14 +256,13 @@ const App: React.FC = () => {
                 } 
               />
 
-              {/* Reports - Available to admin and coordinators */}
-              <Route 
-                path="/reports" 
+              {/* Reports - Available to all authenticated users with role-based data */}
+              <Route path="/reports" 
                 element={
-                  <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
+                  <ProtectedRoute allowedRoles={['admin', 'coordinator', 'client', 'agency', 'third_party']}>
                     <Layout>
                       <RouteErrorBoundary routeName="Reports">
-                        <Reports />
+                        <ResponsiveReportViewer />
                       </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
@@ -304,8 +270,7 @@ const App: React.FC = () => {
               />
 
               {/* Settings - Available to all authenticated users */}
-              <Route 
-                path="/settings" 
+              <Route path="/settings" 
                 element={
                   <ProtectedRoute>
                     <Layout>
@@ -318,8 +283,7 @@ const App: React.FC = () => {
               />
 
               {/* Profile - Available to all authenticated users */}
-              <Route 
-                path="/profile" 
+              <Route path="/profile" 
                 element={
                   <ProtectedRoute>
                     <Layout>
@@ -332,8 +296,7 @@ const App: React.FC = () => {
               />
 
               {/* User Profile - Admin only */}
-              <Route 
-                path="/users/user-profile/:userId" 
+              <Route path="/users/user-profile/:userId" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
@@ -346,8 +309,7 @@ const App: React.FC = () => {
               />
 
               {/* Preferences - Available to all authenticated users */}
-              <Route 
-                path="/preferences" 
+              <Route path="/preferences" 
                 element={
                   <ProtectedRoute>
                     <Layout>
@@ -360,8 +322,7 @@ const App: React.FC = () => {
               />
 
               {/* Template Document Manager - Available to admin and coordinators */}
-              <Route 
-                path="/templates" 
+              <Route path="/templates" 
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
                     <Layout>
@@ -374,8 +335,7 @@ const App: React.FC = () => {
               />
 
               {/* Admin-specific routes */}
-              <Route 
-                path="/admin/templates" 
+              <Route path="/admin/templates" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
@@ -387,8 +347,7 @@ const App: React.FC = () => {
                 } 
               />
 
-              <Route 
-                path="/admin/audit" 
+              <Route path="/admin/audit" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
@@ -400,8 +359,7 @@ const App: React.FC = () => {
                 } 
               />
 
-              <Route 
-                path="/admin/gpt" 
+              <Route path="/admin/gpt" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
@@ -413,8 +371,7 @@ const App: React.FC = () => {
                 } 
               />
 
-              <Route 
-                path="/admin/ai-gpt" 
+              <Route path="/admin/ai-gpt" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
@@ -426,8 +383,7 @@ const App: React.FC = () => {
                 } 
               />
 
-              <Route 
-                path="/admin/practice-panther" 
+              <Route path="/admin/practice-panther" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
@@ -439,8 +395,7 @@ const App: React.FC = () => {
                 } 
               />
 
-              <Route 
-                path="/admin/agencies" 
+              <Route path="/admin/agencies" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
@@ -452,8 +407,7 @@ const App: React.FC = () => {
                 } 
               />
 
-              <Route 
-                path="/admin/agency-assignments" 
+              <Route path="/admin/agency-assignments" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
@@ -465,8 +419,7 @@ const App: React.FC = () => {
                 } 
               />
 
-              <Route 
-                path="/admin/agencies" 
+              <Route path="/admin/agencies" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
@@ -478,8 +431,7 @@ const App: React.FC = () => {
                 } 
               />
 
-              <Route 
-                path="/admin/system" 
+              <Route path="/admin/system" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
@@ -509,8 +461,7 @@ const App: React.FC = () => {
               )}
 
               {/* Catch-all route */}
-              <Route 
-                path="*" 
+              <Route path="*" 
                 element={
                   <ProtectedRoute>
                     <Layout>

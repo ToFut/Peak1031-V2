@@ -3,31 +3,126 @@ const { body, validationResult } = require('express-validator');
 const AuthService = require('../services/auth');
 const { authenticateToken } = require('../middleware/auth');
 const { transformToCamelCase } = require('../utils/caseTransform');
+const securityAuditService = require('../services/securityAuditService');
 
 const router = express.Router();
+
+// Helper function to get client IP
+function getClientIp(req) {
+  // Check for forwarded IPs (when behind proxy/load balancer)
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  
+  // Check for real IP header
+  const realIp = req.headers['x-real-ip'];
+  if (realIp) {
+    return realIp;
+  }
+  
+  // Fall back to connection remote address
+  return req.connection.remoteAddress || 
+         req.socket.remoteAddress || 
+         req.connection.socket?.remoteAddress || 
+         '0.0.0.0';
+}
 
 // Login endpoint
 router.post('/login', [
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 1 })
 ], async (req, res) => {
+  const ipAddress = getClientIp(req);
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+  let userId = null;
+  let loginSuccess = false;
+  let failureReason = null;
+
   try {
     console.log('\n🔐 AUTH ROUTE: Login attempt received');
     console.log('📧 Email:', req.body.email);
+    console.log('🌐 IP Address:', ipAddress);
+    console.log('📱 User Agent:', userAgent);
     console.log('🔍 Request body keys:', Object.keys(req.body));
     
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       console.log('❌ Validation errors:', errors.array());
+      failureReason = 'Validation failed';
       return res.status(400).json({ errors: errors.array() });
     }
 
     const { email, password, twoFactorCode } = req.body;
     console.log('✅ Validation passed, attempting authentication...');
 
+    // Try to get user ID even if authentication fails (for audit logging)
+    try {
+      const userLookup = await AuthService.getUserByEmail(email);
+      if (userLookup) {
+        userId = userLookup.id;
+      }
+    } catch (lookupError) {
+      // Ignore lookup errors
+    }
+
     // Authenticate user
-    const user = await AuthService.authenticateUser(email, password);
-    console.log('✅ User authenticated:', user.email, 'Role:', user.role);
+    let user;
+    try {
+      user = await AuthService.authenticateUser(email, password);
+      console.log('✅ User authenticated:', user.email, 'Role:', user.role);
+      userId = user.id; // Update with actual user ID
+    } catch (authError) {
+      failureReason = 'Invalid credentials';
+      
+      // Log failed login attempt
+      if (userId) {
+        await securityAuditService.logLoginEvent({
+          userId,
+          eventType: 'failed_login',
+          ipAddress,
+          userAgent,
+          success: false,
+          failureReason
+        });
+      }
+      
+      throw authError;
+    }
+
+    // Check if account is security locked
+    if (user.security_locked) {
+      failureReason = 'Account locked for security';
+      await securityAuditService.logLoginEvent({
+        userId: user.id,
+        eventType: 'failed_login',
+        ipAddress,
+        userAgent,
+        success: false,
+        failureReason
+      });
+      return res.status(403).json({ 
+        error: 'Account has been locked for security reasons. Please contact support.',
+        securityLocked: true 
+      });
+    }
+
+    // Check if forced password reset is required
+    if (user.force_password_reset) {
+      await securityAuditService.logLoginEvent({
+        userId: user.id,
+        eventType: 'login',
+        ipAddress,
+        userAgent,
+        success: true,
+        sessionId: null
+      });
+      return res.status(403).json({ 
+        error: 'Password reset required',
+        forcePasswordReset: true,
+        temporaryToken: AuthService.generatePasswordResetToken(user.email)
+      });
+    }
 
     // Check 2FA if enabled
     if (user.twoFaEnabled) {
@@ -40,6 +135,15 @@ router.post('/login', [
 
       const isValidTwoFactor = await AuthService.verifyTwoFactor(user.id, twoFactorCode);
       if (!isValidTwoFactor) {
+        failureReason = 'Invalid 2FA code';
+        await securityAuditService.logLoginEvent({
+          userId: user.id,
+          eventType: 'failed_login',
+          ipAddress,
+          userAgent,
+          success: false,
+          failureReason
+        });
         return res.status(401).json({ error: 'Invalid 2FA code' });
       }
     }
@@ -48,6 +152,17 @@ router.post('/login', [
     console.log('🔑 Generating tokens...');
     const { token, refreshToken } = AuthService.generateTokens(user);
     console.log('✅ Tokens generated successfully');
+
+    // Log successful login
+    loginSuccess = true;
+    await securityAuditService.logLoginEvent({
+      userId: user.id,
+      eventType: 'login',
+      ipAddress,
+      userAgent,
+      success: true,
+      sessionId: token.substring(0, 20) // Store partial token as session ID
+    });
 
     const responseData = {
       user: transformToCamelCase(user.toJSON ? user.toJSON() : user),
@@ -60,6 +175,19 @@ router.post('/login', [
   } catch (error) {
     console.error('❌ AUTH ROUTE ERROR:', error.message);
     console.error('🔍 Full error:', error);
+    
+    // Log failed attempt if we haven't already
+    if (!loginSuccess && userId && !failureReason) {
+      await securityAuditService.logLoginEvent({
+        userId,
+        eventType: 'failed_login',
+        ipAddress,
+        userAgent,
+        success: false,
+        failureReason: error.message
+      });
+    }
+    
     res.status(401).json({ error: error.message });
   }
 });
@@ -72,6 +200,9 @@ router.post('/register', [
   body('lastName').isLength({ min: 1 }),
   body('role').optional().isIn(['admin', 'client', 'coordinator', 'third_party', 'agency'])
 ], async (req, res) => {
+  const ipAddress = getClientIp(req);
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -79,6 +210,10 @@ router.post('/register', [
     }
 
     const { email, password, firstName, lastName, role = 'client' } = req.body;
+    
+    console.log('📝 Registration attempt from IP:', ipAddress);
+    console.log('📧 Email:', email);
+    console.log('👤 Role:', role);
     
     // Create user
     const user = await AuthService.createUser({
@@ -89,8 +224,28 @@ router.post('/register', [
       role
     });
 
+    // Log registration event
+    await securityAuditService.logLoginEvent({
+      userId: user.id,
+      eventType: 'register',
+      ipAddress,
+      userAgent,
+      success: true,
+      sessionId: null
+    });
+
     // Generate tokens
     const { token, refreshToken } = AuthService.generateTokens(user);
+
+    // Log initial login after registration
+    await securityAuditService.logLoginEvent({
+      userId: user.id,
+      eventType: 'login',
+      ipAddress,
+      userAgent,
+      success: true,
+      sessionId: token.substring(0, 20)
+    });
 
     res.status(201).json({
       user: transformToCamelCase(user.toJSON ? user.toJSON() : user),
@@ -133,9 +288,26 @@ router.post('/refresh', [
 });
 
 // Logout endpoint
-router.post('/logout', authenticateToken, (req, res) => {
-  // In a real application, you might want to blacklist the token
-  res.json({ message: 'Logged out successfully' });
+router.post('/logout', authenticateToken, async (req, res) => {
+  const ipAddress = getClientIp(req);
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+
+  try {
+    // Log logout event
+    await securityAuditService.logLoginEvent({
+      userId: req.user.id,
+      eventType: 'logout',
+      ipAddress,
+      userAgent,
+      success: true
+    });
+
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout tracking error:', error);
+    // Still return success even if tracking fails
+    res.json({ message: 'Logged out successfully' });
+  }
 });
 
 // Forgot password endpoint
@@ -163,6 +335,9 @@ router.post('/reset-password', [
   body('token').isLength({ min: 1 }),
   body('password').isLength({ min: 8 })
 ], async (req, res) => {
+  const ipAddress = getClientIp(req);
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -171,6 +346,17 @@ router.post('/reset-password', [
 
     const { token, password } = req.body;
     const result = await AuthService.resetPassword(token, password);
+    
+    // Log password reset event if we have a user ID
+    if (result.userId) {
+      await securityAuditService.logLoginEvent({
+        userId: result.userId,
+        eventType: 'password_reset',
+        ipAddress,
+        userAgent,
+        success: true
+      });
+    }
     
     res.json(result);
   } catch (error) {

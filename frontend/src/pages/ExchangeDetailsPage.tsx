@@ -3,11 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Exchange, Task, Document, AuditLog } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { usePermissions } from '../hooks/usePermissions';
+import { useExchangePermissions } from '../hooks/useExchangePermissions';
 import { useRealTimeTasks } from '../hooks/useRealTimeTasks';
 import { apiService } from '../services/api';
 import UnifiedChatInterface from '../features/messages/components/UnifiedChatInterface';
 import EnterpriseParticipantsManager from '../components/EnterpriseParticipantsManager';
 import EnhancedInvitationManager from '../features/exchanges/components/EnhancedInvitationManager';
+import { ExchangeTimeline } from '../features/exchanges/components/ExchangeTimeline';
 import { EnhancedDocumentManager } from '../features/documents/components';
 import TaskCreateModal from '../features/tasks/components/TaskCreateModal';
 import { TaskBoard } from '../features/tasks/components/TaskBoard';
@@ -37,7 +39,8 @@ import {
   ChevronRight,
   Calendar,
   DollarSign,
-  Filter
+  Filter,
+  Building2
 } from 'lucide-react';
 
 interface ExchangeParticipant {
@@ -105,6 +108,7 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isAdmin, isCoordinator } = usePermissions();
+  const exchangePermissions = useExchangePermissions(id);
 
   // State management
   const [exchange, setExchange] = useState<EnterpriseExchange | null>(null);
@@ -117,7 +121,7 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'tasks' | 'documents' | 'financial' | 'compliance' | 'chat' | 'timeline' | 'audit'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'members' | 'tasks' | 'documents' | 'financial' | 'compliance' | 'chat' | 'audit'>('overview');
 
   // Member management
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
@@ -259,50 +263,78 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
 
 
 
-  // Exchange stage calculation
+  // Exchange stage and progress calculation
   const getExchangeStage = useMemo(() => {
     if (!exchange) return null;
+
+    // Check if exchange is completed first
+    const status = exchange.status as string;
+    const isCompleted = status === 'COMPLETED' || status === 'Completed' || status === 'CLOSED';
+    
+    if (isCompleted) {
+      return {
+        stage: 'Completed',
+        color: 'bg-green-100 text-green-800',
+        borderColor: 'border-green-300',
+        progress: 100,
+        isCompleted: true
+      };
+    }
 
     const today = new Date();
     const startDate = new Date(exchange.startDate || exchange.createdAt || '');
     const deadline45 = new Date(exchange.identificationDeadline || '');
-    const deadline180 = new Date(exchange.exchangeDeadline || '');
+    const deadline180 = new Date(exchange.exchangeDeadline || exchange.completionDeadline || '');
+    
+    // Calculate overall progress based on timeline
+    let progress = 0;
+    let stage = '';
+    let color = '';
+    let borderColor = '';
     
     if (today < startDate) {
-      return {
-        stage: 'Before Initial',
-        color: 'bg-gray-100 text-gray-800',
-        borderColor: 'border-gray-300',
-        progress: 0
-      };
-    } else if (today >= startDate && today <= deadline45) {
-      const totalDays = (deadline45.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-      const daysElapsed = (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-      const progress = Math.min((daysElapsed / totalDays) * 100, 100);
-      return {
-        stage: '45 Days',
-        color: 'bg-yellow-100 text-yellow-800',
-        borderColor: 'border-yellow-300',
-        progress: Math.round(progress)
-      };
-    } else if (today > deadline45 && today <= deadline180) {
-      const totalDays = (deadline180.getTime() - deadline45.getTime()) / (1000 * 60 * 60 * 24);
-      const daysElapsed = (today.getTime() - deadline45.getTime()) / (1000 * 60 * 60 * 24);
-      const progress = Math.min((daysElapsed / totalDays) * 100, 100);
-      return {
-        stage: '180 Days',
-        color: 'bg-orange-100 text-orange-800',
-        borderColor: 'border-orange-300',
-        progress: Math.round(progress)
-      };
+      stage = 'Not Started';
+      color = 'bg-gray-100 text-gray-800';
+      borderColor = 'border-gray-300';
+      progress = 0;
+    } else if (today > deadline180) {
+      // Past 180-day deadline
+      if (exchange.status === '45D' || exchange.status === '180D') {
+        // Still active but overdue
+        stage = 'Overdue';
+        color = 'bg-red-100 text-red-800';
+        borderColor = 'border-red-300';
+        progress = 100; // Timeline complete but exchange not closed
+      } else {
+        stage = 'Completed';
+        color = 'bg-green-100 text-green-800';
+        borderColor = 'border-green-300';
+        progress = 100;
+      }
     } else {
-      return {
-        stage: 'Closeup',
-        color: 'bg-green-100 text-green-800',
-        borderColor: 'border-green-300',
-        progress: 100
-      };
+      // Calculate progress within timeline
+      const totalDays = (deadline180.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+      const daysElapsed = (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+      progress = Math.min((daysElapsed / totalDays) * 100, 100);
+      
+      if (today <= deadline45) {
+        stage = '45-Day Period';
+        color = 'bg-yellow-100 text-yellow-800';
+        borderColor = 'border-yellow-300';
+      } else {
+        stage = '180-Day Period';
+        color = 'bg-orange-100 text-orange-800';
+        borderColor = 'border-orange-300';
+      }
     }
+    
+    return {
+      stage,
+      color,
+      borderColor,
+      progress: Math.round(progress),
+      isCompleted
+    };
   }, [exchange]);
 
   // Member management functions
@@ -490,69 +522,175 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
           </div>
         </div>
 
-        {/* Exchange Summary */}
-        <div className="bg-gradient-to-r from-blue-50 to-white rounded-2xl shadow p-8 border">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div>
-              <h2 className="text-3xl font-extrabold mb-2 text-blue-900">{exchange.name}</h2>
+        {/* Enhanced Exchange Summary with Visual Appeal */}
+        <div className={`rounded-2xl shadow-xl p-8 text-white overflow-hidden relative ${
+          getExchangeStage?.isCompleted 
+            ? 'bg-gradient-to-r from-green-600 to-emerald-700' 
+            : getExchangeStage?.stage === 'Overdue'
+            ? 'bg-gradient-to-r from-red-600 to-red-700'
+            : 'bg-gradient-to-r from-blue-600 to-indigo-700'
+        }`}>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24"></div>
+          
+          <div className="relative flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
+                  {getExchangeStage?.isCompleted ? (
+                    <CheckCircle className="w-7 h-7 text-white" />
+                  ) : (
+                    <Building2 className="w-7 h-7 text-white" />
+                  )}
+                </div>
+                <div>
+                  <h2 className="text-3xl font-bold text-white">{exchange.name}</h2>
+                  <p className={`text-sm ${
+                    getExchangeStage?.isCompleted ? 'text-green-100' : 'text-blue-100'
+                  }`}>
+                    {getExchangeStage?.isCompleted && '✓ Completed Exchange • '}
+                    Exchange #{exchange.exchangeNumber || exchange.id}
+                  </p>
+                </div>
+              </div>
               
-              <div className="flex flex-wrap gap-6 text-base text-gray-700 font-medium mb-4">
-                <span>Status: <span className="font-semibold text-blue-700">{exchange.status}</span></span>
-                <span>Value: ${exchange.exchangeValue?.toLocaleString()}</span>
+              <div className="flex flex-wrap gap-3 mb-4">
+                <div className="inline-flex items-center px-4 py-2 bg-white/20 backdrop-blur rounded-lg">
+                  <span className="text-sm text-blue-100 mr-2">Status:</span>
+                  <span className="font-semibold">{exchange.status}</span>
+                </div>
+                <div className="inline-flex items-center px-4 py-2 bg-white/20 backdrop-blur rounded-lg">
+                  <DollarSign className="w-4 h-4 mr-2" />
+                  <span className="font-semibold">${exchange.exchangeValue?.toLocaleString()}</span>
+                </div>
                 {getExchangeStage && (
-                  <div className={`inline-flex items-center px-3 py-1 rounded-lg border ${getExchangeStage.color} ${getExchangeStage.borderColor}`}>
+                  <div className="inline-flex items-center px-4 py-2 bg-white/90 text-gray-800 rounded-lg">
+                    <div className={`w-2 h-2 rounded-full mr-2 ${
+                      getExchangeStage.stage === '45 Days' ? 'bg-yellow-500' : 
+                      getExchangeStage.stage === '180 Days' ? 'bg-orange-500' : 
+                      'bg-green-500'
+                    }`}></div>
                     <span className="text-sm font-semibold">{getExchangeStage.stage}</span>
                   </div>
                 )}
               </div>
               
-              {/* Timeline */}
+              {/* Enhanced Timeline with Visual Progress */}
               {getExchangeStage && (
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-gray-700">Exchange Timeline</span>
-                    <span className="text-xs text-blue-600 font-medium">
-                      Today: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-semibold text-white">Timeline Progress</span>
+                    <span className={`text-xs px-3 py-1 rounded-full ${
+                      getExchangeStage?.isCompleted 
+                        ? 'text-green-100 bg-green-800/30' 
+                        : 'text-blue-100 bg-white/20'
+                    }`}>
+                      <Calendar className="w-3 h-3 inline mr-1" />
+                      {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
                   </div>
-                  <div className="relative bg-gray-200 rounded-full h-4 mb-3">
+                  <div className="relative bg-white/20 rounded-full h-6 mb-4 overflow-hidden">
                     <div 
-                      className={`h-4 rounded-full transition-all duration-300 ${
-                        getExchangeStage.stage === 'Before Initial' ? 'bg-gray-400' : 
-                        getExchangeStage.stage === '45 Days' ? 'bg-yellow-400' : 
-                        getExchangeStage.stage === '180 Days' ? 'bg-orange-400' : 'bg-green-400'
+                      className={`h-6 rounded-full transition-all duration-500 flex items-center justify-end pr-2 ${
+                        getExchangeStage.stage === 'Before Initial' ? 'bg-gradient-to-r from-gray-400 to-gray-500' : 
+                        getExchangeStage.stage === '45 Days' ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' : 
+                        getExchangeStage.stage === '180 Days' ? 'bg-gradient-to-r from-orange-400 to-orange-500' : 
+                        'bg-gradient-to-r from-green-400 to-green-500'
                       }`} 
                       style={{ width: `${getExchangeStage.progress}%` }}
-                    ></div>
+                    >
+                      <span className="text-xs text-white font-bold drop-shadow">{getExchangeStage.progress}%</span>
+                    </div>
                     <div 
-                      className="absolute top-0 w-2 h-4 bg-red-500 rounded-full border-2 border-white shadow-sm" 
-                      style={{ left: `${getExchangeStage.progress}%`, transform: 'translateX(-50%)' }}
+                      className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full border-2 border-blue-600 shadow-lg animate-pulse" 
+                      style={{ left: `${getExchangeStage.progress}%`, transform: 'translateX(-50%) translateY(-50%)' }}
                     ></div>
                   </div>
-                  <div className="flex justify-between text-xs text-gray-600">
-                    <div className="text-center">
-                      <div className="font-medium text-gray-800">Start</div>
-                      <div>{exchange.startDate ? new Date(exchange.startDate).toLocaleDateString() : 'N/A'}</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-white/10 rounded-lg p-2 text-center">
+                      <div className="text-xs font-semibold text-blue-100">Start</div>
+                      <div className="text-sm text-white font-medium">
+                        {exchange.startDate ? new Date(exchange.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Not Set'}
+                      </div>
+                      {exchange.startDate && (
+                        <div className="text-[10px] text-blue-200 mt-1">
+                          {new Date(exchange.startDate).getFullYear()}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-center">
-                      <div className="font-medium text-yellow-700">45-day</div>
-                      <div>{exchange.identificationDeadline ? new Date(exchange.identificationDeadline).toLocaleDateString() : 'N/A'}</div>
+                    <div className="bg-white/10 rounded-lg p-2 text-center">
+                      <div className="text-xs font-semibold text-yellow-200">45-Day Deadline</div>
+                      <div className="text-sm text-white font-medium">
+                        {exchange.identificationDeadline ? new Date(exchange.identificationDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Not Set'}
+                      </div>
+                      {exchange.identificationDeadline && (
+                        <div className={`text-[10px] mt-1 font-medium ${
+                          getDaysRemaining(exchange.identificationDeadline) < 0 ? 'text-red-300' :
+                          getDaysRemaining(exchange.identificationDeadline) < 7 ? 'text-yellow-300' :
+                          'text-blue-200'
+                        }`}>
+                          {getDaysRemaining(exchange.identificationDeadline) < 0 
+                            ? `Passed ${Math.abs(getDaysRemaining(exchange.identificationDeadline))}d ago`
+                            : `${getDaysRemaining(exchange.identificationDeadline)} days left`}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-center">
-                      <div className="font-medium text-orange-700">180-day</div>
-                      <div>{exchange.exchangeDeadline ? new Date(exchange.exchangeDeadline).toLocaleDateString() : 'N/A'}</div>
+                    <div className="bg-white/10 rounded-lg p-2 text-center">
+                      <div className="text-xs font-semibold text-orange-200">180-Day Deadline</div>
+                      <div className="text-sm text-white font-medium">
+                        {exchange.exchangeDeadline ? new Date(exchange.exchangeDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Not Set'}
+                      </div>
+                      {exchange.exchangeDeadline && (
+                        <div className={`text-[10px] mt-1 font-medium ${
+                          getDaysRemaining(exchange.exchangeDeadline) < 0 ? 'text-red-300' :
+                          getDaysRemaining(exchange.exchangeDeadline) < 14 ? 'text-yellow-300' :
+                          'text-blue-200'
+                        }`}>
+                          {getDaysRemaining(exchange.exchangeDeadline) < 0 
+                            ? `Passed ${Math.abs(getDaysRemaining(exchange.exchangeDeadline))}d ago`
+                            : `${getDaysRemaining(exchange.exchangeDeadline)} days left`}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
             </div>
             
-            <button
-              className="mt-4 md:mt-0 bg-blue-600 text-white px-6 py-2 rounded-lg shadow hover:bg-blue-700 transition"
-              onClick={() => setActiveTab('chat')}
-            >
-              Open Chat
-            </button>
+            <div className="flex flex-col gap-3 mt-4 md:mt-0">
+              {/* Permission Badges */}
+              {exchangePermissions.permissions && (
+                <div className="flex flex-wrap gap-2">
+                  {exchangePermissions.getPermissionSummary().map((perm, idx) => (
+                    <span 
+                      key={idx}
+                      className="text-xs px-2 py-1 bg-white/20 backdrop-blur text-white rounded-full border border-white/30"
+                    >
+                      {perm}
+                    </span>
+                  ))}
+                </div>
+              )}
+              
+              <div className="flex gap-3">
+                {exchangePermissions.isTabVisible('chat') && (
+                  <button
+                    className="bg-white/20 backdrop-blur text-white px-6 py-3 rounded-lg shadow-lg hover:bg-white/30 transition flex items-center gap-2 font-medium"
+                    onClick={() => setActiveTab('chat')}
+                  >
+                    <MessageSquare className="w-5 h-5" />
+                    Open Chat
+                  </button>
+                )}
+                <button
+                  className="bg-white text-blue-600 px-6 py-3 rounded-lg shadow-lg hover:bg-gray-50 transition flex items-center gap-2 font-medium"
+                  onClick={() => navigate('/exchanges')}
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                  Back
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -620,30 +758,183 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
               </div>
             )}
 
-            {/* Critical Deadlines */}
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <div className="flex items-center justify-between mb-4">
-                <Clock className="w-5 h-5 text-red-600" />
-                <span className="text-sm text-gray-500">Deadlines</span>
+            {/* Critical Deadlines - Dynamic Agentic Countdown */}
+            <div className="bg-gradient-to-br from-slate-900 to-gray-800 rounded-2xl shadow-2xl p-6 border border-gray-700 relative overflow-hidden">
+              {/* Animated Background Pattern */}
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute top-0 left-0 w-40 h-40 bg-red-500 rounded-full blur-3xl animate-pulse"></div>
+                <div className="absolute bottom-0 right-0 w-40 h-40 bg-orange-500 rounded-full blur-3xl animate-pulse delay-1000"></div>
               </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>45-day:</span>
-                  <span className={exchange?.identificationDeadline && getDaysRemaining(exchange.identificationDeadline) < 0 ? 'text-red-600 font-medium' : 
-                                   exchange?.identificationDeadline && getDaysRemaining(exchange.identificationDeadline) < 7 ? 'text-orange-600 font-medium' : 'text-gray-600'}>
-                    {exchange?.identificationDeadline ? 
-                      (getDaysRemaining(exchange.identificationDeadline) < 0 ? 'OVERDUE' : `${getDaysRemaining(exchange.identificationDeadline)}d left`) : 
-                      'Not set'}
-                  </span>
+              
+              <div className="relative">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-lg flex items-center justify-center animate-pulse">
+                    <Clock className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Critical Exchange Deadlines</h3>
+                    <p className="text-xs text-gray-400">Real-time countdown monitoring</p>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span>180-day:</span>
-                  <span className={exchange?.exchangeDeadline && getDaysRemaining(exchange.exchangeDeadline) < 0 ? 'text-red-600 font-medium' : 
-                                   exchange?.exchangeDeadline && getDaysRemaining(exchange.exchangeDeadline) < 14 ? 'text-orange-600 font-medium' : 'text-gray-600'}>
-                    {exchange?.exchangeDeadline ? 
-                      (getDaysRemaining(exchange.exchangeDeadline) < 0 ? 'OVERDUE' : `${getDaysRemaining(exchange.exchangeDeadline)}d left`) : 
-                      'Not set'}
-                  </span>
+                
+                <div className="space-y-4">
+                  {/* 45-Day Deadline - Agentic Card */}
+                  <div className="bg-gradient-to-r from-yellow-900/30 to-yellow-800/30 backdrop-blur rounded-xl p-4 border border-yellow-700/50 relative group hover:scale-[1.02] transition-transform">
+                    <div className="absolute top-2 right-2">
+                      <div className={`w-2 h-2 rounded-full animate-pulse ${
+                        exchange?.identificationDeadline && getDaysRemaining(exchange.identificationDeadline) < 0 ? 'bg-red-500' :
+                        exchange?.identificationDeadline && getDaysRemaining(exchange.identificationDeadline) < 7 ? 'bg-orange-500' :
+                        'bg-green-500'
+                      }`}></div>
+                    </div>
+                    
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h4 className="text-yellow-400 font-bold text-sm mb-1 flex items-center gap-2">
+                          <Target className="w-4 h-4" />
+                          45-DAY IDENTIFICATION PERIOD
+                        </h4>
+                        <div className="text-gray-300 text-xs font-medium flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-gray-400" />
+                          {exchange?.identificationDeadline ? 
+                            new Date(exchange.identificationDeadline).toLocaleDateString('en-US', { 
+                              weekday: 'long',
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric' 
+                            }) : 'Date not configured'}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {exchange?.identificationDeadline && (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-400 uppercase tracking-wider">Time Remaining</span>
+                          <span className={`text-2xl font-bold tabular-nums ${
+                            getDaysRemaining(exchange.identificationDeadline) < 0 ? 'text-red-400' :
+                            getDaysRemaining(exchange.identificationDeadline) < 7 ? 'text-orange-400' :
+                            'text-green-400'
+                          }`}>
+                            {Math.abs(getDaysRemaining(exchange.identificationDeadline))}
+                            <span className="text-sm ml-1 text-gray-400">days</span>
+                          </span>
+                        </div>
+                        <div className="relative h-2 bg-gray-700/50 rounded-full overflow-hidden">
+                          <div 
+                            className={`absolute h-full rounded-full transition-all duration-500 ${
+                              getDaysRemaining(exchange.identificationDeadline) < 0 ? 'bg-gradient-to-r from-red-500 to-red-600' :
+                              getDaysRemaining(exchange.identificationDeadline) < 7 ? 'bg-gradient-to-r from-orange-500 to-yellow-500' :
+                              'bg-gradient-to-r from-green-500 to-emerald-500'
+                            }`}
+                            style={{ 
+                              width: `${Math.max(0, Math.min(100, (getDaysRemaining(exchange.identificationDeadline) / 45) * 100))}%` 
+                            }}
+                          >
+                            <div className="absolute right-0 top-0 h-full w-1 bg-white/50 animate-pulse"></div>
+                          </div>
+                        </div>
+                        <div className="mt-2 flex items-center justify-center">
+                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                            getDaysRemaining(exchange.identificationDeadline) < 0 
+                              ? 'bg-red-500/20 text-red-400 border border-red-500/50 animate-pulse' 
+                              : getDaysRemaining(exchange.identificationDeadline) < 7 
+                              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50' 
+                              : 'bg-green-500/20 text-green-400 border border-green-500/50'
+                          }`}>
+                            {getDaysRemaining(exchange.identificationDeadline) < 0 
+                              ? `⚠️ OVERDUE BY ${Math.abs(getDaysRemaining(exchange.identificationDeadline))} DAYS` 
+                              : getDaysRemaining(exchange.identificationDeadline) < 7
+                              ? `⚡ URGENT: ${getDaysRemaining(exchange.identificationDeadline)} DAYS LEFT`
+                              : `✓ ON TRACK: ${getDaysRemaining(exchange.identificationDeadline)} DAYS REMAINING`}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* 180-Day Deadline - Agentic Card */}
+                  <div className="bg-gradient-to-r from-orange-900/30 to-red-900/30 backdrop-blur rounded-xl p-4 border border-orange-700/50 relative group hover:scale-[1.02] transition-transform">
+                    <div className="absolute top-2 right-2">
+                      <div className={`w-2 h-2 rounded-full animate-pulse ${
+                        exchange?.exchangeDeadline && getDaysRemaining(exchange.exchangeDeadline) < 0 ? 'bg-red-500' :
+                        exchange?.exchangeDeadline && getDaysRemaining(exchange.exchangeDeadline) < 14 ? 'bg-orange-500' :
+                        'bg-green-500'
+                      }`}></div>
+                    </div>
+                    
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h4 className="text-orange-400 font-bold text-sm mb-1 flex items-center gap-2">
+                          <Activity className="w-4 h-4" />
+                          180-DAY EXCHANGE COMPLETION
+                        </h4>
+                        <div className="text-gray-300 text-xs font-medium flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-gray-400" />
+                          {exchange?.exchangeDeadline ? 
+                            new Date(exchange.exchangeDeadline).toLocaleDateString('en-US', { 
+                              weekday: 'long',
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric' 
+                            }) : 'Date not configured'}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {exchange?.exchangeDeadline && (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-400 uppercase tracking-wider">Time Remaining</span>
+                          <span className={`text-2xl font-bold tabular-nums ${
+                            getDaysRemaining(exchange.exchangeDeadline) < 0 ? 'text-red-400' :
+                            getDaysRemaining(exchange.exchangeDeadline) < 14 ? 'text-orange-400' :
+                            'text-green-400'
+                          }`}>
+                            {Math.abs(getDaysRemaining(exchange.exchangeDeadline))}
+                            <span className="text-sm ml-1 text-gray-400">days</span>
+                          </span>
+                        </div>
+                        <div className="relative h-2 bg-gray-700/50 rounded-full overflow-hidden">
+                          <div 
+                            className={`absolute h-full rounded-full transition-all duration-500 ${
+                              getDaysRemaining(exchange.exchangeDeadline) < 0 ? 'bg-gradient-to-r from-red-500 to-red-600' :
+                              getDaysRemaining(exchange.exchangeDeadline) < 14 ? 'bg-gradient-to-r from-orange-500 to-red-500' :
+                              'bg-gradient-to-r from-green-500 to-emerald-500'
+                            }`}
+                            style={{ 
+                              width: `${Math.max(0, Math.min(100, (getDaysRemaining(exchange.exchangeDeadline) / 180) * 100))}%` 
+                            }}
+                          >
+                            <div className="absolute right-0 top-0 h-full w-1 bg-white/50 animate-pulse"></div>
+                          </div>
+                        </div>
+                        <div className="mt-2 flex items-center justify-center">
+                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                            getDaysRemaining(exchange.exchangeDeadline) < 0 
+                              ? 'bg-red-500/20 text-red-400 border border-red-500/50 animate-pulse' 
+                              : getDaysRemaining(exchange.exchangeDeadline) < 14 
+                              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50' 
+                              : 'bg-green-500/20 text-green-400 border border-green-500/50'
+                          }`}>
+                            {getDaysRemaining(exchange.exchangeDeadline) < 0 
+                              ? `⚠️ OVERDUE BY ${Math.abs(getDaysRemaining(exchange.exchangeDeadline))} DAYS` 
+                              : getDaysRemaining(exchange.exchangeDeadline) < 14
+                              ? `⚡ URGENT: ${getDaysRemaining(exchange.exchangeDeadline)} DAYS LEFT`
+                              : `✓ ON TRACK: ${getDaysRemaining(exchange.exchangeDeadline)} DAYS REMAINING`}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Live Status Indicator */}
+                <div className="mt-4 flex items-center justify-center">
+                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span>Live monitoring active • Updates in real-time</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -703,21 +994,21 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
           </div>
         )}
 
-        {/* Tabs */}
+        {/* Tabs - Permission Based Visibility */}
         <div className="bg-white rounded-lg shadow border">
           <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 px-6">
+            <nav className="flex space-x-8 px-6 overflow-x-auto">
               {[
-                { id: 'overview', label: 'Overview', icon: Eye },
-                { id: 'members', label: 'Members', icon: Users },
-                { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-                { id: 'documents', label: 'Documents', icon: FileText },
-                ...(exchange?.financial_transactions ? [{ id: 'financial', label: 'Financial', icon: DollarSign }] : []),
-                ...(exchange?.compliance_status ? [{ id: 'compliance', label: 'Compliance', icon: Shield }] : []),
-                { id: 'chat', label: 'Chat', icon: MessageSquare },
-                ...(timeline?.length > 0 ? [{ id: 'timeline', label: 'Timeline', icon: Activity }] : []),
-                { id: 'audit', label: 'Audit Log', icon: BarChart3 }
-              ].map((tab) => {
+                { id: 'overview', label: 'Overview', icon: Eye, visible: exchangePermissions.isTabVisible('overview') },
+                { id: 'members', label: 'Members', icon: Users, visible: exchangePermissions.isTabVisible('members') },
+                { id: 'tasks', label: 'Tasks', icon: CheckSquare, visible: exchangePermissions.isTabVisible('tasks') },
+                { id: 'documents', label: 'Documents', icon: FileText, visible: exchangePermissions.isTabVisible('documents') },
+                { id: 'financial', label: 'Financial', icon: DollarSign, visible: exchange?.financial_transactions && exchangePermissions.isTabVisible('financial') },
+                { id: 'compliance', label: 'Compliance', icon: Shield, visible: exchange?.compliance_status && exchangePermissions.isTabVisible('compliance') },
+                { id: 'chat', label: 'Chat', icon: MessageSquare, visible: exchangePermissions.isTabVisible('chat') },
+                { id: 'timeline', label: 'Timeline', icon: Activity, visible: timeline?.length > 0 && exchangePermissions.isTabVisible('timeline') },
+                { id: 'audit', label: 'Audit Log', icon: BarChart3, visible: exchangePermissions.isTabVisible('audit') }
+              ].filter(tab => tab.visible).map((tab) => {
                 const Icon = tab.icon;
                 return (
                   <button
@@ -782,7 +1073,7 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-orange-600">Progress</p>
-                        <p className="text-2xl font-bold text-orange-900">{exchange.progress || 0}%</p>
+                        <p className="text-2xl font-bold text-orange-900">{getExchangeStage?.progress || exchange.progress || 0}%</p>
                       </div>
                       <TrendingUp className="w-8 h-8 text-orange-600" />
                     </div>
@@ -857,17 +1148,23 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
               </div>
             )}
 
-            {activeTab === 'tasks' && (
+            {activeTab === 'tasks' && exchangePermissions.isTabVisible('tasks') && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900">Exchange Tasks</h3>
-                  <button 
-                    onClick={() => setShowTaskCreateModal(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Plus className="w-4 h-4 inline mr-2" />
-                    Add Task
-                  </button>
+                  {exchangePermissions.canAddTasks() ? (
+                    <button 
+                      onClick={() => setShowTaskCreateModal(true)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4 inline mr-2" />
+                      Add Task
+                    </button>
+                  ) : (
+                    <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded">
+                      View Only
+                    </div>
+                  )}
                 </div>
                 
                 {/* Modern TaskBoard Component */}
@@ -906,31 +1203,48 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
                         Create your first task for this exchange using the Add Task button above, 
                         or mention @TASK in the chat to create tasks automatically.
                       </p>
-                      <div className="flex items-center space-x-4">
-                        <button 
-                          onClick={() => setShowTaskCreateModal(true)}
-                          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                        >
-                          <Plus className="w-5 h-5 inline mr-2" />
-                          Create First Task
-                        </button>
-                        <button 
-                          onClick={() => setActiveTab('chat')}
-                          className="bg-purple-100 text-purple-700 px-6 py-3 rounded-lg hover:bg-purple-200 transition-colors font-medium"
-                        >
-                          Try @TASK in Chat
-                        </button>
-                      </div>
+                      {exchangePermissions.canAddTasks() ? (
+                        <div className="flex items-center space-x-4">
+                          <button 
+                            onClick={() => setShowTaskCreateModal(true)}
+                            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                          >
+                            <Plus className="w-5 h-5 inline mr-2" />
+                            Create First Task
+                          </button>
+                          <button 
+                            onClick={() => setActiveTab('chat')}
+                            className="bg-purple-100 text-purple-700 px-6 py-3 rounded-lg hover:bg-purple-200 transition-colors font-medium"
+                          >
+                            Try @TASK in Chat
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500 bg-gray-100 px-4 py-2 rounded-lg">
+                          <Shield className="w-4 h-4 inline mr-2" />
+                          You have view-only access to tasks
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
             )}
 
-            {activeTab === 'documents' && (
+            {activeTab === 'documents' && exchangePermissions.isTabVisible('documents') && (
               <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Exchange Documents</h3>
-                <EnhancedDocumentManager exchangeId={exchange.id} />
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Exchange Documents</h3>
+                  {!exchangePermissions.canUploadDocuments() && (
+                    <span className="text-sm text-gray-500 bg-yellow-50 px-3 py-1 rounded-lg border border-yellow-200">
+                      <Eye className="w-3 h-3 inline mr-1" />
+                      View & Download Only
+                    </span>
+                  )}
+                </div>
+                <EnhancedDocumentManager 
+                  exchangeId={exchange.id}
+                />
               </div>
             )}
 

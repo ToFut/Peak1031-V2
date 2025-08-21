@@ -40,7 +40,7 @@ interface Preferences {
 
 const Preferences: React.FC = () => {
   const { user } = useAuth();
-  const [preferences, setPreferences] = useState<Preferences>({
+  const DEFAULT_PREFERENCES: Preferences = {
     notifications: {
       email: true,
       push: true,
@@ -64,7 +64,9 @@ const Preferences: React.FC = () => {
       session_timeout: 30,
       login_notifications: true
     }
-  });
+  };
+
+  const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -76,7 +78,27 @@ const Preferences: React.FC = () => {
     try {
       const prefs = await apiService.getSettings();
       if (prefs) {
-        setPreferences(prefs);
+        // Deep-merge with defaults to avoid undefined sections/keys
+        setPreferences({
+          ...DEFAULT_PREFERENCES,
+          ...prefs,
+          notifications: {
+            ...DEFAULT_PREFERENCES.notifications,
+            ...(prefs?.notifications || {})
+          },
+          privacy: {
+            ...DEFAULT_PREFERENCES.privacy,
+            ...(prefs?.privacy || {})
+          },
+          display: {
+            ...DEFAULT_PREFERENCES.display,
+            ...(prefs?.display || {})
+          },
+          security: {
+            ...DEFAULT_PREFERENCES.security,
+            ...(prefs?.security || {})
+          }
+        });
       }
     } catch (error) {
       console.error('Failed to load preferences:', error);
@@ -108,31 +130,7 @@ const Preferences: React.FC = () => {
   };
 
   const handleReset = () => {
-    setPreferences({
-      notifications: {
-        email: true,
-        push: true,
-        exchange_updates: true,
-        task_reminders: true,
-        system_alerts: true
-      },
-      privacy: {
-        profile_visibility: 'contacts_only',
-        activity_status: true,
-        last_seen: false
-      },
-      display: {
-        theme: 'light',
-        language: 'en',
-        timezone: 'UTC',
-        date_format: 'MM/DD/YYYY'
-      },
-      security: {
-        two_factor_enabled: false,
-        session_timeout: 30,
-        login_notifications: true
-      }
-    });
+    setPreferences(DEFAULT_PREFERENCES);
   };
 
   if (!user) {

@@ -181,7 +181,7 @@ class InvitationService {
     if (method === 'email' || method === 'both') {
       // Force development mode for local testing since SendGrid sender is not verified
       const isLocalDevelopment = !process.env.VERCEL && !process.env.HEROKU;
-      const isDevelopment = process.env.NODE_ENV !== 'production' || isLocalDevelopment;
+      const isDevelopment = (process.env.NODE_ENV !== 'production' || isLocalDevelopment) && !process.env.FORCE_REAL_EMAILS;
       
       console.log('🔍 Environment check:', {
         NODE_ENV: process.env.NODE_ENV,
@@ -348,9 +348,56 @@ class InvitationService {
   }
 
   /**
-   * Send invitation SMS using Twilio
+   * Send invitation SMS using Twilio Verify Service
    */
   async sendInvitationSMS(options) {
+    const {
+      phone,
+      inviteUrl,
+      exchangeName,
+      inviterName,
+      role,
+      displayName,
+      customMessage,
+      isResend
+    } = options;
+
+    // Check if Twilio Verify Service is configured
+    if (!process.env.TWILIO_VERIFY_SERVICE_SID) {
+      console.log('⚠️ Twilio Verify Service SID not configured, using regular messaging');
+      return this.sendInvitationSMSRegular(options);
+    }
+
+    const message = isResend 
+      ? `Reminder: ${inviterName} has invited you to join the 1031 exchange "${exchangeName}" as a ${role}. Complete your signup: ${inviteUrl}`
+      : `${inviterName} has invited you to join the 1031 exchange "${exchangeName}" as a ${role}. Complete your signup: ${inviteUrl}`;
+
+    try {
+      console.log(`📱 Sending invitation SMS via Twilio Verify Service to ${phone}`);
+      
+      // Use Twilio Verify Service for SMS
+      const verification = await this.twilioClient.verify.v2
+        .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+        .verifications
+        .create({
+          to: phone,
+          channel: 'sms',
+          customMessage: message
+        });
+
+      console.log(`✅ Twilio Verify Service verification sent:`, verification.sid);
+      return verification;
+    } catch (error) {
+      console.error('❌ Failed to send via Verify Service, falling back to regular messaging:', error);
+      // Fallback to regular messaging if Verify Service fails
+      return this.sendInvitationSMSRegular(options);
+    }
+  }
+
+  /**
+   * Send invitation SMS using regular Twilio messaging (fallback)
+   */
+  async sendInvitationSMSRegular(options) {
     const {
       phone,
       inviteUrl,
@@ -366,11 +413,16 @@ class InvitationService {
       ? `Reminder: ${inviterName} has invited you to join the 1031 exchange "${exchangeName}" as a ${role}. Complete your signup: ${inviteUrl}`
       : `${inviterName} has invited you to join the 1031 exchange "${exchangeName}" as a ${role}. Complete your signup: ${inviteUrl}`;
 
-    await this.twilioClient.messages.create({
+    console.log(`📱 Sending invitation SMS via regular Twilio messaging to ${phone}`);
+    
+    const result = await this.twilioClient.messages.create({
       body: message,
       from: process.env.TWILIO_FROM_NUMBER,
       to: phone
     });
+
+    console.log(`✅ Regular Twilio SMS sent:`, result.sid);
+    return result;
   }
 
   /**
@@ -544,7 +596,7 @@ Peak 1031 Exchange Platform - Secure & Compliant 1031 Exchange Management
   }
 
   /**
-   * Send exchange notification SMS
+   * Send exchange notification SMS using Twilio Verify Service
    */
   async sendExchangeNotificationSMS(options) {
     const {
@@ -557,11 +609,58 @@ Peak 1031 Exchange Platform - Secure & Compliant 1031 Exchange Management
 
     const message = `${inviterName} has added you to the 1031 exchange "${exchangeName}" as a ${role}. Login to access: ${loginUrl}`;
 
-    await this.twilioClient.messages.create({
+    // Check if Twilio Verify Service is configured
+    if (!process.env.TWILIO_VERIFY_SERVICE_SID) {
+      console.log('⚠️ Twilio Verify Service SID not configured, using regular messaging for notification');
+      return this.sendExchangeNotificationSMSRegular(options);
+    }
+
+    try {
+      console.log(`📱 Sending exchange notification SMS via Twilio Verify Service to ${phone}`);
+      
+      // Use Twilio Verify Service for SMS
+      const verification = await this.twilioClient.verify.v2
+        .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+        .verifications
+        .create({
+          to: phone,
+          channel: 'sms',
+          customMessage: message
+        });
+
+      console.log(`✅ Twilio Verify Service notification sent:`, verification.sid);
+      return verification;
+    } catch (error) {
+      console.error('❌ Failed to send notification via Verify Service, falling back to regular messaging:', error);
+      // Fallback to regular messaging if Verify Service fails
+      return this.sendExchangeNotificationSMSRegular(options);
+    }
+  }
+
+  /**
+   * Send exchange notification SMS using regular Twilio messaging (fallback)
+   */
+  async sendExchangeNotificationSMSRegular(options) {
+    const {
+      phone,
+      loginUrl,
+      exchangeName,
+      inviterName,
+      role
+    } = options;
+
+    const message = `${inviterName} has added you to the 1031 exchange "${exchangeName}" as a ${role}. Login to access: ${loginUrl}`;
+
+    console.log(`📱 Sending exchange notification SMS via regular Twilio messaging to ${phone}`);
+    
+    const result = await this.twilioClient.messages.create({
       body: message,
       from: process.env.TWILIO_FROM_NUMBER,
       to: phone
     });
+
+    console.log(`✅ Regular Twilio notification SMS sent:`, result.sid);
+    return result;
   }
 
   /**

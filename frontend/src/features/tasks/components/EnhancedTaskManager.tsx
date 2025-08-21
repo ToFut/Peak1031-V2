@@ -24,6 +24,7 @@ import {
   BuildingOfficeIcon,
   FlagIcon
 } from '@heroicons/react/24/outline';
+import { TaskManager } from '../../../components/shared/TaskManager';
 import { SearchableDropdown } from '../../../components/ui/SearchableDropdown';
 import { apiService } from '../../../services/api';
 
@@ -48,6 +49,7 @@ const EnhancedTaskManager: React.FC<{
   });
   const [exchanges, setExchanges] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -55,23 +57,26 @@ const EnhancedTaskManager: React.FC<{
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [exchangesResponse, usersResponse] = await Promise.all([
+        const [exchangesResponse, usersResponse, tasksResponse] = await Promise.all([
           apiService.getExchanges(),
-          apiService.getUsers()
+          apiService.getUsers(),
+          apiService.getTasks(exchangeId)
         ]);
 
         const exchangesData = (exchangesResponse as any)?.data || exchangesResponse;
         const usersData = (usersResponse as any)?.data || usersResponse;
+        const tasksData = (tasksResponse as any)?.tasks || (Array.isArray(tasksResponse) ? tasksResponse : []);
 
         setExchanges(Array.isArray(exchangesData) ? exchangesData : []);
         setUsers(Array.isArray(usersData) ? usersData : []);
+        setTasks(Array.isArray(tasksData) ? tasksData : []);
       } catch (error) {
         console.error('Error loading data:', error);
       }
     };
 
     loadData();
-  }, []);
+  }, [exchangeId]);
 
   // Update form data when exchangeId prop changes
   useEffect(() => {
@@ -129,6 +134,11 @@ const EnhancedTaskManager: React.FC<{
       setErrors({});
       setShowCreateModal(false);
       
+      // Reload tasks to show the new one
+      const tasksResponse = await apiService.getTasks(exchangeId);
+      const tasksData = (tasksResponse as any)?.tasks || (Array.isArray(tasksResponse) ? tasksResponse : []);
+      setTasks(Array.isArray(tasksData) ? tasksData : []);
+      
       if (onTaskCreated) {
         onTaskCreated();
       }
@@ -145,6 +155,31 @@ const EnhancedTaskManager: React.FC<{
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handleTaskUpdate = async (taskId: string, updates: any) => {
+    try {
+      await apiService.updateTask(taskId, updates);
+      // Reload tasks to get updated data
+      const tasksResponse = await apiService.getTasks(exchangeId);
+      const tasksData = (tasksResponse as any)?.tasks || (Array.isArray(tasksResponse) ? tasksResponse : []);
+      setTasks(Array.isArray(tasksData) ? tasksData : []);
+    } catch (error) {
+      console.error('Error updating task:', error);
+    }
+  };
+
+  const handleTaskRollover = async (taskId: string) => {
+    try {
+      await apiService.rolloverTask(taskId);
+      // Reload tasks to get updated data
+      const tasksResponse = await apiService.getTasks(exchangeId);
+      const tasksData = (tasksResponse as any)?.tasks || (Array.isArray(tasksResponse) ? tasksResponse : []);
+      setTasks(Array.isArray(tasksData) ? tasksData : []);
+    } catch (error) {
+      console.error('Error rolling over task:', error);
+      throw error; // Re-throw so the TaskManager can handle the error UI
     }
   };
 
@@ -223,7 +258,9 @@ const EnhancedTaskManager: React.FC<{
               <ClockIcon className="h-5 w-5 text-blue-600 mr-2" />
               <div>
                 <p className="text-sm font-medium text-blue-900">Pending</p>
-                <p className="text-2xl font-bold text-blue-600">0</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {tasks.filter(t => t.status === 'PENDING').length}
+                </p>
               </div>
             </div>
           </div>
@@ -232,7 +269,9 @@ const EnhancedTaskManager: React.FC<{
               <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 mr-2" />
               <div>
                 <p className="text-sm font-medium text-yellow-900">In Progress</p>
-                <p className="text-2xl font-bold text-yellow-600">0</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {tasks.filter(t => t.status === 'IN_PROGRESS').length}
+                </p>
               </div>
             </div>
           </div>
@@ -241,16 +280,24 @@ const EnhancedTaskManager: React.FC<{
               <CheckCircleIcon className="h-5 w-5 text-green-600 mr-2" />
               <div>
                 <p className="text-sm font-medium text-green-900">Completed</p>
-                <p className="text-2xl font-bold text-green-600">0</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {tasks.filter(t => t.status === 'COMPLETED').length}
+                </p>
               </div>
             </div>
           </div>
-          <div className="bg-purple-50 rounded-lg p-4">
+          <div className="bg-red-50 rounded-lg p-4">
             <div className="flex items-center">
-              <SparklesIcon className="h-5 w-5 text-purple-600 mr-2" />
+              <ExclamationTriangleIcon className="h-5 w-5 text-red-600 mr-2" />
               <div>
-                <p className="text-sm font-medium text-purple-900">AI Suggestions</p>
-                <p className="text-2xl font-bold text-purple-600">0</p>
+                <p className="text-sm font-medium text-red-900">Overdue</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {tasks.filter(t => 
+                    t.dueDate && 
+                    new Date(t.dueDate) < new Date() && 
+                    t.status !== 'COMPLETED'
+                  ).length}
+                </p>
               </div>
             </div>
           </div>
@@ -279,9 +326,19 @@ const EnhancedTaskManager: React.FC<{
           <p>Enhanced Task Board coming soon. Use List view for now.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border p-8 text-center text-gray-500">
-          <TableCellsIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-          <p>List view coming soon. Use Board view for now.</p>
+        <div className="bg-white rounded-xl shadow-sm border">
+          <TaskManager
+            tasks={tasks}
+            exchangeId={exchangeId}
+            onTaskUpdate={handleTaskUpdate}
+            onTaskRollover={handleTaskRollover}
+            onCreateTask={() => setShowCreateModal(true)}
+            showCreateButton={false}
+            compact={compactView}
+            groupBy="status"
+            allowStatusChange={true}
+            className="p-6"
+          />
         </div>
       )}
 

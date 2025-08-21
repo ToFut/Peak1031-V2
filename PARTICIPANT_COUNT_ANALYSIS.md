@@ -97,3 +97,6 @@ The participant count discrepancy is **not a bug** but rather a feature that cor
 - **Chat interface**: Shows all people with access to the exchange
 
 This behavior is appropriate for the different contexts in which these counts are displayed.
+
+
+

@@ -52,7 +52,16 @@ class ApiService {
         baseUrl = 'http://localhost:5001/api';
       }
     }
-    
+
+    // Development override: if env points to 5002 but backend runs on 5001, switch
+    try {
+      const isDev = (process.env.NODE_ENV || 'development') !== 'production';
+      if (isDev && baseUrl && /localhost:5002/.test(baseUrl)) {
+        console.warn('⚠️ Detected dev API port 5002; overriding to 5001 for local backend');
+        baseUrl = 'http://localhost:5001/api';
+      }
+    } catch {}
+
     this.baseURL = baseUrl.replace(/\/+$/, '');
     console.log('🔗 API base URL:', this.baseURL);
     console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
@@ -116,6 +125,21 @@ class ApiService {
       return isHealthy;
     } catch (error: any) {
       console.warn('⚠️ Backend health check failed:', error.name === 'AbortError' ? 'Timeout' : error.message);
+      // In development, auto-fallback from :5002 to :5001 if reachable
+      const isDev = (process.env.NODE_ENV || 'development') !== 'production';
+      if (isDev && /localhost:5002\/api$/.test(this.baseURL)) {
+        const fallback = 'http://localhost:5001/api';
+        try {
+          const resp = await fetch(`${fallback}/health`, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+          if (resp.ok) {
+            console.log('✅ Fallback to port 5001 successful. Updating API base URL.');
+            this.baseURL = fallback;
+            this.setConnectionStatus(true);
+            this.lastHealthCheck = Date.now();
+            return true;
+          }
+        } catch {}
+      }
       this.setConnectionStatus(false);
       return false;
     }
@@ -749,6 +773,20 @@ class ApiService {
   async deleteTask(id: string): Promise<void> {
     return await this.request(`/tasks/${id}`, {
       method: 'DELETE'
+    });
+  }
+
+  async rolloverTask(id: string): Promise<{ success: boolean; message?: string; data?: any }> {
+    return await this.request('/tasks/rollover/tasks', {
+      method: 'POST',
+      body: JSON.stringify({ taskIds: [id] })
+    });
+  }
+
+  async rolloverMultipleTasks(taskIds: string[]): Promise<{ success: boolean; message?: string; data?: any }> {
+    return await this.request('/tasks/rollover/tasks', {
+      method: 'POST',
+      body: JSON.stringify({ taskIds })
     });
   }
 

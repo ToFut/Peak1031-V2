@@ -29,6 +29,7 @@ export interface UseSmartExchangesReturn {
   // State
   loading: boolean;
   error: string | null;
+  initialized: boolean;
   
   // Pagination
   pagination: ReturnType<PaginationManager['getInfo']>;
@@ -69,6 +70,7 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFiltersState] = useState<FilterOptions>({});
+  const [initialized, setInitialized] = useState<boolean>(false);
   const [sortBy, setSortByState] = useState('created_at');
   const [sortOrder, setSortOrderState] = useState<'asc' | 'desc'>('desc');
 
@@ -118,9 +120,11 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
         ...(options.searchTerm && { search: options.searchTerm })
       });
       
+      const envBase = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+      const baseApi = envBase.replace('localhost:5002', 'localhost:5001');
       const endpoint = `/exchanges?${queryParams.toString()}`;
-      
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}${endpoint}`, {
+
+      const response = await fetch(`${baseApi}${endpoint}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -133,7 +137,7 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
         // If analytics endpoint fails with 401, fall back to regular exchanges
         if (response.status === 401 && endpoint.includes('analytics')) {
           console.warn('Analytics endpoint requires authentication, falling back to regular exchanges');
-          const fallbackResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/exchanges?limit=${options.limit || 30}`, {
+          const fallbackResponse = await fetch(`${baseApi}/exchanges?limit=${options.limit || 30}`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json'
@@ -177,10 +181,10 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
        // Handle response from exchanges endpoint
       let paginatedResponse: PaginatedResponse<Exchange>;
       if (result?.success && result?.exchanges) {
-        // Response format: { success: true, exchanges: [...], total: ..., page: ..., limit: ... }
+        // Response format: { success: true, exchanges: [...], total: ..., page: ..., limit: ..., pagination: {...} }
         paginatedResponse = {
           data: result.exchanges as Exchange[],
-          pagination: {
+          pagination: result.pagination || {
             currentPage: result.page || 1,
             limit: result.limit || options.limit || 30,
             total: result.total || result.exchanges.length,
@@ -291,8 +295,11 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
         setSummary(null);
       }
     } finally {
-      setLoading(false);
       isLoadingMore.current = false;
+      if (!initialized) {
+        setInitialized(true);
+      }
+      setLoading(false);
     }
   }, [filters, sortBy, sortOrder, enableCache, cacheTimeout]);
 
@@ -335,6 +342,7 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
     const pageOptions = paginationManager.current.goToPage(page);
     if (!pageOptions) return;
 
+    setLoading(true);
     setExchanges([]); // Clear current data
     await fetchExchanges(false);
   }, [fetchExchanges]);
@@ -346,6 +354,7 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
     const nextOptions = paginationManager.current.nextPage();
     if (!nextOptions) return;
 
+    setLoading(true);
     setExchanges([]); // Clear current data
     await fetchExchanges(false);
   }, [fetchExchanges]);
@@ -357,6 +366,7 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
     const prevOptions = paginationManager.current.previousPage();
     if (!prevOptions) return;
 
+    setLoading(true);
     setExchanges([]); // Clear current data
     await fetchExchanges(false);
   }, [fetchExchanges]);
@@ -366,6 +376,7 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
    */
   const setPageSize = useCallback(async (size: number) => {
     paginationManager.current.changeLimit(size);
+    setLoading(true);
     setExchanges([]); // Clear current data
     await fetchExchanges(false);
   }, [fetchExchanges]);
@@ -374,6 +385,7 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
    * Set filters
    */
   const setFilters = useCallback((newFilters: Partial<FilterOptions>) => {
+    setLoading(true);
     setFiltersState(prev => ({ ...prev, ...newFilters }));
     paginationManager.current.reset();
   }, []);
@@ -382,6 +394,7 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
    * Clear all filters
    */
   const clearFilters = useCallback(() => {
+    setLoading(true);
     setFiltersState({});
     paginationManager.current.reset();
   }, []);
@@ -393,6 +406,7 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
     setSortByState(field);
     setSortOrderState(order);
     paginationManager.current.reset();
+    setLoading(true);
     setExchanges([]); // Clear current data
   }, []);
 
@@ -470,6 +484,7 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
     // State
     loading,
     error,
+    initialized,
     
     // Pagination
     pagination,
