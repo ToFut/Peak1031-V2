@@ -107,6 +107,17 @@ router.get('/friday-metrics', authenticateToken, requireRole(['admin', 'coordina
       daysUntilClosing: Math.ceil((new Date(ex.closing_date) - now) / (1000 * 60 * 60 * 24))
     }));
 
+    // If database is empty but connected, return demo data
+    if (mtdExchanges.length === 0 && lastMonthExchanges.length === 0 && incoming7Days.length === 0) {
+      console.log('ℹ️ Database is empty, returning demo Friday metrics');
+      return res.json({
+        success: true,
+        metrics: generateDemoFridayMetrics(),
+        generated: now.toISOString(),
+        demo: true
+      });
+    }
+
     // Calculate additional useful metrics
     const averageDealSize = mtdFunding.length > 0 ? amountFundedMTD / mtdFunding.length : 0;
     const monthOverMonthGrowth = lastMonthExchanges.length > 0 
@@ -343,6 +354,90 @@ function calculateAverageTimeToClose(exchanges) {
   }, 0);
   
   return Math.round(totalDays / completedExchanges.length);
+}
+
+// Generate demo Friday metrics when database is empty or has issues
+function generateDemoFridayMetrics() {
+  const now = new Date();
+  
+  return {
+    reportDate: now.toISOString(),
+    monthToDate: {
+      exchangesCreated: 12,
+      amountFunded: 2450000,
+      averageDealSize: 204166
+    },
+    lastMonth: {
+      exchangesCreated: 8,
+      monthOverMonthGrowth: "50.0%"
+    },
+    next7Days: {
+      incomingFunds: {
+        grossSalesPrice: 1850000,
+        projectedNet: 1110000,
+        numberOfDeals: 5,
+        deals: [
+          {
+            exchangeNumber: "E-DEMO-001",
+            amount: 650000,
+            closingDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+            propertyAddress: "123 Demo Street, Sample City, CA",
+            clientName: "Demo Client LLC"
+          },
+          {
+            exchangeNumber: "E-DEMO-002", 
+            amount: 450000,
+            closingDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
+            propertyAddress: "456 Example Ave, Test Town, TX",
+            clientName: "Sample Holdings Inc"
+          }
+        ]
+      },
+      outgoingFunds: {
+        total: 890000,
+        numberOfTransactions: 7,
+        breakdown: {
+          closings: 3,
+          closeouts: 2,
+          emds: 2
+        }
+      }
+    },
+    largestUpcomingFiles: [
+      {
+        exchangeNumber: "E-DEMO-003",
+        grossSalesPrice: 850000,
+        closingDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(),
+        propertyAddress: "789 Large Property Blvd, Big City, FL",
+        clientName: "Major Investment Group",
+        coordinator: "Demo Coordinator",
+        daysUntilClosing: 12
+      },
+      {
+        exchangeNumber: "E-DEMO-004",
+        grossSalesPrice: 720000,
+        closingDate: new Date(Date.now() + 18 * 24 * 60 * 60 * 1000).toISOString(),
+        propertyAddress: "321 Commercial Plaza, Business District, NY",
+        clientName: "Enterprise Solutions LLC",
+        coordinator: "Demo Coordinator",
+        daysUntilClosing: 18
+      },
+      {
+        exchangeNumber: "E-DEMO-005",
+        grossSalesPrice: 650000,
+        closingDate: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString(),
+        propertyAddress: "555 Industrial Park, Manufacturing City, OH",
+        clientName: "Production Partners Inc",
+        coordinator: "Demo Coordinator", 
+        daysUntilClosing: 25
+      }
+    ],
+    summary: {
+      netCashFlow7Days: 220000,
+      totalActiveExchanges: 20,
+      requiresAttention: 1
+    }
+  };
 }
 
 module.exports = router;
