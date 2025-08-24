@@ -929,7 +929,11 @@ router.post('/:id/verify-pin', authenticateToken, requireDocumentAccess('view'),
       return res.status(404).json({ error: 'Document not found' });
     }
 
-    if (!document.pinRequired) {
+    // Handle both camelCase and snake_case field names
+    const pinRequired = document.pinRequired || document.pin_required;
+    const pinHash = document.pinHash || document.pin_hash;
+    
+    if (!pinRequired) {
       return res.status(400).json({ error: 'This document does not require a PIN' });
     }
 
@@ -937,7 +941,7 @@ router.post('/:id/verify-pin', authenticateToken, requireDocumentAccess('view'),
       return res.status(400).json({ error: 'PIN is required' });
     }
 
-    const isValidPin = await bcrypt.compare(pin, document.pinHash);
+    const isValidPin = await bcrypt.compare(pin, pinHash);
     
     if (!isValidPin) {
       // Log failed PIN attempt

@@ -57,6 +57,7 @@ const settingsRoutes = require('./routes/settings');
 const userProfileRoutes = require('./routes/user-profile');
 const performanceRoutes = require('./routes/performance');
 const agencyRoutes = require('./routes/agencies');
+const agencyManagementRoutes = require('./routes/agency');
 const metricsRoutes = require('./routes/metrics');
 
 // Enterprise routes
@@ -324,6 +325,8 @@ class PeakServer {
     this.app.use('/api/mobile-reports', mobileReportsRoutes);
     this.app.use('/api/enhanced-query', enhancedQueryRoutes);
     this.app.use('/api/pp-token-admin', ppTokenAdminRoutes);
+    // Also mount at /api/admin/pp-token for frontend compatibility
+    this.app.use('/api/admin/pp-token', ppTokenAdminRoutes);
     this.app.use('/api/pp-data', ppDataRoutes);
     this.app.use('/api/unified-data', unifiedDataRoutes);
     this.app.use('/api/invitations', invitationRoutes);
@@ -338,6 +341,7 @@ class PeakServer {
     this.app.use('/api/settings', settingsRoutes);
     this.app.use('/api/user-profile', userProfileRoutes);
     this.app.use('/api/agencies', agencyRoutes);
+    this.app.use('/api/agency', agencyManagementRoutes);
 
     this.app.use('/api/enterprise-exchanges', enterpriseExchangesRoutes);
     this.app.use('/api/account-management', accountManagementRoutes);

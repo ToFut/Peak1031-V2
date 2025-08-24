@@ -18,16 +18,18 @@ export function VirtualizedList<T>({
   const [scrollTop, setScrollTop] = useState(0);
 
   const visibleRange = useMemo(() => {
+    const itemList = items || [];
     const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
     const endIndex = Math.min(
-      items.length - 1,
+      itemList.length - 1,
       Math.ceil((scrollTop + containerHeight) / itemHeight) + overscan
     );
     
     return { startIndex, endIndex };
-  }, [scrollTop, itemHeight, containerHeight, items.length, overscan]);
+  }, [scrollTop, itemHeight, containerHeight, items, overscan]);
 
-  const totalHeight = items.length * itemHeight;
+  const itemList = items || [];
+  const totalHeight = itemList.length * itemHeight;
   const offsetY = visibleRange.startIndex * itemHeight;
 
   const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
@@ -35,7 +37,8 @@ export function VirtualizedList<T>({
   };
 
   const visibleItems = useMemo(() => {
-    return items.slice(visibleRange.startIndex, visibleRange.endIndex + 1);
+    const itemList = items || [];
+    return itemList.slice(visibleRange.startIndex, visibleRange.endIndex + 1);
   }, [items, visibleRange.startIndex, visibleRange.endIndex]);
 
   return (
@@ -54,7 +57,7 @@ export function VirtualizedList<T>({
             right: 0,
           }}
         >
-          {visibleItems.map((item, index) =>
+          {(visibleItems || []).map((item, index) =>
             renderItem(item, visibleRange.startIndex + index)
           )}
         </div>

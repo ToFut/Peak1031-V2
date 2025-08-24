@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Agency Assignments</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .error { color: red; }
+        .success { color: green; }
+        .info { color: blue; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow: auto; }
+        select { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Agency Assignments Debug Tool</h1>
+    
+    <div class="section">
+        <h2>1️⃣ Authentication</h2>
+        <button onclick="login()">Login as Admin</button>
+        <button onclick="checkToken()">Check Current Token</button>
+        <div id="auth-status"></div>
+    </div>
+    
+    <div class="section">
+        <h2>2️⃣ API Endpoints</h2>
+        <button onclick="testAgenciesAPI()">Test Agencies API</button>
+        <button onclick="testThirdPartiesAPI()">Test Third Parties API</button>
+        <button onclick="testAssignmentsAPI()">Test Assignments API</button>
+        <div id="api-status"></div>
+    </div>
+    
+    <div class="section">
+        <h2>3️⃣ Frontend Simulation</h2>
+        <button onclick="simulateAgencyAssignments()">Simulate AgencyAssignments Component</button>
+        <div id="simulation-results"></div>
+    </div>
+    
+    <div class="section">
+        <h2>4️⃣ Create Assignment</h2>
+        <div>
+            <label>Agency: </label>
+            <select id="agency-select">
+                <option value="">Select Agency</option>
+            </select>
+        </div>
+        <div>
+            <label>Third Party: </label>
+            <select id="third-party-select">
+                <option value="">Select Third Party</option>
+            </select>
+        </div>
+        <button onclick="createAssignment()">Create Assignment</button>
+        <div id="assignment-result"></div>
+    </div>
+
+    <script>
+        let currentToken = null;
+        
+        // Get API base URL
+        const API_BASE = window.location.origin.replace(':3000', ':5001') + '/api';
+        
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            element.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        async function login() {
+            log('auth-status', '🔑 Attempting admin login...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@peak1031.com',
+                        password: 'admin123'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    currentToken = data.token;
+                    localStorage.setItem('token', currentToken);
+                    log('auth-status', '✅ Login successful! Token stored.', 'success');
+                } else {
+                    const error = await response.text();
+                    log('auth-status', `❌ Login failed: ${error}`, 'error');
+                }
+            } catch (error) {
+                log('auth-status', `❌ Login error: ${error.message}`, 'error');
+            }
+        }
+        
+        function checkToken() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                currentToken = token;
+                log('auth-status', `✅ Token found in localStorage: ${token.substring(0, 20)}...`, 'success');
+            } else {
+                log('auth-status', '❌ No token found in localStorage', 'error');
+            }
+        }
+        
+        async function testAgenciesAPI() {
+            const token = currentToken || localStorage.getItem('token');
+            if (!token) {
+                log('api-status', '❌ No token available. Please login first.', 'error');
+                return;
+            }
+            
+            log('api-status', '🏢 Testing agencies API...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/agency/contacts?type=agency`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('api-status', `✅ Agencies API: ${data.count || 0} agencies found`, 'success');
+                    log('api-status', `<pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                    
+                    // Populate agency dropdown
+                    const select = document.getElementById('agency-select');
+                    select.innerHTML = '<option value="">Select Agency</option>';
+                    data.data?.forEach(agency => {
+                        const option = document.createElement('option');
+                        option.value = agency.id;
+                        option.textContent = agency.display_name || `${agency.first_name} ${agency.last_name}`;
+                        select.appendChild(option);
+                    });
+                } else {
+                    const error = await response.text();
+                    log('api-status', `❌ Agencies API failed: ${error}`, 'error');
+                }
+            } catch (error) {
+                log('api-status', `❌ Agencies API error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testThirdPartiesAPI() {
+            const token = currentToken || localStorage.getItem('token');
+            if (!token) {
+                log('api-status', '❌ No token available. Please login first.', 'error');
+                return;
+            }
+            
+            log('api-status', '👥 Testing third parties API...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/agency/contacts?type=third_party`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('api-status', `✅ Third Parties API: ${data.count || 0} third parties found`, 'success');
+                    log('api-status', `<pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                    
+                    // Populate third party dropdown
+                    const select = document.getElementById('third-party-select');
+                    select.innerHTML = '<option value="">Select Third Party</option>';
+                    data.data?.forEach(tp => {
+                        const option = document.createElement('option');
+                        option.value = tp.id;
+                        option.textContent = tp.display_name || `${tp.first_name} ${tp.last_name}`;
+                        select.appendChild(option);
+                    });
+                } else {
+                    const error = await response.text();
+                    log('api-status', `❌ Third Parties API failed: ${error}`, 'error');
+                }
+            } catch (error) {
+                log('api-status', `❌ Third Parties API error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testAssignmentsAPI() {
+            const token = currentToken || localStorage.getItem('token');
+            if (!token) {
+                log('api-status', '❌ No token available. Please login first.', 'error');
+                return;
+            }
+            
+            log('api-status', '🔗 Testing assignments API...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/agency/assignments`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('api-status', `✅ Assignments API: ${data.count || 0} assignments found`, 'success');
+                    log('api-status', `<pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                } else {
+                    const error = await response.text();
+                    log('api-status', `❌ Assignments API failed: ${error}`, 'error');
+                }
+            } catch (error) {
+                log('api-status', `❌ Assignments API error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function simulateAgencyAssignments() {
+            const token = currentToken || localStorage.getItem('token');
+            if (!token) {
+                log('simulation-results', '❌ No token available. Please login first.', 'error');
+                return;
+            }
+            
+            log('simulation-results', '🎭 Simulating AgencyAssignments component loadData()...', 'info');
+            
+            try {
+                // Parallel API calls (same as component)
+                const [assignmentsRes, agenciesRes, thirdPartiesRes] = await Promise.all([
+                    fetch(`${API_BASE}/agency/assignments`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }),
+                    fetch(`${API_BASE}/agency/contacts?type=agency`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }),
+                    fetch(`${API_BASE}/agency/contacts?type=third_party`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                ]);
+                
+                let agencies = [];
+                let thirdParties = [];
+                let assignments = [];
+                
+                if (assignmentsRes.ok) {
+                    const assignmentsData = await assignmentsRes.json();
+                    assignments = assignmentsData.data || [];
+                    log('simulation-results', `✅ Assignments loaded: ${assignments.length}`, 'success');
+                }
+                
+                if (agenciesRes.ok) {
+                    const agenciesData = await agenciesRes.json();
+                    agencies = agenciesData.data || [];
+                    log('simulation-results', `✅ Agencies loaded: ${agencies.length}`, 'success');
+                } else {
+                    log('simulation-results', `❌ Agencies failed: ${await agenciesRes.text()}`, 'error');
+                }
+                
+                if (thirdPartiesRes.ok) {
+                    const thirdPartiesData = await thirdPartiesRes.json();
+                    thirdParties = thirdPartiesData.data || [];
+                    log('simulation-results', `✅ Third Parties loaded: ${thirdParties.length}`, 'success');
+                } else {
+                    log('simulation-results', `❌ Third Parties failed: ${await thirdPartiesRes.text()}`, 'error');
+                }
+                
+                // Simulate React state updates
+                log('simulation-results', '📊 Final state would be:', 'info');
+                log('simulation-results', `   setAgencies(${JSON.stringify(agencies.map(a => a.display_name || a.first_name + ' ' + a.last_name))})`, 'info');
+                log('simulation-results', `   setThirdParties(${JSON.stringify(thirdParties.map(tp => tp.display_name || tp.first_name + ' ' + tp.last_name))})`, 'info');
+                log('simulation-results', `   setAssignments([${assignments.length} items])`, 'info');
+                
+            } catch (error) {
+                log('simulation-results', `❌ Simulation error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function createAssignment() {
+            const token = currentToken || localStorage.getItem('token');
+            const agencyId = document.getElementById('agency-select').value;
+            const thirdPartyId = document.getElementById('third-party-select').value;
+            
+            if (!token || !agencyId || !thirdPartyId) {
+                log('assignment-result', '❌ Please login and select both agency and third party', 'error');
+                return;
+            }
+            
+            log('assignment-result', '🔗 Creating assignment...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/agency/assignments`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        agencyContactId: agencyId,
+                        thirdPartyContactId: thirdPartyId,
+                        canViewPerformance: true
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('assignment-result', '✅ Assignment created successfully!', 'success');
+                    log('assignment-result', `<pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                } else {
+                    const error = await response.text();
+                    log('assignment-result', `❌ Assignment creation failed: ${error}`, 'error');
+                }
+            } catch (error) {
+                log('assignment-result', `❌ Assignment error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Auto-check token on page load
+        window.addEventListener('load', () => {
+            checkToken();
+            log('auth-status', `🌐 API Base URL: ${API_BASE}`, 'info');
+        });
+    </script>
+</body>
+</html>

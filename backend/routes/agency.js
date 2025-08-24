@@ -502,11 +502,27 @@ router.post('/assign-third-party', authenticateToken, requireRole(['admin']), as
       .single();
     
     // Verify the contacts have the correct types
-    if (!agency || !agency.contact_type?.includes('agency')) {
+    // Parse contact_type JSON strings
+    let agencyTypes = [];
+    let thirdPartyTypes = [];
+    
+    try {
+      agencyTypes = typeof agency?.contact_type === 'string' 
+        ? JSON.parse(agency.contact_type) 
+        : agency?.contact_type || [];
+      thirdPartyTypes = typeof thirdParty?.contact_type === 'string' 
+        ? JSON.parse(thirdParty.contact_type) 
+        : thirdParty?.contact_type || [];
+    } catch (error) {
+      console.error('Error parsing contact types:', error);
+      return res.status(400).json({ error: 'Invalid contact type data' });
+    }
+    
+    if (!agency || !Array.isArray(agencyTypes) || !agencyTypes.includes('agency')) {
       return res.status(404).json({ error: 'Agency not found or contact is not an agency type' });
     }
     
-    if (!thirdParty || !thirdParty.contact_type?.includes('third_party')) {
+    if (!thirdParty || !Array.isArray(thirdPartyTypes) || !thirdPartyTypes.includes('third_party')) {
       return res.status(404).json({ error: 'Third party not found or contact is not a third party type' });
     }
     
@@ -776,14 +792,29 @@ router.get('/contacts', authenticateToken, requireRole(['admin']), async (req, r
       return res.status(500).json({ error: 'Failed to fetch contacts' });
     }
     
-    // Filter out contacts that don't have the right type (in case contains doesn't work as expected)
+    // Filter out contacts that don't have the right type
+    // Note: contact_type is stored as JSON string in database, need to parse it
     const filteredContacts = contacts?.filter(contact => {
-      if (type === 'agency') {
-        return contact.contact_type?.includes('agency');
-      } else if (type === 'third_party') {
-        return contact.contact_type?.includes('third_party');
+      if (!contact.contact_type) return false;
+      
+      try {
+        // Parse contact_type if it's a JSON string
+        const contactTypes = typeof contact.contact_type === 'string' 
+          ? JSON.parse(contact.contact_type) 
+          : contact.contact_type;
+        
+        if (!Array.isArray(contactTypes)) return false;
+        
+        if (type === 'agency') {
+          return contactTypes.includes('agency');
+        } else if (type === 'third_party') {
+          return contactTypes.includes('third_party');
+        }
+        return true; // Return all if no type filter
+      } catch (error) {
+        console.error('Error parsing contact_type:', error);
+        return false;
       }
-      return true; // Return all if no type filter
     }) || [];
     
     console.log(`✅ Returning ${filteredContacts.length} contacts`);

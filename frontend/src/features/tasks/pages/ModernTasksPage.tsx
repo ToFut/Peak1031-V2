@@ -60,7 +60,8 @@ const ModernTasksPage: React.FC = () => {
         key={refreshKey}
         onTaskSelect={handleTaskSelect}
         onCreateClick={() => setShowCreateModal(true)}
-        initialView="kanban"
+        initialView="list"
+        defaultViews={['list', 'calendar']}
       />
 
       {selectedTask && (

@@ -144,17 +144,73 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// Get contact by ID
+// Get contact by ID with full PP data
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const contact = await databaseService.getContactById(req.params.id);
+    console.log('📧 Getting contact with full PP data:', req.params.id);
     
-    if (!contact) {
-      return res.status(404).json({ error: 'Contact not found' });
+    // Get contact with all PP fields from Supabase
+    const { data: contact, error } = await supabase
+      .from('people')
+      .select(`
+        *,
+        pp_id,
+        pp_account_ref_id,
+        pp_account_ref_display_name,
+        pp_is_primary_contact,
+        pp_display_name,
+        pp_first_name,
+        pp_middle_name,
+        pp_last_name,
+        pp_phone_mobile,
+        pp_phone_work,
+        pp_email,
+        pp_notes,
+        pp_custom_field_values,
+        pp_company,
+        pp_raw_data,
+        pp_synced_at,
+        pp_created_at,
+        pp_updated_at,
+        phone_primary,
+        phone_mobile,
+        phone_work,
+        phone_home,
+        phone_fax
+      `)
+      .eq('id', req.params.id)
+      .single();
+    
+    if (error || !contact) {
+      console.log('❌ Contact not found in people table, checking contacts table');
+      
+      // Fallback to contacts table
+      const { data: fallbackContact, error: fallbackError } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('id', req.params.id)
+        .single();
+        
+      if (fallbackError || !fallbackContact) {
+        return res.status(404).json({ error: 'Contact not found' });
+      }
+      
+      console.log('✅ Found contact in contacts table with PP data');
+      return res.json({ 
+        data: transformToCamelCase(fallbackContact),
+        ppData: fallbackContact.pp_raw_data || {},
+        hasPPData: !!fallbackContact.pp_id
+      });
     }
 
-    res.json({ data: contact });
+    console.log('✅ Found contact in people table with PP data');
+    res.json({ 
+      data: transformToCamelCase(contact),
+      ppData: contact.pp_raw_data || {},
+      hasPPData: !!contact.pp_id
+    });
   } catch (error) {
+    console.error('❌ Error fetching contact:', error);
     res.status(500).json({ error: error.message });
   }
 });

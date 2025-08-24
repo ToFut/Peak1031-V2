@@ -61,10 +61,12 @@ interface Document {
   size: number;
   status: string;
   versions?: number;
+  pinRequired?: boolean;
+  pinProtected?: boolean;
 }
 
 const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId }) => {
-  const { user } = useAuth();
+  const { } = useAuth();
   const { isAdmin, isCoordinator, isClient } = usePermissions();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
@@ -88,6 +90,13 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
   const [showFolderView, setShowFolderView] = useState(false);
   const [folders, setFolders] = useState<any[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [showPinModal, setShowPinModal] = useState<string | null>(null);
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [verifiedDocuments, setVerifiedDocuments] = useState<Set<string>>(new Set());
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [showDocumentActions, setShowDocumentActions] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'view' | 'download' | null>(null);
   
   const categories = ['all', 'contract', 'financial', 'legal', 'identification', 'deed', 'other'];
 
@@ -210,12 +219,33 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
       );
     }
 
-    // Filter by selected folder
+    // Filter by selected folder (virtual folders based on categories)
     if (selectedFolderId) {
-      filtered = filtered.filter(doc => {
-        const docAny = doc as any;
-        return docAny.folderId === selectedFolderId || docAny.folder_id === selectedFolderId;
-      });
+      // Extract category from virtual folder ID
+      if (selectedFolderId.startsWith('virtual-')) {
+        const parts = selectedFolderId.split('-');
+        if (parts.length >= 3) {
+          const category = parts.slice(2).join('-'); // Handle categories with hyphens
+          
+          filtered = filtered.filter(doc => {
+            const docCategory = (doc.category || 'general').toLowerCase();
+            
+            if (category === 'general') {
+              // For general folder, include documents with null/empty/general category
+              return docCategory === 'general' || docCategory === '' || !doc.category;
+            } else {
+              // For specific categories, match exactly
+              return docCategory === category.toLowerCase();
+            }
+          });
+        }
+      } else {
+        // Handle real folder IDs (when folders table exists)
+        filtered = filtered.filter(doc => {
+          const docAny = doc as any;
+          return docAny.folderId === selectedFolderId || docAny.folder_id === selectedFolderId;
+        });
+      }
     }
 
     setFilteredDocuments(filtered);
@@ -254,6 +284,22 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
   };
 
   const handleDownload = async (document: Document) => {
+    // Check if document requires PIN and is not verified
+    console.log('📄 Document PIN check:', {
+      id: document.id,
+      fileName: document.fileName,
+      pinRequired: document.pinRequired,
+      pinProtected: document.pinProtected,
+      isVerified: verifiedDocuments.has(document.id)
+    });
+    
+    if ((document.pinRequired || document.pinProtected) && !verifiedDocuments.has(document.id)) {
+      console.log('🔒 Opening PIN modal for document:', document.id);
+      setPendingAction('download');
+      setShowPinModal(document.id);
+      return;
+    }
+
     try {
       const blob = await apiService.downloadDocument(document.id);
       const url = window.URL.createObjectURL(blob);
@@ -286,6 +332,22 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
   };
 
   const handlePreview = (document: Document) => {
+    // Check if document requires PIN and is not verified
+    console.log('👁️ Preview PIN check:', {
+      id: document.id,
+      fileName: document.fileName,
+      pinRequired: document.pinRequired,
+      pinProtected: document.pinProtected,
+      isVerified: verifiedDocuments.has(document.id)
+    });
+    
+    if ((document.pinRequired || document.pinProtected) && !verifiedDocuments.has(document.id)) {
+      console.log('🔒 Opening PIN modal for document:', document.id);
+      setPendingAction('view');
+      setShowPinModal(document.id);
+      return;
+    }
+
     // Create a preview modal or open in new tab
     const previewUrl = `${process.env.REACT_APP_API_URL || window.location.origin + '/api'}/documents/${document.id}/preview`;
     window.open(previewUrl, '_blank');
@@ -389,6 +451,57 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
     );
   };
 
+  const handlePinVerification = async (documentId: string) => {
+    if (pin.length !== 4) {
+      setPinError('PIN must be 4 digits');
+      return;
+    }
+
+    console.log('🔐 Verifying PIN for document:', documentId, 'PIN:', pin);
+
+    try {
+      // Call API to verify PIN
+      const response = await apiService.verifyDocumentPin(documentId, pin);
+      console.log('🔐 PIN verification response:', response);
+      
+      if (response.success) {
+        console.log('✅ PIN verified successfully');
+        setVerifiedDocuments(prev => new Set(prev.add(documentId)));
+        setShowPinModal(null);
+        setPin('');
+        setPinError('');
+        
+        // Continue with the pending action
+        if (pendingAction === 'view') {
+          const document = documents.find(d => d.id === documentId);
+          if (document) {
+            const previewUrl = `${process.env.REACT_APP_API_URL || window.location.origin + '/api'}/documents/${document.id}/preview`;
+            window.open(previewUrl, '_blank');
+          }
+        } else if (pendingAction === 'download') {
+          const document = documents.find(d => d.id === documentId);
+          if (document) {
+            handleDownload(document);
+          }
+        }
+        setPendingAction(null);
+      } else {
+        console.log('❌ PIN verification failed');
+        setPinError('Invalid PIN. Please try again.');
+      }
+    } catch (error: any) {
+      console.error('❌ PIN verification error:', error);
+      // Handle different error types
+      if (error.response?.status === 401) {
+        setPinError('Invalid PIN. Please try again.');
+      } else if (error.response?.status === 404) {
+        setPinError('Document not found.');
+      } else {
+        setPinError('PIN verification failed. Please try again.');
+      }
+    }
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -410,6 +523,65 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
       case 'deed': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const handleRowClick = (document: Document) => {
+    setSelectedDocument(document);
+    setShowDocumentActions(true);
+  };
+
+  const handleDocumentAction = (action: string, document: Document) => {
+    setShowDocumentActions(false);
+    
+    switch (action) {
+      case 'view':
+        handlePreview(document);
+        break;
+      case 'download':
+        handleDownload(document);
+        break;
+      case 'share':
+        setShowShareModal(document.id);
+        break;
+      case 'versions':
+        loadDocumentVersions(document.id);
+        break;
+      case 'delete':
+        handleDelete(document.id);
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Helper function to count documents for a folder
+  const getDocumentCountForFolder = (folder: any) => {
+    if (!folder.id || !folder.id.startsWith('virtual-')) {
+      return folder.document_count || 0;
+    }
+
+    // Extract category from virtual folder ID
+    const parts = folder.id.split('-');
+    if (parts.length >= 3) {
+      const category = parts.slice(2).join('-').toLowerCase();
+      
+      // Count documents that match this category
+      const count = documents.filter(doc => {
+        const docCategory = (doc.category || 'general').toLowerCase();
+        
+        if (category === 'general') {
+          // For general folder, include documents with null/empty/general category
+          return docCategory === 'general' || docCategory === '' || !doc.category;
+        } else {
+          // For specific categories, match exactly
+          return docCategory === category;
+        }
+      }).length;
+      
+      return count;
+    }
+    
+    return folder.document_count || 0;
   };
 
   return (
@@ -711,7 +883,7 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
 
       {/* Documents Tab */}
       {activeTab === 'documents' && (
-        <div className="bg-white rounded-lg shadow border overflow-hidden">
+        <div className="bg-white rounded-lg shadow border">
           {/* Folder View */}
           {showFolderView && folders.length > 0 && (
             <div className="p-4 border-b border-gray-200 bg-gray-50">
@@ -730,7 +902,7 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
                     <FolderIcon className="h-5 w-5 mr-2 flex-shrink-0" />
                     <span className="text-sm truncate">{folder.name || 'Unnamed Folder'}</span>
                     <span className="ml-auto text-xs text-gray-500">
-                      ({folder.document_count || 0})
+                      ({getDocumentCountForFolder(folder)})
                     </span>
                   </button>
                 ))}
@@ -767,102 +939,176 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
                 </label>
               </div>
 
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Select
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Document
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Category
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Size
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Uploaded
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+              {/* Responsive Card Layout for Mobile and Table for Desktop */}
+              <div className="block lg:hidden">
+                {/* Mobile Card View */}
+                <div className="divide-y divide-gray-200">
                   {filteredDocuments.map(document => (
-                    <tr key={document.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <input
-                          type="checkbox"
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          checked={selectedDocuments.includes(document.id)}
-                          onChange={() => toggleDocumentSelection(document.id)}
-                        />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <DocumentTextIcon className="h-6 w-6 text-gray-400 mr-3" />
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
+                    <div 
+                      key={document.id} 
+                      className="p-4 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => handleRowClick(document)}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1"
+                            checked={selectedDocuments.includes(document.id)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              toggleDocumentSelection(document.id);
+                            }}
+                          />
+                        </div>
+                        <div className="relative mr-3 flex-shrink-0">
+                          <DocumentTextIcon className="h-8 w-8 text-gray-400" />
+                          {(document.pinRequired || document.pinProtected) && (
+                            <LockClosedIcon className="h-3 w-3 text-red-600 absolute -top-1 -right-1 bg-white rounded-full" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <p className="text-sm font-medium text-gray-900 truncate">
                               {document.fileName}
-                            </div>
-                            {document.uploadedBy && (
-                              <div className="text-xs text-gray-500">
-                                By: {document.uploadedBy}
-                              </div>
+                            </p>
+                            {(document.pinRequired || document.pinProtected) && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                <LockClosedIcon className="w-3 h-3 mr-1" />
+                                PIN
+                              </span>
+                            )}
+                            {verifiedDocuments.has(document.id) && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <CheckIcon className="w-3 h-3 mr-1" />
+                                ✓
+                              </span>
                             )}
                           </div>
+                          <div className="flex items-center space-x-4 text-xs text-gray-500">
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getCategoryColor(document.category)}`}>
+                              {document.category}
+                            </span>
+                            <span>{formatFileSize(document.size)}</span>
+                            <span>{formatDate(document.uploadedAt)}</span>
+                          </div>
+                          {document.uploadedBy && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              By: {document.uploadedBy}
+                            </p>
+                          )}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getCategoryColor(document.category)}`}>
-                          {document.category}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatFileSize(document.size)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(document.uploadedAt)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => loadDocumentVersions(document.id)}
-                            className="text-blue-600 hover:text-blue-900"
-                            title="View Versions"
-                          >
-                            <ClockIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => setShowShareModal(document.id)}
-                            className="text-green-600 hover:text-green-900"
-                            title="Share Document"
-                          >
-                            <ShareIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDownload(document)}
-                            className="text-gray-400 hover:text-gray-600"
-                            title="Download"
-                          >
-                            <ArrowDownTrayIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(document.id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Delete"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden lg:block">
+                <div className="min-w-full">
+                  <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+                    <div className="grid grid-cols-12 gap-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <div className="col-span-1">Select</div>
+                      <div className="col-span-4">Document</div>
+                      <div className="col-span-2">Category</div>
+                      <div className="col-span-1">Size</div>
+                      <div className="col-span-2">Uploaded</div>
+                      <div className="col-span-2">Actions</div>
+                    </div>
+                  </div>
+                  <div className="bg-white divide-y divide-gray-200">
+                    {filteredDocuments.map(document => (
+                      <div 
+                        key={document.id} 
+                        className="px-6 py-4 hover:bg-gray-50 cursor-pointer"
+                        onClick={() => handleRowClick(document)}
+                      >
+                        <div className="grid grid-cols-12 gap-4 items-center">
+                          <div className="col-span-1">
+                            <input
+                              type="checkbox"
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              checked={selectedDocuments.includes(document.id)}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                toggleDocumentSelection(document.id);
+                              }}
+                            />
+                          </div>
+                          <div className="col-span-4">
+                            <div className="flex items-center space-x-3">
+                              <div className="relative flex-shrink-0">
+                                <DocumentTextIcon className="h-6 w-6 text-gray-400" />
+                                {(document.pinRequired || document.pinProtected) && (
+                                  <LockClosedIcon className="h-3 w-3 text-red-600 absolute -top-1 -right-1 bg-white rounded-full" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center space-x-2">
+                                  <p className="text-sm font-medium text-gray-900 truncate">
+                                    {document.fileName}
+                                  </p>
+                                  {(document.pinRequired || document.pinProtected) && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                      <LockClosedIcon className="w-3 h-3 mr-1" />
+                                      PIN Required
+                                    </span>
+                                  )}
+                                  {verifiedDocuments.has(document.id) && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                      <CheckIcon className="w-3 h-3 mr-1" />
+                                      Verified
+                                    </span>
+                                  )}
+                                </div>
+                                {document.uploadedBy && (
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    By: {document.uploadedBy}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-span-2">
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getCategoryColor(document.category)}`}>
+                              {document.category}
+                            </span>
+                          </div>
+                          <div className="col-span-1">
+                            <p className="text-sm text-gray-900">
+                              {formatFileSize(document.size)}
+                            </p>
+                          </div>
+                          <div className="col-span-2">
+                            <p className="text-sm text-gray-500">
+                              {formatDate(document.uploadedAt)}
+                            </p>
+                          </div>
+                          <div className="col-span-2">
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handlePreview(document); }}
+                                className="text-blue-600 hover:text-blue-900"
+                                title={(document.pinRequired || document.pinProtected) && !verifiedDocuments.has(document.id) ? 'PIN required to view' : 'View document'}
+                              >
+                                <EyeIcon className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDownload(document); }}
+                                className="text-gray-400 hover:text-gray-600"
+                                title={(document.pinRequired || document.pinProtected) && !verifiedDocuments.has(document.id) ? 'PIN required to download' : 'Download document'}
+                              >
+                                <ArrowDownTrayIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </>
           ) : (
             <div className="text-center py-12">
@@ -1024,6 +1270,180 @@ const EnhancedDocumentManager: React.FC<{ exchangeId?: string }> = ({ exchangeId
                 <LinkIcon className="h-4 w-4 mr-2" />
                 Create Share Link
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Actions Modal */}
+      {showDocumentActions && selectedDocument && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <div className="relative mr-3">
+                  <DocumentTextIcon className="w-6 h-6 text-gray-400" />
+                  {(selectedDocument.pinRequired || selectedDocument.pinProtected) && (
+                    <LockClosedIcon className="h-3 w-3 text-red-600 absolute -top-1 -right-1 bg-white rounded-full" />
+                  )}
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Document Actions</h3>
+              </div>
+              <button
+                onClick={() => setShowDocumentActions(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <p className="text-sm font-medium text-gray-900">
+                  {selectedDocument.fileName}
+                </p>
+                {(selectedDocument.pinRequired || selectedDocument.pinProtected) && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    <LockClosedIcon className="w-3 h-3 mr-1" />
+                    PIN Required
+                  </span>
+                )}
+                {verifiedDocuments.has(selectedDocument.id) && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <CheckIcon className="w-3 h-3 mr-1" />
+                    Verified
+                  </span>
+                )}
+              </div>
+              <div className="mt-1 text-xs text-gray-500">
+                <p>Category: <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getCategoryColor(selectedDocument.category)}`}>
+                  {selectedDocument.category}
+                </span></p>
+                <p>Size: {formatFileSize(selectedDocument.size)}</p>
+                <p>Uploaded: {formatDate(selectedDocument.uploadedAt)}</p>
+                {selectedDocument.uploadedBy && <p>By: {selectedDocument.uploadedBy}</p>}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                onClick={() => handleDocumentAction('view', selectedDocument)}
+                className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <EyeIcon className="w-5 h-5 mr-2" />
+                {(selectedDocument.pinRequired || selectedDocument.pinProtected) && !verifiedDocuments.has(selectedDocument.id) ? 'View (PIN Required)' : 'View Document'}
+              </button>
+              
+              <button
+                onClick={() => handleDocumentAction('download', selectedDocument)}
+                className="w-full flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <ArrowDownTrayIcon className="w-5 h-5 mr-2" />
+                {(selectedDocument.pinRequired || selectedDocument.pinProtected) && !verifiedDocuments.has(selectedDocument.id) ? 'Download (PIN Required)' : 'Download'}
+              </button>
+              
+              <button
+                onClick={() => handleDocumentAction('share', selectedDocument)}
+                className="w-full flex items-center justify-center px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                <ShareIcon className="w-5 h-5 mr-2" />
+                Share Document
+              </button>
+              
+              <button
+                onClick={() => handleDocumentAction('versions', selectedDocument)}
+                className="w-full flex items-center justify-center px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <ClockIcon className="w-5 h-5 mr-2" />
+                View Versions
+              </button>
+              
+              <button
+                onClick={() => handleDocumentAction('delete', selectedDocument)}
+                className="w-full flex items-center justify-center px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <TrashIcon className="w-5 h-5 mr-2" />
+                Delete Document
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PIN Verification Modal */}
+      {showPinModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center mb-4">
+              <LockClosedIcon className="w-6 h-6 text-red-600 mr-2" />
+              <h3 className="text-lg font-semibold text-gray-900">PIN Protected Document</h3>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">
+                This document requires PIN verification to access:
+              </p>
+              <p className="text-sm font-medium text-gray-900">
+                {documents.find(d => d.id === showPinModal)?.fileName || 'Document'}
+              </p>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); handlePinVerification(showPinModal); }} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Enter 4-digit PIN
+                </label>
+                <input
+                  type="password"
+                  maxLength={4}
+                  value={pin}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '');
+                    setPin(value);
+                    setPinError('');
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-2xl tracking-widest"
+                  placeholder="****"
+                  autoFocus
+                />
+                {pinError && (
+                  <p className="mt-1 text-sm text-red-600 flex items-center">
+                    <XMarkIcon className="w-4 h-4 mr-1" />
+                    {pinError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPinModal(null);
+                    setPin('');
+                    setPinError('');
+                  }}
+                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={pin.length !== 4}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  Verify PIN
+                </button>
+              </div>
+            </form>
+
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <div className="flex items-start">
+                <LockClosedIcon className="w-4 h-4 text-yellow-600 mr-2 mt-0.5" />
+                <div className="text-xs text-yellow-800">
+                  <p className="font-medium">Security Notice:</p>
+                  <p>All document access is logged for audit purposes. Unauthorized access attempts will be reported.</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

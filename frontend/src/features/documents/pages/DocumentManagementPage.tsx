@@ -171,12 +171,36 @@ const DocumentManagementPage: React.FC<DocumentManagementPageProps> = ({ exchang
   const filteredDocuments = useMemo(() => {
     let filtered = documents;
 
-    // Filter by selected folder
+    // Filter by selected folder (virtual folders based on categories)
     if (selectedFolder) {
-      filtered = filtered.filter(doc => doc.folder_id === selectedFolder.id);
+      // Extract category from virtual folder ID
+      if (selectedFolder.id.startsWith('virtual-')) {
+        const parts = selectedFolder.id.split('-');
+        if (parts.length >= 3) {
+          const category = parts.slice(2).join('-'); // Handle categories with hyphens
+          
+          filtered = filtered.filter(doc => {
+            const docCategory = (doc.category || 'general').toLowerCase();
+            
+            if (category === 'general') {
+              // For general folder, include documents with null/empty/general category
+              return docCategory === 'general' || docCategory === '' || !doc.category;
+            } else {
+              // For specific categories, match exactly
+              return docCategory === category.toLowerCase();
+            }
+          });
+        }
+      } else {
+        // Handle real folder IDs (when folders table exists)
+        filtered = filtered.filter(doc => doc.folder_id === selectedFolder.id);
+      }
     } else {
-      // Show documents without folders (root level)
-      filtered = filtered.filter(doc => !doc.folder_id);
+      // Show documents without folders (root level) - only when not using virtual folders
+      const hasVirtualFolders = folders.some(f => f.id && f.id.startsWith('virtual-'));
+      if (!hasVirtualFolders) {
+        filtered = filtered.filter(doc => !doc.folder_id);
+      }
     }
 
     // Filter by search term

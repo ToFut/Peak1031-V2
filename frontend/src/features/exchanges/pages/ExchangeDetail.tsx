@@ -27,7 +27,8 @@ import {
   Zap,
   Building2,
   Target,
-  Briefcase
+  Briefcase,
+  Banknote
 } from 'lucide-react';
 
 // Tab Components
@@ -426,7 +427,7 @@ const ExchangeDetail: React.FC = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Header */}
+        {/* Header with Timeline */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl sm:rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 text-white">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
@@ -438,21 +439,33 @@ const ExchangeDetail: React.FC = () => {
                 Back to Exchanges
               </button>
               
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2">{exchange.name || `Exchange #${exchange.exchangeNumber}`}</h1>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2">
+                {exchange.pp_display_name || exchange.name || `Exchange #${exchange.exchangeNumber}`}
+              </h1>
               
               <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-blue-100">
                 <span className="flex items-center">
                   <Users className="w-4 h-4 mr-1" />
                   {exchange.client?.firstName} {exchange.client?.lastName}
                 </span>
-                <span className="flex items-center">
-                  <Calendar className="w-4 h-4 mr-1" />
-                  Created {new Date(exchange.createdAt || '').toLocaleDateString()}
-                </span>
-                <span className="flex items-center">
-                  <DollarSign className="w-4 h-4 mr-1" />
-                  ${((exchange.exchangeValue || 0) / 1000000).toFixed(1)}M
-                </span>
+                {exchange.type_of_exchange && (
+                  <span className="flex items-center">
+                    <Building2 className="w-4 h-4 mr-1" />
+                    {exchange.type_of_exchange}
+                  </span>
+                )}
+                {exchange.bank && (
+                  <span className="flex items-center">
+                    <DollarSign className="w-4 h-4 mr-1" />
+                    {exchange.bank}
+                  </span>
+                )}
+                {exchange.proceeds && (
+                  <span className="flex items-center">
+                    <Banknote className="w-4 h-4 mr-1" />
+                    Proceeds: ${exchange.proceeds.toLocaleString()}
+                  </span>
+                )}
               </div>
             </div>
             
@@ -469,18 +482,37 @@ const ExchangeDetail: React.FC = () => {
                 <span>{exchange.status}</span>
               </div>
               
-              {/* Days remaining */}
-              {daysUntilClosing !== null && daysUntilClosing > 0 && (
-                <div className={`
-                  px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm
-                  ${daysUntilClosing <= 45 ? 'bg-red-500 text-white animate-pulse' :
-                    daysUntilClosing <= 180 ? 'bg-orange-500 text-white' :
-                    'bg-blue-500 text-white'}
-                `}>
-                  <Zap className="w-4 h-4" />
-                  <span>{daysUntilClosing} days left</span>
-                </div>
-              )}
+              {/* Days remaining - now using PP dates */}
+              {(() => {
+                const now = new Date();
+                const day45 = exchange.day_45 ? new Date(exchange.day_45) : null;
+                const day180 = exchange.day_180 ? new Date(exchange.day_180) : null;
+                let daysLeft = null;
+                let isUrgent = false;
+                let label = '';
+                
+                if (day45 && day45 > now) {
+                  daysLeft = Math.ceil((day45.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                  isUrgent = daysLeft <= 10;
+                  label = '45-Day';
+                } else if (day180 && day180 > now) {
+                  daysLeft = Math.ceil((day180.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                  isUrgent = daysLeft <= 30;
+                  label = '180-Day';
+                }
+                
+                return daysLeft !== null ? (
+                  <div className={`
+                    px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm
+                    ${isUrgent ? 'bg-red-500 text-white animate-pulse' :
+                      daysLeft <= 60 ? 'bg-orange-500 text-white' :
+                      'bg-blue-500 text-white'}
+                  `}>
+                    <Zap className="w-4 h-4" />
+                    <span>{daysLeft} days to {label}</span>
+                  </div>
+                ) : null;
+              })()}
               
               {/* Action Menu */}
               <button className="p-1.5 sm:p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
@@ -489,8 +521,110 @@ const ExchangeDetail: React.FC = () => {
             </div>
           </div>
           
+          {/* Visual Timeline with PP Dates */}
+          <div className="mt-6 bg-white/10 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-white">Exchange Timeline</h3>
+              <span className="text-xs text-blue-200">Key Milestones</span>
+            </div>
+            
+            {/* Timeline Events */}
+            <div className="relative">
+              <div className="flex items-center justify-between">
+                {/* Close of Escrow */}
+                {exchange.close_of_escrow_date && (
+                  <div className="flex flex-col items-center text-center flex-1">
+                    <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center mb-2">
+                      <CheckCircle className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="text-xs font-medium">Close of Escrow</div>
+                    <div className="text-xs text-blue-200">
+                      {new Date(exchange.close_of_escrow_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Date Proceeds Received */}
+                {exchange.date_proceeds_received && (
+                  <div className="flex flex-col items-center text-center flex-1">
+                    <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center mb-2">
+                      <DollarSign className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="text-xs font-medium">Proceeds Received</div>
+                    <div className="text-xs text-blue-200">
+                      {new Date(exchange.date_proceeds_received).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}
+                    </div>
+                  </div>
+                )}
+                
+                {/* 45-Day Deadline */}
+                {exchange.day_45 && (() => {
+                  const date45 = new Date(exchange.day_45);
+                  const now = new Date();
+                  const daysTo45 = Math.ceil((date45.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                  const isPast = daysTo45 < 0;
+                  const isUrgent = daysTo45 >= 0 && daysTo45 <= 10;
+                  
+                  return (
+                    <div className="flex flex-col items-center text-center flex-1">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
+                        isPast ? 'bg-gray-400' :
+                        isUrgent ? 'bg-red-500 animate-pulse' :
+                        'bg-yellow-500'
+                      }`}>
+                        <Target className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="text-xs font-medium">DAY 45</div>
+                      <div className="text-xs text-blue-200">
+                        {date45.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}
+                      </div>
+                      {!isPast && (
+                        <div className={`text-xs mt-1 ${isUrgent ? 'text-red-300 font-bold' : 'text-blue-200'}`}>
+                          {daysTo45} days left
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+                
+                {/* 180-Day Deadline */}
+                {exchange.day_180 && (() => {
+                  const date180 = new Date(exchange.day_180);
+                  const now = new Date();
+                  const daysTo180 = Math.ceil((date180.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                  const isPast = daysTo180 < 0;
+                  const isUrgent = daysTo180 >= 0 && daysTo180 <= 30;
+                  
+                  return (
+                    <div className="flex flex-col items-center text-center flex-1">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
+                        isPast ? 'bg-gray-400' :
+                        isUrgent ? 'bg-red-500 animate-pulse' :
+                        'bg-blue-500'
+                      }`}>
+                        <Clock className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="text-xs font-medium">DAY 180</div>
+                      <div className="text-xs text-blue-200">
+                        {date180.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}
+                      </div>
+                      {!isPast && (
+                        <div className={`text-xs mt-1 ${isUrgent ? 'text-red-300 font-bold' : 'text-blue-200'}`}>
+                          {daysTo180} days left
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+              
+              {/* Connecting line */}
+              <div className="absolute top-5 left-12 right-12 h-0.5 bg-white/30 -z-10"></div>
+            </div>
+          </div>
+          
           {/* Progress Bar */}
-          <div className="mt-6">
+          <div className="mt-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-blue-100">Exchange Progress</span>
               <span className="text-sm font-semibold">{exchange.progress || 0}%</span>

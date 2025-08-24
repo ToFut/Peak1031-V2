@@ -14,12 +14,16 @@ export interface FilterOptions {
   status?: string;
   minValue?: number;
   maxValue?: number;
+  valueMin?: number;
+  valueMax?: number;
   exchangeType?: string;
   searchTerm?: string;
   dateRange?: {
     start: string;
     end: string;
   };
+  dateFilter?: string;
+  propertyAddress?: string;
 }
 
 export interface PaginatedResponse<T> {

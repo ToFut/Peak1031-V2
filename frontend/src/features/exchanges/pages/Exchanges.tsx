@@ -95,14 +95,14 @@ const Exchanges: React.FC = () => {
               </div>
 
               {/* Compact Financial Overview */}
-              {analytics.financialOverview && (
+              {analytics.financialOverview && analytics.financialOverview.totalValue && analytics.financialOverview.performanceMetrics && analytics.financialOverview.riskAnalysis && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                   <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-xs font-medium text-blue-600 uppercase tracking-wide">Total Value</p>
                         <p className="text-xl font-bold text-blue-900">
-                          {analytics.formatValue(analytics.financialOverview.totalValue.exchange || analytics.financialOverview.totalValue.relinquished)}
+                          {analytics.formatValue(analytics.financialOverview.totalValue.exchange || analytics.financialOverview.totalValue.relinquished || 0)}
                         </p>
                       </div>
                       <DollarSign className="w-6 h-6 text-blue-600 opacity-70" />
@@ -114,7 +114,7 @@ const Exchanges: React.FC = () => {
                       <div>
                         <p className="text-xs font-medium text-green-600 uppercase tracking-wide">Completion</p>
                         <p className="text-xl font-bold text-green-900">
-                          {analytics.financialOverview.performanceMetrics.completionRate}%
+                          {analytics.financialOverview.performanceMetrics.completionRate || '0'}%
                         </p>
                       </div>
                       <CheckCircle className="w-6 h-6 text-green-600 opacity-70" />
@@ -126,7 +126,7 @@ const Exchanges: React.FC = () => {
                       <div>
                         <p className="text-xs font-medium text-red-600 uppercase tracking-wide">High Risk</p>
                         <p className="text-xl font-bold text-red-900">
-                          {analytics.financialOverview.riskAnalysis.high}
+                          {analytics.financialOverview.riskAnalysis.high || 0}
                         </p>
                       </div>
                       <AlertTriangle className="w-6 h-6 text-red-600 opacity-70" />
@@ -138,7 +138,7 @@ const Exchanges: React.FC = () => {
                       <div>
                         <p className="text-xs font-medium text-purple-600 uppercase tracking-wide">Total</p>
                         <p className="text-xl font-bold text-purple-900">
-                          {analytics.financialOverview.performanceMetrics.totalExchanges.toLocaleString()}
+                          {(analytics.financialOverview.performanceMetrics.totalExchanges || 0).toLocaleString()}
                         </p>
                       </div>
                       <TrendingUp className="w-6 h-6 text-purple-600 opacity-70" />
@@ -373,7 +373,7 @@ const Exchanges: React.FC = () => {
 
         {/* Clean Exchange List */}
         <ExchangeList 
-          title=""
+          title="Your Exchanges"
           showCreateButton={true}
           showFilters={true}
           showSearch={true}

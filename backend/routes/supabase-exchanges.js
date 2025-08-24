@@ -114,7 +114,25 @@ router.get('/', authenticateToken, async (req, res) => {
         .order(sortBy, { ascending: sortOrder });
         
       if (req.query.status) {
-        query = query.eq('status', req.query.status);
+        // Handle special status filter cases to match main exchanges route logic
+        const statusFilter = req.query.status.toLowerCase();
+        if (statusFilter === 'active') {
+          // For "active" filter, match multiple active statuses
+          query = query.in('status', ['active', '45D', '180D', 'In Progress', 'Active']);
+          console.log('🔍 Applied ACTIVE status filter: active, 45D, 180D, In Progress, Active');
+        } else if (statusFilter === 'completed') {
+          // For "completed" filter, match multiple completed statuses
+          query = query.in('status', ['completed', 'COMPLETED', 'Completed']);
+          console.log('🔍 Applied COMPLETED status filter');
+        } else if (statusFilter === 'pending' || statusFilter === 'draft') {
+          // For "pending" filter, match draft/pending statuses
+          query = query.in('status', ['draft', 'pending', 'PENDING', 'Draft']);
+          console.log('🔍 Applied PENDING/DRAFT status filter');
+        } else {
+          // For other statuses, do exact match
+          query = query.eq('status', req.query.status);
+          console.log('🔍 Applied EXACT status filter:', req.query.status);
+        }
       }
       
       query = query.range(offset, offset + limit - 1);

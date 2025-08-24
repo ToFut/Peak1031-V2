@@ -354,9 +354,23 @@ const ReviewStep: React.FC<any> = ({ task, onStepData }) => {
             </div>
           )}
           {task.assigned_to && (
-            <div>
+            <div className="flex items-center gap-2">
               <span className="font-medium text-gray-700">Assigned To:</span>
-              <span className="ml-2">{task.assignedTo || 'Unknown'}</span>
+              <div className="group relative">
+                <div className="w-6 h-6 bg-purple-100 hover:bg-purple-200 rounded-full flex items-center justify-center transition-colors cursor-help">
+                  <span className="text-xs font-medium text-purple-700">
+                    {(task.assignedUser?.firstName || task.assignedUser?.first_name || task.assignedTo || 'U').charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                {/* Tooltip */}
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                  {task.assignedUser?.firstName && task.assignedUser?.lastName 
+                    ? `${task.assignedUser.firstName} ${task.assignedUser.lastName}`
+                    : task.assignedUser?.first_name && task.assignedUser?.last_name
+                      ? `${task.assignedUser.first_name} ${task.assignedUser.last_name}`
+                      : task.assignedTo || 'Unknown'}
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -525,7 +525,7 @@ const StandardizedCoordinatorDashboard: React.FC = () => {
                                   <div className="flex items-center space-x-4 text-sm text-gray-500">
                                     <span>Exchange: {task.exchangeNumber || 'N/A'}</span>
                                     <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
-                                    {task.assignedTo && <span>Assigned to: {task.assignedTo}</span>}
+                                    {task.assignedTo && task.assignedTo !== 'Unassigned' && <span>Assigned to: {task.assignedTo}</span>}
                                   </div>
                                 </div>
                                 <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">

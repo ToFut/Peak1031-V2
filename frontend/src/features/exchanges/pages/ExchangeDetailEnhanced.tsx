@@ -34,7 +34,16 @@ import {
   Settings,
   UserPlus,
   X,
-  ExternalLink
+  ExternalLink,
+  Plus,
+  Briefcase,
+  Scale,
+  ChevronDown,
+  ChevronUp,
+  TrendingUp,
+  MapPin,
+  CreditCard,
+  Handshake
 } from 'lucide-react';
 
 // Tab Components
@@ -45,6 +54,7 @@ import TaskCreateModal from '../../tasks/components/TaskCreateModal';
 import EnhancedInvitationManager from '../components/EnhancedInvitationManager';
 import { EnhancedDocumentUploader } from '../../../components/shared/EnhancedDocumentUploader';
 import { ExchangeQuickActions } from '../components/ExchangeQuickActions';
+import { ExchangeStageManager } from '../components/ExchangeStageManager';
 
 interface TabProps {
   exchange: Exchange;
@@ -753,7 +763,978 @@ const MessagesTab: React.FC<TabProps> = ({ exchange }) => {
   );
 };
 
+// Legal & Settlement Tab
+const LegalSettlementTab: React.FC<TabProps> = ({ exchange }) => {
+  const ex = exchange as any;
+  
+  const formatValue = (value: any, type?: string) => {
+    if (value === null || value === undefined || value === '') return 'Not specified';
+    
+    switch (type) {
+      case 'date':
+        return new Date(value).toLocaleDateString();
+      default:
+        return String(value);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Exchange Agreement Section */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <FileText className="w-5 h-5 mr-2 text-blue-600" />
+          Exchange Agreement & Documentation
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Exchange Agreement Drafted On</label>
+              <p className="text-gray-900">{formatValue(ex.exchange_agreement_drafted_on, 'date')}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Receipt Drafted On</label>
+              <p className="text-gray-900">{formatValue(ex.receipt_drafted_on, 'date')}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Rep 1 Docs Drafted On</label>
+              <p className="text-gray-900">{formatValue(ex.rep_1_docs_drafted_on, 'date')}</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Type of Exchange</label>
+              <p className="text-gray-900">{formatValue(ex.type_of_exchange)}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Failed Exchange?</label>
+              <p className="text-gray-900">{ex.failed_exchange ? 'Yes' : 'No'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Identified?</label>
+              <p className="text-gray-900">{ex.identified ? 'Yes' : 'No'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Settlement Agents Section */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <Users className="w-5 h-5 mr-2 text-green-600" />
+          Settlement Agents & Escrow
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 className="font-medium text-gray-700 mb-3">Relinquished Property</h4>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-600">Settlement Agent</label>
+                <p className="text-gray-900">{formatValue(ex.rel_settlement_agent)}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Escrow Number</label>
+                <p className="text-gray-900 font-mono">{formatValue(ex.rel_escrow_number)}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Purchase Contract Title</label>
+                <p className="text-gray-900 text-sm">{formatValue(ex.rel_purchase_contract_title)}</p>
+              </div>
+            </div>
+          </div>
+          <div>
+            <h4 className="font-medium text-gray-700 mb-3">Replacement Property #1</h4>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-600">Settlement Agent</label>
+                <p className="text-gray-900">{formatValue(ex.rep_1_settlement_agent)}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Escrow Number</label>
+                <p className="text-gray-900 font-mono">{formatValue(ex.rep_1_escrow_number)}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Purchase Contract Title</label>
+                <p className="text-gray-900 text-sm">{formatValue(ex.rep_1_purchase_contract_title)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Vesting Information */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <Building2 className="w-5 h-5 mr-2 text-purple-600" />
+          Vesting & Legal Structure
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Client Vesting</label>
+              <p className="text-gray-900">{formatValue(ex.client_vesting)}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Client 1 Signatory Title</label>
+              <p className="text-gray-900">{formatValue(ex.client_1_signatory_title)}</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Buyer Vesting</label>
+              <p className="text-gray-900">{formatValue(ex.buyer_vesting)}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Rep 1 Seller Vesting</label>
+              <p className="text-gray-900">{formatValue(ex.rep_1_seller_vesting)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Financial Tab
+const FinancialTab: React.FC<TabProps> = ({ exchange }) => {
+  const ex = exchange as any;
+  
+  const formatCurrency = (value: any) => {
+    if (value === null || value === undefined || value === '') return 'Not specified';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+  };
+
+  const formatDate = (value: any) => {
+    if (value === null || value === undefined || value === '') return 'Not specified';
+    return new Date(value).toLocaleDateString();
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Proceeds & Banking */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <Banknote className="w-5 h-5 mr-2 text-green-600" />
+          Proceeds & Banking
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Bank</label>
+              <p className="text-gray-900 font-medium">{ex.bank || 'Not specified'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Proceeds (USD)</label>
+              <p className="text-gray-900 text-lg font-semibold text-green-600">{formatCurrency(ex.proceeds)}</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Date Proceeds Received</label>
+              <p className="text-gray-900">{formatDate(ex.date_proceeds_received)}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Close of Escrow Date</label>
+              <p className="text-gray-900">{formatDate(ex.close_of_escrow_date)}</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Day 45</label>
+              <p className="text-gray-900 font-medium">{formatDate(ex.day_45)}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Day 180</label>
+              <p className="text-gray-900 font-medium">{formatDate(ex.day_180)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Property Values */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <DollarSign className="w-5 h-5 mr-2 text-blue-600" />
+          Property Values
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Relinquished Property Value</label>
+              <p className="text-gray-900 text-xl font-bold text-blue-600">{formatCurrency(ex.rel_value)}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Contract Date</label>
+              <p className="text-gray-900">{formatDate(ex.rel_contract_date)}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Expected Closing Date</label>
+              <p className="text-gray-900">{formatDate(ex.expected_rel_closing_date)}</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Rep 1 Property Value</label>
+              <p className="text-gray-900 text-xl font-bold text-green-600">{formatCurrency(ex.rep_1_value || ex.rep_1_sale_price)}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Purchase Contract Date</label>
+              <p className="text-gray-900">{formatDate(ex.rep_1_purchase_contract_date)}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Close Date</label>
+              <p className="text-gray-900">{formatDate(ex.rep_1_close_date)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Billing Information */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <FileText className="w-5 h-5 mr-2 text-orange-600" />
+          Billing & Matter Information
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Matter Rate</label>
+              <p className="text-gray-900">{ex.matter_rate || 'User Hourly Rate'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Invoice Template</label>
+              <p className="text-gray-900">{ex.invoice_template || 'Account Statement'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Evergreen Retainer</label>
+              <p className="text-gray-900">{ex.evergreen_retainer ? 'Yes' : 'No'}</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Assigned To</label>
+              <p className="text-gray-900">{ex.assigned_to || 'Not assigned'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Matter Number</label>
+              <p className="text-gray-900 font-mono">{ex.matter_number || 'Not assigned'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Status</label>
+              <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                ex.status === 'Open' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+              }`}>
+                {ex.status || 'Open'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Contacts & Referrals Tab
+const ContactsReferralsTab: React.FC<TabProps> = ({ exchange }) => {
+  const ex = exchange as any;
+
+  return (
+    <div className="space-y-6">
+      {/* Main Contact Information */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <Users className="w-5 h-5 mr-2 text-blue-600" />
+          Contact Information
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Contact</label>
+              <p className="text-gray-900 font-semibold">{ex.contact_name || exchange.client?.firstName + ' ' + exchange.client?.lastName || 'Not specified'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Matter Name</label>
+              <p className="text-gray-900">{ex.matter_name || ex.pp_display_name || exchange.name || 'Not specified'}</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Email</label>
+              <p className="text-gray-900">{exchange.client?.email || 'Not specified'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Phone</label>
+              <p className="text-gray-900">{exchange.client?.phone || 'Not specified'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Referral Information */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <ExternalLink className="w-5 h-5 mr-2 text-green-600" />
+          Referral Information
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Referral Source</label>
+              <p className="text-gray-900">{ex.referral_source || 'Not specified'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Referral Source Email</label>
+              <p className="text-gray-900">{ex.referral_source_email || 'Not specified'}</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Bank Referral?</label>
+              <p className="text-gray-900">{ex.bank_referral ? 'Yes' : 'No'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Internal Credit To</label>
+              <p className="text-gray-900">{ex.internal_credit_to || 'Not specified'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Buyer Information */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <UserPlus className="w-5 h-5 mr-2 text-purple-600" />
+          Buyer Information
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Buyer 1 Name</label>
+              <p className="text-gray-900">{ex.buyer_1_name || 'Not specified'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Buyer 2 Name</label>
+              <p className="text-gray-900">{ex.buyer_2_name || 'Not specified'}</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Rep 1 Seller 1 Name</label>
+              <p className="text-gray-900">{ex.rep_1_seller_1_name || 'Not specified'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Rep 1 Seller 2 Name</label>
+              <p className="text-gray-900">{ex.rep_1_seller_2_name || 'Not specified'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Custom Fields */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <Settings className="w-5 h-5 mr-2 text-gray-600" />
+          Custom Fields
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Interest Check Sent</label>
+              <p className="text-gray-900">{ex.interest_check_sent ? 'Yes' : 'No'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Smart Expandable Card Component
+interface ExpandableCardProps {
+  title: string;
+  icon: React.ComponentType<any>;
+  iconColor: string;
+  children: React.ReactNode;
+  defaultExpanded?: boolean;
+  summary?: React.ReactNode;
+}
+
+const ExpandableCard: React.FC<ExpandableCardProps> = ({ 
+  title, 
+  icon: Icon, 
+  iconColor, 
+  children, 
+  defaultExpanded = false,
+  summary 
+}) => {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+      <div 
+        className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className={`p-2 rounded-lg ${iconColor}`}>
+              <Icon className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+              {summary && (
+                <div className="text-sm text-gray-600 mt-1">
+                  {summary}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            {isExpanded ? (
+              <ChevronUp className="w-5 h-5 text-gray-400" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-gray-400" />
+            )}
+          </div>
+        </div>
+      </div>
+      
+      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+        isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+      }`}>
+        <div className="p-6 border-t border-gray-100 bg-gray-50">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Properties Smart Card
+const PropertiesCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
+  const ex = exchange as any;
+  
+  const formatValue = (value: any, type?: string) => {
+    if (value === null || value === undefined || value === '') return 'Not specified';
+    
+    switch (type) {
+      case 'currency':
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+      case 'date':
+        return new Date(value).toLocaleDateString();
+      default:
+        return String(value);
+    }
+  };
+
+  const propertySummary = (
+    <div className="flex items-center space-x-4 text-sm">
+      <span className="flex items-center">
+        <MapPin className="w-4 h-4 mr-1 text-red-500" />
+        Relinquished: {formatValue(ex.rel_value, 'currency')}
+      </span>
+      <span className="flex items-center">
+        <Home className="w-4 h-4 mr-1 text-green-500" />
+        Replacement: {formatValue(ex.rep_1_value || ex.rep_1_sale_price, 'currency')}
+      </span>
+    </div>
+  );
+
+  return (
+    <ExpandableCard
+      title="Properties"
+      icon={Home}
+      iconColor="bg-blue-600"
+      summary={propertySummary}
+    >
+      <div className="space-y-6">
+        {/* Relinquished Property */}
+        <div className="bg-white rounded-lg border border-red-200 p-4">
+          <h4 className="text-md font-semibold text-red-700 mb-3 flex items-center">
+            <MapPin className="w-4 h-4 mr-2" />
+            Relinquished Property
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Address</span>
+                <p className="font-medium">{formatValue(ex.rel_property_address)}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">APN</span>
+                <p className="font-mono text-sm">{formatValue(ex.rel_apn)}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Value</span>
+                <p className="text-lg font-bold text-red-600">{formatValue(ex.rel_value, 'currency')}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Property Type</span>
+                <p>{formatValue(ex.property_type)}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Contract Date</span>
+                <p>{formatValue(ex.rel_contract_date, 'date')}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Settlement Agent</span>
+                <p>{formatValue(ex.rel_settlement_agent)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Replacement Property #1 */}
+        <div className="bg-white rounded-lg border border-green-200 p-4">
+          <h4 className="text-md font-semibold text-green-700 mb-3 flex items-center">
+            <Home className="w-4 h-4 mr-2" />
+            Replacement Property #1
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Address</span>
+                <p className="font-medium">{formatValue(ex.rep_1_property_address || ex.rep_1_address)}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">APN</span>
+                <p className="font-mono text-sm">{formatValue(ex.rep_1_apn)}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Purchase Price</span>
+                <p className="text-lg font-bold text-green-600">{formatValue(ex.rep_1_value || ex.rep_1_sale_price, 'currency')}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Contract Date</span>
+                <p>{formatValue(ex.rep_1_purchase_contract_date, 'date')}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Close Date</span>
+                <p>{formatValue(ex.rep_1_close_date, 'date')}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Settlement Agent</span>
+                <p>{formatValue(ex.rep_1_settlement_agent)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Additional Properties Placeholder */}
+        <div className="bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 p-6 text-center">
+          <Plus className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+          <p className="text-gray-600">Additional replacement properties will appear here</p>
+          <p className="text-sm text-gray-500">Supports up to 10 replacement properties</p>
+        </div>
+      </div>
+    </ExpandableCard>
+  );
+};
+
+// Financial Smart Card
+const FinancialCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
+  const ex = exchange as any;
+  
+  const formatCurrency = (value: any) => {
+    if (value === null || value === undefined || value === '') return 'Not specified';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+  };
+
+  const formatDate = (value: any) => {
+    if (value === null || value === undefined || value === '') return 'Not specified';
+    return new Date(value).toLocaleDateString();
+  };
+
+  const financialSummary = (
+    <div className="flex items-center space-x-4 text-sm">
+      <span className="flex items-center">
+        <TrendingUp className="w-4 h-4 mr-1 text-green-500" />
+        Proceeds: {formatCurrency(ex.proceeds)}
+      </span>
+      <span className="flex items-center">
+        <CreditCard className="w-4 h-4 mr-1 text-blue-500" />
+        Bank: {ex.bank || 'Not specified'}
+      </span>
+    </div>
+  );
+
+  return (
+    <ExpandableCard
+      title="Financial Details"
+      icon={DollarSign}
+      iconColor="bg-green-600"
+      summary={financialSummary}
+    >
+      <div className="space-y-6">
+        {/* Proceeds & Banking */}
+        <div className="bg-white rounded-lg border border-green-200 p-4">
+          <h4 className="text-md font-semibold text-green-700 mb-3 flex items-center">
+            <Banknote className="w-4 h-4 mr-2" />
+            Proceeds & Banking
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Bank</span>
+                <p className="font-medium">{ex.bank || 'Not specified'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Proceeds</span>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(ex.proceeds)}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Date Proceeds Received</span>
+                <p>{formatDate(ex.date_proceeds_received)}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Close of Escrow</span>
+                <p>{formatDate(ex.close_of_escrow_date)}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Day 45</span>
+                <p className="font-medium">{formatDate(ex.day_45)}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Day 180</span>
+                <p className="font-medium">{formatDate(ex.day_180)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Billing Information */}
+        <div className="bg-white rounded-lg border border-orange-200 p-4">
+          <h4 className="text-md font-semibold text-orange-700 mb-3 flex items-center">
+            <FileText className="w-4 h-4 mr-2" />
+            Billing & Matter Info
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Matter Rate</span>
+                <p>{ex.matter_rate || 'User Hourly Rate'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Invoice Template</span>
+                <p>{ex.invoice_template || 'Account Statement'}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Assigned To</span>
+                <p>{ex.assigned_to || 'Not assigned'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Matter Number</span>
+                <p className="font-mono">{ex.matter_number || 'Not assigned'}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Evergreen Retainer</span>
+                <p>{ex.evergreen_retainer ? 'Yes' : 'No'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Status</span>
+                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                  ex.status === 'Open' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {ex.status || 'Open'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ExpandableCard>
+  );
+};
+
+// People & Contacts Smart Card
+const PeopleCard: React.FC<{ exchange: Exchange; participants: any[] }> = ({ exchange, participants }) => {
+  const ex = exchange as any;
+
+  const peopleSummary = (
+    <div className="flex items-center space-x-4 text-sm">
+      <span className="flex items-center">
+        <Users className="w-4 h-4 mr-1 text-blue-500" />
+        {participants.length} participants
+      </span>
+      <span className="flex items-center">
+        <Handshake className="w-4 h-4 mr-1 text-purple-500" />
+        Referral: {ex.referral_source || 'None'}
+      </span>
+    </div>
+  );
+
+  return (
+    <ExpandableCard
+      title="People & Contacts"
+      icon={Users}
+      iconColor="bg-purple-600"
+      summary={peopleSummary}
+    >
+      <div className="space-y-6">
+        {/* Main Contacts */}
+        <div className="bg-white rounded-lg border border-blue-200 p-4">
+          <h4 className="text-md font-semibold text-blue-700 mb-3 flex items-center">
+            <Users className="w-4 h-4 mr-2" />
+            Main Contacts
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Client</span>
+                <p className="font-medium">{ex.contact_name || exchange.client?.firstName + ' ' + exchange.client?.lastName || 'Not specified'}</p>
+                <p className="text-sm text-gray-600">{exchange.client?.email}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Matter Name</span>
+                <p>{ex.matter_name || ex.pp_display_name || exchange.name}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Coordinator</span>
+                <p className="font-medium">{exchange.coordinator ? `${exchange.coordinator.first_name} ${exchange.coordinator.last_name}` : 'Not assigned'}</p>
+                <p className="text-sm text-gray-600">{exchange.coordinator?.email}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Internal Credit To</span>
+                <p>{ex.internal_credit_to || 'Not specified'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Referral Information */}
+        <div className="bg-white rounded-lg border border-purple-200 p-4">
+          <h4 className="text-md font-semibold text-purple-700 mb-3 flex items-center">
+            <Handshake className="w-4 h-4 mr-2" />
+            Referral Information
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Referral Source</span>
+                <p className="font-medium">{ex.referral_source || 'Not specified'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Referral Email</span>
+                <p className="text-sm">{ex.referral_source_email || 'Not specified'}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Bank Referral</span>
+                <p>{ex.bank_referral ? 'Yes' : 'No'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Interest Check Sent</span>
+                <p>{ex.interest_check_sent ? 'Yes' : 'No'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Buyer Information */}
+        <div className="bg-white rounded-lg border border-indigo-200 p-4">
+          <h4 className="text-md font-semibold text-indigo-700 mb-3 flex items-center">
+            <UserPlus className="w-4 h-4 mr-2" />
+            Buyer & Seller Information
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Buyer 1</span>
+                <p>{ex.buyer_1_name || 'Not specified'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Buyer 2</span>
+                <p>{ex.buyer_2_name || 'Not specified'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Buyer Vesting</span>
+                <p className="text-sm">{ex.buyer_vesting || 'Not specified'}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Rep 1 Seller 1</span>
+                <p>{ex.rep_1_seller_1_name || 'Not specified'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Rep 1 Seller 2</span>
+                <p>{ex.rep_1_seller_2_name || 'Not specified'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Client Vesting</span>
+                <p className="text-sm">{ex.client_vesting || 'Not specified'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ExpandableCard>
+  );
+};
+
+// Legal & Settlement Smart Card
+const LegalCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
+  const ex = exchange as any;
+  
+  const formatDate = (value: any) => {
+    if (value === null || value === undefined || value === '') return 'Not specified';
+    return new Date(value).toLocaleDateString();
+  };
+
+  const legalSummary = (
+    <div className="flex items-center space-x-4 text-sm">
+      <span className="flex items-center">
+        <Scale className="w-4 h-4 mr-1 text-indigo-500" />
+        Type: {ex.type_of_exchange || 'Not specified'}
+      </span>
+      <span className="flex items-center">
+        <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
+        Identified: {ex.identified ? 'Yes' : 'No'}
+      </span>
+    </div>
+  );
+
+  return (
+    <ExpandableCard
+      title="Legal & Settlement"
+      icon={Scale}
+      iconColor="bg-indigo-600"
+      summary={legalSummary}
+    >
+      <div className="space-y-6">
+        {/* Exchange Agreement */}
+        <div className="bg-white rounded-lg border border-indigo-200 p-4">
+          <h4 className="text-md font-semibold text-indigo-700 mb-3 flex items-center">
+            <FileText className="w-4 h-4 mr-2" />
+            Exchange Agreement & Documentation
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Type of Exchange</span>
+                <p className="font-medium">{ex.type_of_exchange || 'Not specified'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Failed Exchange</span>
+                <p>{ex.failed_exchange ? 'Yes' : 'No'}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Agreement Drafted</span>
+                <p>{formatDate(ex.exchange_agreement_drafted_on)}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Receipt Drafted</span>
+                <p>{formatDate(ex.receipt_drafted_on)}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Identified</span>
+                <p>{ex.identified ? 'Yes' : 'No'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Rep 1 Docs Drafted</span>
+                <p>{formatDate(ex.rep_1_docs_drafted_on)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Settlement Agents */}
+        <div className="bg-white rounded-lg border border-teal-200 p-4">
+          <h4 className="text-md font-semibold text-teal-700 mb-3 flex items-center">
+            <Handshake className="w-4 h-4 mr-2" />
+            Settlement Agents & Escrow
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Relinquished Settlement Agent</span>
+                <p className="font-medium">{ex.rel_settlement_agent || 'Not specified'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Relinquished Escrow #</span>
+                <p className="font-mono text-sm">{ex.rel_escrow_number || 'Not specified'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Rel Contract Title</span>
+                <p className="text-sm">{ex.rel_purchase_contract_title || 'Not specified'}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Rep 1 Settlement Agent</span>
+                <p className="font-medium">{ex.rep_1_settlement_agent || 'Not specified'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Rep 1 Escrow #</span>
+                <p className="font-mono text-sm">{ex.rep_1_escrow_number || 'Not specified'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Rep 1 Contract Title</span>
+                <p className="text-sm">{ex.rep_1_purchase_contract_title || 'Not specified'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Vesting Information */}
+        <div className="bg-white rounded-lg border border-purple-200 p-4">
+          <h4 className="text-md font-semibold text-purple-700 mb-3 flex items-center">
+            <Building2 className="w-4 h-4 mr-2" />
+            Vesting & Legal Structure
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Client Vesting</span>
+                <p className="text-sm">{ex.client_vesting || 'Not specified'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Client Signatory Title</span>
+                <p>{ex.client_1_signatory_title || 'Not specified'}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Buyer Vesting</span>
+                <p className="text-sm">{ex.buyer_vesting || 'Not specified'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Rep 1 Seller Vesting</span>
+                <p className="text-sm">{ex.rep_1_seller_vesting || 'Not specified'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ExpandableCard>
+  );
+};
+
 const ExchangeDetailEnhanced: React.FC = () => {
+  console.log('🚀 ExchangeDetailEnhanced component loaded - with Invitation tab');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { getExchange } = useExchanges();
@@ -762,7 +1743,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
   
   const [exchange, setExchange] = useState<Exchange | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('messages');
   const [documents, setDocuments] = useState<any[]>([]);
   const [participants, setParticipants] = useState<any[]>([]);
   // Tasks are now managed by EnhancedTaskManager component
@@ -840,14 +1821,24 @@ const ExchangeDetailEnhanced: React.FC = () => {
     try {
       setLoading(true);
       const data = await getExchange(id!);
+      if (!data) {
+        console.error('Exchange not found:', id);
+        return;
+      }
       setExchange(data);
       // Load associated documents, participants, and tasks
       await Promise.all([
         loadDocuments(),
         loadParticipants()
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading exchange:', error);
+      if (error.message?.includes('404') || error.message?.includes('not found')) {
+        console.error('Exchange does not exist:', id);
+      }
+      if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+        console.error('Authentication required. Please log in.');
+      }
     } finally {
       setLoading(false);
     }
@@ -1088,24 +2079,32 @@ const ExchangeDetailEnhanced: React.FC = () => {
       'Basic Information': [
         { label: 'Exchange ID', value: ex.id, type: undefined },
         { label: 'Exchange Number', value: ex.exchangeNumber || ex.exchange_number, type: undefined },
-        { label: 'Name', value: ex.name, type: undefined },
+        { label: 'Name', value: ex.pp_display_name || ex.name, type: undefined },
         { label: 'Status', value: ex.status, type: undefined },
-        { label: 'Exchange Type', value: ex.exchangeType || ex.exchange_type, type: undefined },
+        { label: 'Type of Exchange', value: ex.type_of_exchange || ex.exchangeType || ex.exchange_type, type: undefined },
+        { label: 'Bank', value: ex.bank, type: undefined },
         { label: 'Priority', value: ex.priority, type: undefined },
         { label: 'Active', value: ex.isActive || ex.is_active ? 'Yes' : 'No', type: undefined }
       ],
       'Financial Information': [
-        { label: 'Relinquished Property Value', value: ex.relinquishedPropertyValue || ex.relinquished_property_value, type: 'currency' },
-        { label: 'Replacement Property Value', value: ex.replacementPropertyValue || ex.replacement_property_value, type: 'currency' },
+        { label: 'Proceeds', value: ex.proceeds, type: 'currency' },
+        { label: 'Relinquished Property Value', value: ex.rel_value || ex.relinquishedPropertyValue || ex.relinquished_property_value, type: 'currency' },
+        { label: 'Replacement Property Value', value: ex.rep_1_sale_price || ex.replacementPropertyValue || ex.replacement_property_value, type: 'currency' },
         { label: 'Exchange Value', value: ex.relinquished_property_value || ex.relinquishedPropertyValue || 0, type: 'currency' },
         { label: 'Cash Boot', value: ex.cashBoot || ex.cash_boot, type: 'currency' },
         { label: 'Financing Amount', value: ex.financingAmount || ex.financing_amount, type: 'currency' },
         { label: 'Profitability', value: ex.profitability, type: 'currency' }
       ],
       'Important Dates': [
+        { label: 'Close of Escrow Date', value: ex.close_of_escrow_date, type: 'date' },
+        { label: 'Date Proceeds Received', value: ex.date_proceeds_received, type: 'date' },
+        { label: 'Day 45', value: ex.day_45, type: 'date' },
+        { label: 'Day 180', value: ex.day_180, type: 'date' },
+        { label: 'Relinquished Contract Date', value: ex.rel_contract_date, type: 'date' },
+        { label: 'Replacement Close Date', value: ex.rep_1_close_date, type: 'date' },
         { label: 'Sale Date', value: ex.saleDate || ex.sale_date, type: 'date' },
-        { label: 'Identification Deadline (45-Day)', value: ex.identificationDeadline || ex.identification_deadline, type: 'date' },
-        { label: 'Exchange Deadline (180-Day)', value: ex.exchangeDeadline || ex.exchange_deadline, type: 'date' },
+        { label: 'Identification Deadline (45-Day)', value: ex.identificationDeadline || ex.identification_deadline || ex.day_45, type: 'date' },
+        { label: 'Exchange Deadline (180-Day)', value: ex.exchangeDeadline || ex.exchange_deadline || ex.day_180, type: 'date' },
         { label: 'Created At', value: ex.createdAt || ex.created_at, type: 'datetime' },
         { label: 'Updated At', value: ex.updatedAt || ex.updated_at, type: 'datetime' }
       ],
@@ -1118,6 +2117,31 @@ const ExchangeDetailEnhanced: React.FC = () => {
         { label: 'Stage Progress', value: ex.stageProgress || ex.stage_progress, type: 'percentage' },
         { label: 'Days in Current Stage', value: ex.daysInCurrentStage || ex.days_in_current_stage, type: undefined },
         { label: 'Completion Percentage', value: ex.completionPercentage || ex.completion_percentage, type: 'percentage' }
+      ],
+      'Relinquished Property': [
+        { label: 'Address', value: ex.rel_property_address, type: undefined },
+        { label: 'City', value: ex.rel_property_city, type: undefined },
+        { label: 'State', value: ex.rel_property_state, type: undefined },
+        { label: 'ZIP', value: ex.rel_property_zip, type: undefined },
+        { label: 'APN', value: ex.rel_apn, type: undefined },
+        { label: 'Escrow Number', value: ex.rel_escrow_number, type: undefined },
+        { label: 'Value', value: ex.rel_value, type: 'currency' },
+        { label: 'Contract Date', value: ex.rel_contract_date, type: 'date' }
+      ],
+      'Replacement Property #1': [
+        { label: 'Address', value: ex.rep_1_address, type: undefined },
+        { label: 'City', value: ex.rep_1_city, type: undefined },
+        { label: 'State', value: ex.rep_1_state, type: undefined },
+        { label: 'ZIP', value: ex.rep_1_zip, type: undefined },
+        { label: 'APN', value: ex.rep_1_apn, type: undefined },
+        { label: 'Escrow Number', value: ex.rep_1_escrow_number, type: undefined },
+        { label: 'Sale Price', value: ex.rep_1_sale_price, type: 'currency' },
+        { label: 'Close Date', value: ex.rep_1_close_date, type: 'date' }
+      ],
+      'Buyer Information': [
+        { label: 'Buyer 1 Name', value: ex.buyer_1_name, type: undefined },
+        { label: 'Buyer 2 Name', value: ex.buyer_2_name, type: undefined },
+        { label: 'Client Vesting', value: ex.client_vesting, type: undefined }
       ],
       'Communication': [
         { label: 'Chat Enabled', value: ex.chatEnabled || ex.chat_enabled ? 'Yes' : 'No', type: undefined },
@@ -1172,19 +2196,19 @@ const ExchangeDetailEnhanced: React.FC = () => {
     );
   };
 
+  // Essential tabs only - most info is now in smart cards
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: Building2 },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'tasks', label: 'Tasks', icon: CheckCircle },
     { id: 'documents', label: 'Documents', icon: FileText },
-    ...(canManageInvitations ? [{ id: 'invitations', label: 'Invitations', icon: Users }] : []),
-    { id: 'all-details', label: 'All Details', icon: FileText }
+    ...(canManageInvitations ? [{ id: 'invitations', label: 'Invitations', icon: UserPlus }] : [])
   ];
 
   return (
     <Layout>
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          {/* Enhanced Version Indicator - This confirms you're using the right component */}          
           {/* Clean Header */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
@@ -1306,6 +2330,110 @@ const ExchangeDetailEnhanced: React.FC = () => {
             </div>
           </div>
 
+          {/* Visual Timeline with PP Dates */}
+          {(exchange.close_of_escrow_date || exchange.day_45 || exchange.day_180) && (
+            <div className="mt-6 bg-white/90 rounded-lg p-4 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-800">Exchange Timeline</h3>
+                <span className="text-xs text-gray-600">Key Milestones</span>
+              </div>
+              
+              {/* Timeline Events */}
+              <div className="relative">
+                <div className="flex items-center justify-between">
+                  {/* Close of Escrow */}
+                  {exchange.close_of_escrow_date && (
+                    <div className="flex flex-col items-center text-center flex-1">
+                      <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center mb-2">
+                        <CheckCircle className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="text-xs font-medium">Close of Escrow</div>
+                      <div className="text-xs text-gray-600">
+                        {new Date(exchange.close_of_escrow_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Date Proceeds Received */}
+                  {exchange.date_proceeds_received && (
+                    <div className="flex flex-col items-center text-center flex-1">
+                      <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center mb-2">
+                        <DollarSign className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="text-xs font-medium">Proceeds Received</div>
+                      <div className="text-xs text-gray-600">
+                        {new Date(exchange.date_proceeds_received).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* 45-Day Deadline */}
+                  {exchange.day_45 && (() => {
+                    const date45 = new Date(exchange.day_45);
+                    const now = new Date();
+                    const daysTo45 = Math.ceil((date45.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                    const isPast = daysTo45 < 0;
+                    const isUrgent = daysTo45 >= 0 && daysTo45 <= 10;
+                    
+                    return (
+                      <div className="flex flex-col items-center text-center flex-1">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
+                          isPast ? 'bg-gray-400' :
+                          isUrgent ? 'bg-red-500 animate-pulse' :
+                          'bg-yellow-500'
+                        }`}>
+                          <Target className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="text-xs font-medium">DAY 45</div>
+                        <div className="text-xs text-gray-600">
+                          {date45.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}
+                        </div>
+                        {!isPast && (
+                          <div className={`text-xs mt-1 ${isUrgent ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+                            {daysTo45} days left
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  
+                  {/* 180-Day Deadline */}
+                  {exchange.day_180 && (() => {
+                    const date180 = new Date(exchange.day_180);
+                    const now = new Date();
+                    const daysTo180 = Math.ceil((date180.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                    const isPast = daysTo180 < 0;
+                    const isUrgent = daysTo180 >= 0 && daysTo180 <= 30;
+                    
+                    return (
+                      <div className="flex flex-col items-center text-center flex-1">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
+                          isPast ? 'bg-gray-400' :
+                          isUrgent ? 'bg-red-500 animate-pulse' :
+                          'bg-blue-500'
+                        }`}>
+                          <Clock className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="text-xs font-medium">DAY 180</div>
+                        <div className="text-xs text-gray-600">
+                          {date180.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}
+                        </div>
+                        {!isPast && (
+                          <div className={`text-xs mt-1 ${isUrgent ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+                            {daysTo180} days left
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+                
+                {/* Connecting line */}
+                <div className="absolute top-5 left-12 right-12 h-0.5 bg-gray-300 -z-10"></div>
+              </div>
+            </div>
+          )}
+
           {/* Key Metrics - Simplified */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -1381,7 +2509,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
             </div>
           </div>
 
-          {/* Full Timeline Display */}
+          {/* Full Timeline Display - FIRST for clear deadline visibility */}
           <div className="mb-6">
             <ExchangeTimeline
               startDate={exchange.startDate || exchange.createdAt}
@@ -1389,6 +2517,19 @@ const ExchangeDetailEnhanced: React.FC = () => {
               completionDeadline={exchange.completionDeadline || exchange.exchangeDeadline}
               status={exchange.status}
               compact={false}
+              showToday={true}
+            />
+          </div>
+
+          {/* Exchange Stage Management - Collapsible stage progression */}
+          <div className="mb-6">
+            <ExchangeStageManager
+              exchange={exchange}
+              onRefresh={loadExchange}
+              onStageChange={(newStage) => {
+                console.log('Stage changed to:', newStage);
+                loadExchange(); // Reload exchange data when stage changes
+              }}
             />
           </div>
 
@@ -1403,102 +2544,15 @@ const ExchangeDetailEnhanced: React.FC = () => {
             />
           )}
 
-          {/* Simplified Information Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Home className="w-5 h-5 mr-2 text-blue-600" />
-                Property Information
-              </h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Relinquished Property</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Address:</span>
-                      <span className="text-gray-900">{exchange.relinquishedPropertyAddress || 'Not specified'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Sale Price:</span>
-                      <span className="text-gray-900 font-medium">
-                        {exchange.relinquishedSalePrice 
-                          ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(exchange.relinquishedSalePrice)
-                          : 'Not specified'
-                        }
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Closing Date:</span>
-                      <span className="text-gray-900">
-                        {exchange.relinquishedClosingDate 
-                          ? new Date(exchange.relinquishedClosingDate).toLocaleDateString()
-                          : 'Not scheduled'
-                        }
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Users className="w-5 h-5 mr-2 text-blue-600" />
-                Key Contacts
-              </h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Client</h4>
-                  {exchange.client ? (
-                    <div className="space-y-1 text-sm">
-                      <p className="font-medium text-gray-900">
-                        {exchange.client.firstName} {exchange.client.lastName}
-                      </p>
-                      <div className="flex items-center text-gray-600">
-                        <Mail className="w-4 h-4 mr-2" />
-                        <a href={`mailto:${exchange.client.email}`} className="hover:text-blue-600">
-                          {exchange.client.email}
-                        </a>
-                      </div>
-                      {exchange.client.phone && (
-                        <div className="flex items-center text-gray-600">
-                          <Phone className="w-4 h-4 mr-2" />
-                          <a href={`tel:${exchange.client.phone}`} className="hover:text-blue-600">
-                            {exchange.client.phone}
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 text-sm italic">No client information available</p>
-                  )}
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Coordinator</h4>
-                  {exchange.coordinator ? (
-                    <div className="space-y-1 text-sm">
-                      <p className="font-medium text-gray-900">
-                        {exchange.coordinator.first_name} {exchange.coordinator.last_name}
-                      </p>
-                      <div className="flex items-center text-gray-600">
-                        <Mail className="w-4 h-4 mr-2" />
-                        <a href={`mailto:${exchange.coordinator.email}`} className="hover:text-blue-600">
-                          {exchange.coordinator.email}
-                        </a>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 text-sm italic">No coordinator assigned</p>
-                  )}
-                </div>
-              </div>
-            </div>
+          {/* Smart Expandable Cards */}
+          <div className="space-y-4">
+            <PropertiesCard exchange={exchange} />
+            <FinancialCard exchange={exchange} />
+            <PeopleCard exchange={exchange} participants={participants} />
+            <LegalCard exchange={exchange} />
           </div>
 
-          {/* Clean Tabs */}
+          {/* Essential Tabs Only */}
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="border-b border-gray-200">
               <nav className="flex">
@@ -1523,15 +2577,13 @@ const ExchangeDetailEnhanced: React.FC = () => {
             </div>
             
             <div className="p-6">
-            {activeTab === 'overview' && <ExchangeOverview exchange={exchange as any} participants={participants} tasks={[]} documents={documents} />}
             {activeTab === 'tasks' && (
               <ModernTaskUI 
                 exchangeId={exchange.id}
-                initialView="kanban"
+                initialView="list"
                 onCreateClick={() => setShowCreateTaskModal(true)}
               />
             )}
-            {activeTab === 'all-details' && <AllDetailsView />}
             {activeTab === 'documents' && (
               <>
                 <ExchangeDocuments 

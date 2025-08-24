@@ -58,6 +58,35 @@ export interface Exchange {
   deadline45?: string;
   deadline180?: string;
   
+  // PracticePanther custom fields
+  pp_display_name?: string;
+  bank?: string;
+  rel_property_city?: string;
+  rel_property_state?: string;
+  rel_property_zip?: string;
+  rel_property_address?: string;
+  rel_apn?: string;
+  rel_escrow_number?: string;
+  rel_value?: number;
+  rel_contract_date?: string;
+  close_of_escrow_date?: string;
+  date_proceeds_received?: string;
+  day_45?: string;
+  day_180?: string;
+  proceeds?: number;
+  client_vesting?: string;
+  type_of_exchange?: string;
+  buyer_1_name?: string;
+  buyer_2_name?: string;
+  rep_1_address?: string;
+  rep_1_city?: string;
+  rep_1_state?: string;
+  rep_1_zip?: string;
+  rep_1_sale_price?: number;
+  rep_1_escrow_number?: string;
+  rep_1_apn?: string;
+  rep_1_close_date?: string;
+  
   // Timestamps
   createdAt: string; // ISO date-time string
   updatedAt: string; // ISO date-time string

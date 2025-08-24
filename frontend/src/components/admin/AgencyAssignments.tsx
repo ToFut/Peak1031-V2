@@ -59,10 +59,10 @@ const AgencyAssignments: React.FC = () => {
         fetch('/api/agency/assignments', {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         }),
-        fetch('/api/contacts?type=agency', {
+        fetch('/api/agency/contacts?type=agency', {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         }),
-        fetch('/api/contacts?type=third_party', {
+        fetch('/api/agency/contacts?type=third_party', {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         })
       ]);

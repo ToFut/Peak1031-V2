@@ -14,6 +14,7 @@ import './services/templateService';
 import Messages from './features/messages/pages/Messages';
 import Exchanges from './features/exchanges/pages/Exchanges';
 import ExchangeDetailEnhanced from './features/exchanges/pages/ExchangeDetailEnhanced';
+import ExchangeCreate from './features/exchanges/pages/ExchangeCreate';
 import Tasks from './features/tasks/pages/Tasks';
 import ModernTasksPage from './features/tasks/pages/ModernTasksPage';
 import Contacts from './features/contacts/pages/Contacts';
@@ -27,12 +28,12 @@ import StandardizedThirdPartyDashboard from "./features/dashboard/components/Sta
 import StandardizedAgencyDashboard from "./features/dashboard/components/StandardizedAgencyDashboard";
 import Settings from './features/settings/pages/Settings';
 import Profile from './features/profile/pages/Profile';
-import UserProfile from './features/users/pages/UserProfile';
+import UserProfileEnhanced from './features/users/components/UserProfileEnhanced';
 import Preferences from './features/settings/pages/Preferences';
 import AuthTest from './features/auth/pages/AuthTest';
 import TemplateDocumentManager from './pages/TemplateDocumentManager';
 import { AdminGPT, PracticePantherManager } from './features/admin/components';
-import AuditLogSystem from './features/admin/components/AuditLogSystem';
+import EnhancedAuditSystem from './features/admin/components/EnhancedAuditSystem';
 import AgencyManagement from './pages/admin/AgencyManagement';
 import AgencyAssignments from './components/admin/AgencyAssignments';
 
@@ -194,6 +195,16 @@ const App: React.FC = () => {
                 } 
               />
               
+              <Route path="/exchanges/new" 
+                element={
+                  <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
+                    <RouteErrorBoundary routeName="CreateExchange">
+                      <ExchangeCreate />
+                    </RouteErrorBoundary>
+                  </ProtectedRoute>
+                } 
+              />
+              
               <Route path="/exchanges/:id" 
                 element={
                   <ProtectedRoute>
@@ -301,7 +312,7 @@ const App: React.FC = () => {
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
                       <RouteErrorBoundary routeName="UserProfile">
-                        <UserProfile />
+                        <UserProfileEnhanced />
                       </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
@@ -351,8 +362,8 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
-                      <RouteErrorBoundary routeName="AuditLogSystem">
-                        <AuditLogSystem />
+                      <RouteErrorBoundary routeName="EnhancedAuditSystem">
+                        <EnhancedAuditSystem />
                       </RouteErrorBoundary>
                     </Layout>
                   </ProtectedRoute>
@@ -435,10 +446,7 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <Layout>
-                      <div className="p-8">
-                        <h1 className="text-2xl font-bold mb-4">System Settings</h1>
-                        <p className="text-gray-600">System settings management coming soon...</p>
-                      </div>
+                      <Settings />
                     </Layout>
                   </ProtectedRoute>
                 } 

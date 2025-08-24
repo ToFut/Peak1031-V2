@@ -31,6 +31,62 @@ router.get('/test', (req, res) => {
 });
 
 /**
+ * GET /api/exchanges/statistics
+ * Get exchange statistics for all exchanges
+ */
+router.get('/statistics', [
+  authenticateToken
+], async (req, res) => {
+  try {
+    const supabaseService = require('../services/supabase');
+    
+    // Get all exchanges for statistics (no limit)
+    const { data: allExchanges, error } = await supabaseService.client
+      .from('exchanges')
+      .select('status, exchange_value, relinquished_property_value, replacement_property_value, completion_percentage')
+      .eq('is_active', true);
+    
+    if (error) {
+      console.error('❌ Error fetching exchange statistics:', error);
+      return res.status(500).json({ error: 'Failed to fetch statistics' });
+    }
+
+    const exchanges = allExchanges || [];
+    
+    // Calculate statistics
+    const stats = {
+      total: exchanges.length,
+      active: exchanges.filter(e => e.status === 'active' || e.status === '45D' || e.status === '180D' || e.status === 'In Progress').length,
+      completed: exchanges.filter(e => e.status === 'completed' || e.status === 'COMPLETED' || e.status === 'Completed').length,
+      pending: exchanges.filter(e => e.status === 'draft' || e.status === 'pending' || e.status === 'PENDING' || !e.status).length,
+      totalValue: exchanges.reduce((sum, e) => {
+        const value = e.exchange_value || e.relinquished_property_value || e.replacement_property_value || 0;
+        return sum + Number(value || 0);
+      }, 0),
+      avgProgress: exchanges.length > 0 ? Math.round(
+        exchanges.reduce((sum, e) => {
+          const progress = e.completion_percentage !== undefined && e.completion_percentage !== null ? 
+            e.completion_percentage : 
+            ((e.status === 'completed' || e.status === 'COMPLETED') ? 100 : 0);
+          return sum + Number(progress || 0);
+        }, 0) / exchanges.length
+      ) : 0
+    };
+    
+    console.log('📊 Exchange Statistics:', stats);
+    
+    res.json({ 
+      success: true, 
+      statistics: stats 
+    });
+    
+  } catch (error) {
+    console.error('❌ Statistics error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/exchanges/:id/participants
  * Get exchange participants
  */
@@ -304,7 +360,7 @@ router.get('/', [
   authenticateToken,
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 5000 }).withMessage('Limit must be between 1 and 5000'),
-  query('status').optional().isIn(['PENDING', '45D', '180D', 'COMPLETED', 'TERMINATED', 'ON_HOLD']),
+  query('status').optional().isIn(['PENDING', '45D', '180D', 'COMPLETED', 'TERMINATED', 'ON_HOLD', 'active', 'pending', 'completed', 'draft', 'cancelled']),
   query('priority').optional().isIn(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
   query('search').optional().isLength({ min: 1, max: 100 }),
   query('searchTerm').optional().isLength({ min: 1, max: 100 }),
@@ -412,17 +468,19 @@ router.get('/', [
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     // Use RBAC service for admin users to ensure proper access
-    let exchanges;
+    let exchanges, count;
     if (req.user && req.user.role === 'admin') {
       console.log('🔒 Using RBAC service for admin user');
       const rbacService = require('../services/rbacService');
       const rbacResult = await rbacService.getExchangesForUser(req.user, {
         limit: parseInt(limit),
         offset: offset,
-        orderBy: { column: finalSortBy, ascending: finalSortOrder === 'asc' }
+        orderBy: { column: finalSortBy, ascending: finalSortOrder === 'asc' },
+        whereClause: whereClause  // Pass the status/priority filters to RBAC
       });
       exchanges = rbacResult.data || [];
-      console.log(`🔒 RBAC service returned ${exchanges.length} exchanges for admin`);
+      count = rbacResult.count || 0;  // Use filtered count from RBAC
+      console.log(`🔒 RBAC service returned ${exchanges.length} exchanges for admin, total filtered count: ${count}`);
     } else {
       // Use database service for non-admin users
       console.log('🔍 DEBUG: Calling databaseService.getExchanges with:', {
@@ -439,19 +497,19 @@ router.get('/', [
         // Include participants for all users (needed for chat functionality)
         includeParticipants: true
       });
-    }
-    
-    console.log('🔍 DEBUG: databaseService returned exchanges:', exchanges?.length || 0);
+      
+      console.log('🔍 DEBUG: databaseService returned exchanges:', exchanges?.length || 0);
 
-    // For now, we'll get count separately since our service doesn't support findAndCountAll yet
-    const allExchanges = await databaseService.getExchanges({ 
-      where: whereClause,
-      // Include participants for all users for consistent count
-      includeParticipants: true
-    });
-    
-    console.log('🔍 DEBUG: Total count query returned:', allExchanges?.length || 0);
-    const count = allExchanges.length;
+      // For now, we'll get count separately since our service doesn't support findAndCountAll yet
+      const allExchanges = await databaseService.getExchanges({ 
+        where: whereClause,
+        // Include participants for all users for consistent count
+        includeParticipants: true
+      });
+      
+      console.log('🔍 DEBUG: Total count query returned:', allExchanges?.length || 0);
+      count = allExchanges.length;
+    }
 
     // Enhance exchange data with computed fields
     const enhancedExchanges = exchanges.map(exchange => {
@@ -523,10 +581,66 @@ router.get('/:id', [
       });
     }
 
-    // Use database service instead of direct Sequelize
-    const exchange = await databaseService.getExchangeById(req.params.id);
+    console.log('🏢 Getting exchange with comprehensive PP data:', req.params.id);
+    
+    // Get exchange with all PP fields from Supabase
+    const supabaseService = require('../services/supabase');
+    const { data: exchange, error } = await supabaseService.client
+      .from('exchanges')
+      .select(`
+        *,
+        pp_matter_id,
+        pp_account_ref_id,
+        pp_number,
+        pp_display_name,
+        pp_matter_status,
+        pp_practice_area,
+        pp_responsible_attorney,
+        pp_opened_date,
+        pp_closed_date,
+        pp_billing_method,
+        pp_assigned_to_users,
+        pp_custom_field_values,
+        pp_raw_data,
+        pp_synced_at,
+        rate,
+        tags,
+        assigned_to_users,
+        statute_of_limitation_date,
+        pp_created_at,
+        pp_updated_at,
+        bank,
+        rel_property_city,
+        rel_property_state,
+        rel_property_zip,
+        rel_property_address,
+        rel_apn,
+        rel_escrow_number,
+        rel_value,
+        rel_contract_date,
+        close_of_escrow_date,
+        day_45,
+        day_180,
+        proceeds,
+        client_vesting,
+        type_of_exchange,
+        buyer_1_name,
+        buyer_2_name,
+        rep_1_city,
+        rep_1_state,
+        rep_1_zip,
+        rep_1_property_address,
+        rep_1_apn,
+        rep_1_escrow_number,
+        rep_1_value,
+        rep_1_contract_date,
+        rep_1_seller_name
+      `)
+      .eq('id', req.params.id)
+      .single();
 
-    if (!exchange) {
+    if (error || !exchange) {
+      console.log('❌ Exchange not found:', error?.message);
       return res.status(404).json({
         error: 'Exchange not found'
       });
@@ -537,17 +651,85 @@ router.get('/:id', [
     const documents = await databaseService.getDocuments({ where: { exchange_id: exchange.id } });
     const recentMessages = await databaseService.getMessages({ where: { exchange_id: exchange.id }, limit: 10 });
 
-    // Build comprehensive response
+    // Get participants with user/contact details
+    const { data: participants } = await supabaseService.client
+      .from('exchange_participants')
+      .select(`
+        *,
+        users:user_id(id, email, first_name, last_name),
+        contacts:contact_id(id, email, first_name, last_name, company, pp_raw_data)
+      `)
+      .eq('exchange_id', exchange.id)
+      .eq('is_active', true);
+
+    // Build comprehensive response with all PP data
     const responseData = {
       ...exchange,
       tasks: tasks,
       documents: documents,
+      participants: participants || [],
+      ppData: exchange.pp_raw_data || {},
+      hasPPData: !!exchange.pp_matter_id,
+      
+      // Enhanced PP data structure for UI
+      practicePartnerData: {
+        matterId: exchange.pp_matter_id,
+        matterName: exchange.pp_display_name,
+        status: exchange.pp_matter_status,
+        practiceArea: exchange.pp_practice_area,
+        responsibleAttorney: exchange.pp_responsible_attorney,
+        openedDate: exchange.pp_opened_date,
+        closedDate: exchange.pp_closed_date,
+        billingMethod: exchange.pp_billing_method,
+        assignedUsers: exchange.pp_assigned_to_users || [],
+        customFields: exchange.pp_custom_field_values || [],
+        rawData: exchange.pp_raw_data || {}
+      },
+      
+      // Structured relinquished property data
+      relinquishedProperty: {
+        address: exchange.rel_property_address,
+        city: exchange.rel_property_city,
+        state: exchange.rel_property_state,
+        zip: exchange.rel_property_zip,
+        apn: exchange.rel_apn,
+        escrowNumber: exchange.rel_escrow_number,
+        value: exchange.rel_value,
+        contractDate: exchange.rel_contract_date,
+        closeDate: exchange.close_of_escrow_date,
+        buyerName: exchange.buyer_1_name
+      },
+      
+      // Structured replacement property data (support multiple)
+      replacementProperties: [
+        exchange.rep_1_property_address ? {
+          id: 1,
+          address: exchange.rep_1_property_address,
+          city: exchange.rep_1_city,
+          state: exchange.rep_1_state,
+          zip: exchange.rep_1_zip,
+          apn: exchange.rep_1_apn,
+          escrowNumber: exchange.rep_1_escrow_number,
+          value: exchange.rep_1_value,
+          contractDate: exchange.rep_1_contract_date,
+          sellerName: exchange.rep_1_seller_name
+        } : null
+      ].filter(Boolean),
+      
+      // Key dates from PP
+      keyDates: {
+        day45: exchange.day_45,
+        day180: exchange.day_180,
+        createdAt: exchange.pp_created_at || exchange.created_at,
+        updatedAt: exchange.pp_updated_at || exchange.updated_at
+      },
+      
       statistics: {
         total_tasks: tasks.length || 0,
         completed_tasks: tasks.filter(t => t.status === 'COMPLETED').length || 0,
         pending_tasks: tasks.filter(t => t.status === 'PENDING').length || 0,
         total_documents: documents.length || 0,
-        total_participants: 0,
+        total_participants: participants?.length || 0,
         recent_activity_count: recentMessages.length
       },
       recent_messages: recentMessages.map(msg => ({
@@ -570,6 +752,7 @@ router.get('/:id', [
       details: { exchange_number: exchange.exchange_number }
     });
 
+    console.log('✅ Exchange retrieved with comprehensive PP data');
     res.json(transformToCamelCase(responseData));
 
   } catch (error) {
@@ -1629,7 +1812,21 @@ async function buildExchangeWhereClause(user, filters) {
 
   // Apply filters
   if (filters.status) {
-    whereClause.status = filters.status;
+    // Handle special status filter cases to match statistics endpoint logic
+    const statusLower = filters.status.toLowerCase();
+    if (statusLower === 'active') {
+      // For "active" filter, match multiple active statuses like statistics endpoint
+      whereClause.status = { [Op.in]: ['active', '45D', '180D', 'In Progress', 'Active'] };
+    } else if (statusLower === 'completed') {
+      // For "completed" filter, match multiple completed statuses
+      whereClause.status = { [Op.in]: ['completed', 'COMPLETED', 'Completed'] };
+    } else if (statusLower === 'pending' || statusLower === 'draft') {
+      // For "pending" filter, match draft/pending statuses  
+      whereClause.status = { [Op.in]: ['draft', 'pending', 'PENDING', 'Draft'] };
+    } else {
+      // For other statuses, do exact match
+      whereClause.status = filters.status;
+    }
   }
 
   if (filters.priority) {

@@ -52,6 +52,7 @@ interface NavigationItem {
   iconSolid: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   roles: string[];
   badge?: number;
+  hasAccess?: boolean;
   children?: NavigationItem[];
 }
 
@@ -102,7 +103,7 @@ const DelayedTooltipWrapper: React.FC<DelayedTooltipWrapperProps> = ({ children,
 
 const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   const { user, logout } = useAuth();
-  const { ui, getSidebarItems } = useRolePermissions();
+  const { ui, getSidebarItems, canView, hasAccess } = useRolePermissions();
   const { socket, connectionStatus } = useSocket();
   const { 
     notifications: enhancedNotifications, 
@@ -198,57 +199,74 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
   const getNavigation = (): NavigationItem[] => {
     if (!user?.role) return [];
     
-    // Get user's sidebar configuration from settings
-    // For admin users, include additional admin-specific items
-    const defaultItems = user.role === 'admin' 
-      ? ['dashboard', 'exchanges', 'tasks', 'contacts', 'documents', 'messages', 'users', 'reports', 'admin_gpt', 'agencies', 'settings']
-      : ['dashboard', 'exchanges', 'tasks', 'contacts', 'documents', 'messages', 'settings'];
+    // Get user's sidebar configuration from role permissions (not hardcoded)
+    const sidebarItems = getSidebarItems();
     
-    const sidebarItems = settings?.sidebar?.items || defaultItems;
-    
-    // Define navigation map with proper role-based access
+    // Define navigation map with permission-based access checks
     const navigationMap: Record<string, NavigationItem> = {
-      dashboard: {
+      overview: {
         name: ui.page_titles.dashboard || 'Dashboard',
         href: '/dashboard',
         icon: HomeIcon,
         iconSolid: HomeIconSolid,
-        roles: [user.role]
+        roles: [user.role],
+        hasAccess: true // Dashboard is always available
       },
       exchanges: {
-        name: ui.page_titles.exchanges || 'Exchanges',
+        name: ui.page_titles.exchanges || 'Exchange Management',
         href: '/exchanges',
         icon: DocumentTextIcon,
         iconSolid: DocumentTextIconSolid,
-        roles: [user.role]
+        roles: [user.role],
+        hasAccess: canView('exchanges')
+      },
+      my_exchanges: {
+        name: ui.page_titles.exchanges || 'My Exchanges',
+        href: '/exchanges',
+        icon: DocumentTextIcon,
+        iconSolid: DocumentTextIconSolid,
+        roles: [user.role],
+        hasAccess: canView('exchanges')
       },
       tasks: {
-        name: ui.page_titles.tasks || 'Tasks',
+        name: ui.page_titles.tasks || 'Task Management',
         href: '/tasks',
         icon: CheckCircleIcon,
         iconSolid: CheckCircleIconSolid,
-        roles: [user.role]
+        roles: [user.role],
+        hasAccess: canView('tasks')
+      },
+      my_tasks: {
+        name: ui.page_titles.tasks || 'My Tasks',
+        href: '/tasks',
+        icon: CheckCircleIcon,
+        iconSolid: CheckCircleIconSolid,
+        roles: [user.role],
+        hasAccess: canView('tasks')
       },
       users: {
         name: ui.page_titles.users || 'Users',
         href: '/admin/users',
         icon: UsersIcon,
         iconSolid: UsersIconSolid,
-        roles: ['admin']
+        roles: [user.role],
+        hasAccess: canView('users')
       },
       contacts: {
-        name: ui.page_titles.contacts || 'Contacts',
+        name: ui.page_titles.contacts || 'Contact Management',
         href: '/contacts',
         icon: UsersIcon,
         iconSolid: UsersIconSolid,
-        roles: [user.role]
+        roles: [user.role],
+        hasAccess: canView('contacts')
       },
       documents: {
-        name: ui.page_titles.documents || 'Documents',
+        name: ui.page_titles.documents || 'Document Center',
         href: '/documents',
         icon: DocumentDuplicateIcon,
         iconSolid: DocumentDuplicateIconSolid,
-        roles: [user.role]
+        roles: [user.role],
+        hasAccess: canView('documents')
       },
       messages: {
         name: ui.page_titles.messages || 'Messages',
@@ -256,79 +274,143 @@ const Layout: React.FC<LayoutProps> = ({ children, headerContent }) => {
         icon: ChatBubbleLeftRightIcon,
         iconSolid: ChatIconSolid,
         roles: [user.role],
-        badge: unreadCount
+        badge: unreadCount,
+        hasAccess: canView('messages')
       },
       reports: {
-        name: ui.page_titles.reports || 'Reports',
+        name: ui.page_titles.reports || 'Reports & Analytics',
         href: '/reports',
         icon: ChartBarIcon,
         iconSolid: ChartBarIconSolid,
-        roles: ['admin', 'coordinator']
+        roles: [user.role],
+        hasAccess: hasAccess('analytics')
       },
       ai_gpt: {
-        name: 'AI GPT',
+        name: 'AI Assistant',
         href: '/admin/gpt',
         icon: SparklesIcon,
         iconSolid: SparklesIconSolid,
-        roles: ['admin']
+        roles: [user.role],
+        hasAccess: user.role === 'admin' // Special admin feature
       },
       agency_assignments: {
-        name: 'Agency Assignments',
+        name: 'Agency Management',
         href: '/admin/agency-assignments',
         icon: BuildingOfficeIcon,
         iconSolid: BuildingOfficeIconSolid,
-        roles: ['admin']
+        roles: [user.role],
+        hasAccess: user.role === 'admin' // Special admin feature
       },
       agencies: {
         name: 'Agency Management',
         href: '/admin/agencies',
         icon: BuildingOfficeIcon,
         iconSolid: BuildingOfficeIconSolid,
-        roles: ['admin']
+        roles: [user.role],
+        hasAccess: user.role === 'admin' // Special admin feature
+      },
+      pp_management: {
+        name: 'PracticePanther Management',
+        href: '/admin/practice-panther',
+        icon: ArrowPathIcon,
+        iconSolid: ArrowPathIconSolid,
+        roles: [user.role],
+        hasAccess: hasAccess('pp_sync')
+      },
+      system: {
+        name: 'System Settings',
+        href: '/admin/system',
+        icon: CogIcon,
+        iconSolid: CogIconSolid,
+        roles: [user.role],
+        hasAccess: hasAccess('system_settings')
+      },
+      audit: {
+        name: 'Audit Logs',
+        href: '/admin/audit',
+        icon: ShieldCheckIcon,
+        iconSolid: ShieldCheckIcon,
+        roles: [user.role],
+        hasAccess: hasAccess('audit_logs')
       },
       settings: {
         name: 'Settings',
         href: '/settings',
         icon: CogIcon,
         iconSolid: CogIconSolid,
-        roles: [user.role]
+        roles: [user.role],
+        hasAccess: true // Settings are always available
+      },
+      // Additional role-specific items
+      service_portfolio: {
+        name: 'Service Portfolio',
+        href: '/exchanges',
+        icon: DocumentTextIcon,
+        iconSolid: DocumentTextIconSolid,
+        roles: [user.role],
+        hasAccess: canView('exchanges')
+      },
+      our_team: {
+        name: 'Our Team',
+        href: '/contacts',
+        icon: UsersIcon,
+        iconSolid: UsersIconSolid,
+        roles: [user.role],
+        hasAccess: canView('contacts')
+      },
+      performance: {
+        name: 'Performance',
+        href: '/reports',
+        icon: ChartBarIcon,
+        iconSolid: ChartBarIconSolid,
+        roles: [user.role],
+        hasAccess: hasAccess('analytics')
       }
     };
 
-    // Return only the items that are in the user's sidebar configuration and user has access to
+    // Return only the items that are in the user's sidebar configuration and user has permission to access
     const filteredItems = sidebarItems
       .map((itemKey: string) => navigationMap[itemKey])
-      .filter((item: NavigationItem | undefined) => item !== undefined && item.roles.includes(user.role));
+      .filter((item: NavigationItem | undefined) => 
+        item !== undefined && 
+        item.roles.includes(user.role) && 
+        item.hasAccess !== false
+      );
     
     // Debug: Log filtered items
     console.log('🔍 Navigation items for user:', user.role, filteredItems.map((item: NavigationItem) => item.name));
     
-    // Fallback: if no items found, show basic navigation
+    // Fallback: if no items found, show basic navigation with permission checks
     if (filteredItems.length === 0) {
       console.log('⚠️ No navigation items found, showing fallback navigation');
-      return [
+      const fallbackItems = [
         {
           name: 'Dashboard',
           href: '/dashboard',
           icon: HomeIcon,
           iconSolid: HomeIconSolid,
-          roles: [user.role]
+          roles: [user.role],
+          hasAccess: true
         },
         {
           name: 'Exchanges',
           href: '/exchanges',
           icon: DocumentTextIcon,
           iconSolid: DocumentTextIconSolid,
-          roles: [user.role]
+          roles: [user.role],
+          hasAccess: canView('exchanges')
         },
         {
           name: 'Tasks',
           href: '/tasks',
           icon: CheckCircleIcon,
           iconSolid: CheckCircleIconSolid,
-          roles: [user.role]
+          roles: [user.role],
+          hasAccess: canView('tasks')
         }
       ];
+      
+      return fallbackItems.filter(item => item.hasAccess !== false);
     }
     
     return filteredItems;

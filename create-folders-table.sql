@@ -78,3 +78,6 @@ FROM exchanges e
 WHERE e.id NOT IN (SELECT DISTINCT exchange_id FROM folders WHERE name = 'Legal Documents' AND exchange_id IS NOT NULL);
 
 
+
+
+

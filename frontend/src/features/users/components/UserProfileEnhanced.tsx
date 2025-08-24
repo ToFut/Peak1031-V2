@@ -24,11 +24,13 @@ import {
   TrashIcon,
   DocumentDuplicateIcon,
   ChatBubbleBottomCenterTextIcon,
-  CogIcon
+  CogIcon,
+  CircleStackIcon as DatabaseIcon
 } from '@heroicons/react/24/outline';
 import { useUserProfile } from '../../../hooks/useUserProfile';
 import { UserProfileService } from '../../../services/userProfileService';
 import { EnhancedStatCard } from '../../dashboard/components/SharedDashboardComponents';
+import PPContactDataDisplay from './PPContactDataDisplay';
 import apiService from '../../../services/api';
 
 interface AgencyAssignment {
@@ -67,6 +69,24 @@ interface Permission {
 
 interface UserProfileEnhancedProps {
   initialProfile?: any; // Profile passed from parent to avoid duplicate API calls
+}
+
+interface UserContact {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  first_name?: string;
+  last_name?: string;
+  phone_primary?: string;
+  phone_mobile?: string;
+  phone_work?: string;
+  company?: string;
+  pp_id?: string;
+  pp_raw_data?: any;
+  ppData?: any;
+  hasPPData?: boolean;
+  [key: string]: any;
 }
 
 // Animation variants for staggered wave effect
@@ -519,6 +539,78 @@ const UserProfileEnhanced: React.FC<UserProfileEnhancedProps> = ({ initialProfil
             )}
           </motion.div>
         </motion.div>
+      </motion.div>
+
+      {/* PP Contact Data Section */}
+      <motion.div
+        className="bg-white rounded-lg shadow-sm border"
+        variants={itemVariants}
+      >
+        <div className="p-6">
+          <div className="flex items-center mb-6">
+            <DatabaseIcon className="h-6 w-6 text-gray-500 mr-3" />
+            <h3 className="text-lg font-semibold text-gray-900">Contact Information</h3>
+          </div>
+          
+          <PPContactDataDisplay
+            contactData={{
+              ...profile.user,
+              // Basic contact info mapping
+              firstName: profile.user.first_name || profile.user.firstName,
+              lastName: profile.user.last_name || profile.user.lastName,
+              phoneNumber: profile.user.phone || profile.user.phone_primary,
+              
+              // Enhanced PracticePanther field mappings
+              home_phone: profile.user.home_phone || profile.user.phone_primary || profile.user.phone,
+              phone_mobile: profile.user.phone_mobile || profile.user.mobile_phone,
+              phone_work: profile.user.phone_work || profile.user.work_phone,
+              
+              // Address information
+              address: profile.user.address || profile.user.street_address,
+              street: profile.user.street || profile.user.address_line_1,
+              city: profile.user.city,
+              state: profile.user.state,
+              zip: profile.user.zip || profile.user.postal_code,
+              
+              // Financial information
+              fee: profile.user.fee || profile.user.pp_fee,
+              additional_property_fee: profile.user.additional_property_fee || profile.user.pp_additional_fee,
+              internal_credit_to: profile.user.internal_credit_to || profile.user.pp_internal_credit,
+              referral_source: profile.user.referral_source || profile.user.pp_referral_source,
+              invoice_template: profile.user.invoice_template || profile.user.pp_invoice_template,
+              
+              // Client settings
+              client_portal: profile.user.client_portal || profile.user.pp_client_portal,
+              text_messages: profile.user.text_messages || profile.user.pp_text_messages,
+              client_portal_settings: profile.user.client_portal_settings || profile.user.pp_portal_settings,
+              
+              // Status and assignment
+              status: profile.user.status || profile.user.pp_status || (profile.user.is_active ? 'Active' : 'Inactive'),
+              assigned_to: profile.user.assigned_to || profile.user.pp_assigned_to,
+              number: profile.user.number || profile.user.pp_number || profile.user.contact_number,
+              
+              // PracticePanther data
+              pp_id: profile.user.pp_id,
+              pp_raw_data: profile.user.pp_raw_data,
+              ppData: profile.user.ppData,
+              hasPPData: profile.user.hasPPData || !!profile.user.pp_id,
+              
+              // Additional PP fields
+              pp_email: profile.user.pp_email,
+              pp_phone_mobile: profile.user.pp_phone_mobile,
+              pp_phone_work: profile.user.pp_phone_work,
+              pp_display_name: profile.user.pp_display_name,
+              pp_is_primary_contact: profile.user.pp_is_primary_contact,
+              pp_account_ref_display_name: profile.user.pp_account_ref_display_name,
+              pp_notes: profile.user.pp_notes,
+              pp_custom_field_values: profile.user.pp_custom_field_values,
+              pp_synced_at: profile.user.pp_synced_at,
+              pp_created_at: profile.user.pp_created_at,
+              pp_updated_at: profile.user.pp_updated_at
+            }}
+            variant="detailed"
+          />
+        </div>
       </motion.div>
 
       {/* Additional sections can be added here with similar animation patterns */}

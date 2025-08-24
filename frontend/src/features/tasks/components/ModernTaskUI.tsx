@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Task, TaskStatus, TaskPriority } from '../../../types';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
+import { useViewPreferences, VIEW_PREFERENCE_KEYS } from '../../../hooks/useViewPreferences';
 import CalendarView from './CalendarView';
 import {
   MagnifyingGlassIcon,
@@ -43,6 +44,7 @@ interface ModernTaskUIProps {
   initialView?: 'grid' | 'list' | 'kanban' | 'calendar' | 'timeline';
   onTaskSelect?: (task: Task) => void;
   onCreateClick?: () => void;
+  defaultViews?: ('list' | 'calendar')[];
 }
 
 interface Exchange {
@@ -53,8 +55,10 @@ interface Exchange {
 
 interface User {
   id: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
+  first_name?: string;
+  last_name?: string;
   email: string;
 }
 
@@ -152,19 +156,51 @@ const STATUS_CONFIG: Record<StatusConfigKey, {
 
 export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
   exchangeId,
-  initialView = 'kanban',
+  initialView = 'list',
   onTaskSelect,
-  onCreateClick
+  onCreateClick,
+  defaultViews = ['list', 'calendar']
 }) => {
   // const { user } = useAuth(); // Unused variable
+  
+  // Handle view mode changes and save to preferences
+  const handleViewModeChange = (newViewMode: 'grid' | 'list' | 'kanban' | 'calendar' | 'timeline') => {
+    setViewMode(newViewMode);
+    setSavedViewMode(newViewMode);
+    // If switching to a single view, disable dual view
+    if (!defaultViews.includes(newViewMode as any)) {
+      setShowDualView(false);
+    }
+  };
+
+  // Toggle dual view (list + calendar)
+  const toggleDualView = () => {
+    setShowDualView(!showDualView);
+    if (!showDualView) {
+      setViewMode('list'); // Default to list when enabling dual view
+      setSavedViewMode('list');
+    }
+  };
   const [tasks, setTasks] = useState<Task[]>([]);
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban' | 'calendar' | 'timeline'>(initialView || 'grid');
+  const { viewType: savedViewMode, setViewType: setSavedViewMode, loading: preferencesLoading } = useViewPreferences(
+    VIEW_PREFERENCE_KEYS.TASK_LIST,
+    initialView
+  );
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban' | 'calendar' | 'timeline'>(savedViewMode);
+  const [showDualView, setShowDualView] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchType, setSearchType] = useState<'all' | 'exchange' | 'user'>('all');
   const [selectedExchange, setSelectedExchange] = useState<string>('all');
+
+  // Update viewMode when saved preference loads
+  useEffect(() => {
+    if (!preferencesLoading) {
+      setViewMode(savedViewMode);
+    }
+  }, [savedViewMode, preferencesLoading]);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
@@ -187,7 +223,12 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
   // Get user name by ID
   const getUserName = (userId: string) => {
     const user = users.find(u => u.id === userId);
-    return user ? `${user.firstName} ${user.lastName}` : userId;
+    if (user) {
+      const firstName = user.firstName || user.first_name;
+      const lastName = user.lastName || user.last_name;
+      return firstName && lastName ? `${firstName} ${lastName}` : userId;
+    }
+    return userId;
   };
 
   // Get exchange name by ID
@@ -545,14 +586,16 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
     if (view === 'list') {
       return (
         <div
-          className={`group flex flex-col sm:flex-row sm:items-center p-3 sm:p-5 bg-white border rounded-lg sm:rounded-xl hover:shadow-lg transition-all cursor-pointer ${
-            isSelected ? 'ring-2 ring-purple-500 border-purple-500 shadow-md' : 'border-gray-200'
-          } ${isOverdue ? 'border-l-4 border-l-red-500' : ''}`}
+          className={`group flex items-center gap-3 px-4 py-3 bg-white border-l-2 hover:bg-gray-50 transition-all cursor-pointer ${
+            isSelected ? 'bg-purple-50 border-l-purple-500' : 
+            isOverdue ? 'border-l-red-500' : 'border-l-transparent hover:border-l-gray-300'
+          }`}
           onClick={() => onTaskSelect?.(task)}
         >
+          {/* Minimal Checkbox */}
           <input
             type="checkbox"
-            className="mr-4 w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+            className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-1 focus:ring-purple-500"
             checked={isSelected}
             onChange={(e) => {
               e.stopPropagation();
@@ -568,77 +611,71 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
             }}
           />
           
-          <div className="flex items-center mr-4">
-            <div className={`p-2 rounded-lg ${statusConfig.bgClass}`}>
-              <StatusIcon className={`w-5 h-5 ${statusConfig.textClass}`} />
-            </div>
-          </div>
-          
+          {/* Clean Minimal Task Content */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-2">
-              <h3 className="font-semibold text-gray-900 text-lg truncate">{task.title}</h3>
-              {(task as any).starred && <StarSolidIcon className="w-5 h-5 text-yellow-500" />}
-              {isOverdue && (
-                <span className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
-                  <ExclamationTriangleIcon className="w-3 h-3" />
-                  Overdue
-                </span>
-              )}
-            </div>
-            {task.description && (
-              <p className="text-sm text-gray-600 mb-2 line-clamp-2">{task.description}</p>
-            )}
-            <div className="flex items-center gap-4 text-sm text-gray-500">
-              <div className="flex items-center gap-1">
-                <PriorityIcon className={`w-4 h-4 ${priorityConfig.textClass}`} />
-                <span className={priorityConfig.textClass}>{priorityConfig.label} Priority</span>
+            {/* Single Row: Title + Minimal Indicators */}
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-gray-900 truncate pr-3">{task.title}</h3>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Priority Icon Only */}
+                <div className="group relative">
+                  <PriorityIcon className={`w-4 h-4 ${priorityConfig.textClass} cursor-help`} />
+                  <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                    {priorityConfig.label}
+                  </div>
+                </div>
+                
+                {/* Status Dot Only */}
+                <div className="group relative">
+                  <div className={`w-2 h-2 rounded-full cursor-help ${
+                    task.status === 'COMPLETED' ? 'bg-green-500' :
+                    task.status === 'IN_PROGRESS' ? 'bg-blue-500' :
+                    isOverdue ? 'bg-red-500' : 'bg-gray-400'
+                  }`}></div>
+                  <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                    {isOverdue ? 'Overdue' : statusConfig.label}
+                  </div>
+                </div>
+                
+                {/* Due Date Icon Only */}
+                {dueDateInfo && (
+                  <div className="group relative">
+                    <CalendarIcon className={`w-4 h-4 cursor-help ${dueDateInfo.urgent ? 'text-red-500' : 'text-gray-400'}`} />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                      {dueDateInfo.text}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Assignee Icon Only */}
+                {(task.assignedTo || task.assigned_to) && (
+                  <div className="group relative">
+                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-purple-100 hover:bg-purple-200 transition-colors cursor-help">
+                      <span className="text-xs font-medium text-purple-700">
+                        {getUserName(task.assignedTo || task.assigned_to || '').split(' ').map(n => n[0]).join('').toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                      {getUserName(task.assignedTo || task.assigned_to || '')}
+                    </div>
+                  </div>
+                )}
               </div>
-              {dueDateInfo && (
-                <div className={`flex items-center gap-1 ${dueDateInfo.color}`}>
-                  <CalendarIcon className="w-4 h-4" />
-                  <span className={dueDateInfo.urgent ? 'font-medium' : ''}>{dueDateInfo.text}</span>
-                </div>
-              )}
-              {(task.assignedTo || task.assigned_to) && (
-                <div className="flex items-center gap-1">
-                  <UserCircleIcon className="w-4 h-4" />
-                  <span>Assigned: {getUserName(task.assignedTo || task.assigned_to || '')}</span>
-                </div>
-              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3 ml-4">
-            <span className={`px-3 py-1 text-sm font-medium rounded-full ${statusConfig.bgClass} ${statusConfig.textClass}`}>
-              {statusConfig.label}
-            </span>
-            {(task.assignedTo || task.assigned_to) && (
-              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium text-purple-600">
-                  {getUserName(task.assignedTo || task.assigned_to || '').charAt(0).toUpperCase()}
-                </span>
-              </div>
-            )}
-            <div className="opacity-0 group-hover:opacity-100 flex gap-1">
-              <button 
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onTaskSelect?.(task);
-                }}
-              >
-                <PencilIcon className="w-4 h-4 text-gray-500" />
-              </button>
-              <button 
-                className="p-2 hover:bg-red-100 rounded-lg transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleTaskDelete(task.id);
-                }}
-              >
-                <TrashIcon className="w-4 h-4 text-red-500" />
-              </button>
-            </div>
+          {/* Hover Actions - Minimal */}
+          <div className="opacity-0 group-hover:opacity-100 flex gap-1 ml-2">
+            <button 
+              className="p-1 hover:bg-gray-100 rounded transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTaskSelect?.(task);
+              }}
+              title="Edit"
+            >
+              <PencilIcon className="w-3 h-3 text-gray-500" />
+            </button>
           </div>
         </div>
       );
@@ -732,49 +769,6 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
           </div>
         )}
 
-        {/* Footer with assignee and actions */}
-        <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-100">
-          <div className="flex items-center gap-3">
-            {(task.assignedTo || task.assigned_to) && (
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-purple-600">
-                    {(task.assignedTo || task.assigned_to || '').charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <span className="text-sm text-gray-600">Assigned: {task.assignedTo || task.assigned_to}</span>
-              </div>
-            )}
-            {(task as any).tags?.slice(0, 2).map((tag: string) => (
-              <span key={tag} className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
-                {tag}
-              </span>
-            ))}
-          </div>
-          
-          <div className="opacity-0 group-hover:opacity-100 flex gap-2 transition-all">
-            <button 
-              className="p-2 hover:bg-purple-100 rounded-lg transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                onTaskSelect?.(task);
-              }}
-              title="Edit task"
-            >
-              <PencilIcon className="w-4 h-4 text-purple-600" />
-            </button>
-            <button 
-              className="p-2 hover:bg-red-100 rounded-lg transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleTaskDelete(task.id);
-              }}
-              title="Delete task"
-            >
-              <TrashIcon className="w-4 h-4 text-red-500" />
-            </button>
-          </div>
-        </div>
       </div>
     );
   };
@@ -807,7 +801,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
         return `${task.assignedUser.first_name} ${task.assignedUser.last_name}`;
       }
       if (task.assignedTo || task.assigned_to) {
-        return task.assignedTo || task.assigned_to || '';
+        return getUserName(task.assignedTo || task.assigned_to || '');
       }
       return 'Unassigned';
     };
@@ -1115,7 +1109,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
         return `${task.assignedUser.first_name} ${task.assignedUser.last_name}`;
       }
       if (task.assignedTo || task.assigned_to) {
-        return task.assignedTo || task.assigned_to || '';
+        return getUserName(task.assignedTo || task.assigned_to || '');
       }
       return 'Unassigned';
     };
@@ -1309,16 +1303,17 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
             {/* Assignee */}
             <div className="flex items-center gap-2">
               {task.assignedTo || task.assigned_to ? (
-                <>
-                  <div className="w-5 h-5 bg-purple-100 rounded-full flex items-center justify-center">
+                <div className="group relative">
+                  <div className="w-5 h-5 bg-purple-100 hover:bg-purple-200 rounded-full flex items-center justify-center transition-colors cursor-help">
                     <span className="text-xs font-medium text-purple-700">
                       {getInitials(task.assignedTo || task.assigned_to)}
                     </span>
                   </div>
-                  <span className="text-xs text-gray-700 truncate">
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
                     {getUserName(task.assignedTo || task.assigned_to || '')}
-                  </span>
-                </>
+                  </div>
+                </div>
               ) : (
                 <>
                   <UserCircleIcon className="w-4 h-4 text-gray-400" />
@@ -1619,16 +1614,17 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
                                     {/* Assignee */}
                                     <div className="flex items-center gap-2">
                                       {task.assignedTo || task.assigned_to ? (
-                                        <>
-                                          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                                        <div className="group relative">
+                                          <div className="w-8 h-8 bg-purple-100 hover:bg-purple-200 rounded-full flex items-center justify-center transition-colors cursor-help">
                                             <span className="text-sm font-medium text-purple-700">
                                               {getInitials(task.assignedTo || task.assigned_to)}
                                             </span>
                                           </div>
-                                          <span className="text-sm text-gray-700 font-medium">
-                                            {task.assignedTo || task.assigned_to}
-                                          </span>
-                                        </>
+                                          {/* Tooltip */}
+                                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                                            {task.assignedUser?.firstName && task.assignedUser?.lastName ? `${task.assignedUser.firstName} ${task.assignedUser.lastName}` : task.assignedUser?.first_name && task.assignedUser?.last_name ? `${task.assignedUser.first_name} ${task.assignedUser.last_name}` : getUserName(task.assignedTo || task.assigned_to || '')}
+                                          </div>
+                                        </div>
                                       ) : (
                                         <>
                                           <UserCircleIcon className="w-6 h-6 text-gray-400" />
@@ -1915,7 +1911,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
               {/* Compact View Mode Switcher */}
               <div className="flex items-center bg-white rounded-lg p-1 shadow-sm border border-gray-200">
                 <button
-                  onClick={() => setViewMode('kanban')}
+                  onClick={() => handleViewModeChange('kanban')}
                   className={`p-2 rounded-md transition-all duration-200 ${
                     viewMode === 'kanban' 
                       ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md' 
@@ -1926,7 +1922,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
                   <Squares2X2Icon className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => setViewMode('list')}
+                  onClick={() => handleViewModeChange('list')}
                   className={`p-2 rounded-md transition-all duration-200 ${
                     viewMode === 'list' 
                       ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md' 
@@ -1937,7 +1933,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
                   <ListBulletIcon className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => setViewMode('grid')}
+                  onClick={() => handleViewModeChange('grid')}
                   className={`p-2 rounded-md transition-all duration-200 ${
                     viewMode === 'grid' 
                       ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md' 
@@ -1948,7 +1944,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
                   <TableCellsIcon className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => setViewMode('calendar')}
+                  onClick={() => handleViewModeChange('calendar')}
                   className={`p-2 rounded-md transition-all duration-200 ${
                     viewMode === 'calendar' 
                       ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md' 
@@ -1959,7 +1955,7 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
                   <CalendarIcon className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => setViewMode('timeline')}
+                  onClick={() => handleViewModeChange('timeline')}
                   className={`p-2 rounded-md transition-all duration-200 ${
                     viewMode === 'timeline' 
                       ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md' 
@@ -1968,6 +1964,21 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
                   title="Timeline View"
                 >
                   <ClockIcon className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Dual View Toggle */}
+              <div className="flex items-center bg-white rounded-lg p-1 shadow-sm border border-gray-200 ml-3">
+                <button
+                  onClick={toggleDualView}
+                  className={`px-3 py-2 rounded-md transition-all duration-200 text-sm font-medium ${
+                    showDualView 
+                      ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-md' 
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  title="Toggle List + Calendar View"
+                >
+                  {showDualView ? 'List + Calendar' : 'Single View'}
                 </button>
               </div>
             </div>
@@ -2152,22 +2163,62 @@ export const ModernTaskUI: React.FC<ModernTaskUIProps> = ({
             </div>
           ) : (
             <>
-              {viewMode === 'kanban' && renderKanbanView()}
-              {viewMode === 'list' && renderListView()}
-              {viewMode === 'grid' && renderGridView()}
-              {viewMode === 'timeline' && renderTimelineView()}
+              {showDualView && (defaultViews.includes('list' as any) || defaultViews.includes('calendar' as any)) ? (
+                // Dual View: List + Calendar
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                      <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                        <ListBulletIcon className="w-5 h-5 text-purple-600" />
+                        Task List
+                      </h3>
+                    </div>
+                    <div className="p-0">
+                      {renderListView()}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                      <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                        <CalendarIcon className="w-5 h-5 text-purple-600" />
+                        Calendar View
+                      </h3>
+                    </div>
+                    <div className="p-0">
+                      <CalendarView
+                        tasks={processedTasks}
+                        onTaskSelect={onTaskSelect}
+                        onCreateTask={(date) => onCreateClick?.()}
+                        onTaskUpdate={(taskId, updates) => {
+                          // Handle task updates
+                          console.log('Task update:', taskId, updates);
+                        }}
+                        exchangeId={exchangeId}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // Single View
+                <>
+                  {viewMode === 'kanban' && renderKanbanView()}
+                  {viewMode === 'list' && renderListView()}
+                  {viewMode === 'grid' && renderGridView()}
+                  {viewMode === 'timeline' && renderTimelineView()}
 
-              {viewMode === 'calendar' && (
-                <CalendarView
-                  tasks={processedTasks}
-                  onTaskSelect={onTaskSelect}
-                  onCreateTask={(date) => onCreateClick?.()}
-                  onTaskUpdate={(taskId, updates) => {
-                    // Handle task updates
-                    console.log('Task update:', taskId, updates);
-                  }}
-                  exchangeId={exchangeId}
-                />
+                  {viewMode === 'calendar' && (
+                    <CalendarView
+                      tasks={processedTasks}
+                      onTaskSelect={onTaskSelect}
+                      onCreateTask={(date) => onCreateClick?.()}
+                      onTaskUpdate={(taskId, updates) => {
+                        // Handle task updates
+                        console.log('Task update:', taskId, updates);
+                      }}
+                      exchangeId={exchangeId}
+                    />
+                  )}
+                </>
               )}
             </>
           )}

@@ -14,7 +14,11 @@ class RBACService {
       throw new Error('User is required for RBAC filtering');
     }
 
+    const { whereClause = {} } = options;
     console.log(`🔒 RBAC: Getting exchanges for ${user.role} user: ${user.email}`);
+    if (Object.keys(whereClause).length > 0) {
+      console.log(`🔒 RBAC: Applying additional filters:`, whereClause);
+    }
 
     // Use count: 'exact' to get total count even with limit
     let query = supabaseService.client.from('exchanges').select('*', { count: 'exact' });
@@ -180,9 +184,29 @@ class RBACService {
         return { data: [], count: 0 };
     }
 
-    // Apply additional filters from options
+    // Apply additional filters from options and whereClause
     if (options.status) {
       query = query.eq('status', options.status);
+    }
+    
+    // Apply whereClause filters (includes Op.in operations from buildExchangeWhereClause)
+    if (whereClause && Object.keys(whereClause).length > 0) {
+      Object.keys(whereClause).forEach(key => {
+        if (key === 'status' && whereClause[key] && typeof whereClause[key] === 'object') {
+          // Handle Sequelize Op.in for status filtering
+          const opKeys = Object.getOwnPropertySymbols(whereClause[key]);
+          const hasInSymbol = opKeys.find(sym => sym.toString().includes('in'));
+          if (hasInSymbol && Array.isArray(whereClause[key][hasInSymbol])) {
+            console.log(`🔒 RBAC: Applying status IN filter:`, whereClause[key][hasInSymbol]);
+            query = query.in('status', whereClause[key][hasInSymbol]);
+          }
+        } else if (key === 'is_active' && whereClause[key] !== undefined) {
+          query = query.eq('is_active', whereClause[key]);
+        } else if (whereClause[key] !== undefined && whereClause[key] !== null && typeof whereClause[key] !== 'object') {
+          // Handle simple equality filters
+          query = query.eq(key, whereClause[key]);
+        }
+      });
     }
     if (options.limit) {
       query = query.limit(options.limit);

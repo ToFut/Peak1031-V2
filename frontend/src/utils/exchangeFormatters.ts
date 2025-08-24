@@ -3,6 +3,33 @@
  */
 
 /**
+ * Format date to MM/DD/YYYY format
+ */
+export const formatDate = (dateString: string | Date | undefined | null): string => {
+  if (!dateString) return 'Not set';
+  
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'Invalid date';
+  
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const year = date.getFullYear();
+  
+  return `${month}/${day}/${year}`;
+};
+
+/**
+ * Calculate days from exchange creation to a deadline
+ */
+export const calculateDaysFromCreation = (createdDate: string | Date, targetDate: string | Date): number => {
+  const created = new Date(createdDate);
+  const target = new Date(targetDate);
+  const diffTime = target.getTime() - created.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+};
+
+/**
  * Format exchange number to standard E-XXXX format
  * @param exchangeNumber - The exchange number or ID to format
  * @returns Formatted exchange number as E-XXXX

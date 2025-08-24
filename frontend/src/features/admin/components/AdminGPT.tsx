@@ -13,9 +13,11 @@ import {
   SparklesIcon,
   ChartBarIcon,
   TableCellsIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  ShieldExclamationIcon
 } from '@heroicons/react/24/outline';
 import { apiService } from '../../../services/api';
+import { useAuth } from '../../../hooks/useAuth';
 
 interface QueryResult {
   id: string;
@@ -36,6 +38,7 @@ interface GPTInsight {
 }
 
 const AdminGPT: React.FC = () => {
+  const { user, loading: authLoading } = useAuth();
   const [currentQuery, setCurrentQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [queryResults, setQueryResults] = useState<QueryResult[]>([]);
@@ -44,26 +47,49 @@ const AdminGPT: React.FC = () => {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [usageStats, setUsageStats] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const queryInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    loadInitialData();
-  }, []);
+    // Only load data if user is authenticated and is an admin
+    if (!authLoading && user && user.role === 'admin') {
+      loadInitialData();
+    } else if (!authLoading && user && user.role !== 'admin') {
+      setError('Admin access required. Please log in with an administrator account.');
+    } else if (!authLoading && !user) {
+      setError('Authentication required. Please log in to access AdminGPT.');
+    }
+  }, [user, authLoading]);
 
   const loadInitialData = async () => {
     try {
       setError(null);
+      setIsLoading(true);
+      
       // Load usage stats and suggested queries
       const [stats, suggestedQueries] = await Promise.all([
         apiService.getGPTUsageStats(),
-        apiService.get('/admin/gpt/suggestions')
+        apiService.get('/admin-gpt/suggestions')
       ]);
       
       setUsageStats(stats);
       setSuggestions(suggestedQueries.suggestions || []);
+      setIsInitialized(true);
     } catch (error: any) {
       console.error('Failed to load initial data:', error);
-      setError('Failed to connect to AI service. Please ensure the backend is running.');
+      
+      // More specific error messages based on error type
+      if (error.message?.includes('401') || error.message?.includes('Authentication')) {
+        setError('Authentication failed. Please log in again.');
+      } else if (error.message?.includes('403') || error.message?.includes('Admin access')) {
+        setError('Admin access required. You do not have permission to use AdminGPT.');
+      } else if (error.message?.includes('Network Error') || error.message?.includes('fetch')) {
+        setError('Failed to connect to AI service. Please ensure the backend is running.');
+      } else {
+        setError(`AI service error: ${error.message || 'Unknown error occurred'}`);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -183,6 +209,45 @@ const AdminGPT: React.FC = () => {
       </div>
     );
   };
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <ArrowPathIcon className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-spin" />
+            <p className="text-gray-600">Loading AdminGPT...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied if user is not admin
+  if (!user || user.role !== 'admin') {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
+          <ShieldExclamationIcon className="h-16 w-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-red-800 mb-2">Access Restricted</h2>
+          <p className="text-red-600 mb-4">
+            AdminGPT is only available to administrator users.
+          </p>
+          {!user && (
+            <p className="text-sm text-red-500">
+              Please log in with an administrator account to access this feature.
+            </p>
+          )}
+          {user && user.role !== 'admin' && (
+            <p className="text-sm text-red-500">
+              Current role: {user.role}. Administrator role required.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto p-6">

@@ -17,6 +17,9 @@ try {
   console.log('ℹ️ Scheduled sync service not available');
 }
 
+// Import comprehensive sync service for full data sync
+const ComprehensivePPSyncService = require('../services/comprehensive-pp-sync');
+
 // Initialize services
 const tokenManager = new PPTokenManager();
 const ppService = PracticePartnerService.instance || new PracticePartnerService();
@@ -442,13 +445,17 @@ router.post('/trigger-sync', async (req, res) => {
       });
     }
     
-    // Get sync options from request
+    // Get sync options from request - FORCE comprehensive sync to get ALL data
     const { 
       sync_contacts = true, 
       sync_matters = true, 
       sync_tasks = true,
-      force_full_sync = false 
+      force_full_sync = false,
+      use_comprehensive_sync = false // Disabled due to schema mismatch issues
     } = req.body;
+    
+    // FORCE use regular sync but with NO LIMITS
+    console.log('🚀 Using FIXED regular sync service (NO LIMITS - increased pagination)');
     
     // Log sync start
     const { createClient } = require('@supabase/supabase-js');
@@ -474,7 +481,17 @@ router.post('/trigger-sync', async (req, res) => {
       });
     
     // Trigger the sync (this will run in background)
-    const syncPromise = performSync(sync_contacts, sync_matters, sync_tasks, force_full_sync);
+    let syncPromise;
+    
+    if (use_comprehensive_sync) {
+      // Use comprehensive sync service that fetches ALL data without limits
+      console.log('🚀 Using COMPREHENSIVE sync service (NO LIMITS - fetches ALL data)');
+      const comprehensiveSync = new ComprehensivePPSyncService();
+      syncPromise = comprehensiveSync.syncAll();
+    } else {
+      // Use regular sync with limitations
+      syncPromise = performSync(sync_contacts, sync_matters, sync_tasks, force_full_sync);
+    }
     
     // Don't wait for completion - return immediately
     res.json({

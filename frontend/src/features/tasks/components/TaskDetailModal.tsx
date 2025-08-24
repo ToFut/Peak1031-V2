@@ -42,8 +42,10 @@ interface TaskDetailModalProps {
 
 interface User {
   id: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
+  first_name?: string;
+  last_name?: string;
   email: string;
   role?: string;
   assignmentId?: string;
@@ -109,7 +111,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   // Get user name by ID
   const getUserName = (userId: string) => {
     const user = users.find(u => u.id === userId);
-    return user ? `${user.firstName} ${user.lastName}` : userId;
+    if (user) {
+      const firstName = user.firstName || user.first_name;
+      const lastName = user.lastName || user.last_name;
+      return firstName && lastName ? `${firstName} ${lastName}` : userId;
+    }
+    return userId;
   };
 
   // Get exchange name by ID
@@ -498,9 +505,17 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
               {/* Assignee */}
               {formData.assignedTo && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700">
-                  <UserCircleIcon className="w-4 h-4" />
-                  <span className="text-sm">{formData.assignedTo}</span>
+                <div className="group relative">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 hover:bg-purple-200 transition-colors cursor-help">
+                    <span className="text-sm font-medium text-purple-700">
+                      {getUserName(formData.assignedTo).split(' ').map(n => n[0]).join('').toUpperCase()}
+                    </span>
+                  </div>
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                    Assigned to: {getUserName(formData.assignedTo)}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900"></div>
+                  </div>
                 </div>
               )}
             </div>

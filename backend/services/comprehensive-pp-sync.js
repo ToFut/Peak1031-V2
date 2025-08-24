@@ -164,11 +164,18 @@ class ComprehensivePPSyncService {
   mapMatter(ppMatter) {
     const now = new Date().toISOString();
     
+    // Extract custom field values for mapping to specific columns
+    const customFields = ppMatter.custom_field_values || [];
+    const getCustomField = (fieldName) => {
+      const field = customFields.find(f => f.field_name === fieldName || f.name === fieldName);
+      return field ? field.value : null;
+    };
+
     return {
       // Core exchange identity
       exchange_number: ppMatter.number?.toString() || `PP-${ppMatter.id}`,
       name: ppMatter.display_name || `Exchange ${ppMatter.number || ppMatter.id}`,
-      exchange_type: 'simultaneous', // Default, can be updated later
+      exchange_type: getCustomField('TYPE OF EXCHANGE') || getCustomField('Exchange Type') || 'simultaneous',
 
       // Exchange-specific chat system
       exchange_chat_id: null, // Will be auto-generated
@@ -188,6 +195,54 @@ class ComprehensivePPSyncService {
       pp_custom_field_values: ppMatter.custom_field_values || [],
       pp_raw_data: ppMatter, // Complete PP API response
       pp_synced_at: now,
+      pp_created_at: ppMatter.created_at || null,
+      pp_updated_at: ppMatter.updated_at || null,
+
+      // PP Custom Fields - Match user's example data structure
+      rate: getCustomField('RATE') || getCustomField('Rate'),
+      tags: ppMatter.tags || [],
+      assigned_to_users: ppMatter.assigned_to_users || [],
+      statute_of_limitation_date: getCustomField('STATUTE OF LIMITATION DATE') ? new Date(getCustomField('STATUTE OF LIMITATION DATE')) : null,
+      
+      // Banking and Financial Info
+      bank: getCustomField('BANK') || getCustomField('Bank'),
+      
+      // Relinquished Property Information
+      rel_property_city: getCustomField('REL PROPERTY CITY') || getCustomField('Relinquished Property City'),
+      rel_property_state: getCustomField('REL PROPERTY STATE') || getCustomField('Relinquished Property State'),
+      rel_property_zip: getCustomField('REL PROPERTY ZIP') || getCustomField('Relinquished Property Zip'),
+      rel_property_address: getCustomField('REL PROPERTY ADDRESS') || getCustomField('Relinquished Property Address'),
+      rel_apn: getCustomField('REL APN') || getCustomField('Relinquished APN'),
+      rel_escrow_number: getCustomField('REL ESCROW #') || getCustomField('Relinquished Escrow Number'),
+      rel_value: getCustomField('REL VALUE') ? parseFloat(getCustomField('REL VALUE').toString().replace(/[$,]/g, '')) : null,
+      rel_contract_date: getCustomField('REL CONTRACT DATE') ? new Date(getCustomField('REL CONTRACT DATE')) : null,
+      
+      // Key Exchange Dates
+      close_of_escrow_date: getCustomField('CLOSE OF ESCROW DATE') ? new Date(getCustomField('CLOSE OF ESCROW DATE')) : null,
+      day_45: getCustomField('45 DAY') || getCustomField('45DAY') ? new Date(getCustomField('45 DAY') || getCustomField('45DAY')) : null,
+      day_180: getCustomField('180 DAY') || getCustomField('180DAY') ? new Date(getCustomField('180 DAY') || getCustomField('180DAY')) : null,
+      
+      // Financial Information
+      proceeds: getCustomField('PROCEEDS') ? parseFloat(getCustomField('PROCEEDS').toString().replace(/[$,]/g, '')) : null,
+      
+      // Client Information
+      client_vesting: getCustomField('CLIENT VESTING') || getCustomField('Client Vesting'),
+      type_of_exchange: getCustomField('TYPE OF EXCHANGE') || getCustomField('Exchange Type'),
+      
+      // Buyer Information
+      buyer_1_name: getCustomField('BUYER 1 NAME') || getCustomField('Buyer 1 Name'),
+      buyer_2_name: getCustomField('BUYER 2 NAME') || getCustomField('Buyer 2 Name'),
+      
+      // Replacement Property 1 Information
+      rep_1_city: getCustomField('REP 1 CITY') || getCustomField('Replacement 1 City'),
+      rep_1_state: getCustomField('REP 1 STATE') || getCustomField('Replacement 1 State'),
+      rep_1_zip: getCustomField('REP 1 ZIP') || getCustomField('Replacement 1 Zip'),
+      rep_1_property_address: getCustomField('REP 1 PROPERTY ADDRESS') || getCustomField('Replacement 1 Address'),
+      rep_1_apn: getCustomField('REP 1 APN') || getCustomField('Replacement 1 APN'),
+      rep_1_escrow_number: getCustomField('REP 1 ESCROW #') || getCustomField('Replacement 1 Escrow Number'),
+      rep_1_value: getCustomField('REP 1 VALUE') ? parseFloat(getCustomField('REP 1 VALUE').toString().replace(/[$,]/g, '')) : null,
+      rep_1_contract_date: getCustomField('REP 1 CONTRACT DATE') ? new Date(getCustomField('REP 1 CONTRACT DATE')) : null,
+      rep_1_seller_name: getCustomField('REP 1 SELLER NAME') || getCustomField('Replacement 1 Seller'),
 
       // Status & workflow
       status: ppMatter.status === 'Active' ? 'active' : 'pending',
@@ -195,8 +250,7 @@ class ComprehensivePPSyncService {
       completion_percentage: 0,
 
       // Analytics & intelligence
-      tags: [],
-      custom_fields: {},
+      custom_fields: Object.fromEntries(customFields.map(f => [f.field_name || f.name, f.value])),
       estimated_fees: null,
       actual_fees: null,
 

@@ -1,5 +1,42 @@
 import React from 'react';
-import { Calendar, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, Clock, AlertCircle, CheckCircle, XCircle, MapPin } from 'lucide-react';
+
+// Custom animation styles
+const customStyles = `
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-6px); }
+  }
+  
+  @keyframes shimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+  
+  .animate-fadeIn { animation: fadeIn 0.8s ease-out; }
+  .animate-float { animation: float 3s ease-in-out infinite; }
+  .animate-shimmer { 
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+`;
+
+// Inject styles
+if (typeof document !== 'undefined') {
+  const styleElement = document.getElementById('timeline-custom-styles');
+  if (!styleElement) {
+    const style = document.createElement('style');
+    style.id = 'timeline-custom-styles';
+    style.textContent = customStyles;
+    document.head.appendChild(style);
+  }
+}
 
 interface ExchangeTimelineProps {
   startDate?: string | Date;
@@ -7,6 +44,7 @@ interface ExchangeTimelineProps {
   completionDeadline?: string | Date;
   status?: string;
   compact?: boolean;
+  showToday?: boolean;
 }
 
 export const ExchangeTimeline: React.FC<ExchangeTimelineProps> = ({
@@ -14,10 +52,18 @@ export const ExchangeTimeline: React.FC<ExchangeTimelineProps> = ({
   identificationDeadline,
   completionDeadline,
   status,
-  compact = false
+  compact = false,
+  showToday = false
 }) => {
+  // Get fresh today date every render
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  
+  // Format today's date for display
+  const todayFormatted = today.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric'
+  });
 
   // Parse dates
   const start = startDate ? new Date(startDate) : null;
@@ -170,16 +216,36 @@ export const ExchangeTimeline: React.FC<ExchangeTimelineProps> = ({
     );
   }
 
+  // Calculate today's position on timeline
+  const calculateTodayPosition = () => {
+    if (!start || !deadline180) return null;
+    const totalDays = calculateDays(start, deadline180) || 180;
+    const elapsedDays = calculateDays(start, today) || 0;
+    return Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100));
+  };
+  
+  const todayPosition = calculateTodayPosition();
+
   // Full view for detail pages
   return (
     <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-          <Calendar className="w-5 h-5 mr-2 text-gray-600" />
-          Exchange Timeline
-        </h3>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+            <Calendar className="w-5 h-5 mr-2 text-gray-600" />
+            Exchange Timeline
+          </h3>
+          <p className="text-sm text-gray-600 mt-1">
+            Today: <span className="font-medium">{today.toLocaleDateString('en-US', { 
+              weekday: 'long',
+              month: 'long', 
+              day: 'numeric',
+              year: 'numeric'
+            })}</span>
+          </p>
+        </div>
         <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-          currentPhase === 'overdue' ? 'bg-red-100 text-red-700' :
+          currentPhase === 'overdue' ? 'bg-red-100 text-red-700 animate-pulse' :
           currentPhase === 'completed' ? 'bg-green-100 text-green-700' :
           'bg-blue-100 text-blue-700'
         }`}>
@@ -192,8 +258,50 @@ export const ExchangeTimeline: React.FC<ExchangeTimelineProps> = ({
       </div>
 
       {/* Timeline Visualization */}
-      <div className="relative mb-6">
+      <div className="relative mb-8">
         <div className="absolute left-0 top-6 w-full h-1 bg-gray-200"></div>
+        
+        {/* Elegant Small Today Marker */}
+        {showToday && todayPosition !== null && status !== 'COMPLETED' && status !== 'Completed' && (
+          <div 
+            className="absolute top-2 z-20 group cursor-pointer"
+            style={{ left: `${todayPosition}%`, transform: 'translateX(-50%)' }}
+          >
+            {/* Compact Badge */}
+            <div className="relative">
+              {/* Subtle glow */}
+              <div className="absolute inset-0 bg-blue-400 rounded-full blur-sm opacity-40 animate-pulse"></div>
+              
+              {/* Main badge */}
+              <div className="relative px-2 py-1 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full shadow-lg text-xs font-medium">
+                <div className="flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
+                  <span className="whitespace-nowrap">{todayFormatted}</span>
+                </div>
+              </div>
+              
+              {/* Small indicator line */}
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0.5 h-3 bg-blue-500 opacity-80"></div>
+              
+              {/* Timeline dot */}
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 translate-y-2 w-2 h-2 bg-blue-500 border-2 border-white rounded-full shadow-sm">
+                <div className="w-full h-full bg-blue-400 rounded-full animate-ping opacity-75"></div>
+              </div>
+            </div>
+
+            {/* Compact hover tooltip */}
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-30">
+              <div className="px-2 py-1 bg-gray-800 text-white text-xs rounded shadow-lg whitespace-nowrap">
+                Today: {today.toLocaleDateString('en-US', { 
+                  weekday: 'short',
+                  month: 'short', 
+                  day: 'numeric'
+                })}
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-l-transparent border-r-2 border-r-transparent border-b-2 border-b-gray-800"></div>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Timeline Nodes */}
         <div className="relative flex justify-between">
@@ -205,8 +313,8 @@ export const ExchangeTimeline: React.FC<ExchangeTimelineProps> = ({
               <Calendar className="w-6 h-6" />
             </div>
             <div className="mt-2 text-center">
-              <p className="text-xs font-medium text-gray-600">Start Date</p>
-              <p className="text-sm font-semibold">
+              <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Start Date</p>
+              <p className="text-lg font-black text-gray-900">
                 {start ? start.toLocaleDateString('en-US', { 
                   month: 'short', 
                   day: 'numeric',
@@ -214,7 +322,7 @@ export const ExchangeTimeline: React.FC<ExchangeTimelineProps> = ({
                 }) : 'Not Set'}
               </p>
               {daysFromStart !== null && (
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-600 font-medium mt-1">
                   {daysFromStart} days ago
                 </p>
               )}
@@ -232,8 +340,8 @@ export const ExchangeTimeline: React.FC<ExchangeTimelineProps> = ({
               {is45Overdue ? <AlertCircle className="w-6 h-6" /> : <Clock className="w-6 h-6" />}
             </div>
             <div className="mt-2 text-center">
-              <p className="text-xs font-medium text-gray-600">45-Day Deadline</p>
-              <p className={`text-sm font-semibold ${is45Overdue ? 'text-red-600' : ''}`}>
+              <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">45-Day Deadline</p>
+              <p className={`text-lg font-black ${is45Overdue ? 'text-red-600' : 'text-gray-900'}`}>
                 {deadline45 ? deadline45.toLocaleDateString('en-US', { 
                   month: 'short', 
                   day: 'numeric',
@@ -241,11 +349,15 @@ export const ExchangeTimeline: React.FC<ExchangeTimelineProps> = ({
                 }) : 'Not Set'}
               </p>
               {daysTo45 !== null && (
-                <p className={`text-xs mt-1 ${
-                  is45Overdue ? 'text-red-600 font-semibold' : 'text-gray-500'
+                <div className={`mt-2 px-3 py-1.5 rounded-lg ${
+                  is45Overdue ? 'bg-red-600 text-white animate-pulse' : 
+                  daysTo45 <= 7 ? 'bg-orange-500 text-white' :
+                  'bg-blue-600 text-white'
                 }`}>
-                  {daysTo45 >= 0 ? `${daysTo45} days left` : `${Math.abs(daysTo45)} days overdue`}
-                </p>
+                  <p className="text-sm font-extrabold">
+                    {daysTo45 >= 0 ? `${daysTo45} DAYS LEFT` : `${Math.abs(daysTo45)} DAYS OVERDUE`}
+                  </p>
+                </div>
               )}
             </div>
           </div>
@@ -263,8 +375,8 @@ export const ExchangeTimeline: React.FC<ExchangeTimelineProps> = ({
                <Clock className="w-6 h-6" />}
             </div>
             <div className="mt-2 text-center">
-              <p className="text-xs font-medium text-gray-600">180-Day Deadline</p>
-              <p className={`text-sm font-semibold ${is180Overdue && status !== 'COMPLETED' ? 'text-red-600' : ''}`}>
+              <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">180-Day Deadline</p>
+              <p className={`text-lg font-black ${is180Overdue && status !== 'COMPLETED' ? 'text-red-600' : 'text-gray-900'}`}>
                 {deadline180 ? deadline180.toLocaleDateString('en-US', { 
                   month: 'short', 
                   day: 'numeric',
@@ -272,14 +384,20 @@ export const ExchangeTimeline: React.FC<ExchangeTimelineProps> = ({
                 }) : 'Not Set'}
               </p>
               {daysTo180 !== null && status !== 'COMPLETED' && status !== 'Completed' && (
-                <p className={`text-xs mt-1 ${
-                  is180Overdue ? 'text-red-600 font-semibold' : 'text-gray-500'
+                <div className={`mt-2 px-3 py-1.5 rounded-lg ${
+                  is180Overdue ? 'bg-red-600 text-white animate-pulse' : 
+                  daysTo180 <= 30 ? 'bg-orange-500 text-white' :
+                  'bg-purple-600 text-white'
                 }`}>
-                  {daysTo180 >= 0 ? `${daysTo180} days left` : `${Math.abs(daysTo180)} days overdue`}
-                </p>
+                  <p className="text-sm font-extrabold">
+                    {daysTo180 >= 0 ? `${daysTo180} DAYS LEFT` : `${Math.abs(daysTo180)} DAYS OVERDUE`}
+                  </p>
+                </div>
               )}
               {(status === 'COMPLETED' || status === 'Completed') && (
-                <p className="text-xs mt-1 text-green-600 font-semibold">Completed</p>
+                <div className="mt-2 px-3 py-1.5 bg-green-600 text-white rounded-lg">
+                  <p className="text-sm font-extrabold">COMPLETED</p>
+                </div>
               )}
             </div>
           </div>

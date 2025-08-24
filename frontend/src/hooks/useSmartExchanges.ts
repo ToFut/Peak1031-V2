@@ -107,6 +107,7 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
       };
 
       console.log('📊 Fetching exchanges with options:', options);
+      console.log('📊 Current filters state:', filters);
 
       const token = localStorage.getItem('token');
       
@@ -117,12 +118,20 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
         ...(options.sortBy && { sortBy: options.sortBy }),
         ...(options.sortOrder && { sortOrder: options.sortOrder }),
         ...(options.status && { status: options.status }),
-        ...(options.searchTerm && { search: options.searchTerm })
+        ...(options.searchTerm && { search: options.searchTerm }),
+        ...(options.exchangeType && { exchangeType: options.exchangeType }),
+        ...(options.valueMin && { valueMin: options.valueMin.toString() }),
+        ...(options.valueMax && { valueMax: options.valueMax.toString() }),
+        ...(options.dateFilter && { dateFilter: options.dateFilter }),
+        ...(options.propertyAddress && { propertyAddress: options.propertyAddress })
       });
       
       const envBase = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
       const baseApi = envBase.replace('localhost:5002', 'localhost:5001');
       const endpoint = `/exchanges?${queryParams.toString()}`;
+      
+      console.log('📊 Final API endpoint:', `${baseApi}${endpoint}`);
+      console.log('📊 Query params:', queryParams.toString());
 
       const response = await fetch(`${baseApi}${endpoint}`, {
         method: 'GET',
@@ -133,7 +142,11 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
         signal: abortController.current?.signal
       });
 
+      console.log('📊 Response status:', response.status, response.statusText);
+      
       if (!response.ok) {
+        console.error('📊 API request failed:', response.status, response.statusText);
+        
         // If analytics endpoint fails with 401, fall back to regular exchanges
         if (response.status === 401 && endpoint.includes('analytics')) {
           console.warn('Analytics endpoint requires authentication, falling back to regular exchanges');
@@ -177,6 +190,14 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
       }
 
       const result = await response.json();
+      console.log('📊 API response received:', { 
+        success: result.success,
+        dataCount: result.data?.length || result.exchanges?.length || 0, 
+        pagination: result.pagination,
+        hasFilters: Object.keys(filters).length > 0,
+        statusFilter: filters.status,
+        resultKeys: Object.keys(result)
+      });
        
        // Handle response from exchanges endpoint
       let paginatedResponse: PaginatedResponse<Exchange>;
@@ -269,13 +290,14 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
       if (append && paginatedResponse.pagination.currentPage > 1) {
         // Append new data (lazy loading)
         setExchanges(prev => {
-          const existingIds = new Set(prev.map((e: Exchange) => e.id));
+          const currentExchanges = prev || [];
+          const existingIds = new Set(currentExchanges.map((e: Exchange) => e.id));
           const newExchanges = paginatedResponse.data.filter((e: Exchange) => !existingIds.has(e.id));
-          return [...prev, ...newExchanges];
+          return [...currentExchanges, ...newExchanges];
         });
       } else {
         // Replace data (new search/filter)
-        setExchanges(paginatedResponse.data);
+        setExchanges(paginatedResponse.data || []);
       }
 
       setSummary(paginatedResponse.summary || null);
@@ -432,6 +454,19 @@ export function useSmartExchanges(options: UseSmartExchangesOptions = {}): UseSm
   useEffect(() => {
     debouncedFetch(false);
   }, [debouncedFetch]);
+
+  /**
+   * Trigger fetch when filters change (but skip initial mount)
+   */
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    console.log('📊 Filters changed, triggering fetch:', filters);
+    fetchExchanges(false);
+  }, [filters, fetchExchanges]);
 
   /**
    * Auto-refresh setup

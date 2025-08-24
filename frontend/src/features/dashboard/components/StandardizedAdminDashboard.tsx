@@ -10,7 +10,13 @@ import {
   ArrowTrendingDownIcon,
   ClockIcon,
   DocumentTextIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  ArrowRightIcon,
+  CalendarIcon,
+  BriefcaseIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 
 // Remove unused lazy loading components since we're using StandardDashboard
@@ -26,6 +32,8 @@ const StandardizedAdminDashboard: React.FC = () => {
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [mtdMetrics, setMtdMetrics] = useState<any>(null);
   const [quickActions, setQuickActions] = useState<Array<{ action: string; label: string; icon?: string }>>([]);
+  const [urgentTasks, setUrgentTasks] = useState<any[]>([]);
+  const [recentExchanges, setRecentExchanges] = useState<any[]>([]);
 
   // Fetch enhanced metrics from your backend
   const fetchEnhancedMetrics = async () => {
@@ -35,11 +43,15 @@ const StandardizedAdminDashboard: React.FC = () => {
       const results = await Promise.allSettled([
         api.get('/dashboard/fast'),
         api.get('/metrics/friday-metrics'),
-        api.get('/dashboard/quick-actions')
+        api.get('/dashboard/quick-actions'),
+        api.get('/tasks?status=urgent&limit=5'),
+        api.get('/exchanges?limit=5&sortBy=created_at&sortOrder=desc')
       ]);
       const fastResp = results[0].status === 'fulfilled' ? results[0].value : null;
       const mtdResp = results[1].status === 'fulfilled' ? results[1].value : null;
       const actionsResp = results[2].status === 'fulfilled' ? results[2].value : null;
+      const tasksResp = results[3].status === 'fulfilled' ? results[3].value : null;
+      const exchangesResp = results[4].status === 'fulfilled' ? results[4].value : null;
 
       console.log('✅ Fast dashboard response:', fastResp);
       if (!fastResp) throw new Error('Failed to load fast dashboard');
@@ -61,6 +73,8 @@ const StandardizedAdminDashboard: React.FC = () => {
       setEnhancedMetrics((fastResp as any)?.data || fastResp);
       setMtdMetrics((mtdResp as any)?.metrics || (mtdResp as any)?.data?.metrics || null);
       setQuickActions((actionsResp as any)?.quickActions || (actionsResp as any)?.data?.quickActions || []);
+      setUrgentTasks((tasksResp as any)?.tasks || (tasksResp as any)?.data || []);
+      setRecentExchanges((exchangesResp as any)?.exchanges || (exchangesResp as any)?.data || []);
       setLastRefresh(new Date());
       setError(null);
     } catch (err: any) {
@@ -241,20 +255,302 @@ const StandardizedAdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Debug Section - Remove in production */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <h3 className="text-sm font-medium text-yellow-800 mb-2">Debug Info</h3>
-            <div className="text-xs text-yellow-700 space-y-1">
-              <p>MTD Metrics Available: {mtdMetrics ? 'Yes' : 'No'}</p>
-              {mtdMetrics && (
-                <pre className="text-xs bg-yellow-100 p-2 rounded overflow-x-auto">
-                  {JSON.stringify(mtdMetrics, null, 2)}
-                </pre>
-              )}
+        {/* MTD Financial Overview Dashboard */}
+        {mtdMetrics && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Financial Overview</h3>
+              <div className="text-sm text-gray-500">
+                Updated: {new Date(mtdMetrics.reportDate).toLocaleDateString()}
+              </div>
+            </div>
+            
+            {/* Key Metrics Row */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-blue-50 rounded-lg p-4">
+                <div className="flex items-center">
+                  <ChartBarIcon className="h-8 w-8 text-blue-600 mr-3" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">MTD Exchanges</p>
+                    <p className="text-2xl font-bold text-blue-900">
+                      {mtdMetrics.monthToDate?.exchangesCreated?.toLocaleString() || 0}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="flex items-center">
+                  <CurrencyDollarIcon className="h-8 w-8 text-green-600 mr-3" />
+                  <div>
+                    <p className="text-sm font-medium text-green-900">Amount Funded</p>
+                    <p className="text-xl font-bold text-green-900">
+                      ${(mtdMetrics.monthToDate?.amountFunded / 1000000).toFixed(1)}M
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-purple-50 rounded-lg p-4">
+                <div className="flex items-center">
+                  <ArrowTrendingUpIcon className="h-8 w-8 text-purple-600 mr-3" />
+                  <div>
+                    <p className="text-sm font-medium text-purple-900">Avg Deal Size</p>
+                    <p className="text-lg font-bold text-purple-900">
+                      ${(mtdMetrics.monthToDate?.averageDealSize / 1000000).toFixed(2)}M
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-orange-50 rounded-lg p-4">
+                <div className="flex items-center">
+                  <DocumentTextIcon className="h-8 w-8 text-orange-600 mr-3" />
+                  <div>
+                    <p className="text-sm font-medium text-orange-900">Active Exchanges</p>
+                    <p className="text-2xl font-bold text-orange-900">
+                      {mtdMetrics.summary?.totalActiveExchanges?.toLocaleString() || 0}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Growth & Cash Flow Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Growth Metrics */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">Growth Metrics</h4>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Month-over-Month</span>
+                    <span className="text-sm font-semibold text-green-600">
+                      {mtdMetrics.lastMonth?.monthOverMonthGrowth || 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Last Month Exchanges</span>
+                    <span className="text-sm font-semibold text-gray-900">
+                      {mtdMetrics.lastMonth?.exchangesCreated || 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Requires Attention</span>
+                    <span className={`text-sm font-semibold ${mtdMetrics.summary?.requiresAttention > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {mtdMetrics.summary?.requiresAttention || 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 7-Day Cash Flow */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">Next 7 Days Cash Flow</h4>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Incoming Funds</span>
+                    <span className="text-sm font-semibold text-green-600">
+                      ${(mtdMetrics.next7Days?.incomingFunds?.projectedNet || 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Outgoing Funds</span>
+                    <span className="text-sm font-semibold text-red-600">
+                      ${(mtdMetrics.next7Days?.outgoingFunds?.total || 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center border-t border-gray-200 pt-2">
+                    <span className="text-sm font-semibold text-gray-900">Net Cash Flow</span>
+                    <span className={`text-sm font-bold ${mtdMetrics.summary?.netCashFlow7Days >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      ${(mtdMetrics.summary?.netCashFlow7Days || 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Upcoming Deals</span>
+                    <span className="text-sm font-semibold text-blue-600">
+                      {mtdMetrics.next7Days?.incomingFunds?.numberOfDeals || 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
+
+        {/* Urgent Tasks & Recent Activity Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Urgent Tasks */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <ExclamationTriangleIcon className="h-6 w-6 text-red-500 mr-2" />
+                <h3 className="text-lg font-semibold text-gray-900">Urgent Tasks</h3>
+              </div>
+              <button 
+                onClick={() => navigate('/tasks')}
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center"
+              >
+                View All
+                <ArrowRightIcon className="h-4 w-4 ml-1" />
+              </button>
+            </div>
+            
+            {urgentTasks && urgentTasks.length > 0 ? (
+              <div className="space-y-3">
+                {urgentTasks.slice(0, 5).map((task: any, index: number) => (
+                  <div key={task.id || index} className="border-l-4 border-red-500 pl-4 py-2">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">{task.title || task.name}</p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Exchange: {task.exchange?.name || task.exchangeName || 'N/A'}
+                        </p>
+                        <div className="flex items-center mt-2 space-x-4">
+                          <span className="text-xs text-gray-500 flex items-center">
+                            <CalendarIcon className="h-3 w-3 mr-1" />
+                            Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'ASAP'}
+                          </span>
+                          <span className="text-xs text-gray-500 flex items-center">
+                            <UserIcon className="h-3 w-3 mr-1" />
+                            {task.assignedTo?.name || task.assignedToName || 'Unassigned'}
+                          </span>
+                        </div>
+                      </div>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        task.priority === 'HIGH' || task.priority === 'URGENT' 
+                          ? 'bg-red-100 text-red-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {task.priority || 'URGENT'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <CheckCircleIcon className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                <p className="text-sm text-gray-600">No urgent tasks at this time</p>
+              </div>
+            )}
+          </div>
+
+          {/* Recent Exchanges & Stages */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <BriefcaseIcon className="h-6 w-6 text-blue-500 mr-2" />
+                <h3 className="text-lg font-semibold text-gray-900">Recent Exchanges</h3>
+              </div>
+              <button 
+                onClick={() => navigate('/exchanges')}
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center"
+              >
+                View All
+                <ArrowRightIcon className="h-4 w-4 ml-1" />
+              </button>
+            </div>
+            
+            {recentExchanges && recentExchanges.length > 0 ? (
+              <div className="space-y-3">
+                {recentExchanges.slice(0, 5).map((exchange: any, index: number) => {
+                  // Determine exchange stage
+                  const getStage = (ex: any) => {
+                    if (ex.status === 'completed' || ex.status === 'COMPLETED') return 'Completed';
+                    if (ex.status === '180D' || ex.completionDeadline) return '180-Day Period';
+                    if (ex.status === '45D' || ex.identificationDeadline) return '45-Day ID Period';
+                    if (ex.status === 'active' || ex.status === 'Active') return 'Active';
+                    return 'Setup';
+                  };
+                  
+                  const getStageColor = (stage: string) => {
+                    switch(stage) {
+                      case 'Completed': return 'bg-green-100 text-green-800';
+                      case '180-Day Period': return 'bg-blue-100 text-blue-800';
+                      case '45-Day ID Period': return 'bg-yellow-100 text-yellow-800';
+                      case 'Active': return 'bg-purple-100 text-purple-800';
+                      default: return 'bg-gray-100 text-gray-800';
+                    }
+                  };
+                  
+                  const stage = getStage(exchange);
+                  
+                  return (
+                    <div key={exchange.id || index} className="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
+                         onClick={() => navigate(`/exchanges/${exchange.id}`)}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">
+                            {exchange.name || `Exchange #${exchange.id?.slice(0,8)}`}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1">
+                            Client: {exchange.client?.firstName} {exchange.client?.lastName || exchange.clientName || 'N/A'}
+                          </p>
+                          <div className="flex items-center mt-2 space-x-4">
+                            <span className="text-xs text-gray-500">
+                              Value: ${(exchange.exchangeValue || exchange.relinquishedPropertyValue || 0).toLocaleString()}
+                            </span>
+                            {exchange.completionPercentage !== undefined && (
+                              <div className="flex items-center">
+                                <div className="w-20 bg-gray-200 rounded-full h-1.5">
+                                  <div 
+                                    className="bg-blue-600 h-1.5 rounded-full" 
+                                    style={{ width: `${exchange.completionPercentage}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs text-gray-500 ml-2">
+                                  {exchange.completionPercentage}%
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStageColor(stage)}`}>
+                          {stage}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <BriefcaseIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-sm text-gray-600">No recent exchanges</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Exchange Stage Summary */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Exchange Pipeline</h3>
+            <button 
+              onClick={() => navigate('/exchanges')}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              Manage Exchanges →
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {[
+              { stage: 'Setup', count: enhancedMetrics?.stageBreakdown?.setup || 0, color: 'bg-gray-100 text-gray-800' },
+              { stage: '45-Day ID', count: enhancedMetrics?.stageBreakdown?.identification || 0, color: 'bg-yellow-100 text-yellow-800' },
+              { stage: 'Properties Identified', count: enhancedMetrics?.stageBreakdown?.identified || 0, color: 'bg-blue-100 text-blue-800' },
+              { stage: '180-Day Close', count: enhancedMetrics?.stageBreakdown?.closing || 0, color: 'bg-purple-100 text-purple-800' },
+              { stage: 'Completed', count: enhancedMetrics?.stageBreakdown?.completed || 0, color: 'bg-green-100 text-green-800' }
+            ].map((item) => (
+              <div key={item.stage} className="text-center">
+                <div className={`rounded-lg p-3 ${item.color}`}>
+                  <p className="text-2xl font-bold">{item.count}</p>
+                  <p className="text-xs font-medium mt-1">{item.stage}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* Month-To-Date Metrics */}
         {mtdMetrics && (

@@ -4,8 +4,10 @@ import { Clock, AlertTriangle, CheckCircle, User, Calendar, Star, Flag, ArrowRig
 
 interface User {
   id: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
+  first_name?: string;
+  last_name?: string;
   email: string;
 }
 
@@ -100,7 +102,12 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   // Get user name by ID
   const getUserName = (userId: string) => {
     const user = users.find(u => u.id === userId);
-    return user ? `${user.firstName} ${user.lastName}` : userId;
+    if (user) {
+      const firstName = user.firstName || user.first_name;
+      const lastName = user.lastName || user.last_name;
+      return firstName && lastName ? `${firstName} ${lastName}` : userId;
+    }
+    return userId;
   };
 
   // Memoize task statistics for performance

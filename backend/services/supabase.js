@@ -308,6 +308,18 @@ class SupabaseService {
             } else if (key === 'id' && where[key] === null) {
               // Handle null id (no exchanges)
               query = query.eq('id', '00000000-0000-0000-0000-000000000000'); // Impossible UUID
+            } else if (where[key] && typeof where[key] === 'object') {
+              // Handle Sequelize operators like Op.in
+              const opKeys = Object.getOwnPropertySymbols(where[key]);
+              const hasInSymbol = opKeys.find(sym => sym.toString().includes('in'));
+              if (hasInSymbol && Array.isArray(where[key][hasInSymbol])) {
+                // Handle Op.in clause for any field (status, etc.)
+                console.log(`🔍 Applying IN filter for ${key}:`, where[key][hasInSymbol]);
+                query = query.in(key, where[key][hasInSymbol]);
+              } else {
+                // For other complex objects, try to extract simple eq value
+                query = query.eq(key, where[key]);
+              }
             } else if (where[key] !== undefined && where[key] !== null) {
               query = query.eq(key, where[key]);
             }
@@ -655,11 +667,21 @@ class SupabaseService {
         .select('*');
 
       // Apply where conditions with column name conversion
+      console.log('🔍 Supabase getMessages where conditions:', where);
+      
       if (where.exchangeId) {
+        console.log('📌 Filtering by exchangeId (camelCase):', where.exchangeId);
         query = query.eq('exchange_id', where.exchangeId);
+      }
+      if (where.exchange_id) {
+        console.log('📌 Filtering by exchange_id (snake_case):', where.exchange_id);
+        query = query.eq('exchange_id', where.exchange_id);
       }
       if (where.senderId) {
         query = query.eq('sender_id', where.senderId);
+      }
+      if (where.sender_id) {
+        query = query.eq('sender_id', where.sender_id);
       }
       if (where.content) {
         query = query.ilike('content', `%${where.content}%`);
@@ -692,6 +714,7 @@ class SupabaseService {
       
       // Return messages with included relationships
       const messages = data || [];
+      console.log(`✅ Supabase getMessages found ${messages.length} messages after filtering`);
       
       // Transform messages and fetch sender information separately
       if (messages.length > 0) {

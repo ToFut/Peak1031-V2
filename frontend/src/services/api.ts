@@ -582,6 +582,18 @@ class ApiService {
     return await this.request(`/exchanges/${id}`);
   }
 
+  async getExchangeStatistics(): Promise<{
+    total: number;
+    active: number;
+    completed: number;
+    pending: number;
+    totalValue: number;
+    avgProgress: number;
+  }> {
+    const response = await this.request<{ success: boolean; statistics: any }>('/exchanges/statistics');
+    return response.statistics;
+  }
+
   async getTasks(exchangeId?: string, options?: ApiOptions): Promise<Task[]> {
     console.log('🔍 API Service: Getting tasks, exchangeId:', exchangeId);
     
@@ -840,6 +852,13 @@ class ApiService {
   async deleteDocument(id: string): Promise<void> {
     await this.request(`/documents/${id}`, {
       method: 'DELETE'
+    });
+  }
+
+  async verifyDocumentPin(documentId: string, pin: string): Promise<{ success: boolean }> {
+    return await this.request(`/documents/${documentId}/verify-pin`, {
+      method: 'POST',
+      body: JSON.stringify({ pin })
     });
   }
 
@@ -1824,7 +1843,7 @@ class ApiService {
     explanation: string;
     suggestedActions?: string[];
   }> {
-    return await this.request('/admin/gpt/query', {
+    return await this.request('/admin-gpt/query', {
       method: 'POST',
       body: JSON.stringify({ query, context })
     });
@@ -1843,7 +1862,7 @@ class ApiService {
     }>;
     summary: string;
   }> {
-    const endpoint = exchangeId ? `/admin/gpt/insights/${exchangeId}` : '/admin/gpt/insights';
+    const endpoint = exchangeId ? `/admin-gpt/insights/${exchangeId}` : '/admin-gpt/insights';
     return await this.request(endpoint);
   }
 
@@ -1863,7 +1882,7 @@ class ApiService {
       executionTime: number;
     };
   }> {
-    return await this.request('/admin/gpt/reports', {
+    return await this.request('/admin-gpt/reports', {
       method: 'POST',
       body: JSON.stringify({ reportType, parameters })
     });
@@ -1885,7 +1904,7 @@ class ApiService {
       avgResponseTime: number;
     }>;
   }> {
-    return await this.request('/admin/gpt/usage');
+    return await this.request('/admin-gpt/usage');
   }
 
   // ===========================================  

@@ -470,9 +470,9 @@ class PracticePartnerService {
     console.log('📄 PP: Fetching matters...', params);
     
     try {
-      // Set small batch size and shorter timeout for matters
+      // Use proper pagination without artificial limits
       const requestParams = {
-        per_page: Math.min(params.per_page || 10, 10), // Max 10 matters per request
+        per_page: params.per_page || 100, // Use PP's max of 100 per page
         page: params.page || 1,
         ...params
       };
@@ -1395,7 +1395,7 @@ class PracticePartnerService {
 
       let hasMore = true;
       let page = 1;
-      const maxPages = 50; // Safety limit
+      const maxPages = 500; // Increased to handle 11,000+ records (100 per page × 500 pages = 50,000 max)
 
       while (hasMore && page <= maxPages) {
         console.log(`📄 Processing page ${page}...`);

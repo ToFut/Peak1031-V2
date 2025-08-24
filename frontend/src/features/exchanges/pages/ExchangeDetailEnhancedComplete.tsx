@@ -3,6 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { apiService } from '../../../services/api';
 import Layout from '../../../components/Layout';
+import PPDataDisplay from '../components/PPDataDisplay';
+import ReplacementPropertiesDisplay from '../components/ReplacementPropertiesDisplay';
+import ExchangeStageProgresser from '../components/ExchangeStageProgresser';
+import ClientCountdownView from '../components/ClientCountdownView';
 import {
   ArrowLeft,
   Calendar,
@@ -1253,6 +1257,21 @@ const ExchangeDetailEnhancedComplete: React.FC = () => {
           <div className="p-4 sm:p-8">
             {activeTab === 'overview' && (
               <div className="space-y-6">
+                {/* Client/Third Party Countdown */}
+                {(user?.role === 'client' || user?.role === 'third_party') && (
+                  <ClientCountdownView
+                    exchange={exchange as any}
+                    variant="banner"
+                  />
+                )}
+                
+                {/* Exchange Stage Progression */}
+                <ExchangeStageProgresser
+                  exchange={exchange as any}
+                  variant="detailed"
+                  readOnly={user?.role === 'client' || user?.role === 'third_party'}
+                />
+                
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                   <div className="bg-gray-50 rounded-lg p-4 sm:p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Exchange Details</h3>
@@ -1320,10 +1339,37 @@ const ExchangeDetailEnhancedComplete: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                
+                {/* Enhanced PP Data Section */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+                    <Database className="w-5 h-5 mr-2 text-purple-600" />
+                    PracticePanther Integration
+                  </h3>
+                  <PPDataDisplay
+                    exchange={exchange as any}
+                    variant="compact"
+                  />
+                </div>
               </div>
             )}
             
-            {activeTab === 'properties' && <EnhancedPropertyCard exchange={exchange} />}
+            {activeTab === 'properties' && (
+              <div className="space-y-6">
+                {/* Comprehensive PP Data Display */}
+                <PPDataDisplay
+                  exchange={exchange as any}
+                  variant="detailed"
+                />
+                
+                {/* Multiple Replacement Properties Support */}
+                <ReplacementPropertiesDisplay
+                  exchange={exchange as any}
+                  readOnly={user?.role === 'client' || user?.role === 'third_party'}
+                  variant="detailed"
+                />
+              </div>
+            )}
             
             {activeTab === 'financial' && <FinancialCard exchange={exchange} />}
             
