@@ -23,6 +23,7 @@ import {
   ChartPieIcon,
   ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline';
+import Layout from '../../../components/Layout';
 
 interface ThirdParty {
   id: string;
@@ -1216,10 +1217,12 @@ const StandardizedAgencyDashboard: React.FC = () => {
 
   // Use StandardDashboard with agency role and custom content
   return (
+    <Layout>
     <StandardDashboard 
       role="agency" 
       customContent={customContent}
     />
+    </Layout>
   );
 };
 

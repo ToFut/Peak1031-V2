@@ -149,3 +149,6 @@ GRANT EXECUTE ON FUNCTION get_exchanges_with_relationships(UUID) TO authenticate
 
 
 
+
+
+

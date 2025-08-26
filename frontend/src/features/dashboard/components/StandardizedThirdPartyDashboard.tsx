@@ -11,7 +11,8 @@ import {
   ClockIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
-
+import Layout from '../../../components/Layout';
+    
 interface ThirdPartyTabContentProps {
   activeTab: string;
   role: string;
@@ -233,10 +234,12 @@ const StandardizedThirdPartyDashboard: React.FC = () => {
   );
 
   return (
+    <Layout>
     <StandardDashboard
       role="third_party"
       customContent={customOverviewContent}
     />
+    </Layout>
   );
 };
 

@@ -15,6 +15,7 @@ import {
   EyeIcon,
   ClockIcon
 } from '@heroicons/react/24/outline';
+import Layout from '../../../components/Layout';
 
 interface ClientTabContentProps {
   activeTab: string;
@@ -204,10 +205,12 @@ const StandardizedClientDashboard: React.FC = () => {
   );
 
   return (
+    <Layout>
     <StandardDashboard
       role="client"
       customContent={customOverviewContent}
     />
+    </Layout>
   );
 };
 

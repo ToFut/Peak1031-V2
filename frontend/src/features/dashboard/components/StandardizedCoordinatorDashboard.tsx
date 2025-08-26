@@ -25,6 +25,8 @@ import {
   ChatBubbleLeftRightIcon as ChatBubbleLeftRightIconSolid,
   EnvelopeIcon as EnvelopeIconSolid
 } from '@heroicons/react/24/solid';
+import { StandardDashboard } from './StandardDashboard';
+import Layout from '../../../components/Layout';
 
 interface DashboardStats {
   exchanges: {
@@ -680,6 +682,16 @@ const StandardizedCoordinatorDashboard: React.FC = () => {
       </div>
     </div>
   );
+
+  // Use StandardDashboard with agency role and custom content
+  return (
+    <Layout>
+    <StandardDashboard  
+      role="coordinator" 
+    />
+    </Layout>
+  );
 };
+
 
 export default StandardizedCoordinatorDashboard;

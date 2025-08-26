@@ -16,7 +16,7 @@ import {
   Shield
 } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
-import api from '../../../services/api';
+import { apiService } from '../../../services/api';
 import { format } from 'date-fns';
 
 interface ReportCategory {
@@ -109,20 +109,28 @@ export const MobileReportViewer: React.FC = () => {
   const loadReportData = async () => {
     setLoading(true);
     try {
+      console.log(`📊 Loading ${activeCategory} report data for user:`, user?.email);
+      
       const params = new URLSearchParams({
         startDate: format(dateRange.start, 'yyyy-MM-dd'),
         endDate: format(dateRange.end, 'yyyy-MM-dd')
       });
-      const response = await fetch(`${api.getBaseURL?.() || ''}/mobile-reports/${activeCategory}?${params.toString()}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {})
-        }
-      });
-      const json = await response.json();
-      setReportData(json.data);
+      
+      // Use apiService.get with proper URL construction
+      const endpoint = `/mobile-reports/${activeCategory}?${params.toString()}`;
+      const response = await apiService.get(endpoint);
+      
+      if (response.success) {
+        console.log(`✅ Loaded ${activeCategory} data:`, response.data);
+        setReportData(response.data);
+      } else {
+        console.error(`❌ Failed to load ${activeCategory} data:`, response.error);
+        throw new Error(response.error || `Failed to load ${activeCategory} report`);
+      }
     } catch (error) {
       console.error('Error loading report:', error);
+      // Set fallback data to prevent crashes
+      setReportData(null);
     } finally {
       setLoading(false);
     }
@@ -135,27 +143,27 @@ export const MobileReportViewer: React.FC = () => {
         startDate: format(dateRange.start, 'yyyy-MM-dd'),
         endDate: format(dateRange.end, 'yyyy-MM-dd')
       });
-      const requestUrl = `${api.getBaseURL?.() || ''}/mobile-reports/${activeCategory}/export?${params.toString()}`;
-      const response = await fetch(requestUrl, {
-        method: 'GET',
-        headers: {
-          ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {})
-        }
-      });
-
-      const blob = exportFormat === 'pdf'
-        ? await response.blob()
-        : await (async () => {
-            const data = await response.json();
-            return new Blob([
-              exportFormat === 'csv' ? data : JSON.stringify(data, null, 2)
-            ], { type: exportFormat === 'csv' ? 'text/csv' : 'application/json' });
-          })();
+      
+      const endpoint = `/mobile-reports/${activeCategory}/export?${params.toString()}`;
+      const response = await apiService.get(endpoint);
+      
+      // Create download based on format
+      let blob: Blob;
+      let filename = `${activeCategory}_report_${format(new Date(), 'yyyy-MM-dd')}.${exportFormat}`;
+      
+      if (exportFormat === 'json') {
+        blob = new Blob([JSON.stringify(response, null, 2)], { type: 'application/json' });
+      } else {
+        // For PDF and CSV, the response should be the raw data
+        blob = new Blob([response], { 
+          type: exportFormat === 'pdf' ? 'application/pdf' : 'text/csv' 
+        });
+      }
       
       const blobUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = `${activeCategory}_report_${format(new Date(), 'yyyy-MM-dd')}.${exportFormat}`;
+      a.download = filename;
       a.click();
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
@@ -200,10 +208,10 @@ export const MobileReportViewer: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50 pb-4 lg:pb-0">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-white shadow-sm">
-        <div className="px-4 py-3">
+        <div className="px-4 lg:px-8 py-3">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold text-gray-900">Reports</h1>
             <div className="flex items-center space-x-2">
@@ -264,32 +272,34 @@ export const MobileReportViewer: React.FC = () => {
           )}
         </div>
 
-        {/* Category Tabs - Horizontal Scrollable */}
-        <div className="border-t border-gray-200">
-          <div className="flex overflow-x-auto scrollbar-hide">
-            {reportCategories.map((category) => {
-              const Icon = category.icon;
-              return (
-                <button
-                  key={category.id}
-                  onClick={() => setActiveCategory(category.id)}
-                  className={`flex-shrink-0 px-4 py-3 flex items-center space-x-2 border-b-2 transition-colors ${
-                    activeCategory === category.id
-                      ? 'border-blue-600 text-blue-600 bg-blue-50'
-                      : 'border-transparent text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="font-medium whitespace-nowrap">{category.name}</span>
-                </button>
-              );
-            })}
+        {/* Category Tabs - PracticePanther Style */}
+        <div className="mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8 overflow-x-auto scrollbar-hide px-4 lg:px-8">
+              {reportCategories.map((category) => {
+                const Icon = category.icon;
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => setActiveCategory(category.id)}
+                    className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                      activeCategory === category.id
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 mr-2" />
+                    {category.name}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
         </div>
       </div>
 
       {/* Report Content */}
-      <div className="px-4 py-4">
+      <div className="px-4 lg:px-8 py-4 max-w-7xl mx-auto">
         {renderReportContent()}
       </div>
     </div>
@@ -299,9 +309,9 @@ export const MobileReportViewer: React.FC = () => {
 // Individual Report Components
 
 const OverviewReport: React.FC<{ data: any }> = ({ data }) => (
-  <div className="space-y-4">
+  <div className="space-y-4 lg:space-y-6">
     {/* Key Metrics Grid */}
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
       <MetricCard
         title="Total Exchanges"
         value={data.totalExchanges}
@@ -332,31 +342,32 @@ const OverviewReport: React.FC<{ data: any }> = ({ data }) => (
       />
     </div>
 
-    {/* Charts */}
-    <div className="bg-white rounded-lg p-4 shadow-sm">
-      <h3 className="font-semibold text-gray-900 mb-3">Weekly Trend</h3>
-      <MobileChart data={data.weeklyTrend} type="line" />
-    </div>
+    {/* Charts and Activity - Responsive Layout */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+      <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
+        <h3 className="font-semibold text-gray-900 mb-3">Weekly Trend</h3>
+        <MobileChart data={data.weeklyTrend} type="line" />
+      </div>
 
-    {/* Recent Activity List */}
-    <div className="bg-white rounded-lg p-4 shadow-sm">
-      <h3 className="font-semibold text-gray-900 mb-3">Recent Activity</h3>
-      <div className="space-y-2">
-        {data.recentActivity?.map((activity: any, index: number) => (
-          <div key={index} className="flex items-center justify-between py-2 border-b last:border-0">
-            <div>
-              <p className="text-sm font-medium text-gray-900">{activity.description}</p>
-              <p className="text-xs text-gray-500">{activity.time}</p>
+      <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
+        <h3 className="font-semibold text-gray-900 mb-3">Recent Activity</h3>
+        <div className="space-y-2">
+          {data.recentActivity?.map((activity: any, index: number) => (
+            <div key={index} className="flex items-center justify-between py-2 border-b last:border-0">
+              <div>
+                <p className="text-sm font-medium text-gray-900">{activity.description}</p>
+                <p className="text-xs text-gray-500">{activity.time}</p>
+              </div>
+              <span className={`px-2 py-1 text-xs rounded-full ${
+                activity.type === 'success' ? 'bg-green-100 text-green-800' :
+                activity.type === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {activity.type}
+              </span>
             </div>
-            <span className={`px-2 py-1 text-xs rounded-full ${
-              activity.type === 'success' ? 'bg-green-100 text-green-800' :
-              activity.type === 'warning' ? 'bg-yellow-100 text-yellow-800' :
-              'bg-gray-100 text-gray-800'
-            }`}>
-              {activity.type}
-            </span>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   </div>
@@ -456,12 +467,12 @@ const ExchangesReport: React.FC<{ data: any }> = ({ data }) => (
     </div>
 
     {/* Performance Metrics */}
-    <div className="grid grid-cols-2 gap-3">
-      <div className="bg-white rounded-lg p-3 shadow-sm">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
+      <div className="bg-white rounded-lg p-3 lg:p-4 shadow-sm">
         <p className="text-xs text-gray-600 mb-1">Completion Rate</p>
         <p className="text-xl font-bold text-green-600">{data.completionRate}%</p>
       </div>
-      <div className="bg-white rounded-lg p-3 shadow-sm">
+      <div className="bg-white rounded-lg p-3 lg:p-4 shadow-sm">
         <p className="text-xs text-gray-600 mb-1">Avg. Duration</p>
         <p className="text-xl font-bold text-blue-600">{data.avgDuration} days</p>
       </div>
