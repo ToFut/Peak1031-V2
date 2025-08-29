@@ -33,6 +33,14 @@ router.get('/', authenticateToken, async (req, res) => {
     let total = 0;
     
     try {
+      // Role-based access control
+      if (req.user.role !== 'admin' && req.user.role !== 'coordinator') {
+        return res.status(403).json({
+          error: 'Unauthorized',
+          message: 'Only admins and coordinators can view agencies'
+        });
+      }
+      
       // Get all users with agency role
       const allUsers = await databaseService.getUsers();
       const agencyUsers = allUsers.filter(user => user.role === 'agency');

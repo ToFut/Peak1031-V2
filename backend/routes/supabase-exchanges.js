@@ -72,25 +72,29 @@ router.get('/', authenticateToken, async (req, res) => {
   
   try {
     let result;
+    let totalCount;
+    let page = parseInt(req.query.page) || 1;
+    let limit = parseInt(req.query.limit) || 50;
     
-    // For admin users, bypass RBAC and get all exchanges directly
+    // Handle role-based filtering for all users
     if (req.user.role === 'admin') {
+      // Admin users can see all exchanges
       console.log('✅ Admin user - bypassing RBAC to get all exchanges');
       
-      const limit = parseInt(req.query.limit) || 50;
-      const page = parseInt(req.query.page) || 1;
       const offset = (page - 1) * limit;
       const sortBy = req.query.sortBy || 'created_at';
       const sortOrder = req.query.sortOrder === 'asc' ? true : false; // Default to DESC (newest first)
       
       // Get total count
-      const { count: totalCount, error: countError } = await supabase
+      const { count, error: countError } = await supabase
         .from('exchanges')
         .select('*', { count: 'exact', head: true });
         
       if (countError) {
         throw new Error(`Count query failed: ${countError.message}`);
       }
+      
+      totalCount = count;
       
       // Get exchanges with pagination (basic query first)
       let query = supabase
@@ -204,71 +208,52 @@ router.get('/', authenticateToken, async (req, res) => {
         data: exchangesWithParticipants,
         count: totalCount
       };
-    } else {
-      // For non-admin users, use RBAC service to get authorized exchanges
-      console.log('🔒 Non-admin user - using RBAC filtering');
-      result = await rbacService.getExchangesForUser(req.user, {
-        status: req.query.status,
-        limit: parseInt(req.query.limit) || 50,
-        orderBy: {
-          column: req.query.sortBy || 'created_at',
-          ascending: req.query.sortOrder !== 'desc'
-        }
-      });
-    }
-    
-    // Transform the response
-    const transformedExchanges = result.data.map(exchange => 
-      transformApiResponse(exchange, { includeComputed: true })
-    );
-    
-    console.log(`📊 Returning ${transformedExchanges.length} exchanges (${result.count} total) for ${req.user.role} user: ${req.user.email}`);
-    
-    res.json({
-      success: true,
-      exchanges: transformedExchanges,
-      total: result.count,
-      page: parseInt(req.query.page) || 1,
-      limit: parseInt(req.query.limit) || 50
-    });
-    
-    return; // Exit early - skip the old implementation
-  } catch (error) {
-    console.error('RBAC exchanges error:', error);
-    res.status(500).json({
-      error: 'Failed to fetch exchanges',
-      message: error.message
-    });
-    return;
-  }
-  
-  // OLD IMPLEMENTATION BELOW - WILL BE REMOVED
-  try {
-    const { 
-      status, 
-      coordinator_id, 
-      client_id,
-      userId, 
-      search, 
-      page = 1, 
-      limit = 20 
-    } = req.query;
-    
-    // Enforce reasonable limits to prevent performance issues
-    const maxLimit = req.user?.role === 'admin' ? 100 : 50;
-    const actualLimit = Math.min(parseInt(limit), maxLimit);
-
-    // Check if Supabase client is initialized
-    if (!supabase) {
-      return res.status(500).json({
-        error: 'Database service unavailable',
-        message: 'Supabase client not initialized. Check environment variables.'
-      });
-    }
-
-    // Try Supabase first
-    try {
-      // Build query with joins to people table
+    } else if (req.user.role === 'client' || req.user.role === 'third_party') {
+      // Client and Third Party users only see their assigned exchanges
+      console.log(`🔒 ${req.user.role} user - filtering to assigned exchanges only`);
+      
+      const offset = (page - 1) * limit;
+      
+      // First get the exchanges this user is assigned to
+      const { data: participantData, error: participantError } = await supabase
+        .from('exchange_participants')
+        .select('exchange_id')
+        .eq('user_id', req.user.id)
+        .eq('is_active', true);
+      
+      if (participantError) {
+        console.error('Error fetching participant exchanges:', participantError);
+        throw participantError;
+      }
+      
+      const exchangeIds = participantData?.map(p => p.exchange_id) || [];
+      console.log(`📋 User ${req.user.email} is assigned to ${exchangeIds.length} exchanges`);
+      
+      if (exchangeIds.length === 0) {
+        // User has no assigned exchanges
+        res.json({
+          success: true,
+          exchanges: [],
+          total: 0,
+          page: page,
+          limit: limit
+        });
+        return;
+      }
+      
+      // Get total count for assigned exchanges
+      const { count, error: countError } = await supabase
+        .from('exchanges')
+        .select('*', { count: 'exact', head: true })
+        .in('id', exchangeIds);
+      
+      if (countError) {
+        throw new Error(`Count query failed: ${countError.message}`);
+      }
+      
+      totalCount = count;
+      
+      // Get the exchanges with full data
       let query = supabase
         .from('exchanges')
         .select(`
@@ -278,8 +263,7 @@ router.get('/', authenticateToken, async (req, res) => {
             first_name,
             last_name,
             email,
-            company,
-            phone
+            company
           ),
           coordinator:people!coordinator_id (
             id,
@@ -288,92 +272,195 @@ router.get('/', authenticateToken, async (req, res) => {
             email
           )
         `)
-      ;
-
-      // Apply RBAC filtering
-      query = await req.applyRBACFilter(query);
-
-      // Apply filters
-      if (status) {
-        query = query.eq('status', status);
+        .in('id', exchangeIds)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+      
+      // Apply status filter if provided
+      if (req.query.status) {
+        const statusFilter = req.query.status.toLowerCase();
+        if (statusFilter === 'active') {
+          query = query.in('status', ['active', '45D', '180D', 'In Progress', 'Active']);
+        } else if (statusFilter === 'completed') {
+          query = query.in('status', ['completed', 'COMPLETED', 'Completed']);
+        } else if (statusFilter === 'pending' || statusFilter === 'draft') {
+          query = query.in('status', ['draft', 'pending', 'PENDING', 'Draft']);
+        } else {
+          query = query.eq('status', req.query.status);
+        }
       }
-      if (coordinator_id) {
-        query = query.eq('coordinator_id', coordinator_id);
-      }
-      if (client_id) {
-        query = query.eq('client_id', client_id);
-      }
-      if (userId) {
-        // Filter exchanges where user is either coordinator or participant
-        query = query.or(`coordinator_id.eq.${userId},client_id.eq.${userId}`);
-      }
-      if (search) {
-        query = query.or(`name.ilike.%${search}%,notes.ilike.%${search}%`);
-      }
-
-      // Add pagination
-      const offset = (parseInt(page) - 1) * actualLimit;
-      query = query.range(offset, offset + actualLimit - 1);
-
-      // Order by creation date
-      query = query.order('created_at', { ascending: false });
-
-      const { data: exchanges, error, count } = await query;
-
+      
+      const { data: exchanges, error } = await query;
+      
       if (error) {
-        console.log('⚠️ Supabase error, falling back to local database:', error.message);
-        throw error; // Fall back to local database
+        throw new Error(`Exchanges query failed: ${error.message}`);
       }
-
-      // Transform data for frontend
-      const transformedExchanges = exchanges.map(exchange => 
-        transformApiResponse(exchange, { includeComputed: true })
-      );
-
-      // Normalize replacementProperties to always be an array
-      const normalizeReplacementProps = (ex) => {
-        let rp = ex.replacementProperties;
-        if (typeof rp === 'string') {
-          try { rp = JSON.parse(rp); } catch (e) { rp = undefined; }
-        }
-        if (rp && !Array.isArray(rp)) {
-          rp = [rp];
-        }
-        ex.replacementProperties = Array.isArray(rp) ? rp : [];
-        return ex;
-      };
-
-      const normalizedExchanges = transformedExchanges.map(normalizeReplacementProps);
-
-      // Calculate pagination
-      const totalPages = Math.ceil(count / actualLimit);
-
-      return res.json(transformToCamelCase({
-        exchanges: normalizedExchanges,
-        pagination: {
-          current_page: parseInt(page),
-          total_pages: totalPages,
-          total_items: count,
-          items_per_page: actualLimit,
-          has_next: parseInt(page) < totalPages,
-          has_previous: parseInt(page) > 1
-        }
+      
+      // Transform the exchanges
+      const transformedExchanges = (exchanges || []).map(exchange => ({
+        ...exchange,
+        clientName: exchange.client ? 
+          `${exchange.client.first_name || ''} ${exchange.client.last_name || ''}`.trim() : 
+          'Unknown Client',
+        coordinatorName: exchange.coordinator ?
+          `${exchange.coordinator.first_name || ''} ${exchange.coordinator.last_name || ''}`.trim() :
+          'Unassigned'
       }));
-
-    } catch (supabaseError) {
-      // Don't fall back to SQLite if Supabase is configured - just return the error
-      console.log('❌ Supabase error, returning error instead of fallback:', supabaseError.message);
-      return res.status(500).json({
-        error: 'Database timeout',
-        message: 'Database query timed out. Please try again or reduce the number of results.',
-        suggestion: 'Try refreshing the page or use filters to narrow down results.'
+      
+      result = {
+        data: transformedExchanges,
+        count: totalCount
+      };
+    } else {
+      // For non-admin/client/third-party users, use RBAC service
+      console.log(`🔐 ${req.user.role} user - using RBAC filtering`);
+      result = await rbacService.getExchangesForUser(req.user, {
+        status: req.query.status,
+        limit: limit,
+        page: page,
+        orderBy: {
+          column: req.query.sortBy || 'created_at',
+          ascending: req.query.sortOrder !== 'desc'
+        }
       });
+      totalCount = result.count;
     }
 
+    // Transform and send the response
+    const transformedExchanges = result.data.map(exchange => 
+      transformApiResponse(exchange, { includeComputed: true })
+    );
+    
+    console.log(`📊 Returning ${transformedExchanges.length} exchanges (${totalCount} total) for ${req.user.role} user: ${req.user.email}`);
+    
+    res.json({
+      success: true,
+      exchanges: transformedExchanges,
+      total: totalCount,
+      page: page,
+      limit: limit
+    });
   } catch (error) {
     console.error('Error fetching exchanges:', error);
     res.status(500).json({
       error: 'Failed to fetch exchanges',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/exchanges/statistics
+ * Get role-based exchange statistics
+ */
+router.get('/statistics', authenticateToken, async (req, res) => {
+  console.log('📊 Statistics request from:', req.user?.email, 'Role:', req.user?.role);
+  
+  try {
+    let exchanges = [];
+    
+    if (req.user.role === 'admin') {
+      // Admin sees all exchanges
+      const { data, error } = await supabase
+        .from('exchanges')
+        .select('status, exchange_value, relinquished_property_value, replacement_property_value, completion_percentage')
+        .eq('is_active', true);
+      
+      if (error) throw error;
+      exchanges = data || [];
+      
+    } else if (req.user.role === 'client' || req.user.role === 'third_party') {
+      // Client/Third Party only see their assigned exchanges
+      const { data: participantData, error: participantError } = await supabase
+        .from('exchange_participants')
+        .select('exchange_id')
+        .eq('user_id', req.user.id)
+        .eq('is_active', true);
+      
+      if (participantError) throw participantError;
+      
+      const exchangeIds = participantData?.map(p => p.exchange_id) || [];
+      
+      if (exchangeIds.length > 0) {
+        const { data, error } = await supabase
+          .from('exchanges')
+          .select('status, exchange_value, relinquished_property_value, replacement_property_value, completion_percentage')
+          .in('id', exchangeIds);
+        
+        if (error) throw error;
+        exchanges = data || [];
+      }
+      
+    } else if (req.user.role === 'coordinator') {
+      // Coordinator sees exchanges they coordinate or are assigned to
+      const { data: participantData } = await supabase
+        .from('exchange_participants')
+        .select('exchange_id')
+        .eq('user_id', req.user.id)
+        .eq('is_active', true);
+      
+      const participantIds = participantData?.map(p => p.exchange_id) || [];
+      
+      let query = supabase
+        .from('exchanges')
+        .select('status, exchange_value, relinquished_property_value, replacement_property_value, completion_percentage');
+      
+      // Build OR condition for coordinator
+      let orConditions = [`coordinator_id.eq.${req.user.id}`];
+      if (participantIds.length > 0) {
+        orConditions.push(`id.in.(${participantIds.join(',')})`);
+      }
+      
+      const { data, error } = await query.or(orConditions.join(','));
+      if (error) throw error;
+      exchanges = data || [];
+      
+    } else {
+      // Other roles - use RBAC service
+      const rbacResult = await rbacService.getExchangesForUser(req.user);
+      exchanges = rbacResult.data || [];
+    }
+    
+    // Calculate statistics from filtered exchanges
+    const stats = {
+      total: exchanges.length,
+      active: exchanges.filter(e => {
+        const s = e.status?.toLowerCase();
+        return s === 'active' || s === '45d' || s === '180d' || s === 'in progress';
+      }).length,
+      completed: exchanges.filter(e => {
+        const s = e.status?.toLowerCase();
+        return s === 'completed';
+      }).length,
+      pending: exchanges.filter(e => {
+        const s = e.status?.toLowerCase();
+        return s === 'draft' || s === 'pending' || !e.status;
+      }).length,
+      totalValue: exchanges.reduce((sum, e) => {
+        const value = e.exchange_value || e.relinquished_property_value || e.replacement_property_value || 0;
+        return sum + Number(value || 0);
+      }, 0),
+      avgProgress: exchanges.length > 0 ? Math.round(
+        exchanges.reduce((sum, e) => {
+          const progress = e.completion_percentage !== undefined && e.completion_percentage !== null ? 
+            e.completion_percentage : 
+            (e.status?.toLowerCase() === 'completed' ? 100 : 0);
+          return sum + Number(progress || 0);
+        }, 0) / exchanges.length
+      ) : 0
+    };
+    
+    console.log(`✅ Statistics for ${req.user.role} ${req.user.email}: ${stats.total} total, ${stats.active} active, ${stats.completed} completed`);
+    
+    res.json({
+      success: true,
+      statistics: stats
+    });
+    
+  } catch (error) {
+    console.error('❌ Statistics error:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch statistics',
       message: error.message
     });
   }

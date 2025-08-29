@@ -71,15 +71,23 @@ class RBACService {
         
         console.log(`   ✓ Client filter - user ID: ${clientUserId}, contact ID: ${clientContactId}`);
         
-        // Get participant exchanges
-        console.log(`   🔍 Looking for participants with contact_id: ${clientContactId}`);
+        // Get participant exchanges - check BOTH user_id and contact_id columns
+        console.log(`   🔍 Looking for participants with user_id: ${clientUserId} OR contact_id: ${clientContactId}`);
         
-        // First try with contact_id only (since user_id column might not exist)
-        const { data: participantExchanges, error: participantError } = await supabaseService.client
+        // Query for participants by user_id OR contact_id
+        let participantQuery = supabaseService.client
           .from('exchange_participants')
-          .select('exchange_id, contact_id, is_active')
-          .eq('contact_id', clientContactId || clientUserId)
+          .select('exchange_id, contact_id, user_id, is_active')
           .eq('is_active', true);
+        
+        // Build OR condition for user_id and contact_id
+        let participantOrConditions = [`user_id.eq.${clientUserId}`];
+        if (clientContactId) {
+          participantOrConditions.push(`contact_id.eq.${clientContactId}`);
+        }
+        
+        const { data: participantExchanges, error: participantError } = await participantQuery
+          .or(participantOrConditions.join(','));
         
         if (participantError) {
           console.log(`   ❌ Error fetching participants:`, participantError);
@@ -120,10 +128,16 @@ class RBACService {
         
         console.log(`   ✓ Third party filter - user ID: ${tpUserId}, contact ID: ${tpContactId}`);
         
+        // Build OR condition for user_id and contact_id
+        let tpOrConditions = [`user_id.eq.${tpUserId}`];
+        if (tpContactId) {
+          tpOrConditions.push(`contact_id.eq.${tpContactId}`);
+        }
+        
         const { data: tpExchanges } = await supabaseService.client
           .from('exchange_participants')
           .select('exchange_id')
-          .eq('contact_id', tpContactId || tpUserId)
+          .or(tpOrConditions.join(','))
           .eq('is_active', true);
         
         const tpIds = tpExchanges?.map(p => p.exchange_id) || [];

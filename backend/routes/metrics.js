@@ -191,19 +191,20 @@ router.get('/dashboard-live', authenticateToken, async (req, res) => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
-    let baseQuery = supabase.from('exchanges').select('*');
+    let exchanges = [];
     
-    // Apply role-based filtering
-    if (role === 'coordinator') {
-      baseQuery = baseQuery.eq('coordinator_id', userId);
-    } else if (role === 'client') {
-      baseQuery = baseQuery.eq('client_id', userId);
-    } else if (role === 'third_party') {
-      baseQuery = baseQuery.contains('third_party_ids', [userId]);
+    // Apply role-based filtering using RBAC service
+    if (role === 'admin') {
+      // Admin sees all exchanges
+      const { data, error } = await supabase.from('exchanges').select('*');
+      if (error) throw error;
+      exchanges = data;
+    } else {
+      // Use RBAC service for proper filtering
+      const rbacService = require('../services/rbacService');
+      const userExchanges = await rbacService.getExchangesForUser(req.user);
+      exchanges = userExchanges.data || [];
     }
-
-    const { data: exchanges, error } = await baseQuery;
-    if (error) throw error;
 
     // Calculate live metrics
     const metrics = {

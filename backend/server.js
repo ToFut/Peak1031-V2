@@ -313,8 +313,10 @@ class PeakServer {
     this.app.use('/api/test-messages', testMessageRoutes);
     this.app.use('/api/sync', syncRoutes);
     this.app.use('/api/admin', adminRoutes);
-    this.app.use('/api/notifications', notificationRoutes);
-    this.app.use('/api/notifications-enhanced', enhancedNotificationRoutes);
+    // Add sync-cron routes for pg_cron integration
+    const syncCronRoutes = require('./routes/sync-cron');
+    this.app.use('/api/sync-cron', syncCronRoutes);
+    this.app.use('/api/notifications', notificationRoutes);    this.app.use('/api/notifications-enhanced', enhancedNotificationRoutes);
     this.app.use('/api/exchanges', exchangePermissionRoutes);
     this.app.use('/api/oauth', oauthRoutes);
     this.app.use('/api/exports', exportRoutes);

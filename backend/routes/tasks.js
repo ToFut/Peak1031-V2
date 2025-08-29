@@ -161,7 +161,19 @@ router.get('/', authenticateToken, async (req, res) => {
     
     const { page = 1, limit = 20, search, status, priority, exchangeId, assignedTo, sortBy = 'due_date', sortOrder = 'asc', urgent } = req.query;
     
-    // Direct Supabase query (simplified to avoid RBAC issues)
+    // Get user's authorized exchanges first
+    const rbacService = require('../services/rbacService');
+    const userExchanges = await rbacService.getExchangesForUser(req.user);
+    const authorizedExchangeIds = userExchanges.data.map(e => e.id);
+    
+    if (authorizedExchangeIds.length === 0) {
+      return res.json({
+        data: [],
+        pagination: { page: parseInt(page), limit: parseInt(limit), total: 0, totalPages: 0 }
+      });
+    }
+    
+    // Query tasks from authorized exchanges only
     let query = supabaseService.client.from('tasks').select(`
       *,
       assignee:assigned_to (
@@ -175,7 +187,8 @@ router.get('/', authenticateToken, async (req, res) => {
         exchange_number,
         status
       )
-    `, { count: 'exact' });
+    `, { count: 'exact' })
+    .in('exchange_id', authorizedExchangeIds);
 
     // Apply filters
     if (search) {

@@ -1,0 +1,88 @@
+{
+  "passed": 0,
+  "failed": 9,
+  "total": 9,
+  "details": [
+    {
+      "endpoint": "/api/health",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-27T18:43:40.214Z"
+    },
+    {
+      "endpoint": "/api",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-27T18:43:40.216Z"
+    },
+    {
+      "endpoint": "/api/debug/users",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-27T18:43:40.217Z"
+    },
+    {
+      "endpoint": "/api/debug/token",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-27T18:43:40.218Z"
+    },
+    {
+      "endpoint": "/api/auth/login",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-27T18:43:40.221Z"
+    },
+    {
+      "endpoint": "/api/auth/logout",
+      "method": "POST",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-27T18:43:40.222Z"
+    },
+    {
+      "endpoint": "/api/contacts",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-27T18:43:40.223Z"
+    },
+    {
+      "endpoint": "/api/exchanges",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-27T18:43:40.224Z"
+    },
+    {
+      "endpoint": "/api/exchanges?page=1&limit=10",
+      "method": "GET",
+      "status": 500,
+      "success": false,
+      "response": null,
+      "error": null,
+      "timestamp": "2025-08-27T18:43:40.225Z"
+    }
+  ]
+}

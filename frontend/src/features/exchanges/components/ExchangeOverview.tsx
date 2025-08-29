@@ -116,9 +116,9 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
         <div className="bg-green-50 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-green-600">Proceeds</p>
+              <p className="text-sm font-medium text-green-600">Proceeds Holding</p>
               <p className="text-xl font-bold text-green-900">
-                {formatCurrency(exchange.proceeds)}
+                {formatCurrency(exchange.proceeds || exchange.relinquishedValue)}
               </p>
             </div>
             <DollarSign className="w-8 h-8 text-green-600" />
@@ -276,7 +276,7 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
             
             {exchange.rel_value && (
               <div>
-                <h4 className="text-sm font-medium text-gray-500">Property Value</h4>
+                <h4 className="text-sm font-medium text-gray-500">Contract Value</h4>
                 <p className="mt-1 text-sm text-gray-900 font-semibold">
                   {formatCurrency(exchange.rel_value)}
                 </p>
@@ -351,7 +351,7 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
             
             {exchange.rep_1_value && (
               <div>
-                <h4 className="text-sm font-medium text-gray-500">Property Value</h4>
+                <h4 className="text-sm font-medium text-gray-500">Contract Value</h4>
                 <p className="mt-1 text-sm text-gray-900 font-semibold">
                   {formatCurrency(exchange.rep_1_value)}
                 </p>

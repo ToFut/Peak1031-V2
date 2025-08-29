@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Exchange } from '../../../types';
 import { useAuth } from '../../../hooks/useAuth';
@@ -363,6 +363,10 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchMode, setSearchMode] = useState<'instant' | 'manual'>('manual'); // Default to manual search
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [statusFilter, setStatusFilter] = useState('active'); // Default to active filter
   const [typeFilter, setTypeFilter] = useState('');
   const [valueMinFilter, setValueMinFilter] = useState('');
@@ -393,12 +397,71 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
   const [bootReceivedFilter, setBootReceivedFilter] = useState('');
   const [bootPaidFilter, setBootPaidFilter] = useState('');
 
+  // Sorting state
+  const [sortField, setSortField] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  // Handle column sorting
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+    if (setSortBy) {
+      setSortBy(`${field}:${sortDirection === 'asc' ? 'desc' : 'asc'}`);
+    }
+  };
+
+  // Debounce search term for instant mode only
+  useEffect(() => {
+    if (searchMode === 'instant') {
+      const timer = setTimeout(() => {
+        setDebouncedSearchTerm(searchTerm);
+        setIsSearching(false);
+      }, 500); // Wait 500ms after user stops typing
+
+      if (searchTerm !== debouncedSearchTerm) {
+        setIsSearching(true);
+      }
+
+      return () => clearTimeout(timer);
+    }
+    // In manual mode, don't update debouncedSearchTerm automatically
+  }, [searchTerm, searchMode, debouncedSearchTerm]);
+
+  // Handle manual search - only update debounced term when user explicitly searches
+  const handleManualSearch = useCallback(() => {
+    console.log('Manual search triggered with:', searchTerm);
+    setDebouncedSearchTerm(searchTerm);
+    setIsSearching(false);
+  }, [searchTerm]);
+
+  // Handle search clear
+  const handleClearSearch = useCallback(() => {
+    setSearchTerm('');
+    setDebouncedSearchTerm('');
+    setIsSearching(false);
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, []);
+
+  // Handle Enter key for manual search
+  const handleSearchKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && searchMode === 'manual') {
+      handleManualSearch();
+    }
+  }, [searchMode, handleManualSearch]);
+
   // Sync local filters with server-side filtering
   useEffect(() => {
     const filterOptions: any = {};
     
-    if (searchTerm.trim()) {
-      filterOptions.searchTerm = searchTerm.trim();
+    // Only use debouncedSearchTerm for API calls to prevent calls on every keystroke
+    if (debouncedSearchTerm.trim()) {
+      filterOptions.searchTerm = debouncedSearchTerm.trim();
     }
     
     if (statusFilter) {
@@ -425,13 +488,35 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
       filterOptions.propertyAddress = propertyAddressFilter.trim();
     }
     
+    // Add advanced filters
+    if (clientFilter.trim()) {
+      filterOptions.client = clientFilter.trim();
+    }
+    
+    if (coordinatorFilter.trim()) {
+      filterOptions.coordinator = coordinatorFilter.trim();
+    }
+    
+    if (attorneyFilter.trim()) {
+      filterOptions.attorney = attorneyFilter.trim();
+    }
+    
+    if (progressMinFilter) {
+      filterOptions.progressMin = parseFloat(progressMinFilter);
+    }
+    
+    if (progressMaxFilter) {
+      filterOptions.progressMax = parseFloat(progressMaxFilter);
+    }
+    
     // Update server-side filters
     console.log('🔄 Syncing filters with backend:', filterOptions);
     console.log('🔄 statusFilter value:', statusFilter);
     console.log('🔄 Current exchanges length before filter sync:', exchanges?.length || 0);
     setSmartFilters(filterOptions);
     console.log('🔄 Called setSmartFilters with:', filterOptions);
-  }, [searchTerm, statusFilter, typeFilter, valueMinFilter, valueMaxFilter, dateFilter, propertyAddressFilter, setSmartFilters]);
+  }, [debouncedSearchTerm, statusFilter, typeFilter, valueMinFilter, valueMaxFilter, dateFilter, propertyAddressFilter, 
+      clientFilter, coordinatorFilter, attorneyFilter, progressMinFilter, progressMaxFilter, setSmartFilters]);
 
   // View toggle state with localStorage persistence - Default to list/table as requested
   const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
@@ -723,7 +808,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
           if (result.downloadUrl) {
             const link = document.createElement('a');
             link.href = result.downloadUrl;
-            link.download = result.filename || `Exchange-${exchange.exchangeNumber}-Summary.pdf`;
+            link.download = `Exchange_${exchange.exchangeNumber}.pdf`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -734,31 +819,16 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
         console.warn('API PDF generation failed, using client-side generation:', apiError);
       }
 
-      // Fallback: Generate client-side PDF
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(pdfContent);
-        printWindow.document.close();
-        
-        // Wait for content to load, then print
-        printWindow.onload = () => {
-          setTimeout(() => {
-            printWindow.print();
-            printWindow.close();
-          }, 500);
-        };
-      } else {
-        // If popup blocked, create downloadable HTML
-        const blob = new Blob([pdfContent], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `Exchange-${exchange.exchangeNumber}-Summary.html`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }
+      // Fallback: Generate client-side HTML report (downloads automatically, no print dialog)
+      const blob = new Blob([pdfContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Exchange_${exchange.exchangeNumber}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       
     } catch (error) {
       console.error('Error generating document:', error);
@@ -804,191 +874,414 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Exchange ${exchange.exchangeNumber} Summary</title>
+      <title>Exchange ${exchange.exchangeNumber} Report</title>
       <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; color: #333; line-height: 1.6; }
-        .header { text-align: center; border-bottom: 3px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
-        .logo { font-size: 24px; font-weight: bold; color: #2563eb; margin-bottom: 10px; }
-        .title { font-size: 28px; font-weight: bold; margin: 10px 0; color: #1f2937; }
-        .subtitle { color: #6b7280; font-size: 16px; }
-        .section { margin: 30px 0; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; }
-        .section-title { font-size: 20px; font-weight: bold; color: #1f2937; border-bottom: 2px solid #f3f4f6; padding-bottom: 10px; margin-bottom: 20px; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
-        .info-item { margin: 10px 0; }
-        .label { font-weight: bold; color: #374151; display: inline-block; min-width: 150px; }
-        .value { color: #1f2937; }
-        .status-badge { 
-          padding: 6px 12px; 
-          border-radius: 20px; 
-          font-size: 12px; 
-          font-weight: bold; 
-          text-transform: uppercase;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+          color: #1f2937; 
+          line-height: 1.6; 
+          background: #f9fafb;
+          padding: 30px;
         }
-        .status-active { background: #fef3c7; color: #92400e; }
-        .status-completed { background: #d1fae5; color: #166534; }
-        .status-pending { background: #f3f4f6; color: #374151; }
-        .deadline-urgent { color: #dc2626; font-weight: bold; }
-        .deadline-warning { color: #d97706; font-weight: bold; }
-        .deadline-normal { color: #059669; }
+        .container {
+          max-width: 900px;
+          margin: 0 auto;
+          background: white;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          border-radius: 12px;
+          overflow: hidden;
+        }
+        .header { 
+          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+          color: white;
+          padding: 40px;
+          text-align: center;
+        }
+        .logo { 
+          font-size: 32px; 
+          font-weight: bold; 
+          margin-bottom: 15px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+        }
+        .title { 
+          font-size: 24px; 
+          font-weight: 500; 
+          margin: 10px 0; 
+          opacity: 0.95;
+        }
+        .exchange-number {
+          display: inline-block;
+          background: rgba(255, 255, 255, 0.2);
+          padding: 8px 20px;
+          border-radius: 20px;
+          font-size: 18px;
+          font-weight: bold;
+          margin-top: 10px;
+        }
+        .content { padding: 40px; }
+        .section { 
+          margin: 0 0 35px 0; 
+          padding: 25px; 
+          background: #f9fafb;
+          border-radius: 10px;
+          border: 1px solid #e5e7eb;
+        }
+        .section-title { 
+          font-size: 18px; 
+          font-weight: 600; 
+          color: #111827; 
+          border-bottom: 2px solid #e5e7eb; 
+          padding-bottom: 12px; 
+          margin-bottom: 20px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .icon { font-size: 20px; }
+        .info-grid { 
+          display: grid; 
+          grid-template-columns: 1fr 1fr; 
+          gap: 25px; 
+          margin: 20px 0; 
+        }
+        .info-item { 
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+        }
+        .label { 
+          font-weight: 600; 
+          color: #6b7280; 
+          font-size: 13px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .value { 
+          color: #111827; 
+          font-size: 15px;
+          font-weight: 500;
+        }
+        .value-large {
+          font-size: 18px;
+          font-weight: 600;
+          color: #1d4ed8;
+        }
+        .status-badge { 
+          display: inline-block;
+          padding: 8px 16px; 
+          border-radius: 25px; 
+          font-size: 13px; 
+          font-weight: 600; 
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .status-active { 
+          background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); 
+          color: #92400e; 
+          box-shadow: 0 2px 4px rgba(251, 191, 36, 0.2);
+        }
+        .status-completed { 
+          background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); 
+          color: #166534;
+          box-shadow: 0 2px 4px rgba(34, 197, 94, 0.2);
+        }
+        .status-pending { 
+          background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); 
+          color: #374151;
+          box-shadow: 0 2px 4px rgba(107, 114, 128, 0.2);
+        }
+        .deadline-urgent { 
+          color: #dc2626; 
+          font-weight: 600;
+          background: #fee2e2;
+          padding: 4px 8px;
+          border-radius: 4px;
+        }
+        .deadline-warning { 
+          color: #d97706; 
+          font-weight: 600;
+          background: #fef3c7;
+          padding: 4px 8px;
+          border-radius: 4px;
+        }
+        .deadline-normal { 
+          color: #059669;
+          background: #d1fae5;
+          padding: 4px 8px;
+          border-radius: 4px;
+        }
+        .progress-container {
+          margin: 15px 0;
+        }
         .progress-bar { 
           width: 100%; 
-          height: 20px; 
-          background: #f3f4f6; 
-          border-radius: 10px; 
+          height: 24px; 
+          background: #e5e7eb; 
+          border-radius: 12px; 
           overflow: hidden;
-          margin: 10px 0;
+          position: relative;
         }
         .progress-fill { 
           height: 100%; 
-          background: linear-gradient(90deg, #3b82f6, #1d4ed8);
-          transition: width 0.3s ease;
+          background: linear-gradient(90deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: 600;
+          font-size: 13px;
+        }
+        .financial-highlight {
+          background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+          border: 2px solid #3b82f6;
+          border-radius: 8px;
+          padding: 15px;
+          margin: 10px 0;
         }
         .footer { 
-          margin-top: 50px; 
-          padding-top: 20px; 
-          border-top: 1px solid #e5e7eb; 
+          background: #f9fafb;
+          padding: 30px 40px;
           text-align: center; 
           color: #6b7280; 
-          font-size: 14px; 
+          font-size: 13px;
+          border-top: 2px solid #e5e7eb;
+        }
+        .footer-logo {
+          font-weight: 600;
+          color: #2563eb;
+          margin-bottom: 10px;
+        }
+        .notes-box {
+          background: #fef3c7;
+          border-left: 4px solid #f59e0b;
+          padding: 15px;
+          border-radius: 6px;
+          margin-top: 15px;
+          font-style: italic;
         }
         @media print {
-          body { margin: 0; padding: 15px; }
+          body { 
+            margin: 0; 
+            padding: 0;
+            background: white;
+          }
+          .container {
+            box-shadow: none;
+            border-radius: 0;
+          }
           .section { break-inside: avoid; }
         }
       </style>
     </head>
     <body>
-      <div class="header">
-        <div class="logo">🏢 Peak 1031</div>
-        <div class="title">1031 Exchange Summary Report</div>
-        <div class="subtitle">Generated on ${today.toLocaleDateString('en-US', { 
-          weekday: 'long', 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        })}</div>
-      </div>
+      <div class="container">
+        <div class="header">
+          <div class="logo">
+            <span>🏢</span>
+            <span>Peak 1031 Exchange</span>
+          </div>
+          <div class="title">Exchange Summary Report</div>
+          <div class="exchange-number">Exchange #${exchange.exchangeNumber}</div>
+        </div>
+        
+        <div class="content">
 
-      <div class="section">
-        <div class="section-title">📋 Exchange Overview</div>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="label">Exchange Number:</span>
-            <span class="value">#${exchange.exchangeNumber}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Exchange Name:</span>
-            <span class="value">${exchange.name || 'Unnamed Exchange'}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Type:</span>
-            <span class="value">${exchange.exchangeType || 'Like-Kind Exchange'}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Status:</span>
-            <span class="status-badge ${exchange.status === 'COMPLETED' ? 'status-completed' : 
-                                        (exchange.status === '45D' || exchange.status === '180D') ? 'status-active' : 
-                                        'status-pending'}">
-              ${exchange.status || 'Pending'}
-            </span>
-          </div>
-          <div class="info-item">
-            <span class="label">Exchange Value:</span>
-            <span class="value">${formatCurrency(exchange.exchangeValue)}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Progress:</span>
-            <div>
-              <span class="value">${Math.round(exchange.progress || 0)}%</span>
+          <div class="section">
+            <div class="section-title">
+              <span class="icon">📊</span>
+              <span>Exchange Overview</span>
+            </div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">Exchange Name</span>
+                <span class="value">${exchange.name || 'Unnamed Exchange'}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Exchange Type</span>
+                <span class="value">${exchange.exchangeType || 'Like-Kind Exchange'}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Current Status</span>
+                <span class="status-badge ${exchange.status === 'COMPLETED' ? 'status-completed' : 
+                                            (exchange.status === '45D' || exchange.status === '180D') ? 'status-active' : 
+                                            'status-pending'}">
+                  ${exchange.status || 'Pending'}
+                </span>
+              </div>
+              <div class="info-item">
+                <span class="label">Exchange Value</span>
+                <span class="value value-large">${formatCurrency(exchange.exchangeValue)}</span>
+              </div>
+            </div>
+            <div class="progress-container">
+              <span class="label">Overall Progress</span>
               <div class="progress-bar">
-                <div class="progress-fill" style="width: ${exchange.progress || 0}%"></div>
+                <div class="progress-fill" style="width: ${exchange.progress || 0}%">
+                  ${Math.round(exchange.progress || 0)}%
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div class="section">
-        <div class="section-title">👤 Client Information</div>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="label">Client Name:</span>
-            <span class="value">${exchange.client?.firstName || ''} ${exchange.client?.lastName || 'Not specified'}</span>
+          <div class="section">
+            <div class="section-title">
+              <span class="icon">👤</span>
+              <span>Client Information</span>
+            </div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">Client Name</span>
+                <span class="value">${exchange.client?.firstName || ''} ${exchange.client?.lastName || 'Not specified'}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Email Address</span>
+                <span class="value">${exchange.client?.email || 'Not provided'}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Phone Number</span>
+                <span class="value">${exchange.client?.phone || 'Not provided'}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Exchange Created</span>
+                <span class="value">${formatDate(exchange.createdAt)}</span>
+              </div>
+            </div>
           </div>
-          <div class="info-item">
-            <span class="label">Email:</span>
-            <span class="value">${exchange.client?.email || 'Not provided'}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Phone:</span>
-            <span class="value">${exchange.client?.phone || 'Not provided'}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Created Date:</span>
-            <span class="value">${formatDate(exchange.createdAt)}</span>
-          </div>
-        </div>
-      </div>
 
-      <div class="section">
-        <div class="section-title">⏰ Critical Deadlines</div>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="label">45-Day Identification:</span>
-            <span class="value ${exchange.identificationDeadline && new Date(exchange.identificationDeadline) < today ? 'deadline-urgent' : 
-                                exchange.identificationDeadline && (new Date(exchange.identificationDeadline).getTime() - today.getTime()) / (1000 * 60 * 60 * 24) <= 7 ? 'deadline-warning' : 'deadline-normal'}">
-              ${formatDate(exchange.identificationDeadline)}
-              <br><small>${calculateDaysRemaining(exchange.identificationDeadline)}</small>
-            </span>
+          <div class="section">
+            <div class="section-title">
+              <span class="icon">⏰</span>
+              <span>Critical Deadlines</span>
+            </div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">45-Day Identification Deadline</span>
+                <div>
+                  <span class="value">${formatDate(exchange.identificationDeadline)}</span>
+                  <div style="margin-top: 5px;">
+                    <span class="${exchange.identificationDeadline && new Date(exchange.identificationDeadline) < today ? 'deadline-urgent' : 
+                                    exchange.identificationDeadline && (new Date(exchange.identificationDeadline).getTime() - today.getTime()) / (1000 * 60 * 60 * 24) <= 7 ? 'deadline-warning' : 'deadline-normal'}">
+                      ${calculateDaysRemaining(exchange.identificationDeadline)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="label">180-Day Completion Deadline</span>
+                <div>
+                  <span class="value">${formatDate(exchange.completionDeadline)}</span>
+                  <div style="margin-top: 5px;">
+                    <span class="${exchange.completionDeadline && new Date(exchange.completionDeadline) < today ? 'deadline-urgent' : 
+                                    exchange.completionDeadline && (new Date(exchange.completionDeadline).getTime() - today.getTime()) / (1000 * 60 * 60 * 24) <= 30 ? 'deadline-warning' : 'deadline-normal'}">
+                      ${calculateDaysRemaining(exchange.completionDeadline)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="info-item">
-            <span class="label">180-Day Completion:</span>
-            <span class="value ${exchange.completionDeadline && new Date(exchange.completionDeadline) < today ? 'deadline-urgent' : 
-                                exchange.completionDeadline && (new Date(exchange.completionDeadline).getTime() - today.getTime()) / (1000 * 60 * 60 * 24) <= 30 ? 'deadline-warning' : 'deadline-normal'}">
-              ${formatDate(exchange.completionDeadline)}
-              <br><small>${calculateDaysRemaining(exchange.completionDeadline)}</small>
-            </span>
-          </div>
-        </div>
-      </div>
 
-      <div class="section">
-        <div class="section-title">💰 Financial Summary</div>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="label">Exchange Value:</span>
-            <span class="value">${formatCurrency(exchange.exchangeValue)}</span>
+          <div class="section">
+            <div class="section-title">
+              <span class="icon">💰</span>
+              <span>Financial Summary</span>
+            </div>
+            <div class="financial-highlight">
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="label">Total Exchange Value</span>
+                  <span class="value value-large">${formatCurrency(exchange.exchangeValue)}</span>
+                </div>
+                <div class="info-item">
+                  <span class="label">Relinquished Property Value</span>
+                  <span class="value value-large">${formatCurrency(exchange.relinquishedValue)}</span>
+                </div>
+              </div>
+            </div>
+            <div class="info-grid" style="margin-top: 20px;">
+              <div class="info-item">
+                <span class="label">Boot Received (Escrow)</span>
+                <span class="value">${formatCurrency((exchange as any).bootReceivedEscrow || (exchange as any).bootReceived || 0)}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Boot Paid (Escrow)</span>
+                <span class="value">${formatCurrency((exchange as any).bootPaidEscrow || (exchange as any).bootPaid || 0)}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Replacement Property Value</span>
+                <span class="value">${formatCurrency(exchange.replacementValue || 0)}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Net Exchange Amount</span>
+                <span class="value">${formatCurrency((exchange.exchangeValue || 0) - ((exchange as any).bootReceivedEscrow || (exchange as any).bootReceived || 0) + ((exchange as any).bootPaidEscrow || (exchange as any).bootPaid || 0))}</span>
+              </div>
+            </div>
           </div>
-          <div class="info-item">
-            <span class="label">Proceeds Amount:</span>
-            <span class="value">${formatCurrency(exchange.relinquishedValue)}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Boot Received:</span>
-            <span class="value">${formatCurrency((exchange as any).bootReceived || 0)}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Boot Paid:</span>
-            <span class="value">${formatCurrency((exchange as any).bootPaid || 0)}</span>
-          </div>
-        </div>
-      </div>
 
-      ${exchange.notes || exchange.clientNotes ? `
-      <div class="section">
-        <div class="section-title">📝 Notes</div>
-        <div style="background: #f9fafb; padding: 15px; border-radius: 6px; border-left: 4px solid #3b82f6;">
-          ${exchange.clientNotes || exchange.notes || 'No notes available'}
+          ${exchange.notes || exchange.clientNotes ? `
+          <div class="section">
+            <div class="section-title">
+              <span class="icon">📝</span>
+              <span>Exchange Notes</span>
+            </div>
+            <div class="notes-box">
+              ${exchange.clientNotes || exchange.notes || 'No notes available'}
+            </div>
+          </div>
+          ` : ''}
+          
+          ${exchange.relinquishedPropertyAddress || (exchange as any).rel_property_address ? `
+          <div class="section">
+            <div class="section-title">
+              <span class="icon">🏠</span>
+              <span>Property Information</span>
+            </div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">Relinquished Property Address</span>
+                <span class="value">${exchange.relinquishedPropertyAddress || (exchange as any).rel_property_address || 'Not specified'}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Sale Price</span>
+                <span class="value">${formatCurrency(exchange.relinquishedSalePrice || (exchange as any).rel_value || 0)}</span>
+              </div>
+              ${exchange.relinquishedClosingDate || (exchange as any).close_of_escrow_date ? `
+              <div class="info-item">
+                <span class="label">Closing Date</span>
+                <span class="value">${formatDate(exchange.relinquishedClosingDate || (exchange as any).close_of_escrow_date)}</span>
+              </div>
+              ` : ''}
+              ${(exchange as any).rel_escrow_number ? `
+              <div class="info-item">
+                <span class="label">Escrow Number</span>
+                <span class="value">${(exchange as any).rel_escrow_number}</span>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+          ` : ''}
         </div>
-      </div>
-      ` : ''}
-
-      <div class="footer">
-        <p>This report was generated from Peak 1031 Exchange Management System</p>
-        <p>Report generated on ${today.toLocaleString()}</p>
-        <p style="margin-top: 20px; font-size: 12px;">
-          <strong>Important:</strong> This document contains confidential information. Please handle according to your organization's data protection policies.
-        </p>
+        
+        <div class="footer">
+          <div class="footer-logo">🏢 Peak 1031 Exchange Management System</div>
+          <p>Report Generated: ${today.toLocaleString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}</p>
+          <p style="margin-top: 15px; color: #9ca3af;">
+            This document contains confidential information and is intended solely for the use of the addressee.<br>
+            Please handle according to your organization's data protection and privacy policies.
+          </p>
+        </div>
       </div>
     </body>
     </html>
@@ -998,6 +1291,8 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
   const clearAllFilters = useCallback(() => {
     // Clear local filter states
     setSearchTerm('');
+    setDebouncedSearchTerm('');
+    setIsSearching(false);
     setStatusFilter('');
     setTypeFilter('');
     setValueMinFilter('');
@@ -1024,9 +1319,13 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
     setEquityMaxFilter('');
     setBootReceivedFilter('');
     setBootPaidFilter('');
+    setSortField('');
+    setSortDirection('desc');
     
     // Clear server-side filters
-    clearFilters();
+    if (clearFilters) {
+      clearFilters();
+    }
   }, [clearFilters]);
 
   // Note: Date filtering is now handled server-side via the dateFilter parameter
@@ -1047,38 +1346,41 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
     }
   }, [exchanges]);
 
-  // Client-side filtering logic
+  // Client-side filtering logic - enhanced to work with both client and server filtering
   const filteredExchanges = useMemo(() => {
     const exchangeList = exchanges || [];
     console.log('Starting filter with', exchangeList.length, 'exchanges');
     console.log('Current statusFilter:', statusFilter);
     console.log('First 5 exchange statuses:', exchangeList.slice(0, 5).map(e => ({ id: e.id, status: e.status })));
     
-    // Since we're always using smart mode with server-side filtering,
-    // skip client-side filtering to avoid double filtering
-    // Server-side filtering is handled by setSmartFilters()
-    console.log('Using smart mode - skipping client-side filtering, returning server-filtered results');
-    return exchangeList;
-    
     let filtered = [...exchangeList];
 
-    // Search term filter
-    if (searchTerm.trim()) {
-      const search = searchTerm.toLowerCase();
-      console.log('Applying search filter:', search);
+    // Enhanced search term filter - use debouncedSearchTerm for filtering
+    if (debouncedSearchTerm.trim()) {
+      const search = debouncedSearchTerm.toLowerCase();
+      console.log('Applying enhanced search filter:', search);
       const initialLength = filtered.length;
       filtered = filtered.filter(exchange => {
         // Cast to access additional fields
         const ex = exchange as any;
         
+        // Enhanced searchable fields including exchange number and contact names
         const searchableFields = [
           exchange.name,
-          exchange.exchangeNumber,
+          exchange.exchangeNumber?.toString(),
+          `#${exchange.exchangeNumber}`, // Allow searching with # prefix
           exchange.id?.toString(),
           ex.exchangeId?.toString(),
           ex.pp_display_name,
           ex.client_name,
           `${ex.client?.firstName || ''} ${ex.client?.lastName || ''}`.trim(),
+          ex.client?.email,
+          ex.client?.phone,
+          ex.coordinator?.name,
+          ex.coordinator?.email,
+          ex.escrowOfficer?.name,
+          ex.attorney?.name,
+          ex.realtor?.name,
           ex.rel_property_address,
           ex.rep_1_property_address,
           ex.relinquished_property_address,
@@ -1086,12 +1388,23 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
           ex.pp_responsible_attorney,
           ex.buyer_1_name,
           ex.buyer_2_name,
-          ex.rep_1_seller_name
+          ex.rep_1_seller_name,
+          ex.seller_name,
+          ex.buyer_name
         ].filter(field => field && field.toString().trim());
         
-        return searchableFields.some(field => 
+        // Check if search matches any field
+        const matches = searchableFields.some(field => 
           field.toString().toLowerCase().includes(search)
         );
+        
+        // Special handling for exchange number search
+        if (!matches && /^\d+$/.test(search)) {
+          // If search is purely numeric, try exact exchange number match
+          return exchange.exchangeNumber?.toString() === search;
+        }
+        
+        return matches;
       });
       console.log(`Search filter: ${initialLength} → ${filtered.length}`);
     }
@@ -1323,20 +1636,78 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
       });
     }
 
+    // Apply sorting
+    if (sortField) {
+      filtered.sort((a, b) => {
+        let aValue: any;
+        let bValue: any;
+        
+        switch (sortField) {
+          case 'name':
+            aValue = a.name || a.exchangeNumber || '';
+            bValue = b.name || b.exchangeNumber || '';
+            break;
+          case 'exchangeNumber':
+            aValue = parseInt(a.exchangeNumber || '0');
+            bValue = parseInt(b.exchangeNumber || '0');
+            break;
+          case 'status':
+            aValue = a.status || '';
+            bValue = b.status || '';
+            break;
+          case 'client':
+            aValue = `${(a as any).client?.firstName || ''} ${(a as any).client?.lastName || ''}`;
+            bValue = `${(b as any).client?.firstName || ''} ${(b as any).client?.lastName || ''}`;
+            break;
+          case 'value':
+            aValue = a.exchangeValue || 0;
+            bValue = b.exchangeValue || 0;
+            break;
+          case 'created':
+            aValue = new Date(a.createdAt || 0).getTime();
+            bValue = new Date(b.createdAt || 0).getTime();
+            break;
+          case 'progress':
+            aValue = a.progress || 0;
+            bValue = b.progress || 0;
+            break;
+          case 'deadline45':
+            aValue = a.identificationDeadline ? new Date(a.identificationDeadline).getTime() : 0;
+            bValue = b.identificationDeadline ? new Date(b.identificationDeadline).getTime() : 0;
+            break;
+          case 'deadline180':
+            aValue = a.completionDeadline ? new Date(a.completionDeadline).getTime() : 0;
+            bValue = b.completionDeadline ? new Date(b.completionDeadline).getTime() : 0;
+            break;
+          default:
+            aValue = (a as any)[sortField] || '';
+            bValue = (b as any)[sortField] || '';
+        }
+        
+        if (sortDirection === 'asc') {
+          return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+        } else {
+          return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+        }
+      });
+    }
+
     console.log(`Final filtered result: ${exchanges.length} → ${filtered.length}`);
     return filtered;
-  }, [exchanges, searchTerm, statusFilter, typeFilter, stageFilter, valueMinFilter, valueMaxFilter, 
+  }, [exchanges, debouncedSearchTerm, statusFilter, typeFilter, stageFilter, valueMinFilter, valueMaxFilter, 
       progressMinFilter, progressMaxFilter, proceedsMinFilter, proceedsMaxFilter, clientFilter, 
       attorneyFilter, realtorFilter, propertyAddressFilter, tagsFilter, deadline45Filter, 
-      deadline180Filter, dateFilter]);
+      deadline180Filter, dateFilter, sortField, sortDirection, coordinatorFilter, escrowOfficerFilter, 
+      priorityFilter, daysActiveFilter, lastActivityFilter, equityMinFilter, equityMaxFilter, 
+      bootReceivedFilter, bootPaidFilter]);
 
   // Memoize active filters check
   const hasActiveFilters = useMemo(() => {
-    return searchTerm || statusFilter || typeFilter || valueMinFilter || valueMaxFilter || 
+    return debouncedSearchTerm || statusFilter || typeFilter || valueMinFilter || valueMaxFilter || 
            dateFilter || propertyAddressFilter || progressMinFilter || progressMaxFilter ||
            proceedsMinFilter || proceedsMaxFilter || clientFilter || attorneyFilter || 
            realtorFilter || tagsFilter || deadline45Filter || deadline180Filter || stageFilter;
-  }, [searchTerm, statusFilter, typeFilter, valueMinFilter, valueMaxFilter, dateFilter, 
+  }, [debouncedSearchTerm, statusFilter, typeFilter, valueMinFilter, valueMaxFilter, dateFilter, 
       propertyAddressFilter, progressMinFilter, progressMaxFilter, proceedsMinFilter, 
       proceedsMaxFilter, clientFilter, attorneyFilter, realtorFilter, tagsFilter, 
       deadline45Filter, deadline180Filter, stageFilter]);
@@ -1505,34 +1876,113 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
           <div className="flex items-center gap-4 flex-wrap mb-4">
             {showSearch && (
               <div className="flex-1 min-w-64">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search exchanges..."
-                    className={`w-full pl-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
-                      hasActiveFilters ? 'pr-20 border-blue-300 bg-blue-50/30' : 'pr-4 border-gray-300'
-                    }`}
-                  />
-                  {/* Filter Indicator */}
-                  {hasActiveFilters && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
-                      <div className="flex items-center gap-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-2 py-1 rounded-full text-xs font-medium shadow-sm">
-                        <Filter className="w-3 h-3" />
-                        <span>Active</span>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onKeyPress={handleSearchKeyPress}
+                      placeholder={searchMode === 'manual' ? "Type and press Enter or click Search..." : "Search as you type..."}
+                      className={`w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
+                        isSearching ? 'border-yellow-300 bg-yellow-50/30' : 
+                        hasActiveFilters ? 'border-blue-300 bg-blue-50/30' : 'border-gray-300'
+                      }`}
+                    />
+                    {/* Clear button */}
+                    {searchTerm && (
+                      <button
+                        onClick={handleClearSearch}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        title="Clear search"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                    {/* Loading indicator */}
+                    {isSearching && (
+                      <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
+                        <div className="animate-spin h-4 w-4 border-2 border-gray-300 border-t-blue-600 rounded-full"></div>
                       </div>
-                    </div>
+                    )}
+                  </div>
+                  
+                  {/* Search button for manual mode */}
+                  {searchMode === 'manual' && (
+                    <button
+                      onClick={handleManualSearch}
+                      disabled={!searchTerm.trim()}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        searchTerm.trim() 
+                          ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      Search
+                    </button>
                   )}
+                  
+                  {/* Search mode toggle */}
+                  <button
+                    onClick={() => {
+                      const newMode = searchMode === 'instant' ? 'manual' : 'instant';
+                      setSearchMode(newMode);
+                      if (newMode === 'manual') {
+                        // Clear debounced search when switching to manual
+                        setDebouncedSearchTerm('');
+                      } else {
+                        // Apply current search when switching to instant
+                        setDebouncedSearchTerm(searchTerm);
+                      }
+                    }}
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm flex items-center gap-1"
+                    title={`Switch to ${searchMode === 'instant' ? 'manual' : 'instant'} search`}
+                  >
+                    {searchMode === 'instant' ? (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span className="hidden sm:inline">Instant</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        <span className="hidden sm:inline">Manual</span>
+                      </>
+                    )}
+                  </button>
                 </div>
+                
+                {/* Search info */}
+                {(searchTerm || debouncedSearchTerm) && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    {searchMode === 'instant' ? (
+                      isSearching ? 'Searching...' : 
+                      debouncedSearchTerm ? `Showing results for "${debouncedSearchTerm}"` : 'Type to search'
+                    ) : (
+                      debouncedSearchTerm ? `Showing results for "${debouncedSearchTerm}"` : 
+                      searchTerm ? 'Press Enter or click Search to apply' : ''
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
             <ModernDropdown
               options={statusOptions}
               value={statusFilter}
-              onChange={setStatusFilter}
+              onChange={(value) => {
+                setStatusFilter(value);
+                console.log('Status filter changed to:', value);
+              }}
               className="min-w-32"
             />
 
@@ -1872,8 +2322,11 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
             <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-gray-200">
               <span className="text-sm text-gray-600">Active filters:</span>
               
-              {searchTerm && (
-                <FilterChip label="Search" value={searchTerm} onRemove={() => setSearchTerm('')} />
+              {debouncedSearchTerm && (
+                <FilterChip label="Search" value={debouncedSearchTerm} onRemove={() => {
+                  setSearchTerm('');
+                  setDebouncedSearchTerm('');
+                }} />
               )}
               {statusFilter && (
                 <FilterChip
@@ -2054,138 +2507,281 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
           </div>
         )
       ) : (
-        // Enhanced Table view with customizable columns
+        // Enhanced Table view with customizable columns and sorting
         <div className="bg-white rounded-lg shadow border">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   {selectedFields.includes('name') && (
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Exchange Name
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 sticky top-0 bg-gray-50 z-10"
+                    onClick={() => handleSort('name')}
+                  >
+                      <div className="flex items-center gap-1">
+                        Exchange Name
+                        {sortField === 'name' && (
+                          <span className="text-blue-600">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </div>
                   </th>
                   )}
                   {selectedFields.includes('status') && (
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status/Stage
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 sticky top-0 bg-gray-50 z-10"
+                    onClick={() => handleSort('status')}
+                  >
+                      <div className="flex items-center gap-1">
+                        Status/Stage
+                        {sortField === 'status' && (
+                          <span className="text-blue-600">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </div>
                   </th>
                   )}
                   {selectedFields.includes('client') && (
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Client
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 sticky top-0 bg-gray-50 z-10"
+                    onClick={() => handleSort('client')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Client
+                      {sortField === 'client' && (
+                        <span className="text-blue-600">
+                          {sortDirection === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
                   </th>
                   )}
                   {selectedFields.includes('value') && (
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 sticky top-0 bg-gray-50 z-10"
+                    onClick={() => handleSort('value')}
+                  >
+                      <div className="flex items-center gap-1">
+                        Amount
+                        {sortField === 'value' && (
+                          <span className="text-blue-600">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </div>
                   </th>
                   )}
                   {selectedFields.includes('deadline45') && (
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      45-Day Countdown
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 sticky top-0 bg-gray-50 z-10"
+                    onClick={() => handleSort('deadline45')}
+                  >
+                      <div className="flex items-center gap-1">
+                        45-Day Countdown
+                        {sortField === 'deadline45' && (
+                          <span className="text-blue-600">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </div>
                   </th>
                   )}
                   {selectedFields.includes('deadline180') && (
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      180-Day Countdown
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 sticky top-0 bg-gray-50 z-10"
+                    onClick={() => handleSort('deadline180')}
+                  >
+                      <div className="flex items-center gap-1">
+                        180-Day Countdown
+                        {sortField === 'deadline180' && (
+                          <span className="text-blue-600">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </div>
                   </th>
                   )}
                   {selectedFields.includes('tags') && (
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">
                       Tags
                   </th>
                   )}
                   {selectedFields.includes('tasks') && (
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">
                       Tasks
                   </th>
                   )}
                   {selectedFields.includes('proceeds') && (
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Proceeds
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 sticky top-0 bg-gray-50 z-10"
+                    onClick={() => handleSort('proceeds')}
+                  >
+                      <div className="flex items-center gap-1">
+                        Proceeds
+                        {sortField === 'proceeds' && (
+                          <span className="text-blue-600">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </div>
                   </th>
                   )}
                   {selectedFields.includes('created') && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Created
+                    <th 
+                      scope="col" 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 sticky top-0 bg-gray-50 z-10"
+                      onClick={() => handleSort('created')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Created
+                        {sortField === 'created' && (
+                          <span className="text-blue-600">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </div>
                     </th>
                   )}
                   {selectedFields.includes('notes') && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">
                       Comments
                     </th>
                   )}
                   {selectedFields.includes('exchangeStage') && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">
                       Stage
                     </th>
                   )}
                   {selectedFields.includes('ppData') && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">
                       PP Details
                     </th>
                   )}
                   {selectedFields.includes('replacementProps') && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">
                       Rep Properties
                     </th>
                   )}
                   {selectedFields.includes('exchangeType') && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Type
+                    <th 
+                      scope="col" 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 sticky top-0 bg-gray-50 z-10"
+                      onClick={() => handleSort('exchangeType')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Type
+                        {sortField === 'exchangeType' && (
+                          <span className="text-blue-600">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </div>
                     </th>
                   )}
                   {selectedFields.includes('progress') && (
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Progress
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 sticky top-0 bg-gray-50 z-10"
+                    onClick={() => handleSort('progress')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Progress
+                      {sortField === 'progress' && (
+                        <span className="text-blue-600">
+                          {sortDirection === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
                   </th>
                   )}
                   {selectedFields.includes('daysActive') && (
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Days Active
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 sticky top-0 bg-gray-50 z-10"
+                    onClick={() => handleSort('daysActive')}
+                  >
+                      <div className="flex items-center gap-1">
+                        Days Active
+                        {sortField === 'daysActive' && (
+                          <span className="text-blue-600">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </div>
                   </th>
                   )}
                   {selectedFields.includes('lastActivity') && (
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Last Activity
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 sticky top-0 bg-gray-50 z-10"
+                    onClick={() => handleSort('lastActivity')}
+                  >
+                      <div className="flex items-center gap-1">
+                        Last Activity
+                        {sortField === 'lastActivity' && (
+                          <span className="text-blue-600">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </div>
                   </th>
                   )}
                   {selectedFields.includes('documents') && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">
                       Documents
                     </th>
                   )}
                   {selectedFields.includes('messages') && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">
                       Messages
                     </th>
                   )}
                   {selectedFields.includes('equity') && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Equity
+                    <th 
+                      scope="col" 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 sticky top-0 bg-gray-50 z-10"
+                      onClick={() => handleSort('equity')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Equity
+                        {sortField === 'equity' && (
+                          <span className="text-blue-600">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </div>
                     </th>
                   )}
                   {selectedFields.includes('bootReceived') && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">
                       Boot Received
                     </th>
                   )}
                   {selectedFields.includes('bootPaid') && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">
                       Boot Paid
                     </th>
                   )}
                   {selectedFields.includes('attorney') && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">
                       Attorney
                     </th>
                   )}
                   {selectedFields.includes('realtor') && (
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">
                       Realtor
                     </th>
                   )}
-                  <th scope="col" className="relative px-6 py-3">
+                  <th scope="col" className="relative px-6 py-3 sticky top-0 bg-gray-50 z-10">
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>
