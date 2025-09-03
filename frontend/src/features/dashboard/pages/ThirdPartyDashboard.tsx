@@ -83,7 +83,16 @@ const ThirdPartyDashboard: React.FC = () => {
         performance: {
           successRate: myExchanges.length > 0 ? Math.round((myExchanges.filter((ex: any) => ex.status === 'COMPLETED').length / myExchanges.length) * 100) : 0,
           completedExchanges: myExchanges.filter((ex: any) => ex.status === 'COMPLETED').length,
-          averageDays: 138 // Mock data
+          averageDays: myExchanges.length > 0 ? 
+            Math.round(myExchanges
+              .filter((ex: any) => ex.status === 'COMPLETED' && ex.startDate && ex.completionDate)
+              .reduce((sum: number, ex: any) => {
+                const start = new Date(ex.startDate);
+                const completion = new Date(ex.completionDate);
+                const days = Math.ceil((completion.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+                return sum + days;
+              }, 0) / Math.max(1, myExchanges.filter((ex: any) => ex.status === 'COMPLETED').length)
+            ) : 0
         }
       });
       

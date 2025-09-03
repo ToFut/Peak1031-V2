@@ -8,11 +8,7 @@ import DebugPanel from './shared/ui/organisms/DebugPanel';
 
 // Pages
 import Login from './features/auth/pages/Login';
-import AdminDashboard from './features/dashboard/pages/AdminDashboard';
-import ClientDashboard from './features/dashboard/pages/ClientDashboard';
-import CoordinatorDashboard from './features/dashboard/pages/CoordinatorDashboard';
-import ThirdPartyDashboard from './features/dashboard/pages/ThirdPartyDashboard';
-import AgencyDashboard from './features/dashboard/pages/AgencyDashboard';
+import DashboardPage from './features/dashboard/pages/DashboardPage';
 import Messages from './features/messages/pages/Messages';
 import Exchanges from './features/exchanges/pages/Exchanges';
 import ExchangeDetailsPage from './features/exchanges/pages/ExchangeDetailsPage';
@@ -65,29 +61,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
   return <>{children}</>;
 };
 
-// Dashboard Route Component
+// Dashboard Route Component - Now uses unified DashboardPage
 const DashboardRoute: React.FC = () => {
-  const { user } = useAuth();
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // Route to appropriate dashboard based on user role
-  switch (user.role) {
-    case 'admin':
-      return <AdminDashboard />;
-    case 'coordinator':
-      return <CoordinatorDashboard />;
-    case 'client':
-      return <ClientDashboard />;
-    case 'third_party':
-      return <ThirdPartyDashboard />;
-    case 'agency':
-      return <AgencyDashboard />;
-    default:
-      return <Navigate to="/login" replace />;
-  }
+  return <DashboardPage />;
 };
 
 const App: React.FC = () => {
@@ -272,12 +248,6 @@ const App: React.FC = () => {
                 path="/admin/system" 
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
-                    <Layout>
-                      <div className="p-8">
-                        <h1 className="text-2xl font-bold mb-4">System Settings</h1>
-                        <p className="text-gray-600">System settings management coming soon...</p>
-                      </div>
-                    </Layout>
                   </ProtectedRoute>
                 } 
               />

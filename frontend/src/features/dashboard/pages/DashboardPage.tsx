@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '@/shared/hooks/useAuth';
 import { DashboardProvider } from '@/shared/components/Dashboard/DashboardProvider';
+import PageWithCommunications from '@/shared/components/Layout/PageWithCommunications';
 import {
   AdminDashboard,
   ClientDashboard,
@@ -61,8 +62,8 @@ const DashboardPage: React.FC = () => {
 
   return (
     <DashboardProvider>
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      <PageWithCommunications>
+        <div className="p-6">
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between">
@@ -85,7 +86,7 @@ const DashboardPage: React.FC = () => {
           {/* Role-based dashboard content */}
           {renderDashboard()}
         </div>
-      </div>
+      </PageWithCommunications>
     </DashboardProvider>
   );
 };

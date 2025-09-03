@@ -60,16 +60,17 @@ export const useTasks = (): UseTasksReturn => {
 
   useEffect(() => {
     if (!socket) return;
-    socket.on('task:update', (data: { type: string; task: Task }) => {
-      if (data.type === 'created') {
+    const handleTaskUpdate = (data: any) => {
+      if (data.type === 'created' && data.task) {
         setTasks(prev => [data.task, ...prev]);
-      } else if (data.type === 'updated') {
+      } else if (data.type === 'updated' && data.task) {
         setTasks(prev => prev.map(t => t.id === data.task.id ? data.task : t));
-      } else if (data.type === 'deleted') {
+      } else if (data.type === 'deleted' && data.task) {
         setTasks(prev => prev.filter(t => t.id !== data.task.id));
       }
-    });
-    return () => { socket.off('task:update'); };
+    };
+    socket.on('task:update', handleTaskUpdate);
+    return () => { socket.off('task:update', handleTaskUpdate); };
   }, [socket]);
 
   const createTask = useCallback(async (task: Partial<Task>): Promise<Task> => {
@@ -83,7 +84,7 @@ export const useTasks = (): UseTasksReturn => {
   }, []);
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>): Promise<Task> => {
-    const response = await apiService.put(`/api/tasks/${id}`, updates);
+    const response = await apiService.post(`/api/tasks/${id}`, updates);
     if (response.success && response.data) {
       const updatedTask = response.data;
       setTasks(prev => prev.map(t => t.id === id ? updatedTask : t));

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { Exchange } from '../types';
 
 interface SocketState {
   connected: boolean;
@@ -6,6 +7,8 @@ interface SocketState {
 }
 
 interface SocketContextType extends SocketState {
+  off(arg0: string, handleExchangeUpdate: (data: { type: string; exchange: Exchange; }) => void): unknown;
+  on(arg0: string, handleExchangeUpdate: (data: { type: string; exchange: Exchange; }) => void): unknown;
   connect: () => void;
   disconnect: () => void;
 }
@@ -47,7 +50,13 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const value: SocketContextType = {
     ...socketState,
     connect,
-    disconnect
+    disconnect,
+    off: function (arg0: string, handleExchangeUpdate: (data: { type: string; exchange: Exchange; }) => void): unknown {
+      throw new Error('Function not implemented.');
+    },
+    on: function (arg0: string, handleExchangeUpdate: (data: { type: string; exchange: Exchange; }) => void): unknown {
+      throw new Error('Function not implemented.');
+    }
   };
 
   return (

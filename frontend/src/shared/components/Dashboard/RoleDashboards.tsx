@@ -3,6 +3,7 @@ import { StatCard } from './DashboardCard';
 import { ExchangeWidget } from './ExchangeWidget';
 import { TaskWidget } from './TaskWidget';
 import { useDashboard } from './DashboardProvider';
+import ImprovedAdminDashboard from '../../../features/dashboard/components/ImprovedAdminContent';
 import {
   BuildingOfficeIcon,
   UserGroupIcon,
@@ -19,81 +20,7 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
-  const { data } = useDashboard();
-  const { stats, loading } = data;
-
-  return (
-    <div className="space-y-6">
-      {/* Admin Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          label="Total Users"
-          value={stats.totalUsers}
-          icon={<UserGroupIcon className="w-6 h-6" />}
-          color="blue"
-          loading={loading}
-          change={{
-            value: "+5 this month",
-            type: "increase"
-          }}
-        />
-        <StatCard
-          label="Total Exchanges"
-          value={stats.totalExchanges}
-          icon={<BuildingOfficeIcon className="w-6 h-6" />}
-          color="green"
-          loading={loading}
-          change={{
-            value: `${stats.activeExchanges} active`,
-            type: "neutral"
-          }}
-        />
-        <StatCard
-          label="Total Value"
-          value={stats.totalValue}
-          icon={<BanknotesIcon className="w-6 h-6" />}
-          color="purple"
-          loading={loading}
-        />
-        <StatCard
-          label="Pending Tasks"
-          value={stats.pendingTasks}
-          icon={<ExclamationTriangleIcon className="w-6 h-6" />}
-          color="yellow"
-          loading={loading}
-        />
-      </div>
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ExchangeWidget userRole="admin" variant="list" maxItems={5} />
-        <TaskWidget userRole="admin" variant="board" maxItems={10} />
-      </div>
-
-      {/* Secondary Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <ExchangeWidget userRole="admin" variant="table" maxItems={3} />
-        <TaskWidget userRole="admin" variant="summary" />
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">System Health</h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">API Status</span>
-              <span className="text-sm font-medium text-green-600">Online</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Database</span>
-              <span className="text-sm font-medium text-green-600">Connected</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Practice Panther Sync</span>
-              <span className="text-sm font-medium text-blue-600">Syncing</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <ImprovedAdminDashboard />;
 };
 
 export const ClientDashboard: React.FC = () => {
