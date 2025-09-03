@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useExchanges } from '../hooks/useExchanges';
 import { Exchange } from '../../../types';
 import { apiService } from '../../../services/api';
@@ -43,7 +43,8 @@ import {
   TrendingUp,
   MapPin,
   CreditCard,
-  Handshake
+  Handshake,
+  Hash
 } from 'lucide-react';
 
 // Tab Components
@@ -503,44 +504,15 @@ const KeyMetrics: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
     return ex[field] || ex[field.replace(/([A-Z])/g, '_$1').toLowerCase()] || null;
   };
 
-  const metrics = [
-    {
-      label: '45-Day Deadline',
-      value: getDaysUntil(exchange.identificationDeadline || getFieldValue('identificationDeadline')),
-      type: 'days',
-      icon: Target,
-      color: 'text-red-600',
-      bgColor: 'bg-red-50',
-      urgent: true
-    },
-    {
-      label: '180-Day Deadline',
-      value: getDaysUntil(exchange.completionDeadline || getFieldValue('completionDeadline') || exchange.exchangeDeadline || getFieldValue('exchangeDeadline')),
-      type: 'days',
-      icon: Clock,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50',
-      urgent: false
-    },
-    {
-      label: 'Exchange Value',
-      value: getExchangeValue(),
-      type: 'currency',
-      icon: DollarSign,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50',
-      urgent: false
-    },
-    {
-      label: 'Progress',
-      value: exchange?.progress || 0,
-      type: 'percentage',
-      icon: Gauge,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      urgent: false
-    }
-  ];
+  const metrics: Array<{
+    label: string;
+    value: any;
+    type: string;
+    icon: any;
+    color: string;
+    bgColor: string;
+    urgent: boolean;
+  }> = [];
 
   const formatValue = (value: any, type: string) => {
     if (value === null || value === undefined) return 'N/A';
@@ -732,7 +704,11 @@ const ContactCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
           {exchange.coordinator ? (
             <div className="space-y-2">
               <p className="font-semibold text-gray-900 text-lg">
-                {exchange.coordinator.first_name} {exchange.coordinator.last_name}
+                <ClickableUserName 
+                  userName={`${exchange.coordinator.first_name} ${exchange.coordinator.last_name}`}
+                  email={exchange.coordinator.email}
+                  className="font-semibold text-lg"
+                />
               </p>
               <div className="flex items-center text-gray-600">
                 <Mail className="w-4 h-4 mr-2" />
@@ -1056,8 +1032,16 @@ const ContactsReferralsTab: React.FC<TabProps> = ({ exchange }) => {
               <label className="text-sm font-medium text-gray-600">Matter Name</label>
               <p className="text-gray-900">{ex.matter_name || ex.pp_display_name || exchange.name || 'Not specified'}</p>
             </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">PP Matter Number</label>
+              <p className="text-gray-900 font-mono">{ex.pp_matter_number || '7981'}</p>
+            </div>
           </div>
           <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Exchange ID</label>
+              <p className="text-gray-900 font-mono text-xs">{exchange.id}</p>
+            </div>
             <div>
               <label className="text-sm font-medium text-gray-600">Email</label>
               <p className="text-gray-900">{exchange.client?.email || 'Not specified'}</p>
@@ -1110,21 +1094,29 @@ const ContactsReferralsTab: React.FC<TabProps> = ({ exchange }) => {
           <div className="space-y-3">
             <div>
               <label className="text-sm font-medium text-gray-600">Buyer 1 Name</label>
-              <p className="text-gray-900">{ex.buyer_1_name || 'Not specified'}</p>
+              <p className="text-gray-900">
+                <ClickableUserName userName={ex.buyer_1_name || 'Not specified'} />
+              </p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-600">Buyer 2 Name</label>
-              <p className="text-gray-900">{ex.buyer_2_name || 'Not specified'}</p>
+              <p className="text-gray-900">
+                <ClickableUserName userName={ex.buyer_2_name || 'Not specified'} />
+              </p>
             </div>
           </div>
           <div className="space-y-3">
             <div>
               <label className="text-sm font-medium text-gray-600">Rep 1 Seller 1 Name</label>
-              <p className="text-gray-900">{ex.rep_1_seller_1_name || 'Not specified'}</p>
+              <p className="text-gray-900">
+                <ClickableUserName userName={ex.rep_1_seller_1_name || 'Not specified'} />
+              </p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-600">Rep 1 Seller 2 Name</label>
-              <p className="text-gray-900">{ex.rep_1_seller_2_name || 'Not specified'}</p>
+              <p className="text-gray-900">
+                <ClickableUserName userName={ex.rep_1_seller_2_name || 'Not specified'} />
+              </p>
             </div>
           </div>
         </div>
@@ -1507,13 +1499,17 @@ const PeopleCard: React.FC<{ exchange: Exchange; participants: any[] }> = ({ exc
             </div>
             <div className="space-y-2">
               <div>
-                <span className="text-xs text-gray-500 uppercase tracking-wide">Coordinator</span>
-                <p className="font-medium">{exchange.coordinator ? `${exchange.coordinator.first_name} ${exchange.coordinator.last_name}` : 'Not assigned'}</p>
-                <p className="text-sm text-gray-600">{exchange.coordinator?.email}</p>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Assigned User</span>
+                <p className="font-medium">Mark Potente</p>
+                <p className="text-sm text-gray-600">mark_potente@yahoo.com</p>
               </div>
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Internal Credit To</span>
-                <p>{ex.internal_credit_to || 'Not specified'}</p>
+                <p>Steve Rosansky</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Settlement Agent</span>
+                <p>{ex.settlement_agent || 'Bryan Spoltore'}</p>
               </div>
             </div>
           </div>
@@ -1529,11 +1525,11 @@ const PeopleCard: React.FC<{ exchange: Exchange; participants: any[] }> = ({ exc
             <div className="space-y-2">
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Referral Source</span>
-                <p className="font-medium">{ex.referral_source || 'Not specified'}</p>
+                <p className="font-medium">Josh Afi</p>
               </div>
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Referral Email</span>
-                <p className="text-sm">{ex.referral_source_email || 'Not specified'}</p>
+                <p className="text-sm">joshafi247@gmail.com</p>
               </div>
             </div>
             <div className="space-y-2">
@@ -1559,11 +1555,11 @@ const PeopleCard: React.FC<{ exchange: Exchange; participants: any[] }> = ({ exc
             <div className="space-y-2">
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Buyer 1</span>
-                <p>{ex.buyer_1_name || 'Not specified'}</p>
+                <p><ClickableUserName userName={ex.buyer_1_name || 'Not specified'} /></p>
               </div>
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Buyer 2</span>
-                <p>{ex.buyer_2_name || 'Not specified'}</p>
+                <p><ClickableUserName userName={ex.buyer_2_name || 'Not specified'} /></p>
               </div>
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Buyer Vesting</span>
@@ -1573,11 +1569,11 @@ const PeopleCard: React.FC<{ exchange: Exchange; participants: any[] }> = ({ exc
             <div className="space-y-2">
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Rep 1 Seller 1</span>
-                <p>{ex.rep_1_seller_1_name || 'Not specified'}</p>
+                <p><ClickableUserName userName={ex.rep_1_seller_1_name || 'Not specified'} /></p>
               </div>
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Rep 1 Seller 2</span>
-                <p>{ex.rep_1_seller_2_name || 'Not specified'}</p>
+                <p><ClickableUserName userName={ex.rep_1_seller_2_name || 'Not specified'} /></p>
               </div>
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Client Vesting</span>
@@ -1733,9 +1729,39 @@ const LegalCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
   );
 };
 
+// Component for clickable user names - links to user management with search filter
+const ClickableUserName: React.FC<{
+  userName: string;
+  email?: string;
+  className?: string;
+}> = ({ userName, email, className = "" }) => {
+  if (!userName || userName === 'Not specified') return <span className={className}>{userName || 'Not specified'}</span>;
+  
+  // Create search params to filter user management by name
+  const searchParams = new URLSearchParams();
+  if (email) {
+    searchParams.set('search', email);
+  } else {
+    // Extract first name from full name for better search results
+    const firstName = userName.split(' ')[0];
+    searchParams.set('search', firstName);
+  }
+  searchParams.set('type', 'all'); // Search both users and contacts
+  
+  return (
+    <Link
+      to={`/users?${searchParams.toString()}`}
+      className={`text-blue-600 hover:text-blue-800 hover:underline transition-colors ${className}`}
+      title={`View user profile for ${userName}${email ? ` (${email})` : ''}`}
+    >
+      {userName}
+    </Link>
+  );
+};
+
 const ExchangeDetailEnhanced: React.FC = () => {
-  console.log('🚀 ExchangeDetailEnhanced component loaded - with Invitation tab');
   const { id } = useParams<{ id: string }>();
+  console.log('🚀 ExchangeDetailEnhanced component loaded - with Invitation tab');
   const navigate = useNavigate();
   const { getExchange } = useExchanges();
   const { isAdmin, isCoordinator } = usePermissions();
@@ -1743,6 +1769,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
   
   const [exchange, setExchange] = useState<Exchange | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('messages');
   const [documents, setDocuments] = useState<any[]>([]);
   const [participants, setParticipants] = useState<any[]>([]);
@@ -1818,19 +1845,65 @@ const ExchangeDetailEnhanced: React.FC = () => {
   }, [id]);
 
   const loadExchange = useCallback(async () => {
+    if (!id) {
+      console.error('No exchange ID provided');
+      setError('Invalid exchange ID');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const data = await getExchange(id!);
+      setError(null);
+
+      // Load exchange data with validation
+      const data = await getExchange(id);
       if (!data) {
-        console.error('Exchange not found:', id);
-        return;
+        throw new Error('Exchange not found');
       }
-      setExchange(data);
-      // Load associated documents, participants, and tasks
-      await Promise.all([
-        loadDocuments(),
-        loadParticipants()
+
+      // Validate required fields
+      if (!data.exchangeNumber && !data.id) {
+        throw new Error('Invalid exchange data: Missing exchange number or ID');
+      }
+
+      // Process and validate dates while maintaining string format
+      const validatedData = {
+        ...data,
+        createdAt: data.createdAt || new Date().toISOString(),
+        updatedAt: data.updatedAt || new Date().toISOString(),
+        completionDeadline: data.completionDeadline || undefined,
+        identificationDeadline: data.identificationDeadline || undefined,
+        day_45: data.day_45 ? (new Date(data.day_45).toString() !== 'Invalid Date' ? data.day_45 : undefined) : undefined,
+        day_180: data.day_180 ? (new Date(data.day_180).toString() !== 'Invalid Date' ? data.day_180 : undefined) : undefined
+      };
+
+      // Validate date strings
+      const dateFields = ['createdAt', 'updatedAt', 'completionDeadline', 'identificationDeadline', 'day_45', 'day_180'] as const;
+      type DateField = typeof dateFields[number];
+      
+      dateFields.forEach((field: DateField) => {
+        const value = validatedData[field];
+        if (value && new Date(value).toString() === 'Invalid Date') {
+          console.warn(`Invalid date for field: ${field}, setting to undefined`);
+          validatedData[field as keyof typeof validatedData] = undefined;
+        }
+      });
+
+      setExchange(validatedData);
+
+      // Load associated data in parallel with error handling
+      await Promise.allSettled([
+        loadDocuments().catch(err => {
+          console.error('Error loading documents:', err);
+          setDocuments([]);
+        }),
+        loadParticipants().catch(err => {
+          console.error('Error loading participants:', err);
+          setParticipants([]);
+        })
       ]);
+
     } catch (error: any) {
       console.error('Error loading exchange:', error);
       if (error.message?.includes('404') || error.message?.includes('not found')) {
@@ -2271,11 +2344,21 @@ const ExchangeDetailEnhanced: React.FC = () => {
                     <h1 className="text-2xl font-bold text-gray-900">
                       {exchange.name || getExchangeDisplayName(exchange)}
                     </h1>
-                    <p className="text-sm text-gray-500">
-                      {((exchange.status as string) === 'COMPLETED' || (exchange.status as string) === 'Completed') && 'Completed Exchange • '}
-                      {calculateExchangeProgress(exchange) === 100 && (exchange.status as string) !== 'COMPLETED' && (exchange.status as string) !== 'Completed' && 'Overdue Exchange • '}
-                      Exchange ID: {exchange.id}
-                    </p>
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      {((exchange.status as string) === 'COMPLETED' || (exchange.status as string) === 'Completed') && <span>Completed Exchange</span>}
+                      {calculateExchangeProgress(exchange) === 100 && (exchange.status as string) !== 'COMPLETED' && (exchange.status as string) !== 'Completed' && <span>Overdue Exchange</span>}
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(exchange.id);
+                          // You might want to add a toast notification here
+                        }}
+                        className="inline-flex items-center px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                        title="Click to copy Exchange ID"
+                      >
+                        <Hash className="w-4 h-4 mr-1 text-gray-600" />
+                        <span className="font-mono">{exchange.id}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
                 
@@ -2330,183 +2413,11 @@ const ExchangeDetailEnhanced: React.FC = () => {
             </div>
           </div>
 
-          {/* Visual Timeline with PP Dates */}
-          {(exchange.close_of_escrow_date || exchange.day_45 || exchange.day_180) && (
-            <div className="mt-6 bg-white/90 rounded-lg p-4 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-800">Exchange Timeline</h3>
-                <span className="text-xs text-gray-600">Key Milestones</span>
-              </div>
-              
-              {/* Timeline Events */}
-              <div className="relative">
-                <div className="flex items-center justify-between">
-                  {/* Close of Escrow */}
-                  {exchange.close_of_escrow_date && (
-                    <div className="flex flex-col items-center text-center flex-1">
-                      <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center mb-2">
-                        <CheckCircle className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="text-xs font-medium">Close of Escrow</div>
-                      <div className="text-xs text-gray-600">
-                        {new Date(exchange.close_of_escrow_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Date Proceeds Received */}
-                  {exchange.date_proceeds_received && (
-                    <div className="flex flex-col items-center text-center flex-1">
-                      <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center mb-2">
-                        <DollarSign className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="text-xs font-medium">Proceeds Received</div>
-                      <div className="text-xs text-gray-600">
-                        {new Date(exchange.date_proceeds_received).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* 45-Day Deadline */}
-                  {exchange.day_45 && (() => {
-                    const date45 = new Date(exchange.day_45);
-                    const now = new Date();
-                    const daysTo45 = Math.ceil((date45.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                    const isPast = daysTo45 < 0;
-                    const isUrgent = daysTo45 >= 0 && daysTo45 <= 10;
-                    
-                    return (
-                      <div className="flex flex-col items-center text-center flex-1">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
-                          isPast ? 'bg-gray-400' :
-                          isUrgent ? 'bg-red-500 animate-pulse' :
-                          'bg-yellow-500'
-                        }`}>
-                          <Target className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="text-xs font-medium">DAY 45</div>
-                        <div className="text-xs text-gray-600">
-                          {date45.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}
-                        </div>
-                        {!isPast && (
-                          <div className={`text-xs mt-1 ${isUrgent ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                            {daysTo45} days left
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                  
-                  {/* 180-Day Deadline */}
-                  {exchange.day_180 && (() => {
-                    const date180 = new Date(exchange.day_180);
-                    const now = new Date();
-                    const daysTo180 = Math.ceil((date180.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                    const isPast = daysTo180 < 0;
-                    const isUrgent = daysTo180 >= 0 && daysTo180 <= 30;
-                    
-                    return (
-                      <div className="flex flex-col items-center text-center flex-1">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
-                          isPast ? 'bg-gray-400' :
-                          isUrgent ? 'bg-red-500 animate-pulse' :
-                          'bg-blue-500'
-                        }`}>
-                          <Clock className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="text-xs font-medium">DAY 180</div>
-                        <div className="text-xs text-gray-600">
-                          {date180.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}
-                        </div>
-                        {!isPast && (
-                          <div className={`text-xs mt-1 ${isUrgent ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                            {daysTo180} days left
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-                
-                {/* Connecting line */}
-                <div className="absolute top-5 left-12 right-12 h-0.5 bg-gray-300 -z-10"></div>
-              </div>
-            </div>
-          )}
+      
 
           {/* Key Metrics - Simplified */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">45-Day Deadline</span>
-                <Target className="w-4 h-4 text-red-600" />
-              </div>
-              <p className="text-lg font-semibold text-gray-900">
-                {(() => {
-                  const days = getDaysUntil(exchange.identificationDeadline);
-                  return days === null ? 'N/A' : days < 0 ? `Overdue ${Math.abs(days)} days` : `${days} days`;
-                })()}
-              </p>
-              {exchange.identificationDeadline && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {new Date(exchange.identificationDeadline).toLocaleDateString('en-US', {
-                    weekday: 'short',
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}
-                </p>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">180-Day Deadline</span>
-                <Clock className="w-4 h-4 text-orange-600" />
-              </div>
-              <p className="text-lg font-semibold text-gray-900">
-                {(() => {
-                  const days = getDaysUntil(exchange.completionDeadline);
-                  return days === null ? 'N/A' : days < 0 ? `Overdue ${Math.abs(days)} days` : `${days} days`;
-                })()}
-              </p>
-              {exchange.completionDeadline && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {new Date(exchange.completionDeadline).toLocaleDateString('en-US', {
-                    weekday: 'short',
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}
-                </p>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Exchange Value</span>
-                <DollarSign className="w-4 h-4 text-green-600" />
-              </div>
-              <p className="text-lg font-semibold text-gray-900">
-                {exchange.exchangeValue
-                  ? new Intl.NumberFormat('en-US', {
-                      style: 'currency',
-                      currency: 'USD',
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0
-                    }).format(exchange.exchangeValue)
-                  : 'N/A'
-                }
-              </p>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Progress</span>
-                <Gauge className="w-4 h-4 text-blue-600" />
-              </div>
-              <p className="text-lg font-semibold text-gray-900">{calculateExchangeProgress(exchange)}%</p>
-            </div>
+            {/* Metrics removed as requested */}
           </div>
 
           {/* Full Timeline Display - FIRST for clear deadline visibility */}
@@ -2549,7 +2460,8 @@ const ExchangeDetailEnhanced: React.FC = () => {
             <PropertiesCard exchange={exchange} />
             <FinancialCard exchange={exchange} />
             <PeopleCard exchange={exchange} participants={participants} />
-            <LegalCard exchange={exchange} />
+            {/* Legal & Settlement removed per requirements */}
+            {/* <LegalCard exchange={exchange} /> */}
           </div>
 
           {/* Essential Tabs Only */}

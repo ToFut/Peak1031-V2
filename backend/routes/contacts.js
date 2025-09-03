@@ -20,28 +20,61 @@ router.get('/', authenticateToken, async (req, res) => {
     console.log('👤 CONTACTS ROUTE: Getting contacts for', req.user?.email, 'Role:', req.user?.role);
     
     const { page = 1, limit = 50, search } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const actualLimit = Math.min(parseInt(limit), 1000); // Cap at 1000 for safety
+    const offset = (parseInt(page) - 1) * actualLimit;
     
     // Admin sees all contacts
     if (req.user.role === 'admin') {
       console.log('✅ Admin access - fetching all contacts');
-      const contactsResult = await databaseService.getContacts({
-        page: parseInt(page),
-        limit: parseInt(limit),
-        offset,
-        search
+      
+      // Search in people table
+      let peopleQuery = supabase
+        .from('people')
+        .select('*', { count: 'exact' });
+        
+      if (search) {
+        peopleQuery = peopleQuery.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
+      }
+      
+      const { data: peopleContacts, error: peopleError, count: peopleCount } = await peopleQuery
+        .order('created_at', { ascending: false })
+        .range(offset, offset + actualLimit - 1);
+        
+      // Search in contacts table
+      let contactsQuery = supabase
+        .from('contacts')
+        .select('*');
+        
+      if (search) {
+        contactsQuery = contactsQuery.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
+      }
+      
+      const { data: legacyContacts, error: contactsError } = await contactsQuery
+        .order('created_at', { ascending: false })
+        .limit(actualLimit);
+      
+      // Merge results
+      const allAdminContacts = [...(peopleContacts || [])];
+      const adminExistingIds = new Set(peopleContacts?.map(c => c.id) || []);
+      
+      legacyContacts?.forEach(contact => {
+        if (!adminExistingIds.has(contact.id)) {
+          allAdminContacts.push(contact);
+        }
       });
       
-      const transformedContacts = transformToCamelCase(contactsResult.data || []);
+      console.log(`✅ Admin found ${allAdminContacts.length} contacts (${peopleContacts?.length || 0} from people, ${legacyContacts?.length || 0} from contacts)`);
+      
+      const transformedContacts = transformToCamelCase(allAdminContacts || []);
       
       return res.json({
         contacts: transformedContacts,
         data: transformedContacts,
         pagination: {
-          page: contactsResult.page || parseInt(page),
-          limit: contactsResult.limit || parseInt(limit),
-          total: contactsResult.total || 0,
-          totalPages: contactsResult.totalPages || 1
+          page: parseInt(page),
+          limit: actualLimit,
+          total: allAdminContacts.length,
+          totalPages: Math.ceil(allAdminContacts.length / actualLimit)
         }
       });
     }
@@ -102,7 +135,7 @@ router.get('/', authenticateToken, async (req, res) => {
       });
     }
     
-    // Query contacts with RBAC filter
+    // Query contacts with RBAC filter from people table
     let query = supabase
       .from('people')
       .select('*', { count: 'exact' })
@@ -112,21 +145,56 @@ router.get('/', authenticateToken, async (req, res) => {
       query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
     }
     
-    // Apply pagination
+    // Apply pagination to people table
     query = query
       .order('created_at', { ascending: false })
       .range(offset, offset + parseInt(limit) - 1);
       
-    const { data: contacts, error, count } = await query;
+    const { data: peopleContacts, error, count: peopleCount } = await query;
     
     if (error) {
-      console.error('Error fetching filtered contacts:', error);
+      console.error('Error fetching contacts from people table:', error);
       throw error;
     }
     
-    console.log(`✅ Found ${contacts?.length || 0} contacts for ${req.user.role} user (total: ${count || 0})`);
+    // Also search in contacts table as fallback
+    let contactsQuery = supabase
+      .from('contacts')
+      .select('*')
+      .in('id', allContactIds);
+      
+    if (search) {
+      contactsQuery = contactsQuery.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
+    }
     
-    const transformedContacts = transformToCamelCase(contacts || []);
+    const { data: legacyContacts, error: contactsError } = await contactsQuery
+      .order('created_at', { ascending: false })
+      .limit(parseInt(limit));
+    
+    if (contactsError) {
+      console.error('Error fetching contacts from contacts table:', contactsError);
+    }
+    
+    // Merge results, avoiding duplicates based on email or name+company
+    const allContacts = [...(peopleContacts || [])];
+    const existingIdentifiers = new Set();
+    
+    peopleContacts?.forEach(contact => {
+      if (contact.email) existingIdentifiers.add(contact.email);
+      else existingIdentifiers.add(`${contact.first_name}_${contact.last_name}_${contact.company}`);
+    });
+    
+    legacyContacts?.forEach(contact => {
+      const identifier = contact.email || `${contact.first_name}_${contact.last_name}_${contact.company}`;
+      if (!existingIdentifiers.has(identifier)) {
+        allContacts.push(contact);
+        existingIdentifiers.add(identifier);
+      }
+    });
+    
+    console.log(`✅ Found ${allContacts?.length || 0} total contacts (${peopleContacts?.length || 0} from people, ${legacyContacts?.length || 0} from contacts)`);
+    
+    const transformedContacts = transformToCamelCase(allContacts || []);
     
     res.json({
       contacts: transformedContacts,
@@ -134,8 +202,8 @@ router.get('/', authenticateToken, async (req, res) => {
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / parseInt(limit))
+        total: allContacts.length,
+        totalPages: Math.ceil(allContacts.length / parseInt(limit))
       }
     });
   } catch (error) {

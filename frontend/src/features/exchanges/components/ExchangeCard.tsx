@@ -305,49 +305,7 @@ export const ExchangeCard: React.FC<ExchangeCardProps> = ({
           {getTimelineBadge(exchange)}
         </div>
         
-        {/* Key Metrics Snapshot */}
-        <div className="px-5 pb-4">
-          <div className="grid grid-cols-3 gap-3">
-            {/* Exchange Value */}
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-gray-600">Value</span>
-                <DollarSign className="w-4 h-4 text-green-600" />
-              </div>
-              <p className="text-lg font-bold text-gray-900">
-                ${exchange.exchangeValue ? (exchange.exchangeValue / 1000000).toFixed(1) + 'M' : 'N/A'}
-              </p>
-            </div>
-            
-            {/* Progress */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-gray-600">Progress</span>
-                <TrendingUp className="w-4 h-4 text-blue-600" />
-              </div>
-              <p className="text-lg font-bold text-gray-900">
-                {exchange.progress || 0}%
-              </p>
-            </div>
-            
-            {/* Deadline */}
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-gray-600">Deadline</span>
-                <Calendar className="w-4 h-4 text-purple-600" />
-              </div>
-              <p className="text-sm font-bold text-gray-900">
-                {exchange.completionDeadline 
-                  ? new Date(exchange.completionDeadline).toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric' 
-                    })
-                  : 'TBD'
-                }
-              </p>
-            </div>
-          </div>
-        </div>
+        {/* Key Metrics Snapshot - Removed as requested */}
         
         {/* Progress Bar */}
         <div className="px-5 pb-4">

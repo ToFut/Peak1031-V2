@@ -203,10 +203,86 @@ class RBACService {
       query = query.eq('status', options.status);
     }
     
-    // Apply whereClause filters (includes Op.in operations from buildExchangeWhereClause)
+    // Apply whereClause filters (includes Op.in and Op.or operations from buildExchangeWhereClause)
     if (whereClause && Object.keys(whereClause).length > 0) {
+      console.log(`🔒 RBAC: Applying whereClause filters:`, JSON.stringify(whereClause, null, 2));
+      // Check for Op.or symbol (for search functionality)
+      const opSymbols = Object.getOwnPropertySymbols(whereClause);
+      console.log(`🔒 RBAC: Found ${opSymbols.length} Op symbols`);
+      const orSymbol = opSymbols.find(sym => sym.toString().includes('or'));
+      
+      if (orSymbol && Array.isArray(whereClause[orSymbol])) {
+        // Handle Op.or conditions for search
+        const orConditions = whereClause[orSymbol].map(condition => {
+          const conditionKey = Object.keys(condition)[0];
+          const conditionValue = condition[conditionKey];
+          
+          // Check if value has Op symbols (like Op.iLike)
+          if (conditionValue && typeof conditionValue === 'object') {
+            const valueSymbols = Object.getOwnPropertySymbols(conditionValue);
+            const iLikeSymbol = valueSymbols.find(sym => sym.toString().includes('iLike'));
+            
+            if (iLikeSymbol) {
+              // Handle iLike operator for search
+              const searchValue = conditionValue[iLikeSymbol];
+              // Remove % wildcards and use Supabase's ilike
+              const cleanValue = searchValue.replace(/%/g, '*');
+              return `${conditionKey}.ilike.${cleanValue}`;
+            }
+          }
+          return null;
+        }).filter(Boolean);
+        
+        if (orConditions.length > 0) {
+          console.log(`🔒 RBAC: Applying search OR conditions:`, orConditions);
+          query = query.or(orConditions.join(','));
+        }
+      }
+      
+      // Handle other whereClause properties
       Object.keys(whereClause).forEach(key => {
-        if (key === 'status' && whereClause[key] && typeof whereClause[key] === 'object') {
+        if (typeof key === 'symbol') return; // Skip Op symbols
+        
+        if (key === 'searchFields' && whereClause.searchQuery) {
+          // Handle search with multiple fields
+          const searchValue = whereClause.searchQuery;
+          const fields = whereClause.searchFields;
+          console.log(`🔒 RBAC: Applying search for "${searchValue}" across ${fields.length} fields`);
+          
+          // Split the search into individual words/numbers to avoid special character issues
+          const searchTerms = searchValue.split(/[,\-\s]+/).filter(p => p.length > 0);
+          
+          // Build OR conditions for each search term
+          const orConditions = [];
+          
+          // Only search for the individual parts to avoid PostgREST parsing issues
+          searchTerms.forEach(term => {
+            // Skip very short terms
+            if (term.trim().length < 2) return;
+            
+            fields.forEach(f => {
+              // Clean the term and create condition
+              const cleanTerm = term.trim().replace(/[%*]/g, '');
+              if (cleanTerm) {
+                orConditions.push(`${f.field}.ilike.%${cleanTerm}%`);
+              }
+            });
+          });
+          
+          // Remove duplicates and apply
+          const uniqueConditions = [...new Set(orConditions)];
+          console.log(`🔒 RBAC: Applying ${uniqueConditions.length} search conditions for terms: ${searchTerms.join(', ')}`);
+          
+          if (uniqueConditions.length > 0) {
+            const orClause = uniqueConditions.join(',');
+            console.log(`🔒 RBAC: Final OR clause:`, orClause);
+            query = query.or(orClause);
+          }
+        } else if (key === 'or' && typeof whereClause[key] === 'string') {
+          // Handle direct Supabase PostgREST or query string
+          console.log(`🔒 RBAC: Applying direct OR string:`, whereClause[key]);
+          query = query.or(whereClause[key]);
+        } else if (key === 'status' && whereClause[key] && typeof whereClause[key] === 'object') {
           // Handle Sequelize Op.in for status filtering
           const opKeys = Object.getOwnPropertySymbols(whereClause[key]);
           const hasInSymbol = opKeys.find(sym => sym.toString().includes('in'));
@@ -214,6 +290,8 @@ class RBACService {
             console.log(`🔒 RBAC: Applying status IN filter:`, whereClause[key][hasInSymbol]);
             query = query.in('status', whereClause[key][hasInSymbol]);
           }
+        } else if (key === 'searchQuery' || key === 'searchFields') {
+          // Skip these as they're handled above
         } else if (key === 'is_active' && whereClause[key] !== undefined) {
           query = query.eq('is_active', whereClause[key]);
         } else if (whereClause[key] !== undefined && whereClause[key] !== null && typeof whereClause[key] !== 'object') {

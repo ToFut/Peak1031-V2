@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Users, CheckSquare, FileText, TrendingUp, Calendar, DollarSign, 
   Target, Shield, MapPin, Home, Building2, Banknote, Clock,
@@ -13,22 +14,58 @@ interface ExchangeOverviewProps {
   exchange: EnterpriseExchange & {
     // PP Fields
     pp_display_name?: string;
+    pp_matter_number?: number; // PP Matter Number: 7981
     pp_matter_status?: string;
     pp_responsible_attorney?: string;
     type_of_exchange?: string;
     client_vesting?: string;
     bank?: string;
     proceeds?: number;
+    // PP Data structure for accessing unmapped fields
+    pp_data?: {
+      id?: string;
+      number?: number;
+      display_name?: string;
+      status?: string;
+      account_ref?: {
+        id?: string;
+        display_name?: string;
+      };
+      assigned_to_users?: Array<{
+        id?: string;
+        display_name?: string;
+        email_address?: string;
+      }>;
+      custom_field_values?: Array<{
+        custom_field_ref: {
+          label: string;
+          value_type?: string;
+        };
+        value_string?: string;
+        value_number?: number;
+        value_date_time?: string;
+        value_boolean?: boolean;
+        contact_ref?: {
+          display_name?: string;
+        };
+      }>;
+    };
     // Relinquished Property
     rel_property_address?: string;
     rel_property_city?: string;
     rel_property_state?: string;
     rel_property_zip?: string;
-    rel_apn?: string;
-    rel_escrow_number?: string;
-    rel_value?: number;
+    rel_property_type?: string; // Type: Residential
+    rel_apn?: string; // APN: 4363-007-106
+    rel_escrow_number?: string; // Escrow Number: CA-25-26225
+    rel_value?: number; // Value: $588,000
     rel_contract_date?: string;
+    rel_purchase_contract_title?: string;
     close_of_escrow_date?: string;
+    contract_type?: string; // Contract Type: Residential Purchase Agreement
+    expected_closing?: string; // Expected Closing: September 17, 2025
+    exchange_agreement_drafted?: string; // August 29, 2025
+    settlement_agent?: string; // Settlement Agent: Bryan Spoltore
     // Replacement Property
     rep_1_property_address?: string;
     rep_1_city?: string;
@@ -39,9 +76,13 @@ interface ExchangeOverviewProps {
     rep_1_value?: number;
     rep_1_contract_date?: string;
     rep_1_seller_name?: string;
+    rep_1_seller_1_name?: string;
+    rep_1_seller_2_name?: string;
+    rep_1_purchase_contract_title?: string;
     // Buyers
-    buyer_1_name?: string;
-    buyer_2_name?: string;
+    buyer_vesting?: string; // Buyer Vesting: Sanjeev Subherwal and Aarush Subherwal
+    buyer_1_name?: string; // Buyer 1: Sanjeev Subherwal
+    buyer_2_name?: string; // Buyer 2: Aarush Subherwal
     // Key Dates
     day_45?: string;
     day_180?: string;
@@ -63,6 +104,36 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
   documents,
   exchangeStage
 }) => {
+  
+  // Component for clickable user names - links to user management with search filter
+  const ClickableUserName: React.FC<{
+    userName: string;
+    email?: string;
+    className?: string;
+  }> = ({ userName, email, className = "" }) => {
+    if (!userName) return null;
+    
+    // Create search params to filter user management by name
+    const searchParams = new URLSearchParams();
+    if (email) {
+      searchParams.set('search', email);
+    } else {
+      // Extract first name from full name for better search results
+      const firstName = userName.split(' ')[0];
+      searchParams.set('search', firstName);
+    }
+    searchParams.set('type', 'all'); // Search both users and contacts
+    
+    return (
+      <Link
+        to={`/users?${searchParams.toString()}`}
+        className={`text-blue-600 hover:text-blue-800 hover:underline transition-colors ${className}`}
+        title={`View user profile for ${userName}${email ? ` (${email})` : ''}`}
+      >
+        {userName}
+      </Link>
+    );
+  };
   const defaultExchangeStage = {
     stage: getExchangeStage(exchange),
     color: getRiskColorClass(exchange.risk_level),
@@ -99,6 +170,36 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
     }
   };
 
+  // Helper function to get PP custom field value - returns JSX for contacts
+  const getPPValue = (label: string): React.ReactNode => {
+    if (!exchange.pp_data?.custom_field_values) return null;
+    const field = exchange.pp_data.custom_field_values.find(f => f.custom_field_ref.label === label);
+    if (!field) return null;
+    
+    // Handle each type explicitly to avoid type issues
+    if (field.value_string) return field.value_string;
+    if (field.value_number) return field.value_number;
+    if (field.value_date_time) return field.value_date_time;
+    if (field.contact_ref?.display_name) {
+      return <ClickableUserName userName={field.contact_ref.display_name} />;
+    }
+    if (field.value_boolean !== undefined) return field.value_boolean ? 'Yes' : 'No';
+    
+    return null;
+  };
+
+  // Get complete PP field values (database field OR pp_data field)
+  const getPPField = (dbField: any, ppLabel: string): string => {
+    const dbValue = dbField;
+    const ppValue = getPPValue(ppLabel);
+    return dbValue || ppValue || 'Not specified';
+  };
+
+  // PP Matter GUID for reference
+  const ppMatterGuid = exchange.pp_data?.id;
+  const ppAccountName = exchange.pp_data?.account_ref?.display_name;
+  const ppResponsibleAttorneyEmail = exchange.pp_data?.assigned_to_users?.[0]?.email_address;
+
   return (
     <div className="space-y-6">
       {/* Quick Stats - Enhanced with PP data */}
@@ -118,7 +219,7 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
             <div>
               <p className="text-sm font-medium text-green-600">Proceeds Holding</p>
               <p className="text-xl font-bold text-green-900">
-                {formatCurrency(exchange.proceeds || exchange.relinquishedValue)}
+                {formatCurrency(exchange.proceeds || exchange.rel_value || (exchange as any).relinquishedValue || 0)}
               </p>
             </div>
             <DollarSign className="w-8 h-8 text-green-600" />
@@ -158,6 +259,25 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
             <h4 className="text-sm font-medium text-gray-500">Matter Name</h4>
             <p className="mt-1 text-sm text-gray-900 font-medium">
               {exchange.pp_display_name || exchange.name || `Exchange #${(exchange as any).exchangeNumber || exchange.id}`}
+            </p>
+          </div>
+
+          {/* PP Matter Number */}
+          {exchange.pp_matter_number && (
+            <div>
+              <h4 className="text-sm font-medium text-gray-500">PP Matter Number</h4>
+              <p className="mt-1 text-sm text-gray-900 flex items-center">
+                <Hash className="w-4 h-4 mr-1 text-gray-400" />
+                {exchange.pp_matter_number}
+              </p>
+            </div>
+          )}
+
+          {/* Exchange ID - always visible for search */}
+          <div>
+            <h4 className="text-sm font-medium text-gray-500">Exchange ID</h4>
+            <p className="mt-1 text-xs text-gray-600 font-mono">
+              {exchange.id}
             </p>
           </div>
           
@@ -203,48 +323,83 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
               <h4 className="text-sm font-medium text-gray-500">Responsible Attorney</h4>
               <p className="mt-1 text-sm text-gray-900 flex items-center">
                 <User className="w-4 h-4 mr-1 text-gray-400" />
-                {exchange.pp_responsible_attorney}
+                <ClickableUserName 
+                  userName={exchange.pp_responsible_attorney}
+                  email={ppResponsibleAttorneyEmail}
+                  className="font-medium"
+                />
+              </p>
+              {ppResponsibleAttorneyEmail && (
+                <p className="mt-1 text-xs text-gray-600 flex items-center">
+                  <Mail className="w-3 h-3 mr-1 text-gray-400" />
+                  <a 
+                    href={`mailto:${ppResponsibleAttorneyEmail}`}
+                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    {ppResponsibleAttorneyEmail}
+                  </a>
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Account Information from PP */}
+          {ppAccountName && (
+            <div>
+              <h4 className="text-sm font-medium text-gray-500">Account Name</h4>
+              <p className="mt-1 text-sm text-gray-900">
+                {ppAccountName}
               </p>
             </div>
           )}
 
-          {/* Critical Dates */}
-          <div>
-            <h4 className="text-sm font-medium text-gray-500">45-Day Deadline</h4>
-            <p className="mt-1 text-sm text-gray-900">
-              {formatUSDate(day45)}
-              {day45 && (
-                <span className={`ml-2 text-xs font-medium ${
-                  daysUntil45 < 0 ? 'text-red-600' : 
-                  daysUntil45 <= 10 ? 'text-orange-600' : 'text-gray-500'
-                }`}>
-                  {daysUntil45 < 0 ? `${Math.abs(daysUntil45)} days overdue` : 
-                   daysUntil45 === 0 ? 'TODAY' : `${daysUntil45} days left`}
-                </span>
+          {/* PP Matter GUID for reference */}
+          {ppMatterGuid && (
+            <div>
+              <h4 className="text-sm font-medium text-gray-500">Matter GUID</h4>
+              <p className="mt-1 text-xs text-gray-600 font-mono">
+                {ppMatterGuid}
+              </p>
+            </div>
+          )}
+
+          {/* Referral Information */}
+          {getPPValue('Referral Source') && (
+            <div>
+              <h4 className="text-sm font-medium text-gray-500">Referral Source</h4>
+              <p className="mt-1 text-sm text-gray-900">
+                {getPPValue('Referral Source')}
+              </p>
+              {getPPValue('Referral Source Email') && (
+                <p className="mt-1 text-xs text-gray-600 flex items-center">
+                  <Mail className="w-3 h-3 mr-1 text-gray-400" />
+                  {getPPValue('Referral Source Email')}
+                </p>
               )}
-            </p>
-          </div>
-          
-          <div>
-            <h4 className="text-sm font-medium text-gray-500">180-Day Deadline</h4>
-            <p className="mt-1 text-sm text-gray-900">
-              {formatUSDate(day180)}
-              {day180 && (
-                <span className={`ml-2 text-xs font-medium ${
-                  daysUntil180 < 0 ? 'text-red-600' : 
-                  daysUntil180 <= 30 ? 'text-orange-600' : 'text-gray-500'
-                }`}>
-                  {daysUntil180 < 0 ? `${Math.abs(daysUntil180)} days overdue` : 
-                   daysUntil180 === 0 ? 'TODAY' : `${daysUntil180} days left`}
-                </span>
-              )}
-            </p>
-          </div>
+            </div>
+          )}
+
+          {/* Internal Credit Information */}
+          {getPPValue('Internal Credit To') && (
+            <div>
+              <h4 className="text-sm font-medium text-gray-500">Internal Credit To</h4>
+              <p className="mt-1 text-sm text-gray-900">
+                {getPPValue('Internal Credit To')}
+              </p>
+            </div>
+          )}
           
           <div>
             <h4 className="text-sm font-medium text-gray-500">Close of Escrow</h4>
             <p className="mt-1 text-sm text-gray-900">
               {formatUSDate(exchange.close_of_escrow_date)}
+            </p>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-medium text-gray-500">Contract Value</h4>
+            <p className="mt-1 text-sm text-gray-900 font-semibold">
+              {formatCurrency(exchange.proceeds || exchange.rel_value || (exchange as any).relinquishedValue || 0)}
             </p>
           </div>
         </div>
@@ -303,22 +458,143 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
               </div>
             )}
             
+            {/* Property Type from PP data */}
+            {(exchange.rel_property_type || getPPValue('Property Type')) && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Property Type</h4>
+                <p className="mt-1 text-sm text-gray-900 flex items-center">
+                  <Home className="w-4 h-4 mr-1 text-gray-400" />
+                  {getPPField(exchange.rel_property_type, 'Property Type')}
+                </p>
+              </div>
+            )}
+            
             {exchange.rel_contract_date && (
               <div>
                 <h4 className="text-sm font-medium text-gray-500">Contract Date</h4>
-                <p className="mt-1 text-sm text-gray-900">
+                <p className="mt-1 text-sm text-gray-900 flex items-center">
+                  <Calendar className="w-4 h-4 mr-1 text-gray-400" />
                   {formatUSDate(exchange.rel_contract_date)}
                 </p>
               </div>
             )}
             
-            {(exchange.buyer_1_name || exchange.buyer_2_name) && (
+            {exchange.contract_type && (
+              <div className="md:col-span-2">
+                <h4 className="text-sm font-medium text-gray-500">Contract Type</h4>
+                <p className="mt-1 text-sm text-gray-900">
+                  {exchange.contract_type}
+                </p>
+              </div>
+            )}
+            
+            {exchange.expected_closing && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Expected Closing</h4>
+                <p className="mt-1 text-sm text-gray-900 flex items-center">
+                  <Clock className="w-4 h-4 mr-1 text-gray-400" />
+                  {formatUSDate(exchange.expected_closing)}
+                </p>
+              </div>
+            )}
+            
+            {exchange.exchange_agreement_drafted && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Exchange Agreement Drafted</h4>
+                <p className="mt-1 text-sm text-gray-900 flex items-center">
+                  <FileCheck className="w-4 h-4 mr-1 text-gray-400" />
+                  {formatUSDate(exchange.exchange_agreement_drafted)}
+                </p>
+              </div>
+            )}
+            
+            {/* Settlement Agent from PP data */}
+            {(exchange.settlement_agent || getPPValue('Rel Settlement Agent')) && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Settlement Agent</h4>
+                <p className="mt-1 text-sm text-gray-900 flex items-center">
+                  <User className="w-4 h-4 mr-1 text-gray-400" />
+                  {getPPField(exchange.settlement_agent, 'Rel Settlement Agent')}
+                </p>
+              </div>
+            )}
+            
+            {/* Purchase Contract Title from PP data */}
+            {(exchange.rel_purchase_contract_title || getPPValue('Rel Purchase Contract Title')) && (
+              <div className="md:col-span-2">
+                <h4 className="text-sm font-medium text-gray-500">Purchase Contract</h4>
+                <p className="mt-1 text-sm text-gray-900 flex items-center">
+                  <FileCheck className="w-4 h-4 mr-1 text-gray-400" />
+                  {getPPField(exchange.rel_purchase_contract_title, 'Rel Purchase Contract Title')}
+                </p>
+              </div>
+            )}
+            
+            {/* Client Signatory Title */}
+            {getPPValue('Client 1 Signatory Title') && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Client Signatory Title</h4>
+                <p className="mt-1 text-sm text-gray-900">
+                  {getPPValue('Client 1 Signatory Title')}
+                </p>
+              </div>
+            )}
+            
+            {/* Date Proceeds Received */}
+            {getPPValue('Date Proceeds Received') && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Date Proceeds Received</h4>
+                <p className="mt-1 text-sm text-gray-900 flex items-center">
+                  <Calendar className="w-4 h-4 mr-1 text-gray-400" />
+                  {formatUSDate(getPPValue('Date Proceeds Received')?.toString())}
+                </p>
+              </div>
+            )}
+            
+            {/* Receipt Drafted On */}
+            {getPPValue('Receipt Drafted On') && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Receipt Drafted</h4>
+                <p className="mt-1 text-sm text-gray-900 flex items-center">
+                  <Calendar className="w-4 h-4 mr-1 text-gray-400" />
+                  {formatUSDate(getPPValue('Receipt Drafted On')?.toString())}
+                </p>
+              </div>
+            )}
+            
+            {(exchange.buyer_1_name || exchange.buyer_2_name || exchange.buyer_vesting) && (
               <div className="md:col-span-2">
                 <h4 className="text-sm font-medium text-gray-500">Buyer(s)</h4>
                 <p className="mt-1 text-sm text-gray-900 flex items-center">
                   <Users className="w-4 h-4 mr-1 text-gray-400" />
-                  {[exchange.buyer_1_name, exchange.buyer_2_name].filter(Boolean).join(' & ')}
+                  {exchange.buyer_vesting ? (
+                    // Handle buyer vesting which may contain multiple names
+                    exchange.buyer_vesting.split(' and ').map((name, index, arr) => (
+                      <span key={index}>
+                        <ClickableUserName userName={name.trim()} />
+                        {index < arr.length - 1 && ' and '}
+                      </span>
+                    ))
+                  ) : (
+                    // Handle individual buyer names
+                    [exchange.buyer_1_name, exchange.buyer_2_name].filter(Boolean).map((name, index, arr) => (
+                      <span key={index}>
+                        <ClickableUserName userName={name || ''} />
+                        {index < arr.length - 1 && ' & '}
+                      </span>
+                    ))
+                  )}
                 </p>
+                {(exchange.buyer_1_name || exchange.buyer_2_name) && exchange.buyer_vesting && (
+                  <p className="mt-1 text-xs text-gray-600">
+                    Individual: {[exchange.buyer_1_name, exchange.buyer_2_name].filter(Boolean).map((name, index, arr) => (
+                      <span key={index}>
+                        <ClickableUserName userName={name || ''} />
+                        {index < arr.length - 1 && ', '}
+                      </span>
+                    ))}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -387,12 +663,65 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
               </div>
             )}
             
-            {exchange.rep_1_seller_name && (
+            {/* Seller Information - Combined */}
+            {(exchange.rep_1_seller_name || exchange.rep_1_seller_1_name || exchange.rep_1_seller_2_name) && (
               <div className="md:col-span-2">
-                <h4 className="text-sm font-medium text-gray-500">Seller</h4>
+                <h4 className="text-sm font-medium text-gray-500">Seller(s)</h4>
                 <p className="mt-1 text-sm text-gray-900 flex items-center">
                   <User className="w-4 h-4 mr-1 text-gray-400" />
-                  {exchange.rep_1_seller_name}
+                  {exchange.rep_1_seller_name ? (
+                    <ClickableUserName userName={exchange.rep_1_seller_name} />
+                  ) : (
+                    [exchange.rep_1_seller_1_name, exchange.rep_1_seller_2_name].filter(Boolean).map((name, index, arr) => (
+                      <span key={index}>
+                        <ClickableUserName userName={name || ''} />
+                        {index < arr.length - 1 && ' & '}
+                      </span>
+                    ))
+                  )}
+                </p>
+              </div>
+            )}
+            
+            {/* Rep Settlement Agent from PP data */}
+            {getPPValue('Rep 1 Settlement Agent') && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Rep Settlement Agent</h4>
+                <p className="mt-1 text-sm text-gray-900 flex items-center">
+                  <User className="w-4 h-4 mr-1 text-gray-400" />
+                  {getPPValue('Rep 1 Settlement Agent')}
+                </p>
+              </div>
+            )}
+            
+            {/* Rep Purchase Contract Title */}
+            {(exchange.rep_1_purchase_contract_title || getPPValue('Rep 1 Purchase Contract Title')) && (
+              <div className="md:col-span-2">
+                <h4 className="text-sm font-medium text-gray-500">Rep Purchase Contract</h4>
+                <p className="mt-1 text-sm text-gray-900 flex items-center">
+                  <FileCheck className="w-4 h-4 mr-1 text-gray-400" />
+                  {getPPField(exchange.rep_1_purchase_contract_title, 'Rep 1 Purchase Contract Title')}
+                </p>
+              </div>
+            )}
+            
+            {/* Rep Seller Vesting */}
+            {getPPValue('Rep 1 Seller Vesting') && (
+              <div className="md:col-span-2">
+                <h4 className="text-sm font-medium text-gray-500">Rep Seller Vesting</h4>
+                <p className="mt-1 text-sm text-gray-900">
+                  {getPPValue('Rep 1 Seller Vesting')}
+                </p>
+              </div>
+            )}
+            
+            {/* Rep Docs Drafted On */}
+            {getPPValue('Rep 1 Docs Drafted on') && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Rep Docs Drafted</h4>
+                <p className="mt-1 text-sm text-gray-900 flex items-center">
+                  <Calendar className="w-4 h-4 mr-1 text-gray-400" />
+                  {formatUSDate(getPPValue('Rep 1 Docs Drafted on')?.toString())}
                 </p>
               </div>
             )}
@@ -416,7 +745,7 @@ export const ExchangeOverview: React.FC<ExchangeOverviewProps> = ({
             </div>
             
             <div className="bg-white rounded-lg p-4">
-              <div className="text-sm text-gray-500">Proceeds Available</div>
+              <div className="text-sm text-gray-500">Proceeds Holding</div>
               <div className="text-2xl font-bold text-green-600">
                 {formatCurrency(exchange.proceeds)}
               </div>

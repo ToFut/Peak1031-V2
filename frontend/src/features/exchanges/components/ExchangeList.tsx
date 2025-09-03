@@ -77,8 +77,7 @@ const ExchangeStats: React.FC<{ exchanges: Exchange[]; total?: number }> = React
     total: total || exchanges.length,
     active: exchanges.filter(e => 
       e.status === '45D' || 
-      e.status === '180D' || 
-      e.status === 'In Progress'
+      e.status === '180D'
     ).length,
     completed: exchanges.filter(e => 
       e.status === 'COMPLETED' || 
@@ -87,13 +86,17 @@ const ExchangeStats: React.FC<{ exchanges: Exchange[]; total?: number }> = React
     pending: exchanges.filter(e => 
       e.status === 'PENDING' || 
       e.status === 'Draft' ||
+      e.status === 'In Progress' || 
+      e.status === 'ON_HOLD' ||
       !e.status
     ).length,
-    totalValue: exchanges.reduce((sum, e) => {
-      const value = e.exchangeValue || 
-                  (e as any).proceeds || 
+    totalFundsOnDeposit: exchanges.reduce((sum, e) => {
+      // Calculate funds on deposit (proceeds holding)
+      const proceeds = (e as any).proceeds || 
+                      ((e as any).date_proceeds_received ? e.exchangeValue : 0);
+      const value = proceeds || 
+                  e.relinquishedValue || 
                   (e as any).rel_value || 
-                  (e as any).total_value || 
                   0;
       return sum + value;
     }, 0),
@@ -151,9 +154,9 @@ const ExchangeStats: React.FC<{ exchanges: Exchange[]; total?: number }> = React
       <div className="bg-white rounded-lg shadow p-4 border">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600">Total Value</p>
+            <p className="text-sm font-medium text-gray-600">Total Funds on Deposit</p>
             <p className="text-lg font-bold text-gray-900">
-              ${(stats.totalValue / 1000000).toFixed(1)}M
+              ${(stats.totalFundsOnDeposit / 1000000).toFixed(1)}M
             </p>
           </div>
           <DollarSign className="w-8 h-8 text-green-600" />
@@ -258,6 +261,36 @@ const getTimelineBadge = (exchange: Exchange) => {
   );
 };
 
+// Component for clickable user names in ExchangeList
+const ClickableUserName: React.FC<{
+  userName: string;
+  email?: string;
+  className?: string;
+}> = ({ userName, email, className = "" }) => {
+  if (!userName || userName === 'Not assigned') return <span className={className}>{userName || 'Not assigned'}</span>;
+  
+  // Create search params to filter user management by name
+  const searchParams = new URLSearchParams();
+  if (email) {
+    searchParams.set('search', email);
+  } else {
+    // Extract first name from full name for better search results
+    const firstName = userName.split(' ')[0];
+    searchParams.set('search', firstName);
+  }
+  searchParams.set('type', 'all'); // Search both users and contacts
+  
+  return (
+    <Link
+      to={`/users?${searchParams.toString()}`}
+      className={`text-blue-600 hover:text-blue-800 hover:underline transition-colors ${className}`}
+      title={`View user profile for ${userName}${email ? ` (${email})` : ''}`}
+    >
+      {userName}
+    </Link>
+  );
+};
+
 // Main ExchangeList Component - Memoized
 export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({ 
   title = "Exchanges", 
@@ -307,7 +340,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
     active: 0,
     completed: 0, 
     pending: 0,
-    totalValue: 0,
+    totalFundsOnDeposit: 0,
     avgProgress: 0
   });
   const [statsLoading, setStatsLoading] = React.useState(true);
@@ -323,7 +356,7 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
           active: 766,
           completed: 3,
           pending: 231,
-          totalValue: 214490000,
+          totalFundsOnDeposit: 214490000,
           avgProgress: 0
         };
         
@@ -396,6 +429,15 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
   const [equityMaxFilter, setEquityMaxFilter] = useState('');
   const [bootReceivedFilter, setBootReceivedFilter] = useState('');
   const [bootPaidFilter, setBootPaidFilter] = useState('');
+  
+  // New filters for specific fields
+  const [ppMatterNumberFilter, setPpMatterNumberFilter] = useState('');
+  const [exchangeIdFilter, setExchangeIdFilter] = useState('');
+  const [apnFilter, setApnFilter] = useState('');
+  const [escrowNumberFilter, setEscrowNumberFilter] = useState('');
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState('');
+  const [buyerFilter, setBuyerFilter] = useState('');
+  const [settlementAgentFilter, setSettlementAgentFilter] = useState('');
 
   // Sorting state
   const [sortField, setSortField] = useState<string>('');
@@ -509,6 +551,35 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
       filterOptions.progressMax = parseFloat(progressMaxFilter);
     }
     
+    // New specific field filters
+    if (ppMatterNumberFilter.trim()) {
+      filterOptions.ppMatterNumber = ppMatterNumberFilter.trim();
+    }
+    
+    if (exchangeIdFilter.trim()) {
+      filterOptions.exchangeId = exchangeIdFilter.trim();
+    }
+    
+    if (apnFilter.trim()) {
+      filterOptions.apn = apnFilter.trim();
+    }
+    
+    if (escrowNumberFilter.trim()) {
+      filterOptions.escrowNumber = escrowNumberFilter.trim();
+    }
+    
+    if (propertyTypeFilter.trim()) {
+      filterOptions.propertyType = propertyTypeFilter.trim();
+    }
+    
+    if (buyerFilter.trim()) {
+      filterOptions.buyer = buyerFilter.trim();
+    }
+    
+    if (settlementAgentFilter.trim()) {
+      filterOptions.settlementAgent = settlementAgentFilter.trim();
+    }
+    
     // Update server-side filters
     console.log('🔄 Syncing filters with backend:', filterOptions);
     console.log('🔄 statusFilter value:', statusFilter);
@@ -516,7 +587,8 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
     setSmartFilters(filterOptions);
     console.log('🔄 Called setSmartFilters with:', filterOptions);
   }, [debouncedSearchTerm, statusFilter, typeFilter, valueMinFilter, valueMaxFilter, dateFilter, propertyAddressFilter, 
-      clientFilter, coordinatorFilter, attorneyFilter, progressMinFilter, progressMaxFilter, setSmartFilters]);
+      clientFilter, coordinatorFilter, attorneyFilter, progressMinFilter, progressMaxFilter, 
+      ppMatterNumberFilter, exchangeIdFilter, apnFilter, escrowNumberFilter, propertyTypeFilter, buyerFilter, settlementAgentFilter, setSmartFilters]);
 
   // View toggle state with localStorage persistence - Default to list/table as requested
   const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
@@ -570,6 +642,13 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
     { key: 'bootReceived', label: 'Boot Received', default: false },
     { key: 'bootPaid', label: 'Boot Paid', default: false },
     { key: 'ppData', label: 'PracticePanther Details', default: false },
+    { key: 'ppMatterNumber', label: 'PP Matter Number', default: false },
+    { key: 'exchangeId', label: 'Exchange ID', default: false },
+    { key: 'apn', label: 'APN', default: false },
+    { key: 'escrowNumber', label: 'Escrow Number', default: false },
+    { key: 'propertyType', label: 'Property Type', default: false },
+    { key: 'buyer', label: 'Buyer Names', default: false },
+    { key: 'settlementAgent', label: 'Settlement Agent', default: false },
     { key: 'replacementProps', label: 'Replacement Properties', default: false },
     { key: 'exchangeStage', label: 'Exchange Stage', default: true },
     { key: 'relProperty', label: 'Relinquished Property', default: false }
@@ -1358,6 +1437,16 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
     // Enhanced search term filter - use debouncedSearchTerm for filtering
     if (debouncedSearchTerm.trim()) {
       const search = debouncedSearchTerm.toLowerCase();
+      
+      // Search by Exchange ID, name, number, or PP matter number
+      filtered = filtered.filter(exchange => 
+        exchange.id?.toLowerCase().includes(search) ||
+        exchange.exchangeNumber?.toString().toLowerCase().includes(search) ||
+        exchange.name?.toLowerCase().includes(search) ||
+        exchange.pp_matter_number?.toString().toLowerCase().includes(search) ||
+        exchange.client?.firstName?.toLowerCase().includes(search) ||
+        exchange.client?.lastName?.toLowerCase().includes(search)
+      );
       console.log('Applying enhanced search filter:', search);
       const initialLength = filtered.length;
       filtered = filtered.filter(exchange => {
@@ -1371,12 +1460,17 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
           `#${exchange.exchangeNumber}`, // Allow searching with # prefix
           exchange.id?.toString(),
           ex.exchangeId?.toString(),
+          ex.exchange_number?.toString(), // Legacy field
           ex.pp_display_name,
+          ex.pp_matter_number,
           ex.client_name,
           `${ex.client?.firstName || ''} ${ex.client?.lastName || ''}`.trim(),
+          `${ex.client?.first_name || ''} ${ex.client?.last_name || ''}`.trim(),
           ex.client?.email,
           ex.client?.phone,
+          ex.client?.company,
           ex.coordinator?.name,
+          `${ex.coordinator?.first_name || ''} ${ex.coordinator?.last_name || ''}`.trim(),
           ex.coordinator?.email,
           ex.escrowOfficer?.name,
           ex.attorney?.name,
@@ -1399,9 +1493,19 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
         );
         
         // Special handling for exchange number search
-        if (!matches && /^\d+$/.test(search)) {
-          // If search is purely numeric, try exact exchange number match
-          return exchange.exchangeNumber?.toString() === search;
+        if (!matches) {
+          // Try partial exchange number match (allows typing partial numbers)
+          if (/^\d+$/.test(search)) {
+            const exchangeNum = exchange.exchangeNumber?.toString() || 
+                              ex.exchange_number?.toString() || '';
+            return exchangeNum.includes(search);
+          }
+          
+          // Try searching with page number format
+          if (search.startsWith('page ')) {
+            const pageNum = search.replace('page ', '');
+            return exchange.exchangeNumber?.toString().includes(pageNum);
+          }
         }
         
         return matches;
@@ -1845,9 +1949,9 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
             </div>
             <div className="text-center">
               <div className="text-lg font-bold text-gray-900">
-                {statsLoading ? '...' : `$${(overallStats.totalValue / 1000000).toFixed(1)}M`}
+                {statsLoading ? '...' : `$${(overallStats.totalFundsOnDeposit / 1000000).toFixed(1)}M`}
               </div>
-              <div className="text-xs text-gray-600">Total Value</div>
+              <div className="text-xs text-gray-600">Total Funds on Deposit</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-gray-900">
@@ -2860,7 +2964,10 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
                       )}
                       {selectedFields.includes('client') && (
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {exchange.client?.firstName} {exchange.client?.lastName}
+                          <ClickableUserName 
+                            userName={`${exchange.client?.firstName || ''} ${exchange.client?.lastName || ''}`.trim() || 'Not assigned'}
+                            email={exchange.client?.email}
+                          />
                     </td>
                       )}
                       {selectedFields.includes('value') && (
@@ -3070,14 +3177,20 @@ export const ExchangeList: React.FC<ExchangeListProps> = React.memo(({
                       {selectedFields.includes('attorney') && (
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           <div className="max-w-32 truncate">
-                            {(exchange as any).professionals?.attorney?.name || (exchange as any).attorneyName || 'Not assigned'}
+                            <ClickableUserName 
+                              userName={(exchange as any).professionals?.attorney?.name || (exchange as any).attorneyName || 'Not assigned'}
+                              email={(exchange as any).professionals?.attorney?.email || (exchange as any).attorneyEmail}
+                            />
                           </div>
                         </td>
                       )}
                       {selectedFields.includes('realtor') && (
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           <div className="max-w-32 truncate">
-                            {(exchange as any).professionals?.realtor?.name || (exchange as any).realtorName || 'Not assigned'}
+                            <ClickableUserName 
+                              userName={(exchange as any).professionals?.realtor?.name || (exchange as any).realtorName || 'Not assigned'}
+                              email={(exchange as any).professionals?.realtor?.email || (exchange as any).realtorEmail}
+                            />
                           </div>
                         </td>
                       )}

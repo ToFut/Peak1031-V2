@@ -31,7 +31,8 @@ import {
   Settings,
   ChevronDown,
   ChevronUp,
-  ArrowRight
+  ArrowRight,
+  DollarSign
 } from 'lucide-react';
 
 interface QuickActionsProps {
@@ -217,6 +218,62 @@ export const ExchangeQuickActions: React.FC<QuickActionsProps> = React.memo(({
       setIsLoading(null);
     }
   }, [isOverdue, isCritical, exchange.exchangeNumber, exchange.id, participants, onRefresh]);
+
+  const handleSendAccountStatement = useCallback(async () => {
+    setIsLoading('account-statement');
+    try {
+      // Generate account statement PDF
+      const response = await apiService.get(`/exchanges/${exchange.id}/generate-document?type=account-statement`);
+      
+      // Send to all participants
+      await apiService.post(`/exchanges/${exchange.id}/notifications`, {
+        type: 'account_statement',
+        message: `Account statement for Exchange ${exchange.exchangeNumber || exchange.id} is now available.`,
+        recipients: participants.map(p => p.user?.email || p.email).filter(Boolean),
+        attachmentUrl: response.data?.url
+      });
+      
+      alert('Account statement sent to all participants');
+    } catch (error) {
+      console.error('Failed to send account statement:', error);
+      alert('Failed to send account statement');
+    } finally {
+      setIsLoading(null);
+    }
+  }, [exchange.id, exchange.exchangeNumber, participants]);
+
+  const [showPartySelector, setShowPartySelector] = useState(false);
+  const [selectedParties, setSelectedParties] = useState<string[]>([]);
+
+  const handleSendProofOfFunds = useCallback(async () => {
+    if (selectedParties.length === 0) {
+      setShowPartySelector(true);
+      return;
+    }
+
+    setIsLoading('proof-of-funds');
+    try {
+      // Generate proof of funds document
+      const response = await apiService.get(`/exchanges/${exchange.id}/generate-document?type=proof-of-funds`);
+      
+      // Send to selected parties
+      await apiService.post(`/exchanges/${exchange.id}/notifications`, {
+        type: 'proof_of_funds',
+        message: `Proof of funds for Exchange ${exchange.exchangeNumber || exchange.id} is attached.`,
+        recipients: selectedParties,
+        attachmentUrl: response.data?.url
+      });
+      
+      alert(`Proof of funds sent to ${selectedParties.length} recipient(s)`);
+      setSelectedParties([]);
+      setShowPartySelector(false);
+    } catch (error) {
+      console.error('Failed to send proof of funds:', error);
+      alert('Failed to send proof of funds');
+    } finally {
+      setIsLoading(null);
+    }
+  }, [exchange.id, exchange.exchangeNumber, selectedParties]);
 
   // Memoize quick actions to prevent recalculation
   const quickActions = useMemo((): QuickAction[] => {
@@ -415,6 +472,24 @@ export const ExchangeQuickActions: React.FC<QuickActionsProps> = React.memo(({
         variant: 'secondary',
         onClick: handleSendReminder
       });
+
+      actions.push({
+        id: 'account-statement',
+        label: 'Send Account Statement',
+        description: 'Generate and send account statement to all participants',
+        icon: FileText,
+        variant: 'primary',
+        onClick: handleSendAccountStatement
+      });
+
+      actions.push({
+        id: 'proof-of-funds',
+        label: 'Send Proof of Funds',
+        description: 'Generate and send proof of funds to selected parties',
+        icon: DollarSign,
+        variant: 'primary',
+        onClick: handleSendProofOfFunds
+      });
     }
 
     return actions.slice(0, 6); // Limit to 6 actions to avoid overwhelming UI
@@ -511,6 +586,7 @@ export const ExchangeQuickActions: React.FC<QuickActionsProps> = React.memo(({
   );
 
   return (
+    <>
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
       {/* Clickable Header */}
       <div 
@@ -722,6 +798,65 @@ export const ExchangeQuickActions: React.FC<QuickActionsProps> = React.memo(({
         </div>
       </div>
     </div>
+
+    {/* Party Selector Modal */}
+    {showPartySelector && (
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full">
+          <h3 className="text-lg font-semibold mb-4">Select Recipients for Proof of Funds</h3>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {participants.map((participant) => {
+              const email = participant.user?.email || participant.email;
+              const name = participant.user?.firstName ? 
+                `${participant.user.firstName} ${participant.user.lastName}` : 
+                participant.name || email;
+              
+              if (!email) return null;
+              
+              return (
+                <label key={participant.id} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    value={email}
+                    checked={selectedParties.includes(email)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedParties([...selectedParties, email]);
+                      } else {
+                        setSelectedParties(selectedParties.filter(p => p !== email));
+                      }
+                    }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm">
+                    {name} <span className="text-gray-500">({participant.role})</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <div className="mt-4 flex justify-end space-x-2">
+            <button
+              onClick={() => {
+                setShowPartySelector(false);
+                setSelectedParties([]);
+              }}
+              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSendProofOfFunds}
+              disabled={selectedParties.length === 0}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Send to {selectedParties.length} Recipient(s)
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 });
 

@@ -544,6 +544,25 @@ class PracticePartnerService {
   }
 
   /**
+   * Fetch individual matter with complete details including custom fields
+   */
+  async fetchMatterDetails(matterId) {
+    console.log(`🔍 PP: Fetching complete details for matter ${matterId}...`);
+    
+    try {
+      const response = await this.client.get(`/matters/${matterId}`);
+      const matter = response.data;
+      
+      console.log(`✅ PP: Fetched complete matter data for ${matterId} with ${matter.custom_field_values?.length || 0} custom fields`);
+      
+      return matter;
+    } catch (error) {
+      console.error(`❌ PP: Error fetching matter details for ${matterId}:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Transform PP contact to our database format
    */
   transformContact(ppContact) {
@@ -570,32 +589,74 @@ class PracticePartnerService {
   }
 
   /**
-   * Transform PP matter to our exchange format
+   * Transform PP matter to our exchange format with comprehensive custom field mapping
    */
   transformMatter(ppMatter) {
+    // Helper function to get PP custom field value
+    const getPPValue = (label) => {
+      if (!ppMatter.custom_field_values) return null;
+      const field = ppMatter.custom_field_values.find(f => f.custom_field_ref.label === label);
+      if (!field) return null;
+      return field.value_string || field.value_number || field.value_date_time || 
+             (field.contact_ref ? field.contact_ref.display_name : field.value_boolean) || null;
+    };
+
     return {
       pp_matter_id: ppMatter.id.toString(),
       name: ppMatter.name || ppMatter.description || 'Unnamed Exchange',
       exchange_name: ppMatter.name || ppMatter.description || 'Unnamed Exchange',
       status: this.mapMatterStatus(ppMatter.status),
-      new_status: this.mapMatterStatusToNew(ppMatter.status),
       exchange_type: this.mapExchangeType(ppMatter.type || ppMatter.matter_type),
       client_id: ppMatter.client_id ? this.findClientByPPId(ppMatter.client_id) : null,
       start_date: ppMatter.opened_date || new Date().toISOString(),
       completion_date: ppMatter.closed_date || null,
       exchange_value: ppMatter.value || null,
-      relinquished_property_address: ppMatter.relinquished_address || ppMatter.property_address || null,
-      relinquished_sale_price: ppMatter.relinquished_price || ppMatter.sale_price || null,
-      relinquished_closing_date: ppMatter.relinquished_closing || ppMatter.closing_date || null,
-      identification_date: ppMatter.identification_date || ppMatter.id_deadline || null,
+      
+      // Basic property information - map to existing columns
+      property_sold_address: ppMatter.relinquished_address || ppMatter.property_address || null,
+      property_sold_value: ppMatter.relinquished_price || ppMatter.sale_price || null,
       identification_deadline: ppMatter.identification_date || ppMatter.id_deadline || null,
       exchange_deadline: ppMatter.exchange_deadline || ppMatter.completion_deadline || null,
-      completion_deadline: ppMatter.exchange_deadline || ppMatter.completion_deadline || null,
-      exchange_coordinator: ppMatter.coordinator || ppMatter.assigned_attorney || null,
-      attorney_or_cpa: ppMatter.attorney || ppMatter.cpa || ppMatter.professional || null,
-      bank_account_escrow: ppMatter.escrow_account || ppMatter.trust_account || null,
+      coordinator_id: ppMatter.coordinator || ppMatter.assigned_attorney || null,
+      primary_attorney_id: ppMatter.attorney || ppMatter.cpa || ppMatter.professional || null,
       notes: ppMatter.description || ppMatter.notes || null,
+      
+      // PP-specific fields from basic data
+      pp_display_name: ppMatter.display_name || ppMatter.name,
+      pp_matter_number: ppMatter.number,
+      pp_matter_status: ppMatter.status,
+      pp_responsible_attorney: ppMatter.assigned_to_users?.[0]?.display_name,
+      
+      // Map PP custom fields to database columns
+      type_of_exchange: getPPValue('Exchange Type'),
+      client_vesting: getPPValue('Client Vesting'), 
+      bank: getPPValue('Banking Institution'),
+      proceeds: getPPValue('Proceeds') || getPPValue('Exchange Proceeds'),
+      day_45: getPPValue('Day 45'),
+      day_180: getPPValue('Day 180'), 
+      rel_property_address: getPPValue('Rel Property Address'),
+      rel_value: getPPValue('Rel Value') || getPPValue('Relinquished Value'),
+      rel_apn: getPPValue('Rel APN'),
+      rel_escrow_number: getPPValue('Rel Escrow Number'),
+      rel_contract_date: getPPValue('Rel Contract Date'),
+      close_of_escrow_date: getPPValue('Close of Escrow Date'),
+      rep_1_property_address: getPPValue('Rep 1 Property Address'),
+      rep_1_value: getPPValue('Rep 1 Value') || getPPValue('Replacement Value'),
+      rep_1_apn: getPPValue('Rep 1 APN'),
+      rep_1_escrow_number: getPPValue('Rep 1 Escrow Number'),
+      rep_1_purchase_contract_date: getPPValue('Rep 1 Purchase Contract Date'),
+      rep_1_seller_1_name: getPPValue('Rep 1 Seller 1 Name'),
+      rep_1_seller_2_name: getPPValue('Rep 1 Seller 2 Name'),
+      buyer_1_name: getPPValue('Buyer 1 Name'),
+      buyer_2_name: getPPValue('Buyer 2 Name'),
+      
+      // Map to existing columns that we know exist
+      rel_purchase_contract_title: getPPValue('Rel Purchase Contract Title'),
+      rep_1_purchase_contract_title: getPPValue('Rep 1 Purchase Contract Title'),
+      
+      // Store complete PP data for component access
       pp_data: ppMatter,
+      pp_raw_data: ppMatter, // Also store in raw_data for backup
       last_sync_at: new Date().toISOString(),
       created_at: ppMatter.created_at || new Date().toISOString(),
       updated_at: ppMatter.updated_at || new Date().toISOString()
@@ -867,7 +928,19 @@ class PracticePartnerService {
    */
   async syncMatter(ppMatter) {
     try {
-      const exchangeData = this.transformMatter(ppMatter);
+      // Fetch complete matter details with custom fields if we only have basic data
+      let completeMatter = ppMatter;
+      if (!ppMatter.custom_field_values || ppMatter.custom_field_values.length === 0) {
+        console.log(`🔍 Fetching complete details for matter ${ppMatter.id} (has ${ppMatter.custom_field_values?.length || 0} custom fields)`);
+        try {
+          completeMatter = await this.fetchMatterDetails(ppMatter.id);
+        } catch (error) {
+          console.warn(`⚠️  Could not fetch complete details for matter ${ppMatter.id}, using basic data:`, error.message);
+          completeMatter = ppMatter; // Fallback to basic data
+        }
+      }
+      
+      const exchangeData = this.transformMatter(completeMatter);
       
       // Resolve client_id if we have pp_contact_id
       if (ppMatter.client_id) {
@@ -1570,6 +1643,85 @@ class PracticePartnerService {
       return data || [];
     } catch (error) {
       console.error('Error getting sync status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Re-extract PP data to individual columns for existing exchanges
+   * Useful for fixing exchanges with pp_data but empty individual fields
+   */
+  async reExtractExchangeData(exchangeId = null) {
+    console.log('🔄 Re-extracting PP data to individual columns...');
+    
+    try {
+      let query = this.supabase
+        .from('exchanges')
+        .select('id, pp_matter_id, pp_data')
+        .not('pp_data', 'eq', '{}')
+        .not('pp_data', 'is', null);
+        
+      if (exchangeId) {
+        query = query.eq('id', exchangeId);
+      }
+      
+      const { data: exchanges, error } = await query;
+      
+      if (error) {
+        throw error;
+      }
+      
+      console.log(`📊 Found ${exchanges.length} exchanges with PP data to re-extract`);
+      
+      const results = [];
+      
+      for (const exchange of exchanges) {
+        try {
+          // Use the same transformation logic as new syncs
+          const extractedData = this.transformMatter(exchange.pp_data);
+          
+          // Only update the individual field columns, keep existing pp_data
+          const updateData = { ...extractedData };
+          delete updateData.pp_data; // Don't overwrite existing pp_data
+          delete updateData.pp_raw_data; // Don't overwrite existing pp_raw_data
+          delete updateData.pp_matter_id; // Don't change the matter ID
+          
+          // Update the exchange
+          const { data, error: updateError } = await this.supabase
+            .from('exchanges')
+            .update(updateData)
+            .eq('id', exchange.id)
+            .select();
+            
+          if (updateError) {
+            console.error(`❌ Error updating exchange ${exchange.id}:`, updateError);
+            results.push({ id: exchange.id, action: 'error', error: updateError.message });
+          } else {
+            console.log(`✅ Updated exchange ${exchange.id} (Matter: ${exchange.pp_matter_id})`);
+            results.push({ id: exchange.id, action: 'updated' });
+          }
+        } catch (error) {
+          console.error(`❌ Error processing exchange ${exchange.id}:`, error);
+          results.push({ id: exchange.id, action: 'error', error: error.message });
+        }
+      }
+      
+      const stats = {
+        processed: results.length,
+        updated: results.filter(r => r.action === 'updated').length,
+        errors: results.filter(r => r.action === 'error').length
+      };
+      
+      console.log('📊 Re-extraction completed:', stats);
+      
+      return {
+        success: true,
+        statistics: stats,
+        results
+      };
+      
+    } catch (error) {
+      console.error('❌ Re-extraction failed:', error);
       throw error;
     }
   }

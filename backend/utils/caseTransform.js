@@ -48,9 +48,21 @@ function transformToCamelCase(obj) {
   if (typeof obj === 'object') {
     const transformed = {};
     
+    // List of PP fields that should NOT be converted to camelCase
+    const preserveSnakeCase = [
+      'day_45', 'day_180', 'client_vesting', 'bank', 'proceeds',
+      'rel_property_address', 'rel_escrow_number', 'rel_value', 'rel_apn',
+      'type_of_exchange', 'buyer_vesting', 'buyer_1_name', 'buyer_2_name',
+      'rep_1_property_address', 'rep_1_value', 'rep_1_seller_1_name',
+      'rep_1_seller_2_name', 'rep_1_apn', 'rep_1_escrow_number',
+      'rep_1_purchase_contract_date', 'referral_source', 'referral_source_email',
+      'pp_display_name', 'pp_matter_number', 'pp_matter_status', 'pp_responsible_attorney'
+    ];
+    
     for (const [key, value] of Object.entries(obj)) {
-      const camelKey = snakeToCamel(key);
-      transformed[camelKey] = transformToCamelCase(value);
+      // Preserve snake_case for PP fields, convert others to camelCase
+      const transformedKey = preserveSnakeCase.includes(key) ? key : snakeToCamel(key);
+      transformed[transformedKey] = transformToCamelCase(value);
     }
     
     return transformed;

@@ -159,6 +159,22 @@ const EnterpriseParticipantsManager: React.FC<EnterpriseParticipantsManagerProps
       permissions: ['view', 'message', 'upload']
     },
     { 
+      value: 'settlement_agent', 
+      label: 'Settlement Agent', 
+      icon: '🏦', 
+      color: 'bg-purple-100 text-purple-800',
+      description: 'Settlement company representative managing property closing',
+      permissions: ['view', 'message', 'upload', 'download']
+    },
+    { 
+      value: 'escrow_officer', 
+      label: 'Escrow Officer', 
+      icon: '🏛️', 
+      color: 'bg-indigo-100 text-indigo-800',
+      description: 'Escrow company officer handling funds and documents',
+      permissions: ['view', 'message', 'upload', 'download']
+    },
+    { 
       value: 'participant', 
       label: 'General Participant', 
       icon: '👥',

@@ -39,6 +39,7 @@ interface UserFormData {
 const UserManagement: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
+  const [contacts, setContacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -46,6 +47,7 @@ const UserManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all'); // New: users, contacts, or all
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
@@ -75,11 +77,44 @@ const UserManagement: React.FC = () => {
     { value: 'inactive', label: 'Inactive' }
   ];
 
+  const typeOptions = [
+    { value: 'all', label: 'All (Users & Contacts)' },
+    { value: 'users', label: 'Users Only' },
+    { value: 'contacts', label: 'Contacts Only' }
+  ];
+
   useEffect(() => {
     loadUsers();
-  }, [currentPage, roleFilter, statusFilter, searchTerm]);
+    loadContacts();
+  }, [currentPage, roleFilter, statusFilter, searchTerm, typeFilter]);
+
+  const loadContacts = async () => {
+    if (typeFilter === 'users') return; // Skip if only showing users
+    
+    try {
+      const response = await apiService.getContacts({
+        search: searchTerm || undefined,
+        limit: 500 // Increased limit to ensure all contacts are loaded
+      });
+      
+      console.log('📋 Contacts API response:', response);
+      // Handle the response structure - it could be an array or an object with contacts/data property
+      let contactsData: any[] = [];
+      if (Array.isArray(response)) {
+        contactsData = response;
+      } else if (response && typeof response === 'object') {
+        contactsData = (response as any).contacts || (response as any).data || [];
+      }
+      setContacts(contactsData);
+    } catch (error) {
+      console.error('Failed to load contacts:', error);
+      setContacts([]);
+    }
+  };
 
   const loadUsers = async () => {
+    if (typeFilter === 'contacts') return; // Skip if only showing contacts
+    
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -267,6 +302,71 @@ const UserManagement: React.FC = () => {
     setSelectedUser(null);
   };
 
+  // Combine users and contacts into a single display dataset with filtering
+  const getCombinedData = () => {
+    const combinedData: any[] = [];
+    
+    // Add users with type flag
+    if (typeFilter === 'all' || typeFilter === 'users') {
+      // Don't filter users here since the API already does the search
+      // The backend filters when we pass searchTerm to loadUsers
+      let filteredUsers = users;
+      
+      // Apply role filter (only for users)
+      if (roleFilter !== 'all') {
+        filteredUsers = filteredUsers.filter(user => user.role === roleFilter);
+      }
+      
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        filteredUsers = filteredUsers.filter(user => 
+          statusFilter === 'active' ? user.is_active : !user.is_active
+        );
+      }
+      
+      filteredUsers.forEach(user => {
+        combinedData.push({
+          ...user,
+          _type: 'user',
+          _displayName: `${user.first_name} ${user.last_name}`,
+          _email: user.email,
+          _phone: (user as any).phone,
+          _status: user.is_active ? 'active' : 'inactive'
+        });
+      });
+    }
+    
+    // Add contacts with type flag
+    if (typeFilter === 'all' || typeFilter === 'contacts') {
+      // Don't filter contacts here since the API already does the search
+      // The backend filters when we pass searchTerm to loadContacts
+      let filteredContacts = contacts;
+      
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        filteredContacts = filteredContacts.filter(contact => {
+          const contactStatus = contact.status || 'active';
+          return statusFilter === 'active' ? contactStatus === 'active' : contactStatus !== 'active';
+        });
+      }
+      
+      filteredContacts.forEach(contact => {
+        combinedData.push({
+          ...contact,
+          _type: 'contact',
+          _displayName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unnamed Contact',
+          _email: contact.email,
+          _phone: contact.phone,
+          _status: contact.status || 'active'
+        });
+      });
+    }
+    
+    return combinedData;
+  };
+  
+  const combinedData = getCombinedData();
+
   const exportUsers = () => {
     const csv = [
       ['Email', 'First Name', 'Last Name', 'Role', 'Phone', 'Status', 'Created At', 'Last Login'].join(','),
@@ -390,6 +490,12 @@ const UserManagement: React.FC = () => {
               onChange={setStatusFilter}
               className="w-48"
             />
+            <ModernDropdown
+              options={typeOptions}
+              value={typeFilter}
+              onChange={setTypeFilter}
+              className="w-48"
+            />
           </div>
         </div>
       </ModernCard>
@@ -422,8 +528,8 @@ const UserManagement: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
+              {combinedData.map((item) => (
+                <tr key={`${item._type}-${item.id}`} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10">
@@ -432,107 +538,126 @@ const UserManagement: React.FC = () => {
                         </div>
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {user.first_name} {user.last_name}
+                        <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                          {item._displayName}
+                          {item._type === 'contact' && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              Contact
+                            </span>
+                          )}
                         </div>
                         <div className="text-sm text-gray-500 flex items-center gap-2">
                           <EnvelopeIcon className="h-4 w-4" />
-                          {user.email}
+                          {item._email}
                         </div>
-                        {(user as any).phone && (
+                        {item._phone && (
                           <div className="text-sm text-gray-500 flex items-center gap-2">
                             <PhoneIcon className="h-4 w-4" />
-                            {(user as any).phone}
+                            {item._phone}
                           </div>
                         )}
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <StatusBadge
-                      status={getRoleDisplayName(user.role)}
-                    />
-                    {user.two_fa_enabled && (
-                      <div className="mt-1">
-                        <span className="inline-flex items-center gap-1 text-xs text-green-700">
-                          <ShieldCheckIcon className="h-3 w-3" />
-                          2FA
-                        </span>
-                      </div>
+                    {item._type === 'user' ? (
+                      <>
+                        <StatusBadge
+                          status={getRoleDisplayName(item.role)}
+                        />
+                        {item.two_fa_enabled && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 text-xs text-green-700">
+                              <ShieldCheckIcon className="h-3 w-3" />
+                              2FA
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <StatusBadge status="PP Contact" />
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StatusBadge
-                      status={user.is_active ? 'Active' : 'Inactive'}
+                      status={item._status === 'active' ? 'Active' : 'Inactive'}
                     />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(user.created_at).toLocaleDateString()}
+                    {item._type === 'user' && item.created_at 
+                      ? new Date(item.created_at).toLocaleDateString() 
+                      : item._type === 'contact' ? 'PP Import' : 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}
+                    {item._type === 'user' && item.last_login 
+                      ? new Date(item.last_login).toLocaleDateString() 
+                      : item._type === 'user' ? 'Never' : 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => openEditModal(user)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Edit user"
-                      >
-                        <PencilSquareIcon className="h-5 w-5" />
-                      </button>
-                      {user.id !== currentUser?.id && (
-                        <>
-                          {user.is_active ? (
+                    {item._type === 'user' ? (
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => openEditModal(item)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Edit user"
+                        >
+                          <PencilSquareIcon className="h-5 w-5" />
+                        </button>
+                        {item.id !== currentUser?.id && (
+                          <>
+                            {item.is_active ? (
+                              <button
+                                onClick={() => handleDeactivateUser(item.id)}
+                                className="text-yellow-600 hover:text-yellow-900"
+                                title="Deactivate user"
+                              >
+                                <XMarkIcon className="h-5 w-5" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleActivateUser(item.id)}
+                                className="text-green-600 hover:text-green-900"
+                                title="Activate user"
+                              >
+                                <CheckIcon className="h-5 w-5" />
+                              </button>
+                            )}
                             <button
-                              onClick={() => handleDeactivateUser(user.id)}
-                              className="text-yellow-600 hover:text-yellow-900"
-                              title="Deactivate user"
+                              onClick={() => handleDeleteUser(item.id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Delete user"
                             >
-                              <XMarkIcon className="h-5 w-5" />
+                              <TrashIcon className="h-5 w-5" />
                             </button>
-                          ) : (
-                            <button
-                              onClick={() => handleActivateUser(user.id)}
-                              className="text-green-600 hover:text-green-900"
-                              title="Activate user"
-                            >
-                              <CheckIcon className="h-5 w-5" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Delete user"
-                          >
-                            <TrashIcon className="h-5 w-5" />
-                          </button>
-                        </>
-                      )}
-                    </div>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-500">PP Contact</span>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
           
-          {users.length === 0 && (
+          {combinedData.length === 0 && (
             <div className="text-center py-12 text-gray-500">
-              No users found
+              No {typeFilter === 'users' ? 'users' : typeFilter === 'contacts' ? 'contacts' : 'users or contacts'} found
             </div>
           )}
         </div>
         ) : (
           /* Card View */
           <div className="p-6">
-            {users.length === 0 ? (
+            {combinedData.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
-                No users found
+                No {typeFilter === 'users' ? 'users' : typeFilter === 'contacts' ? 'contacts' : 'users or contacts'} found
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {users.map((user) => (
-                  <div key={user.id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+                {combinedData.map((item) => (
+                  <div key={`${item._type}-${item.id}`} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
                     {/* User Header */}
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center">
@@ -540,14 +665,19 @@ const UserManagement: React.FC = () => {
                           <UserIcon className="h-6 w-6 text-gray-500" />
                         </div>
                         <div className="ml-3">
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            {user.first_name} {user.last_name}
+                          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                            {item._displayName}
+                            {item._type === 'contact' && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                Contact
+                              </span>
+                            )}
                           </h3>
-                          <p className="text-sm text-gray-500">{user.email}</p>
+                          <p className="text-sm text-gray-500">{item._email}</p>
                         </div>
                       </div>
                       <StatusBadge
-                        status={user.is_active ? 'Active' : 'Inactive'}
+                        status={item._status === 'active' ? 'Active' : 'Inactive'}
                       />
                     </div>
 
@@ -556,32 +686,36 @@ const UserManagement: React.FC = () => {
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Role:</span>
                         <StatusBadge
-                          status={getRoleDisplayName(user.role)}
+                          status={item._type === 'user' ? getRoleDisplayName(item.role) : 'PP Contact'}
                         />
                       </div>
                       
-                      {(user as any).phone && (
+                      {item._phone && (
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-gray-600">Phone:</span>
-                          <span className="text-sm text-gray-900">{(user as any).phone}</span>
+                          <span className="text-sm text-gray-900">{item._phone}</span>
                         </div>
                       )}
                       
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Created:</span>
                         <span className="text-sm text-gray-900">
-                          {new Date(user.created_at).toLocaleDateString()}
+                          {item._type === 'user' && item.created_at
+                            ? new Date(item.created_at).toLocaleDateString()
+                            : item._type === 'contact' ? 'PP Import' : 'N/A'}
                         </span>
                       </div>
                       
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Last Login:</span>
                         <span className="text-sm text-gray-900">
-                          {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}
+                          {item._type === 'user' && item.last_login
+                            ? new Date(item.last_login).toLocaleDateString()
+                            : item._type === 'user' ? 'Never' : 'N/A'}
                         </span>
                       </div>
 
-                      {user.two_fa_enabled && (
+                      {item._type === 'user' && item.two_fa_enabled && (
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-gray-600">2FA:</span>
                           <span className="inline-flex items-center gap-1 text-xs text-green-700">
@@ -595,39 +729,45 @@ const UserManagement: React.FC = () => {
                     {/* Actions */}
                     <div className="mt-6 pt-4 border-t border-gray-100">
                       <div className="flex justify-between items-center">
-                        <button
-                          onClick={() => openEditModal(user)}
-                          className="text-blue-600 hover:text-blue-900 text-sm font-medium"
-                        >
-                          Edit
-                        </button>
-                        {user.id !== currentUser?.id && (
-                          <div className="flex gap-2">
-                            {user.is_active ? (
-                              <button
-                                onClick={() => handleDeactivateUser(user.id)}
-                                className="text-yellow-600 hover:text-yellow-900 text-sm"
-                                title="Deactivate user"
-                              >
-                                <XMarkIcon className="h-4 w-4" />
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleActivateUser(user.id)}
-                                className="text-green-600 hover:text-green-900 text-sm"
-                                title="Activate user"
-                              >
-                                <CheckIcon className="h-4 w-4" />
-                              </button>
-                            )}
+                        {item._type === 'user' ? (
+                          <>
                             <button
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="text-red-600 hover:text-red-900 text-sm"
-                              title="Delete user"
+                              onClick={() => openEditModal(item)}
+                              className="text-blue-600 hover:text-blue-900 text-sm font-medium"
                             >
-                              <TrashIcon className="h-4 w-4" />
+                              Edit
                             </button>
-                          </div>
+                            {item.id !== currentUser?.id && (
+                              <div className="flex gap-2">
+                                {item.is_active ? (
+                                  <button
+                                    onClick={() => handleDeactivateUser(item.id)}
+                                    className="text-yellow-600 hover:text-yellow-900 text-sm"
+                                    title="Deactivate user"
+                                  >
+                                    <XMarkIcon className="h-4 w-4" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleActivateUser(item.id)}
+                                    className="text-green-600 hover:text-green-900 text-sm"
+                                    title="Activate user"
+                                  >
+                                    <CheckIcon className="h-4 w-4" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleDeleteUser(item.id)}
+                                  className="text-red-600 hover:text-red-900 text-sm"
+                                  title="Delete user"
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-sm text-gray-500 font-medium">PP Contact - Read Only</span>
                         )}
                       </div>
                     </div>

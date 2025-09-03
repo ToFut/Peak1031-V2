@@ -509,6 +509,311 @@ class ExportService {
   }
 
   /**
+   * Generate Exchange Summary PDF
+   */
+  async generateExchangeSummaryPDF(exchange) {
+    const doc = new PDFDocument({ margin: 50 });
+    const chunks = [];
+    
+    doc.on('data', chunk => chunks.push(chunk));
+    
+    return new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      // Header
+      doc.fontSize(20).text('EXCHANGE SUMMARY', { align: 'center' });
+      doc.fontSize(12).text(`Exchange #${exchange.exchange_number || exchange.id}`, { align: 'center' });
+      doc.moveDown();
+
+      // Exchange Details
+      doc.fontSize(14).text('Exchange Information', { underline: true });
+      doc.fontSize(10);
+      doc.text(`Status: ${exchange.status}`);
+      doc.text(`Created: ${new Date(exchange.created_at).toLocaleDateString()}`);
+      doc.text(`Contract Value: $${(exchange.proceeds || 0).toLocaleString()}`);
+      doc.text(`Boot Received: $${(exchange.boot_received || 0).toLocaleString()}`);
+      doc.text(`Boot Paid: $${(exchange.boot_paid || 0).toLocaleString()}`);
+      doc.moveDown();
+
+      // Client Information
+      if (exchange.client_name) {
+        doc.fontSize(14).text('Client Information', { underline: true });
+        doc.fontSize(10);
+        doc.text(`Name: ${exchange.client_name}`);
+        doc.text(`Email: ${exchange.client_email || 'N/A'}`);
+        doc.text(`Phone: ${exchange.client_phone || 'N/A'}`);
+        doc.moveDown();
+      }
+
+      doc.end();
+    });
+  }
+
+  /**
+   * Generate Timeline PDF
+   */
+  async generateTimelinePDF(exchange) {
+    const doc = new PDFDocument({ margin: 50 });
+    const chunks = [];
+    
+    doc.on('data', chunk => chunks.push(chunk));
+    
+    return new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      doc.fontSize(20).text('EXCHANGE TIMELINE', { align: 'center' });
+      doc.fontSize(12).text(`Exchange #${exchange.exchange_number || exchange.id}`, { align: 'center' });
+      doc.moveDown();
+
+      // Add timeline events here
+      doc.fontSize(10);
+      doc.text(`Exchange Created: ${new Date(exchange.created_at).toLocaleDateString()}`);
+      if (exchange.identification_deadline) {
+        doc.text(`45-Day Identification: ${new Date(exchange.identification_deadline).toLocaleDateString()}`);
+      }
+      if (exchange.completion_deadline) {
+        doc.text(`180-Day Completion: ${new Date(exchange.completion_deadline).toLocaleDateString()}`);
+      }
+      
+      doc.end();
+    });
+  }
+
+  /**
+   * Generate Tax Documents PDF
+   */
+  async generateTaxDocumentsPDF(exchange) {
+    const doc = new PDFDocument({ margin: 50 });
+    const chunks = [];
+    
+    doc.on('data', chunk => chunks.push(chunk));
+    
+    return new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      doc.fontSize(20).text('TAX DOCUMENTS', { align: 'center' });
+      doc.fontSize(12).text(`Exchange #${exchange.exchange_number || exchange.id}`, { align: 'center' });
+      doc.moveDown();
+
+      doc.fontSize(14).text('1031 Exchange Tax Information', { underline: true });
+      doc.fontSize(10);
+      doc.text(`Exchange ID: ${exchange.id}`);
+      doc.text(`Tax Year: ${new Date(exchange.created_at).getFullYear()}`);
+      doc.text(`Relinquished Property Value: $${(exchange.rel_value || 0).toLocaleString()}`);
+      doc.text(`Replacement Property Value: $${(exchange.rep_value || 0).toLocaleString()}`);
+      doc.text(`Boot Received: $${(exchange.boot_received || 0).toLocaleString()}`);
+      doc.text(`Boot Paid: $${(exchange.boot_paid || 0).toLocaleString()}`);
+      
+      doc.end();
+    });
+  }
+
+  /**
+   * Generate Closing Statement PDF
+   */
+  async generateClosingStatementPDF(exchange) {
+    const doc = new PDFDocument({ margin: 50 });
+    const chunks = [];
+    
+    doc.on('data', chunk => chunks.push(chunk));
+    
+    return new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      doc.fontSize(20).text('CLOSING STATEMENT', { align: 'center' });
+      doc.fontSize(12).text(`Exchange #${exchange.exchange_number || exchange.id}`, { align: 'center' });
+      doc.moveDown();
+
+      doc.fontSize(14).text('Financial Summary', { underline: true });
+      doc.fontSize(10);
+      doc.text(`Total Proceeds: $${(exchange.proceeds || 0).toLocaleString()}`);
+      doc.text(`Boot Received: $${(exchange.boot_received || 0).toLocaleString()}`);
+      doc.text(`Boot Paid: $${(exchange.boot_paid || 0).toLocaleString()}`);
+      doc.text(`Net Exchange Value: $${((exchange.proceeds || 0) - (exchange.boot_received || 0) + (exchange.boot_paid || 0)).toLocaleString()}`);
+      doc.moveDown();
+
+      doc.fontSize(14).text('Exchange Details', { underline: true });
+      doc.fontSize(10);
+      doc.text(`Exchange Number: ${exchange.exchange_number || exchange.id}`);
+      doc.text(`Status: ${exchange.status}`);
+      doc.text(`Closed Date: ${exchange.completed_at ? new Date(exchange.completed_at).toLocaleDateString() : 'Pending'}`);
+      
+      doc.end();
+    });
+  }
+
+  /**
+   * Generate Full Exchange PDF
+   */
+  async generateFullExchangePDF(exchange) {
+    const doc = new PDFDocument({ margin: 50 });
+    const chunks = [];
+    
+    doc.on('data', chunk => chunks.push(chunk));
+    
+    return new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      // Title Page
+      doc.fontSize(24).text('1031 EXCHANGE REPORT', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(16).text(`Exchange #${exchange.exchange_number || exchange.id}`, { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(12).text(`Generated: ${new Date().toLocaleDateString()}`, { align: 'center' });
+      
+      // New page for content
+      doc.addPage();
+      
+      // Exchange Overview
+      doc.fontSize(16).text('Exchange Overview', { underline: true });
+      doc.fontSize(10);
+      doc.text(`Status: ${exchange.status}`);
+      doc.text(`Priority: ${exchange.priority || 'Normal'}`);
+      doc.text(`Created: ${new Date(exchange.created_at).toLocaleDateString()}`);
+      doc.text(`Progress: ${exchange.progress || 0}%`);
+      doc.moveDown();
+
+      // Financial Information
+      doc.fontSize(16).text('Financial Information', { underline: true });
+      doc.fontSize(10);
+      doc.text(`Contract Value: $${(exchange.proceeds || 0).toLocaleString()}`);
+      doc.text(`Boot Received: $${(exchange.boot_received || 0).toLocaleString()}`);
+      doc.text(`Boot Paid: $${(exchange.boot_paid || 0).toLocaleString()}`);
+      doc.text(`Net Exchange: $${((exchange.proceeds || 0) - (exchange.boot_received || 0) + (exchange.boot_paid || 0)).toLocaleString()}`);
+      doc.moveDown();
+
+      // Property Information
+      if (exchange.rel_property_address) {
+        doc.fontSize(16).text('Relinquished Property', { underline: true });
+        doc.fontSize(10);
+        doc.text(`Address: ${exchange.rel_property_address}`);
+        doc.text(`Value: $${(exchange.rel_value || 0).toLocaleString()}`);
+        doc.moveDown();
+      }
+
+      if (exchange.rep_1_property_address) {
+        doc.fontSize(16).text('Replacement Property', { underline: true });
+        doc.fontSize(10);
+        doc.text(`Address: ${exchange.rep_1_property_address}`);
+        doc.text(`Value: $${(exchange.rep_1_value || 0).toLocaleString()}`);
+        doc.moveDown();
+      }
+
+      // Participants
+      doc.fontSize(16).text('Participants', { underline: true });
+      doc.fontSize(10);
+      doc.text(`Client: ${exchange.client_name || 'N/A'}`);
+      doc.text(`Coordinator: ${exchange.coordinator_name || 'N/A'}`);
+      
+      doc.end();
+    });
+  }
+
+  /**
+   * Generate Account Statement PDF
+   */
+  async generateAccountStatementPDF(exchange) {
+    const doc = new PDFDocument({ margin: 50 });
+    const chunks = [];
+    
+    doc.on('data', chunk => chunks.push(chunk));
+    
+    return new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      // Header
+      doc.fontSize(20).text('ACCOUNT STATEMENT', { align: 'center' });
+      doc.fontSize(12).text(`Exchange #${exchange.exchange_number || exchange.id}`, { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(10).text(`Statement Date: ${new Date().toLocaleDateString()}`, { align: 'center' });
+      doc.moveDown();
+
+      // Account Summary
+      doc.fontSize(14).text('Account Summary', { underline: true });
+      doc.fontSize(10);
+      doc.text(`Exchange Number: ${exchange.exchange_number || exchange.id}`);
+      doc.text(`Client: ${exchange.client_name || 'N/A'}`);
+      doc.text(`Status: ${exchange.status}`);
+      doc.moveDown();
+
+      // Financial Summary
+      doc.fontSize(14).text('Financial Summary', { underline: true });
+      doc.fontSize(10);
+      doc.text(`Opening Balance: $${(exchange.proceeds || 0).toLocaleString()}`);
+      doc.text(`Boot Received: $${(exchange.boot_received || 0).toLocaleString()}`);
+      doc.text(`Boot Paid: $${(exchange.boot_paid || 0).toLocaleString()}`);
+      doc.text(`Current Balance: $${((exchange.proceeds || 0) - (exchange.boot_received || 0) + (exchange.boot_paid || 0)).toLocaleString()}`);
+      doc.moveDown();
+
+      // Transaction History (placeholder for future implementation)
+      doc.fontSize(14).text('Transaction History', { underline: true });
+      doc.fontSize(10);
+      doc.text('Date       | Description                | Amount        | Balance');
+      doc.text('--------------------------------------------------------------');
+      doc.text(`${new Date(exchange.created_at).toLocaleDateString()} | Initial Deposit            | $${(exchange.proceeds || 0).toLocaleString()} | $${(exchange.proceeds || 0).toLocaleString()}`);
+      
+      doc.end();
+    });
+  }
+
+  /**
+   * Generate Proof of Funds PDF
+   */
+  async generateProofOfFundsPDF(exchange) {
+    const doc = new PDFDocument({ margin: 50 });
+    const chunks = [];
+    
+    doc.on('data', chunk => chunks.push(chunk));
+    
+    return new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      // Header
+      doc.fontSize(20).text('PROOF OF FUNDS', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(10).text(`Date: ${new Date().toLocaleDateString()}`, { align: 'center' });
+      doc.moveDown();
+
+      // Letter Content
+      doc.fontSize(12);
+      doc.text('To Whom It May Concern,');
+      doc.moveDown();
+      
+      doc.text(`This letter serves as proof that funds in the amount of $${(exchange.proceeds || 0).toLocaleString()} are currently held in a Qualified Intermediary account for Exchange #${exchange.exchange_number || exchange.id}.`);
+      doc.moveDown();
+      
+      doc.text('These funds are designated for the completion of a 1031 tax-deferred exchange pursuant to Section 1031 of the Internal Revenue Code.');
+      doc.moveDown();
+
+      // Fund Details
+      doc.fontSize(14).text('Fund Details:', { underline: true });
+      doc.fontSize(10);
+      doc.text(`Exchange Number: ${exchange.exchange_number || exchange.id}`);
+      doc.text(`Exchanger: ${exchange.client_name || 'N/A'}`);
+      doc.text(`Funds Available: $${(exchange.proceeds || 0).toLocaleString()}`);
+      doc.text(`Date Funds Received: ${exchange.date_proceeds_received ? new Date(exchange.date_proceeds_received).toLocaleDateString() : 'N/A'}`);
+      doc.moveDown();
+
+      doc.fontSize(12);
+      doc.text('These funds are held in accordance with all applicable regulations and are available for the acquisition of replacement property as part of the exchange.');
+      doc.moveDown();
+      
+      doc.text('Sincerely,');
+      doc.moveDown();
+      doc.text('Peak 1031 Exchange Services');
+      
+      doc.end();
+    });
+  }
+
+  /**
    * Calculate exchange statistics
    */
   calculateExchangeStats(exchanges) {

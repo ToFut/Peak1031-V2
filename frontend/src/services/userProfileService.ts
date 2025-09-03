@@ -23,6 +23,12 @@ export interface RecentExchange {
   updatedAt: string;
   propertyAddress?: string;
   exchangeType?: string;
+  // Additional properties used in UserProfile component
+  client_name?: string;
+  stage?: string;
+  pp_matter_id?: string;
+  assigned_at?: string;
+  participant_role?: string;
 }
 
 export interface MonthlyActivity {
@@ -45,6 +51,16 @@ export interface UserInfo {
   last_login?: string; // Backend compatibility
   createdAt?: string;
   created_at?: string; // Backend compatibility
+  // Additional properties used in UserProfile component
+  assigned_exchanges?: Array<any>;
+  phone?: string;
+  total_exchanges?: number;
+  contact_type?: string;
+  company?: string;
+  last_exchange_assignment?: string;
+  pp_contact_id?: string;
+  pp_user_id?: string;
+  pp_synced_at?: string;
 }
 
 export interface AuditActivity {

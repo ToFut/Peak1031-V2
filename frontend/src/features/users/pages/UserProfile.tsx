@@ -329,6 +329,109 @@ const UserProfile: React.FC = () => {
             </button>
         </div>
 
+      {/* Contact Details Card - Enhanced */}
+      {(profile.user.role === 'client' || profile.user.role === 'third_party') && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+              <UserIcon className="h-5 w-5 mr-2 text-blue-600" />
+              Contact Details
+            </h3>
+            {profile.user.assigned_exchanges && profile.user.assigned_exchanges.length > 0 && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                {profile.user.assigned_exchanges.length} Exchange{profile.user.assigned_exchanges.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Basic Info */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-500 uppercase tracking-wide">Contact Name</label>
+                <p className="text-lg font-semibold text-gray-900">
+                  {profile.user.first_name} {profile.user.last_name}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 uppercase tracking-wide">Email</label>
+                <p className="text-gray-900">{profile.user.email}</p>
+              </div>
+              {profile.user.phone && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wide">Phone</label>
+                  <p className="text-gray-900">{profile.user.phone}</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Exchange Assignment Info */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-500 uppercase tracking-wide">Status</label>
+                <p className="text-gray-900 capitalize">
+                  {profile.user.is_active ? 'Active' : 'Inactive'}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 uppercase tracking-wide">Role</label>
+                <p className="text-gray-900">{UserProfileService.formatRole(profile.user.role)}</p>
+              </div>
+              {(profile.user.total_exchanges ?? 0) > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wide">Total Exchanges</label>
+                  <p className="text-lg font-semibold text-blue-600">{profile.user.total_exchanges}</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Additional Details */}
+            <div className="space-y-3">
+              {profile.user.contact_type && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wide">Contact Type</label>
+                  <p className="text-gray-900 capitalize">{profile.user.contact_type.replace('_', ' ')}</p>
+                </div>
+              )}
+              {profile.user.company && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wide">Company</label>
+                  <p className="text-gray-900">{profile.user.company}</p>
+                </div>
+              )}
+              <div>
+                <label className="text-sm font-medium text-gray-500 uppercase tracking-wide">Last Assignment</label>
+                <p className="text-gray-900">
+                  {profile.user.last_exchange_assignment 
+                    ? new Date(profile.user.last_exchange_assignment).toLocaleDateString()
+                    : 'Never'
+                  }
+                </p>
+              </div>
+              
+              {/* PracticePanther Integration */}
+              {(profile.user.pp_contact_id || profile.user.pp_user_id) && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wide">PracticePanther</label>
+                  <div className="flex items-center space-x-2">
+                    <div className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                      <span className="font-mono">
+                        {profile.user.pp_contact_id ? `Contact #${profile.user.pp_contact_id}` : `User #${profile.user.pp_user_id}`}
+                      </span>
+                    </div>
+                    {profile.user.pp_synced_at && (
+                      <span className="text-xs text-gray-500">
+                        Synced {new Date(profile.user.pp_synced_at).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <EnhancedStatCard
@@ -443,53 +546,143 @@ const UserProfile: React.FC = () => {
           {profile.stats.totalExchanges > 0 ? (
             <div className="space-y-3">
               {(profile.recentExchanges || []).map((exchange) => (
-                <div key={exchange.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
-                  <div className="flex items-center space-x-4">
+                <div key={exchange.id} className="flex items-start justify-between p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
+                  <div className="flex items-start space-x-4 flex-1">
                     <div className="flex-shrink-0">
                       <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                         <DocumentTextIcon className="w-5 h-5 text-blue-600" />
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {exchange.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {exchange.propertyAddress && `📍 ${exchange.propertyAddress}`}
-                        {exchange.exchangeType && ` • ${exchange.exchangeType.replace('_', ' ')}`}
-                      </p>
+                      <div className="flex items-center space-x-2 mb-1">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {exchange.name}
+                        </p>
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${UserProfileService.getStatusColor(exchange.status)}`}>
+                          {exchange.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                      
+                      {/* Exchange Details Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-600 mb-2">
+                        {exchange.propertyAddress && (
+                          <div className="flex items-center">
+                            <span className="text-blue-600">📍</span>
+                            <span className="ml-1 truncate">{exchange.propertyAddress}</span>
+                          </div>
+                        )}
+                        {exchange.exchangeType && (
+                          <div className="flex items-center">
+                            <span className="text-purple-600">🔄</span>
+                            <span className="ml-1 capitalize">{exchange.exchangeType.replace('_', ' ')}</span>
+                          </div>
+                        )}
+                        {exchange.client_name && (
+                          <div className="flex items-center">
+                            <span className="text-green-600">👤</span>
+                            <span className="ml-1">{exchange.client_name}</span>
+                          </div>
+                        )}
+                        {exchange.stage && (
+                          <div className="flex items-center">
+                            <span className="text-orange-600">📋</span>
+                            <span className="ml-1 capitalize">{exchange.stage.replace('_', ' ')}</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* PP Reference */}
+                      {exchange.pp_matter_id && (
+                        <div className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full mb-2">
+                          <span className="font-mono">PP#{exchange.pp_matter_id}</span>
+                        </div>
+                      )}
+                      
                       <p className="text-xs text-gray-500">
                         Created {UserProfileService.getTimePeriodDisplay(exchange.createdAt)}
+                        {exchange.assigned_at && exchange.assigned_at !== exchange.createdAt && (
+                          <span className="ml-2">• Assigned {UserProfileService.getTimePeriodDisplay(exchange.assigned_at)}</span>
+                        )}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${UserProfileService.getStatusColor(exchange.status)}`}>
-                      {exchange.status.replace('_', ' ')}
-                    </span>
+                  
+                  <div className="flex flex-col items-end space-y-2 ml-4">
                     <a
                       href={`/exchanges/${exchange.id}`}
-                      className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                      className="inline-flex items-center px-3 py-1 text-xs font-medium text-blue-600 bg-blue-100 hover:bg-blue-200 rounded-full transition-colors"
                     >
-                      View Details →
+                      <EyeIcon className="w-3 h-3 mr-1" />
+                      View Details
                     </a>
+                    
+                    {/* Assignment Role Badge */}
+                    {exchange.participant_role && (
+                      <span className="inline-flex px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">
+                        {exchange.participant_role.replace('_', ' ')}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
               
+              {/* Show All Exchanges Button */}
               {profile.stats.totalExchanges > (profile.recentExchanges || []).length && (
-                <div className="text-center py-3">
-                  <p className="text-sm text-gray-500">
-                    Showing {profile.recentExchanges?.length || 0} of {profile.stats.totalExchanges} exchanges
-                  </p>
-                  <a
-                    href="/exchanges"
-                    className="inline-flex items-center px-3 py-2 mt-2 text-sm font-medium text-blue-600 hover:text-blue-800"
-                  >
-                    View All Exchanges →
-                  </a>
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600 mb-3">
+                      Showing {profile.recentExchanges?.length || 0} of {profile.stats.totalExchanges} total exchanges
+                    </p>
+                    <div className="flex justify-center space-x-3">
+                      <a
+                        href="/exchanges"
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors"
+                      >
+                        <DocumentTextIcon className="w-4 h-4 mr-2" />
+                        View All Exchanges
+                      </a>
+                      {profile.user.role === 'client' && (
+                        <a
+                          href="/exchanges?client=me"
+                          className="inline-flex items-center px-4 py-2 text-sm font-medium text-green-600 bg-green-100 hover:bg-green-200 rounded-lg transition-colors"
+                        >
+                          <UserIcon className="w-4 h-4 mr-2" />
+                          My Exchanges Only
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
+              
+              {/* Quick Stats Summary */}
+              <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-4 border border-indigo-200">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                  <div>
+                    <div className="text-lg font-semibold text-indigo-600">{profile.stats.totalExchanges}</div>
+                    <div className="text-xs text-indigo-600 font-medium">Total</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-semibold text-green-600">{profile.stats.activeExchanges}</div>
+                    <div className="text-xs text-green-600 font-medium">Active</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-semibold text-yellow-600">
+                      {Object.values(profile.statusDistribution).reduce((acc, val) => {
+                        if (['pending', 'in_progress', 'review'].includes(String(val))) return acc + Number(val);
+                        return acc;
+                      }, 0)}
+                    </div>
+                    <div className="text-xs text-yellow-600 font-medium">In Progress</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-semibold text-purple-600">
+                      {profile.statusDistribution.completed || 0}
+                    </div>
+                    <div className="text-xs text-purple-600 font-medium">Completed</div>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="text-center py-8">

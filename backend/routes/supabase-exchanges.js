@@ -85,13 +85,61 @@ router.get('/', authenticateToken, async (req, res) => {
       const sortBy = req.query.sortBy || 'created_at';
       const sortOrder = req.query.sortOrder === 'asc' ? true : false; // Default to DESC (newest first)
       
-      // Get total count
-      const { count, error: countError } = await supabase
+      // Get search term for filtering
+      const searchTerm = req.query.search || req.query.searchTerm;
+      
+      // Get total count (with search and status filters if applicable)
+      let countQuery = supabase
         .from('exchanges')
         .select('*', { count: 'exact', head: true });
+      
+      // Apply status filter to count query (must match main query)
+      if (req.query.status) {
+        const statusFilter = req.query.status.toLowerCase();
+        if (statusFilter === 'active') {
+          countQuery = countQuery.in('status', ['active', '45D', '180D', 'In Progress', 'Active']);
+        } else if (statusFilter === 'completed') {
+          countQuery = countQuery.in('status', ['completed', 'COMPLETED', 'Completed']);
+        } else if (statusFilter === 'pending' || statusFilter === 'draft') {
+          countQuery = countQuery.in('status', ['draft', 'pending', 'PENDING', 'Draft']);
+        } else {
+          countQuery = countQuery.eq('status', req.query.status);
+        }
+      }
+      
+      // Apply search filter to count query
+      if (searchTerm) {
+        const searchConditions = [
+          `name.ilike.*${searchTerm}*`,
+          `exchange_number.ilike.*${searchTerm}*`,
+          `rel_property_address.ilike.*${searchTerm}*`
+        ];
+        
+        // Only add these fields if they might contain the search term
+        // Commented out fields that may not exist in all exchanges
+        // `notes.ilike.*${searchTerm}*`,
+        // `relinquished_property_address.ilike.*${searchTerm}*`,
+        // `rel_apn.ilike.*${searchTerm}*`,
+        // `rel_escrow_number.ilike.*${searchTerm}*`,
+        // `rel_property_type.ilike.*${searchTerm}*`,
+        // `client_vesting.ilike.*${searchTerm}*`,
+        // `buyer_vesting.ilike.*${searchTerm}*`,
+        // `buyer_1_name.ilike.*${searchTerm}*`,
+        // `buyer_2_name.ilike.*${searchTerm}*`,
+        // `settlement_agent.ilike.*${searchTerm}*`
+        
+        if (!isNaN(searchTerm)) {
+          searchConditions.push(`pp_matter_number.eq.${searchTerm}`);
+        }
+        
+        countQuery = countQuery.or(searchConditions.join(','));
+      }
+      
+      const { count, error: countError } = await countQuery;
         
       if (countError) {
-        throw new Error(`Count query failed: ${countError.message}`);
+        console.error('Count query error:', countError);
+        throw new Error(`Count query failed: ${countError.message || JSON.stringify(countError)}`);
       }
       
       totalCount = count;
@@ -116,6 +164,27 @@ router.get('/', authenticateToken, async (req, res) => {
           )
         `)
         .order(sortBy, { ascending: sortOrder });
+        
+      // Handle search parameter (searchTerm already declared above)
+      if (searchTerm) {
+        console.log('🔍 Applying search filter:', searchTerm);
+        
+        // Build OR conditions for search across multiple fields
+        const searchConditions = [
+          `name.ilike.*${searchTerm}*`,
+          `exchange_number.ilike.*${searchTerm}*`,
+          `rel_property_address.ilike.*${searchTerm}*`
+        ];
+        
+        // Check if searching for PP Matter Number (numeric)
+        if (!isNaN(searchTerm)) {
+          searchConditions.push(`pp_matter_number.eq.${searchTerm}`);
+        }
+        
+        // Apply OR filter for search
+        query = query.or(searchConditions.join(','));
+        console.log('🔍 Search conditions applied:', searchConditions.length);
+      }
         
       if (req.query.status) {
         // Handle special status filter cases to match main exchanges route logic

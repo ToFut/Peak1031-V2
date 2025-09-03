@@ -63,36 +63,18 @@ export const EXCHANGE_STAGES: ExchangeStage[] = [
     actions: [
       {
         id: 'verify_client',
-        label: 'Complete KYC Verification',
+        label: 'Complete Client Verification',
         type: 'manual',
         description: 'Verify client identity and documentation',
-        nextStage: 'KYC_COMPLETED'
+        nextStage: 'SALES_CLOSED'
       }
     ]
   },
   {
-    id: 'KYC_COMPLETED',
-    name: 'KYC Completed',
-    description: 'Client verification completed, awaiting approval',
+    id: 'SALES_CLOSED',
+    name: 'Sales Closed',
+    description: 'Relinquished property sale has closed',
     order: 3,
-    requirements: ['KYC documentation verified'],
-    estimatedDuration: 2,
-    actions: [
-      {
-        id: 'approve_exchange',
-        label: 'Approve Exchange',
-        type: 'manual',
-        requiresApproval: true,
-        description: 'Admin/Staff approval required to proceed',
-        nextStage: 'FUNDS_INSTRUCTED'
-      }
-    ]
-  },
-  {
-    id: 'FUNDS_INSTRUCTED',
-    name: 'Funds Instructed',
-    description: 'Wire instructions have been sent to client',
-    order: 4,
     requirements: ['Admin approval'],
     estimatedDuration: 5,
     actions: [
@@ -115,7 +97,7 @@ export const EXCHANGE_STAGES: ExchangeStage[] = [
     id: 'FUNDS_RECEIVED',
     name: 'Funds Received',
     description: 'Funds confirmed in escrow/QI account',
-    order: 5,
+    order: 4,
     requirements: ['Funds deposited and verified'],
     estimatedDuration: 1,
     autoTrigger: true,
@@ -133,7 +115,7 @@ export const EXCHANGE_STAGES: ExchangeStage[] = [
     id: 'IDENTIFICATION_OPEN',
     name: 'Identification Period Open',
     description: '45-day identification period is active',
-    order: 6,
+    order: 5,
     requirements: ['Funds received', '45-day clock started'],
     estimatedDuration: 45,
     actions: [
@@ -150,7 +132,7 @@ export const EXCHANGE_STAGES: ExchangeStage[] = [
     id: 'PROPERTY_IDENTIFIED',
     name: 'Properties Identified',
     description: 'Replacement properties have been identified and documented',
-    order: 7,
+    order: 6,
     requirements: ['Properties identified within 45 days'],
     estimatedDuration: 7,
     actions: [
@@ -173,7 +155,7 @@ export const EXCHANGE_STAGES: ExchangeStage[] = [
     id: 'UNDER_CONTRACT',
     name: 'Under Contract',
     description: 'Purchase agreement executed and uploaded',
-    order: 8,
+    order: 7,
     requirements: ['Purchase agreement signed and uploaded'],
     estimatedDuration: 30,
     actions: [
@@ -184,34 +166,10 @@ export const EXCHANGE_STAGES: ExchangeStage[] = [
         description: 'Prepare wire transfer for closing'
       },
       {
-        id: 'queue_disbursement',
-        label: 'Queue Disbursement',
+        id: 'prepare_closing',
+        label: 'Prepare for Closing',
         type: 'manual',
-        description: 'Queue wire for multi-party approval',
-        nextStage: 'DISBURSEMENT_PENDING'
-      }
-    ]
-  },
-  {
-    id: 'DISBURSEMENT_PENDING',
-    name: 'Disbursement Pending',
-    description: 'Wire transfer queued and awaiting approval',
-    order: 9,
-    requirements: ['Wire instructions prepared', 'Multi-party approval required'],
-    estimatedDuration: 3,
-    actions: [
-      {
-        id: 'approve_disbursement',
-        label: 'Approve Disbursement',
-        type: 'manual',
-        requiresApproval: true,
-        description: 'Final approval for wire transfer'
-      },
-      {
-        id: 'send_wire',
-        label: 'Send Wire Transfer',
-        type: 'manual',
-        description: 'Execute wire transfer for closing',
+        description: 'Prepare for property closing',
         nextStage: 'EXCHANGE_COMPLETED'
       }
     ]
@@ -220,7 +178,7 @@ export const EXCHANGE_STAGES: ExchangeStage[] = [
     id: 'EXCHANGE_COMPLETED',
     name: 'Exchange Completed',
     description: 'Replacement property closed successfully',
-    order: 10,
+    order: 8,
     requirements: ['Wire transfer completed', 'Closing confirmed'],
     estimatedDuration: 1,
     autoTrigger: true,
@@ -238,7 +196,7 @@ export const EXCHANGE_STAGES: ExchangeStage[] = [
     id: 'CLOSEOUT_ARCHIVED',
     name: 'Closeout Archived',
     description: 'All documentation generated and distributed',
-    order: 11,
+    order: 9,
     requirements: ['Closeout package generated'],
     estimatedDuration: 1,
     actions: [

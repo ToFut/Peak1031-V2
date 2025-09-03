@@ -46,12 +46,42 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const tasksByDate = useMemo(() => {
     const grouped: Record<string, Task[]> = {};
     tasks.forEach(task => {
-      const date = task.dueDate ? new Date(task.dueDate) : new Date(task.createdAt || '');
-      const dateKey = date.toISOString().split('T')[0];
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = [];
+      let date: Date | null = null;
+      
+      // Try to create date from dueDate first
+      if (task.dueDate) {
+        try {
+          date = new Date(task.dueDate);
+          // Check if date is valid
+          if (isNaN(date.getTime())) {
+            date = null;
+          }
+        } catch (e) {
+          date = null;
+        }
       }
-      grouped[dateKey].push(task);
+      
+      // If dueDate is invalid, try createdAt
+      if (!date && task.createdAt) {
+        try {
+          date = new Date(task.createdAt);
+          // Check if date is valid
+          if (isNaN(date.getTime())) {
+            date = null;
+          }
+        } catch (e) {
+          date = null;
+        }
+      }
+      
+      // Only add task if we have a valid date
+      if (date) {
+        const dateKey = date.toISOString().split('T')[0];
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = [];
+        }
+        grouped[dateKey].push(task);
+      }
     });
     return grouped;
   }, [tasks]);

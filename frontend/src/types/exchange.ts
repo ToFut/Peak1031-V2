@@ -60,24 +60,31 @@ export interface Exchange {
   
   // PracticePanther custom fields
   pp_display_name?: string;
+  pp_matter_number?: string; // PP Matter Number: 7981
   bank?: string;
   rel_property_city?: string;
   rel_property_state?: string;
   rel_property_zip?: string;
   rel_property_address?: string;
-  rel_apn?: string;
-  rel_escrow_number?: string;
-  rel_value?: number;
+  rel_apn?: string; // APN: 4363-007-106
+  rel_escrow_number?: string; // Escrow Number: CA-25-26225
+  rel_value?: number; // Value: $588,000
   rel_contract_date?: string;
+  rel_property_type?: string; // Property Type: Residential
   close_of_escrow_date?: string;
   date_proceeds_received?: string;
   day_45?: string;
   day_180?: string;
   proceeds?: number;
-  client_vesting?: string;
-  type_of_exchange?: string;
-  buyer_1_name?: string;
-  buyer_2_name?: string;
+  client_vesting?: string; // Client Vesting: Ofer Butt
+  type_of_exchange?: string; // Type of Exchange: Delayed
+  contract_type?: string; // Contract Type: Residential Purchase Agreement
+  expected_closing?: string; // Expected Closing: September 17, 2025
+  exchange_agreement_drafted?: string; // August 29, 2025
+  settlement_agent?: string; // Settlement Agent: Bryan Spoltore
+  buyer_vesting?: string; // Buyer Vesting: Sanjeev Subherwal and Aarush Subherwal
+  buyer_1_name?: string; // Buyer 1: Sanjeev Subherwal
+  buyer_2_name?: string; // Buyer 2: Aarush Subherwal
   rep_1_address?: string;
   rep_1_city?: string;
   rep_1_state?: string;
@@ -160,12 +167,27 @@ export interface Exchange {
       viewExchange?: boolean;
     };
   }>;
+  
+  // Exchange contacts (all people involved in the exchange)
+  exchangeContacts?: ExchangeContact[];
 }
 
 export interface ReplacementProperty {
   address: string;
   purchasePrice: number;
   closingDate: string; // ISO date string
+}
+
+// Contact interface for exchange participants
+export interface ExchangeContact {
+  id?: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+  role: 'client' | 'assigned_user' | 'internal_credit' | 'referral_source' | 'settlement_agent' | 'buyer';
+  pp_id?: string; // PracticePanther ID if synced
 }
 
 // Extended Exchange interface for internal use (includes additional fields)
@@ -232,6 +254,14 @@ export interface ExchangeFilters {
   dateFrom?: string;
   dateTo?: string;
   search?: string;
+  // New searchable fields
+  pp_matter_number?: string;
+  exchangeId?: string;
+  address?: string;
+  rel_property_type?: string;
+  client_name?: string;
+  apn?: string;
+  escrow_number?: string;
 }
 
 export interface ExchangeSearchParams {

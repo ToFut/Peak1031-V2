@@ -392,6 +392,74 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
     alert(details[role as keyof typeof details] || 'Exchange details not available');
   };
 
+  // Quick Action Handlers
+  const handleSendAccountStatement = async () => {
+    if (!exchange) return;
+    
+    try {
+      // Show participant selection modal
+      const selectedParticipants = await showParticipantSelectionModal();
+      
+      if (selectedParticipants && selectedParticipants.length > 0) {
+        // Generate and send account statement
+        const response = await apiService.post(`/exchanges/${exchange.id}/documents/account-statement`, {
+          participants: selectedParticipants,
+          exchangeData: {
+            exchangeNumber: exchange.exchangeNumber,
+            exchangeValue: exchange.exchangeValue,
+            proceeds: (exchange as any).proceeds,
+            bootReceivedEscrow: (exchange as any).bootReceivedEscrow,
+            bootPaidEscrow: (exchange as any).bootPaidEscrow
+          }
+        });
+        
+        if (response.success) {
+          alert('Account statement sent successfully!');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send account statement:', error);
+      alert('Failed to send account statement. Please try again.');
+    }
+  };
+  
+  const handleSendProofOfFunds = async () => {
+    if (!exchange) return;
+    
+    try {
+      // Show participant selection modal
+      const selectedParticipants = await showParticipantSelectionModal();
+      
+      if (selectedParticipants && selectedParticipants.length > 0) {
+        // Generate and send proof of funds
+        const response = await apiService.post(`/exchanges/${exchange.id}/documents/proof-of-funds`, {
+          participants: selectedParticipants,
+          exchangeData: {
+            exchangeNumber: exchange.exchangeNumber,
+            exchangeValue: exchange.exchangeValue,
+            proceeds: (exchange as any).proceeds || exchange.relinquishedValue,
+            fundsOnDeposit: (exchange as any).proceeds || exchange.relinquishedValue,
+            dateReceived: (exchange as any).date_proceeds_received || exchange.startDate
+          }
+        });
+        
+        if (response.success) {
+          alert('Proof of funds sent successfully!');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send proof of funds:', error);
+      alert('Failed to send proof of funds. Please try again.');
+    }
+  };
+  
+  // Helper function to show participant selection modal
+  const showParticipantSelectionModal = async () => {
+    // This would typically open a modal for selecting participants
+    // For now, return all participants
+    return participants.map(p => p.id);
+  };
+  
   // Enterprise Functions
   // Advance to next stage
   const handleAdvanceStage = async () => {
@@ -516,6 +584,22 @@ const ExchangeDetailsPage: React.FC<ExchangeDetailsPageProps> = () => {
                 >
                   <UserPlus className="w-4 h-4" />
                   <span>Quick Add</span>
+                </button>
+                
+                {/* Quick Actions */}
+                <button
+                  onClick={() => handleSendAccountStatement()}
+                  className="flex items-center space-x-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Account Statement</span>
+                </button>
+                <button
+                  onClick={() => handleSendProofOfFunds()}
+                  className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  <DollarSign className="w-4 h-4" />
+                  <span>Proof of Funds</span>
                 </button>
               </div>
             )}

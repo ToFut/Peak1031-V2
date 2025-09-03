@@ -216,12 +216,26 @@ export const ExchangeTimeline: React.FC<ExchangeTimelineProps> = ({
     );
   }
 
-  // Calculate today's position on timeline
+  // Calculate today's position on timeline (visual positioning between timeline nodes)
   const calculateTodayPosition = () => {
-    if (!start || !deadline180) return null;
-    const totalDays = calculateDays(start, deadline180) || 180;
+    if (!start || !deadline45 || !deadline180) return null;
+    
     const elapsedDays = calculateDays(start, today) || 0;
-    return Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100));
+    const days45 = calculateDays(start, deadline45) || 45;
+    const days180 = calculateDays(start, deadline180) || 180;
+    
+    // Position relative to visual timeline segments
+    if (elapsedDays <= days45) {
+      // In first segment (0% to 50% of visual timeline)
+      const progress = elapsedDays / days45;
+      return progress * 50; // Scale to first half of visual timeline
+    } else {
+      // In second segment (50% to 100% of visual timeline)  
+      const remainingDays = elapsedDays - days45;
+      const secondSegmentDays = days180 - days45;
+      const progress = Math.min(1, remainingDays / secondSegmentDays);
+      return 50 + (progress * 50); // Scale to second half of visual timeline
+    }
   };
   
   const todayPosition = calculateTodayPosition();

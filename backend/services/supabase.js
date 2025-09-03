@@ -282,10 +282,50 @@ class SupabaseService {
       if (where && Object.keys(where).length > 0) {
         console.log('🔍 Supabase getExchanges where clause:', JSON.stringify(where, null, 2));
         
+        // Check for Sequelize Op symbols
+        const opSymbols = Object.getOwnPropertySymbols(where);
+        const orSymbol = opSymbols.find(sym => sym.toString().includes('or'));
+        
         // Handle Op.or conditions
-        if (where.or) {
+        if (orSymbol && Array.isArray(where[orSymbol])) {
+          const orConditions = where[orSymbol].map(condition => {
+            // Handle each condition in the OR array
+            const conditionKey = Object.keys(condition)[0];
+            const conditionValue = condition[conditionKey];
+            
+            // Check if value has Op symbols (like Op.iLike or Op.in)
+            if (conditionValue && typeof conditionValue === 'object') {
+              const valueSymbols = Object.getOwnPropertySymbols(conditionValue);
+              const iLikeSymbol = valueSymbols.find(sym => sym.toString().includes('iLike'));
+              const inSymbol = valueSymbols.find(sym => sym.toString().includes('in'));
+              
+              if (iLikeSymbol) {
+                // Handle iLike operator for search
+                const searchValue = conditionValue[iLikeSymbol];
+                // Remove % wildcards and use Supabase's ilike
+                const cleanValue = searchValue.replace(/%/g, '*');
+                return `${conditionKey}.ilike.${cleanValue}`;
+              } else if (inSymbol) {
+                // Handle IN operator
+                const inValues = conditionValue[inSymbol];
+                return `${conditionKey}.in.(${inValues.join(',')})`;
+              }
+            } else if (conditionKey === 'id' && conditionValue && conditionValue.in) {
+              // Legacy format for id.in
+              return `id.in.(${conditionValue.in.join(',')})`;
+            } else {
+              // Simple equality condition
+              return `${conditionKey}.eq.${conditionValue}`;
+            }
+          }).filter(Boolean);
+          
+          if (orConditions.length > 0) {
+            console.log('🔍 Applying OR conditions:', orConditions);
+            query = query.or(orConditions.join(','));
+          }
+        } else if (where.or) {
+          // Legacy format handling (non-Symbol based)
           const orConditions = where.or.map(condition => {
-            // Convert Sequelize Op conditions to Supabase format
             if (condition.id && condition.id.in) {
               return `id.in.(${condition.id.in.join(',')})`;
             } else if (condition.client_id) {
@@ -299,32 +339,66 @@ class SupabaseService {
           if (orConditions.length > 0) {
             query = query.or(orConditions.join(','));
           }
-        } else {
-          // Handle simple conditions
-          Object.keys(where).forEach(key => {
-            if (key === 'id' && where[key] && where[key].in) {
-              // Handle IN clause for id
-              query = query.in('id', where[key].in);
-            } else if (key === 'id' && where[key] === null) {
-              // Handle null id (no exchanges)
-              query = query.eq('id', '00000000-0000-0000-0000-000000000000'); // Impossible UUID
-            } else if (where[key] && typeof where[key] === 'object') {
-              // Handle Sequelize operators like Op.in
-              const opKeys = Object.getOwnPropertySymbols(where[key]);
-              const hasInSymbol = opKeys.find(sym => sym.toString().includes('in'));
-              if (hasInSymbol && Array.isArray(where[key][hasInSymbol])) {
-                // Handle Op.in clause for any field (status, etc.)
-                console.log(`🔍 Applying IN filter for ${key}:`, where[key][hasInSymbol]);
-                query = query.in(key, where[key][hasInSymbol]);
-              } else {
-                // For other complex objects, try to extract simple eq value
-                query = query.eq(key, where[key]);
-              }
-            } else if (where[key] !== undefined && where[key] !== null) {
+        }
+        
+        // Handle simple conditions (non-OR)
+        Object.keys(where).forEach(key => {
+          // Skip the 'or' key and Op symbols
+          if (key === 'or' || typeof key === 'symbol') return;
+          
+          // Handle search term - apply OR search across multiple fields
+          if (key === '_search_term' && where[key]) {
+            const searchTerm = where[key];
+            console.log('🔍 Applying search term:', searchTerm);
+            
+            // Build OR conditions for search across multiple fields
+            const searchConditions = [
+              `name.ilike.*${searchTerm}*`,
+              `exchange_number.ilike.*${searchTerm}*`,
+              `rel_property_address.ilike.*${searchTerm}*`
+            ];
+            
+            // Search by PP Matter Number if it's a number
+            if (!isNaN(searchTerm)) {
+              searchConditions.push(`pp_matter_number.eq.${parseInt(searchTerm)}`);
+            }
+            
+            // Add Exchange ID search if it looks like a UUID
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(searchTerm);
+            if (isUUID) {
+              searchConditions.push(`id.eq.${searchTerm}`);
+            }
+            
+            query = query.or(searchConditions.join(','));
+            return;
+          }
+          
+          if (key === 'id' && where[key] && where[key].in) {
+            // Handle IN clause for id
+            query = query.in('id', where[key].in);
+          } else if (key === 'id' && where[key] === null) {
+            // Handle null id (no exchanges)
+            query = query.eq('id', '00000000-0000-0000-0000-000000000000'); // Impossible UUID
+          } else if (key === 'status' && where[key] === 'active') {
+            // Special handling for active status - search across multiple active statuses
+            console.log('🔍 Applying active status filter');
+            query = query.in('status', ['active', '45D', '180D', 'In Progress', 'Active']);
+          } else if (where[key] && typeof where[key] === 'object') {
+            // Handle Sequelize operators like Op.in
+            const opKeys = Object.getOwnPropertySymbols(where[key]);
+            const hasInSymbol = opKeys.find(sym => sym.toString().includes('in'));
+            if (hasInSymbol && Array.isArray(where[key][hasInSymbol])) {
+              // Handle Op.in clause for any field (status, etc.)
+              console.log(`🔍 Applying IN filter for ${key}:`, where[key][hasInSymbol]);
+              query = query.in(key, where[key][hasInSymbol]);
+            } else {
+              // For other complex objects, try to extract simple eq value
               query = query.eq(key, where[key]);
             }
-          });
-        }
+          } else if (where[key] !== undefined && where[key] !== null) {
+            query = query.eq(key, where[key]);
+          }
+        });
       }
 
       // Apply ordering

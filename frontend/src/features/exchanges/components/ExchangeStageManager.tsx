@@ -38,13 +38,11 @@ import {
 export enum ExchangeStage {
   EXCHANGE_CREATED = 'EXCHANGE_CREATED',
   ONBOARDING_PENDING = 'ONBOARDING_PENDING',
-  KYC_COMPLETED = 'KYC_COMPLETED',
-  FUNDS_INSTRUCTED = 'FUNDS_INSTRUCTED',
+  SALES_CLOSED = 'SALES_CLOSED',
   FUNDS_RECEIVED = 'FUNDS_RECEIVED',
   IDENTIFICATION_OPEN = 'IDENTIFICATION_OPEN',
   PROPERTY_IDENTIFIED = 'PROPERTY_IDENTIFIED',
   UNDER_CONTRACT = 'UNDER_CONTRACT',
-  DISBURSEMENT_PENDING = 'DISBURSEMENT_PENDING',
   EXCHANGE_COMPLETED = 'EXCHANGE_COMPLETED',
   CLOSEOUT_ARCHIVED = 'CLOSEOUT_ARCHIVED',
   EXCHANGE_CANCELLED = 'EXCHANGE_CANCELLED'
@@ -221,96 +219,50 @@ export const ExchangeStageManager: React.FC<ExchangeStageManagerProps> = ({
       ]
     },
     {
-      stage: ExchangeStage.KYC_COMPLETED,
-      label: 'KYC Completed',
-      description: 'Identity verification complete, awaiting approval',
-      icon: Shield,
-      color: 'text-indigo-700',
-      bgColor: 'bg-indigo-100',
-      borderColor: 'border-indigo-300',
-      autoAdvance: false,
-      requiresApproval: true,
-      requiredTasks: [
-        {
-          id: 'identity_verified',
-          label: 'Identity Verification',
-          description: 'Client identity has been verified',
-          required: true,
-          validator: (ex) => !!(ex as any).identityVerified
-        },
-        {
-          id: 'accreditation_check',
-          label: 'Accreditation Status',
-          description: 'Verify if client meets accreditation requirements',
-          required: false,
-          validator: (ex) => !!(ex as any).accreditationChecked
-        },
-        {
-          id: 'admin_approval',
-          label: 'Admin Approval',
-          description: 'Administrator must approve to proceed',
-          required: true,
-          validator: (ex) => !!(ex as any).kycApproved,
-          actionLabel: 'Approve KYC',
-          action: async () => {
-            await apiService.put(`/exchanges/${exchange.id}`, {
-              kycApproved: true
-            });
-          }
-        }
-      ],
-      automaticActions: [],
-      notifications: [
-        {
-          trigger: 'on_enter',
-          recipients: ['admin'],
-          template: 'KYC approval required for {{exchangeNumber}}',
-          urgent: true
-        }
-      ]
-    },
-    {
-      stage: ExchangeStage.FUNDS_INSTRUCTED,
-      label: 'Funds Instructed',
-      description: 'Wire instructions sent to client',
-      icon: FileText,
-      color: 'text-purple-700',
-      bgColor: 'bg-purple-100',
-      borderColor: 'border-purple-300',
+      stage: ExchangeStage.SALES_CLOSED,
+      label: 'Sales Closed',
+      description: 'Relinquished property sale has closed',
+      icon: Home,
+      color: 'text-green-700',
+      bgColor: 'bg-green-100',
+      borderColor: 'border-green-300',
       autoAdvance: true,
       requiresApproval: false,
-      daysToComplete: 5,
+      daysToComplete: 1,
       requiredTasks: [
         {
-          id: 'wire_instructions_sent',
-          label: 'Wire Instructions Sent',
-          description: 'Wire instructions have been sent to client',
+          id: 'sale_completed',
+          label: 'Sale Completed',
+          description: 'Relinquished property sale has closed',
           required: true,
-          validator: (ex) => !!(ex as any).wireInstructionsSent
+          validator: (ex) => !!(ex as any).saleCompleted
         },
         {
-          id: 'client_acknowledged',
-          label: 'Client Acknowledged',
-          description: 'Client confirmed receipt of instructions',
-          required: false,
-          validator: (ex) => !!(ex as any).instructionsAcknowledged
+          id: 'proceeds_available',
+          label: 'Proceeds Available',
+          description: 'Sale proceeds are available for exchange',
+          required: true,
+          validator: (ex) => !!(ex as any).proceedsAvailable
         }
       ],
       automaticActions: [
         {
-          id: 'send_wire_instructions',
-          label: 'Send Wire Instructions',
+          id: 'notify_sale_complete',
+          label: 'Notify Sale Complete',
           trigger: 'on_enter',
           action: async (ex) => {
-            await apiService.post(`/exchanges/${ex.id}/wire-instructions`, {});
+            await apiService.post(`/exchanges/${ex.id}/notifications`, {
+              type: 'sale_complete',
+              message: 'Relinquished property sale completed'
+            });
           }
         }
       ],
       notifications: [
         {
           trigger: 'on_enter',
-          recipients: ['client'],
-          template: 'Wire instructions for {{exchangeNumber}} have been sent',
+          recipients: ['all'],
+          template: 'Sale closed for {{exchangeNumber}} - exchange can proceed',
           urgent: false
         }
       ]
@@ -519,53 +471,6 @@ export const ExchangeStageManager: React.FC<ExchangeStageManagerProps> = ({
           recipients: ['coordinator'],
           template: 'Exchange {{exchangeNumber}} is under contract',
           urgent: false
-        }
-      ]
-    },
-    {
-      stage: ExchangeStage.DISBURSEMENT_PENDING,
-      label: 'Disbursement Pending',
-      description: 'Funds ready for disbursement to close',
-      icon: Target,
-      color: 'text-yellow-700',
-      bgColor: 'bg-yellow-100',
-      borderColor: 'border-yellow-300',
-      autoAdvance: false,
-      requiresApproval: true,
-      requiredTasks: [
-        {
-          id: 'closing_statement',
-          label: 'Closing Statement Received',
-          description: 'Final closing statement from title company',
-          required: true,
-          validator: (ex) => !!(ex as any).closingStatementReceived
-        },
-        {
-          id: 'wire_approved',
-          label: 'Wire Transfer Approved',
-          description: 'Multi-party approval for wire transfer',
-          required: true,
-          validator: (ex) => !!(ex as any).wireApproved,
-          actionLabel: 'Approve Wire',
-          action: async () => {
-            await apiService.post(`/exchanges/${exchange.id}/approve-wire`, {});
-          }
-        },
-        {
-          id: 'funds_sent',
-          label: 'Funds Sent',
-          description: 'Wire transfer initiated to title company',
-          required: true,
-          validator: (ex) => !!(ex as any).fundsSent
-        }
-      ],
-      automaticActions: [],
-      notifications: [
-        {
-          trigger: 'on_enter',
-          recipients: ['admin', 'coordinator'],
-          template: 'Wire approval needed for {{exchangeNumber}}',
-          urgent: true
         }
       ]
     },
