@@ -61,6 +61,35 @@ export const ExchangeTimeline: React.FC<ExchangeTimelineProps> = ({
   dateProceedsReceived,
   propertiesIdentified = false
 }) => {
+  // Helper function to parse dates correctly in local timezone
+  const parseLocalDate = (dateInput: string | Date | null | undefined): Date | null => {
+    if (!dateInput) return null;
+    
+    if (dateInput instanceof Date) return dateInput;
+    
+    // Handle various date formats and ensure local timezone parsing
+    const dateStr = String(dateInput);
+    
+    // If it's already in YYYY-MM-DD format, parse it as local date
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      const parts = dateStr.split('T')[0].split('-');
+      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    }
+    
+    // If it's in MM/DD/YYYY format, parse it as local date
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(dateStr)) {
+      const parts = dateStr.split('/');
+      return new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+    }
+    
+    // Fallback to regular Date parsing but set to local midnight
+    const parsed = new Date(dateInput);
+    if (isNaN(parsed.getTime())) return null;
+    
+    // Reset to local midnight to avoid timezone issues
+    return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+  };
+
   // Get fresh today date every render
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -72,8 +101,8 @@ export const ExchangeTimeline: React.FC<ExchangeTimelineProps> = ({
   });
 
   // Parse dates - Use Close of Escrow as the KEY date
-  const escrowClose = closeOfEscrowDate ? new Date(closeOfEscrowDate) : null;
-  const proceedsDate = dateProceedsReceived ? new Date(dateProceedsReceived) : null;
+  const escrowClose = parseLocalDate(closeOfEscrowDate);
+  const proceedsDate = parseLocalDate(dateProceedsReceived);
   
   
   // Check if proceeds and escrow dates are close (within 3 days)
@@ -88,12 +117,12 @@ export const ExchangeTimeline: React.FC<ExchangeTimelineProps> = ({
   // Calculate Day 45 and Day 180 from either Proceeds Received or Close of Escrow (whichever exists)
   const referenceDate = proceedsDate || escrowClose;
   const deadline45 = referenceDate ? new Date(referenceDate.getTime() + (45 * 24 * 60 * 60 * 1000)) : 
-                      (identificationDeadline ? new Date(identificationDeadline) : null);
+                      parseLocalDate(identificationDeadline);
   const deadline180 = referenceDate ? new Date(referenceDate.getTime() + (180 * 24 * 60 * 60 * 1000)) :
-                       (completionDeadline ? new Date(completionDeadline) : null);
+                       parseLocalDate(completionDeadline);
   
   // For backwards compatibility with old data
-  const start = startDate ? new Date(startDate) : (proceedsDate || escrowClose);
+  const start = parseLocalDate(startDate) || proceedsDate || escrowClose;
 
   // Calculate days for each phase
   const calculateDays = (fromDate: Date | null, toDate: Date | null) => {

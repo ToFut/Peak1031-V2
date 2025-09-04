@@ -81,10 +81,10 @@ const TimelineTab: React.FC<TabProps> = ({ exchange }) => {
   
   // Extract timeline dates from PP custom fields or backend data
   const exchangeAny = exchange as any;
-  const dateProceedsReceived = exchangeAny.dateProceedsReceived || getCustomFieldValue('Date Proceeds Received');
-  const closeOfEscrowDate = exchangeAny.closeOfEscrowDate || exchangeAny.relinquishedProperty?.closeDate || getCustomFieldValue('Close of Escrow Date');
-  const day45Date = exchangeAny.day45 || exchangeAny.keyDates?.day45 || getCustomFieldValue('Day 45');
-  const day180Date = exchangeAny.day180 || exchangeAny.keyDates?.day180 || getCustomFieldValue('Day 180');
+  const dateProceedsReceived = exchangeAny.dateProceedsReceived || exchangeAny.date_proceeds_received || getCustomFieldValue('Date Proceeds Received');
+  const closeOfEscrowDate = exchangeAny.closeOfEscrowDate || exchangeAny.close_of_escrow_date || exchangeAny.relinquishedProperty?.closeDate || getCustomFieldValue('Close of Escrow Date');
+  const day45Date = exchangeAny.day45 || exchangeAny.day_45 || exchangeAny.keyDates?.day45 || getCustomFieldValue('Day 45');
+  const day180Date = exchangeAny.day180 || exchangeAny.day_180 || exchangeAny.keyDates?.day180 || getCustomFieldValue('Day 180');
   const isIdentified = exchangeAny.identified || getCustomFieldValue('Identified?') || false;
   
   console.log('Timeline data extracted:', {
@@ -244,6 +244,13 @@ const PropertiesTab: React.FC<TabProps> = ({ exchange }) => {
     return null;
   };
   
+  // Extract date variables for timeline - Updated to use correct PP field names
+  const exchangeAny = exchange as any;
+  const dateProceedsReceived = getCustomFieldValue('Date Proceeds Received') || exchangeAny?.dateProceedsReceived || exchangeAny?.date_proceeds_received;
+  const closeOfEscrowDate = getCustomFieldValue('Close of Escrow Date') || exchangeAny?.closeOfEscrowDate || exchangeAny?.close_of_escrow_date || exchangeAny?.relinquishedProperty?.closeDate;
+  const day45Date = getCustomFieldValue('Day 45') || exchangeAny?.day45 || exchangeAny?.day_45 || exchangeAny?.keyDates?.day45;
+  const day180Date = getCustomFieldValue('Day 180') || exchangeAny?.day180 || exchangeAny?.day_180 || exchangeAny?.keyDates?.day180;
+  
   const isIdentified = getCustomFieldValue('Identified?') || false;
   
   const [propertiesIdentified, setPropertiesIdentified] = useState<boolean>(
@@ -282,35 +289,52 @@ const PropertiesTab: React.FC<TabProps> = ({ exchange }) => {
             <div>
               <p className="text-sm text-gray-600">Address</p>
               <p className="font-medium text-gray-900">
-                {exchange.relinquishedPropertyAddress || exchange.rel_property_address || 'Not specified'}
+                {getCustomFieldValue('Rel Property Address') || 
+                 exchange.relinquishedPropertyAddress || 
+                 exchange.rel_property_address || 'Not specified'}
               </p>
-              {(exchange.rel_property_city || exchange.rel_property_state || exchange.rel_property_zip) && (
-                <p className="text-sm text-gray-600">
-                  {[exchange.rel_property_city, exchange.rel_property_state, exchange.rel_property_zip].filter(Boolean).join(', ')}
-                </p>
-              )}
             </div>
             <div>
-              <p className="text-sm text-gray-600">Sale Price</p>
+              <p className="text-sm text-gray-600">Value</p>
               <p className="font-medium text-gray-900">
-                ${exchange.relinquishedSalePrice?.toLocaleString() || exchange.rel_value?.toLocaleString() || 'N/A'}
+                ${(getCustomFieldValue('Rel Value (USD)') || 
+                   exchange.relinquishedSalePrice || 
+                   exchange.rel_value || 
+                   exchange.relinquishedValue || 0).toLocaleString()}
               </p>
             </div>
           </div>
           
-          {exchange.rel_property_type && (
-            <div>
-              <p className="text-sm text-gray-600">Property Type</p>
-              <p className="font-medium text-gray-900">{exchange.rel_property_type}</p>
-            </div>
-          )}
-          
-          {exchange.rel_apn && (
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-gray-600">APN</p>
-              <p className="font-medium text-gray-900">{exchange.rel_apn}</p>
+              <p className="font-medium text-gray-900">
+                {getCustomFieldValue('Rel APN') || exchange.rel_apn || 'Not specified'}
+              </p>
             </div>
-          )}
+            <div>
+              <p className="text-sm text-gray-600">Settlement Agent</p>
+              <p className="font-medium text-gray-900">
+                {getCustomFieldValue('Rel Settlement Agent') || exchange.rel_settlement_agent || 'Not specified'}
+              </p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-gray-600">Property Type</p>
+              <p className="font-medium text-gray-900">
+                {getCustomFieldValue('Property Type') || exchange.rel_property_type || 'Not specified'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Contract Date</p>
+              <p className="font-medium text-gray-900">
+                {getCustomFieldValue('Rel Contract Date') ? 
+                  new Date(getCustomFieldValue('Rel Contract Date')).toLocaleDateString() : 'Not specified'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
       
@@ -374,25 +398,58 @@ const PropertiesTab: React.FC<TabProps> = ({ exchange }) => {
               </div>
             )}
             
-            {/* Additional replacement property fields from PP data */}
-            {(exchange.rep_1_address || exchange.rep_1_sale_price) && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-sm font-medium text-gray-700 mb-2">Additional Properties:</p>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="font-medium text-gray-900">{exchange.rep_1_address || 'Property 1'}</p>
-                  {exchange.rep_1_sale_price && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      Sale Price: ${exchange.rep_1_sale_price.toLocaleString()}
+            {/* Replacement Property Details from PP data */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <p className="text-sm font-medium text-gray-700 mb-2">Replacement Property Details:</p>
+              <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Address</p>
+                    <p className="font-medium text-gray-900">
+                      {getCustomFieldValue('Rep 1 Property Address') || 'Not specified'}
                     </p>
-                  )}
-                  {exchange.rep_1_close_date && (
-                    <p className="text-sm text-gray-600">
-                      Close Date: {new Date(exchange.rep_1_close_date).toLocaleDateString()}
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Purchase Price</p>
+                    <p className="font-medium text-gray-900">
+                      ${(getCustomFieldValue('Rep 1 Value (USD)') || 0).toLocaleString()}
                     </p>
-                  )}
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">APN</p>
+                    <p className="text-sm text-gray-700">
+                      {getCustomFieldValue('Rep 1 APN') || 'Not specified'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Settlement Agent</p>
+                    <p className="text-sm text-gray-700">
+                      {getCustomFieldValue('Rep 1 Settlement Agent') || 'Not specified'}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Contract Date</p>
+                    <p className="text-sm text-gray-700">
+                      {getCustomFieldValue('Rep 1 Purchase Contract Date') ? 
+                        new Date(getCustomFieldValue('Rep 1 Purchase Contract Date')).toLocaleDateString() : 
+                        'Not specified'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Escrow Number</p>
+                    <p className="text-sm text-gray-700">
+                      {getCustomFieldValue('Rep 1 Escrow Number') || 'Not specified'}
+                    </p>
+                  </div>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         ) : (
           <div className="p-4 bg-yellow-50 rounded-lg">
@@ -403,6 +460,66 @@ const PropertiesTab: React.FC<TabProps> = ({ exchange }) => {
         )}
       </div>
       
+      {/* Financial Details Section */}
+      <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <DollarSign className="w-5 h-5 mr-2 text-green-600" />
+          Financial Details
+        </h3>
+        
+        <div className="grid grid-cols-2 gap-6">
+          {/* Proceeds & Banking */}
+          <div className="space-y-3">
+            <h4 className="font-medium text-gray-800">Proceeds & Banking</h4>
+            <div>
+              <p className="text-sm text-gray-600">Bank</p>
+              <p className="font-medium text-gray-900">
+                {getCustomFieldValue('Bank') || exchange.bank || 'Not specified'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Proceeds</p>
+              <p className="text-lg font-bold text-green-600">
+                ${(getCustomFieldValue('Proceeds (USD)') || exchange.proceeds || 0).toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Date Proceeds Received</p>
+              <p className="font-medium text-gray-900">
+                {dateProceedsReceived ? 
+                  new Date(dateProceedsReceived).toLocaleDateString() : 
+                  'Not specified'}
+              </p>
+            </div>
+          </div>
+          
+          {/* Key Dates */}
+          <div className="space-y-3">
+            <h4 className="font-medium text-gray-800">Key Dates</h4>
+            <div>
+              <p className="text-sm text-gray-600">Close of Escrow</p>
+              <p className="font-medium text-gray-900">
+                {closeOfEscrowDate ? 
+                  new Date(closeOfEscrowDate).toLocaleDateString() : 
+                  'Not specified'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Day 45</p>
+              <p className="font-medium text-gray-900">
+                {day45Date ? new Date(day45Date).toLocaleDateString() : 'Not calculated'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Day 180</p>
+              <p className="font-medium text-gray-900">
+                {day180Date ? new Date(day180Date).toLocaleDateString() : 'Not calculated'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Property Value Summary */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -414,19 +531,19 @@ const PropertiesTab: React.FC<TabProps> = ({ exchange }) => {
           <div className="text-center">
             <p className="text-sm text-gray-600">Relinquished</p>
             <p className="text-xl font-bold text-gray-900">
-              ${exchange.relinquishedValue?.toLocaleString() || exchange.rel_value?.toLocaleString() || '0'}
+              ${(getCustomFieldValue('Rel Value (USD)') || exchange.relinquishedValue || exchange.rel_value || 0).toLocaleString()}
             </p>
           </div>
           <div className="text-center">
             <p className="text-sm text-gray-600">Replacement</p>
             <p className="text-xl font-bold text-gray-900">
-              ${exchange.replacementValue?.toLocaleString() || '0'}
+              ${(getCustomFieldValue('Rep 1 Value (USD)') || exchange.replacementValue || 0).toLocaleString()}
             </p>
           </div>
           <div className="text-center">
             <p className="text-sm text-gray-600">Exchange Value</p>
             <p className="text-xl font-bold text-blue-600">
-              ${exchange.exchangeValue?.toLocaleString() || exchange.exchange_value?.toLocaleString() || '0'}
+              ${(getCustomFieldValue('Rep 1 Value (USD)') || exchange.exchangeValue || exchange.exchange_value || 0).toLocaleString()}
             </p>
           </div>
         </div>
@@ -551,10 +668,10 @@ const ExchangeDetail: React.FC = () => {
     if (!exchange) return null;
     const exchangeAny = exchange as any;
     
-    // Check direct fields first
+    // Check direct fields first - Updated with complete PP field mappings
     const fieldMap: Record<string, string> = {
       'Type of Exchange': 'type_of_exchange',
-      'Property Type': 'property_type',
+      'Property Type': 'property_type', 
       'Client 1 Signatory Title': 'client_signatory_title',
       'Bank': 'bank',
       'Proceeds (USD)': 'proceeds',
@@ -564,20 +681,39 @@ const ExchangeDetail: React.FC = () => {
       'Day 180': 'day_180',
       'Rel Settlement Agent': 'rel_settlement_agent',
       'Rel Escrow Number': 'rel_escrow_number',
+      'Rel Property Address': 'rel_property_address',
+      'Rel APN': 'rel_apn',
+      'Rel Value (USD)': 'rel_value',
+      'Rel Contract Date': 'rel_contract_date',
+      'Expected Rel Closing Date': 'expected_rel_closing_date',
       'Rep 1 Settlement Agent': 'rep_1_settlement_agent',
       'Rep 1 Escrow Number': 'rep_1_escrow_number',
+      'Rep 1 Property Address': 'rep_1_property_address',
+      'Rep 1 Address': 'rep_1_property_address', // Alias
+      'Rep 1 APN': 'rep_1_apn',
+      'Rep 1 Value (USD)': 'rep_1_value',
+      'Rep 1 Purchase Price': 'rep_1_value', // Alias
+      'Rep 1 Purchase Contract Date': 'rep_1_purchase_contract_date',
+      'Rep 1 Contract Date': 'rep_1_purchase_contract_date', // Alias
       'Referral Source': 'referral_source',
       'Referral Source Email': 'referral_source_email',
       'Internal Credit To': 'internal_credit_to',
       'Assigned To': 'assigned_to',
       'Buyer 1 Name': 'buyer_1_name',
       'Buyer 2 Name': 'buyer_2_name',
+      'Buyer Vesting': 'buyer_vesting',
       'Rep 1 Seller 1 Name': 'rep_1_seller_1_name',
       'Rep 1 Seller 2 Name': 'rep_1_seller_2_name',
+      'Rep 1 Seller Vesting': 'rep_1_seller_vesting',
+      'Client Vesting': 'client_vesting',
       'Interest Check Sent': 'interest_check_sent',
       'Bank Referral?': 'bank_referral',
       'Identified?': 'identified',
-      'Failed Exchange?': 'failed_exchange'
+      'Failed Exchange?': 'failed_exchange',
+      'Matter Number': 'matter_number',
+      'Receipt Drafted On': 'receipt_drafted_on',
+      'Rep 1 Docs Drafted On': 'rep_1_docs_drafted_on',
+      'Exchange Agreement Drafted On': 'exchange_agreement_drafted_on'
     };
     
     const directField = fieldMap[fieldLabel];
@@ -585,14 +721,38 @@ const ExchangeDetail: React.FC = () => {
       return exchangeAny[directField];
     }
     
-    // Check PP custom fields
-    if (exchangeAny.pp_data?.custom_field_values) {
-      const field = exchangeAny.pp_data.custom_field_values.find(
-        (f: any) => f.custom_field_ref?.label === fieldLabel
+    // Check PP custom fields - Enhanced to handle multiple data structures
+    let customFields = null;
+    
+    if (exchangeAny.pp_custom_field_values) {
+      customFields = exchangeAny.pp_custom_field_values;
+    } else if (exchangeAny.pp_data?.custom_field_values) {
+      customFields = exchangeAny.pp_data.custom_field_values;
+    } else if (exchangeAny.ppData?.custom_field_values) {
+      customFields = exchangeAny.ppData.custom_field_values;
+    } else if (exchangeAny.practicePartnerData?.customFields) {
+      customFields = exchangeAny.practicePartnerData.customFields;
+    }
+    
+    if (customFields && Array.isArray(customFields)) {
+      const field = customFields.find((f: any) => 
+        f.custom_field_ref?.label === fieldLabel || 
+        f.label === fieldLabel ||
+        f.field_label === fieldLabel
       );
+      
       if (field) {
-        return field.value_string || field.value_number || field.value_date_time || 
-               field.value_boolean || field.contact_ref?.display_name;
+        // Handle different value types from PP
+        const value = field.value_date_time || 
+                     field.value_string || 
+                     field.value_number || 
+                     field.value_boolean || 
+                     field.value || 
+                     field.contact_ref?.display_name ||
+                     field.display_name;
+        
+        console.log(`Found PP field "${fieldLabel}":`, value);
+        return value;
       }
     }
     
@@ -820,6 +980,20 @@ const ExchangeDetail: React.FC = () => {
         console.log('🔍 Relinquished Property:', data.relinquishedProperty);
         console.log('🔍 Key Dates:', data.keyDates);
         console.log('🔍 All Exchange Keys:', Object.keys(data));
+        
+        // Debug PP custom fields structure
+        const exchangeAny = data as any;
+        console.log('🔍 PP Custom Fields Debug:');
+        console.log('  - pp_custom_field_values:', exchangeAny.pp_custom_field_values);
+        console.log('  - pp_data?.custom_field_values:', exchangeAny.pp_data?.custom_field_values);
+        console.log('  - ppData?.custom_field_values:', exchangeAny.ppData?.custom_field_values);
+        console.log('  - practicePartnerData?.customFields:', exchangeAny.practicePartnerData?.customFields);
+        
+        // Sample a few fields to see structure
+        if (exchangeAny.pp_data?.custom_field_values?.[0]) {
+          console.log('🔍 Sample PP field structure:', exchangeAny.pp_data.custom_field_values[0]);
+        }
+        
         setExchange(data);
       }
       
@@ -967,22 +1141,22 @@ const ExchangeDetail: React.FC = () => {
                 {/* Display Client with Signatory Title */}
                 <span className="flex items-center bg-purple-800/50 px-2 py-1 rounded">
                   <Users className="w-4 h-4 mr-1" />
-                  {exchange.clientVesting || exchange.relinquishedProperty?.clientVesting || (exchange.client?.firstName && `${exchange.client.firstName} ${exchange.client.lastName}`)}
-                  {(exchange.clientSignatoryTitle || getCustomFieldValue('Client 1 Signatory Title')) && 
-                    ` (${exchange.clientSignatoryTitle || getCustomFieldValue('Client 1 Signatory Title')})`}
+                  {getCustomFieldValue('Client Vesting') || exchange.clientVesting || exchange.relinquishedProperty?.clientVesting || (exchange.client?.firstName && `${exchange.client.firstName} ${exchange.client.lastName}`) || 'Client Name'}
+                  {getCustomFieldValue('Client 1 Signatory Title') && 
+                    ` (${getCustomFieldValue('Client 1 Signatory Title')})`}
                 </span>
                 {/* Display Bank */}
-                {(exchange.bank || getCustomFieldValue('Bank')) && (
+                {getCustomFieldValue('Bank') && (
                   <span className="flex items-center bg-green-800/50 px-2 py-1 rounded">
                     <DollarSign className="w-4 h-4 mr-1" />
-                    {exchange.bank || getCustomFieldValue('Bank')}
+                    {getCustomFieldValue('Bank')}
                   </span>
                 )}
                 {/* Display Proceeds prominently */}
-                {(exchange.proceeds || getCustomFieldValue('Proceeds (USD)')) && (
+                {getCustomFieldValue('Proceeds (USD)') && (
                   <span className="flex items-center bg-yellow-600/70 px-3 py-1 rounded font-semibold">
                     <Banknote className="w-4 h-4 mr-1" />
-                    ${((exchange.proceeds || getCustomFieldValue('Proceeds (USD)')) || 0).toLocaleString()}
+                    ${(getCustomFieldValue('Proceeds (USD)') || 0).toLocaleString()}
                   </span>
                 )}
               </div>
