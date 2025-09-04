@@ -1,0 +1,88 @@
+{
+  "passed": 0,
+  "failed": 9,
+  "total": 9,
+  "details": [
+    {
+      "endpoint": "/api/health",
+      "method": "GET",
+      "status": 504,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 504",
+      "timestamp": "2025-09-04T18:22:50.734Z"
+    },
+    {
+      "endpoint": "/api",
+      "method": "GET",
+      "status": 504,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 504",
+      "timestamp": "2025-09-04T18:22:50.736Z"
+    },
+    {
+      "endpoint": "/api/debug/users",
+      "method": "GET",
+      "status": 504,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 504",
+      "timestamp": "2025-09-04T18:22:50.738Z"
+    },
+    {
+      "endpoint": "/api/debug/token",
+      "method": "GET",
+      "status": 504,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 504",
+      "timestamp": "2025-09-04T18:22:50.739Z"
+    },
+    {
+      "endpoint": "/api/auth/login",
+      "method": "POST",
+      "status": 504,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 504",
+      "timestamp": "2025-09-04T18:22:50.746Z"
+    },
+    {
+      "endpoint": "/api/auth/logout",
+      "method": "POST",
+      "status": 504,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 504",
+      "timestamp": "2025-09-04T18:22:50.747Z"
+    },
+    {
+      "endpoint": "/api/contacts",
+      "method": "GET",
+      "status": 504,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 504",
+      "timestamp": "2025-09-04T18:22:50.748Z"
+    },
+    {
+      "endpoint": "/api/exchanges",
+      "method": "GET",
+      "status": 504,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 504",
+      "timestamp": "2025-09-04T18:22:50.750Z"
+    },
+    {
+      "endpoint": "/api/exchanges?page=1&limit=10",
+      "method": "GET",
+      "status": 504,
+      "success": false,
+      "response": null,
+      "error": "Request failed with status code 504",
+      "timestamp": "2025-09-04T18:22:50.752Z"
+    }
+  ]
+}
