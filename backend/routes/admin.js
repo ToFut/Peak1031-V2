@@ -535,6 +535,16 @@ router.get('/users', authenticateToken, requireRole(['admin']), async (req, res)
     // Admin gets all users by default (limit 1000)
     const { page = 1, limit = 1000, search, role, status } = req.query;
     
+    // Debug: Log all received parameters
+    console.log('🔍 Admin/users endpoint - received params:', {
+      page,
+      limit,
+      search,
+      role,
+      status,
+      fullQuery: req.query
+    });
+    
     // Try to get users from Supabase first - use 'people' table
     if (supabaseService.client) {
       try {

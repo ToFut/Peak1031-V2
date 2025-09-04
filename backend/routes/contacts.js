@@ -114,11 +114,17 @@ router.get('/', authenticateToken, async (req, res) => {
       throw participantError;
     }
     
-    // Get unique contact IDs
-    const contactIds = [...new Set(participants.map(p => p.contact_id).filter(id => id))];
+    // Get unique contact IDs - ensure they are strings, not objects
+    const contactIds = [...new Set(participants.map(p => {
+      const id = p.contact_id;
+      return (typeof id === 'string') ? id : (id && id.toString ? id.toString() : null);
+    }).filter(id => id))];
     
-    // Also include contacts that are clients of the exchanges
-    const clientIds = userExchanges.data.map(e => e.client_id).filter(id => id);
+    // Also include contacts that are clients of the exchanges - ensure they are strings
+    const clientIds = userExchanges.data.map(e => {
+      const id = e.client_id;
+      return (typeof id === 'string') ? id : (id && id.toString ? id.toString() : null);
+    }).filter(id => id);
     const allContactIds = [...new Set([...contactIds, ...clientIds])];
     
     if (allContactIds.length === 0) {
