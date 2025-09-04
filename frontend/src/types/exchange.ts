@@ -24,7 +24,7 @@ export interface Exchange {
   replacementValue?: number;
   
   // Properties
-  relinquishedProperty?: any; // JSONB
+  // relinquishedProperty is defined below with proper typing
   relinquishedPropertyAddress?: string;
   relinquishedSalePrice?: number;
   relinquishedClosingDate?: string; // ISO date string
@@ -58,9 +58,20 @@ export interface Exchange {
   deadline45?: string;
   deadline180?: string;
   
-  // PracticePanther custom fields
+  // PP Data fields from API response
+  pp_custom_field_values?: any[];
+  practicePartnerData?: {
+    customFields?: any[];
+    matterId?: string;
+    matterNumber?: string;
+    rawData?: any;
+  };
+  
+  // PracticePanther custom fields - both snake_case and camelCase versions
   pp_display_name?: string;
+  ppDisplayName?: string;
   pp_matter_number?: string; // PP Matter Number: 7981
+  ppMatterNumber?: string;
   bank?: string;
   rel_property_city?: string;
   rel_property_state?: string;
@@ -68,29 +79,69 @@ export interface Exchange {
   rel_property_address?: string;
   rel_apn?: string; // APN: 4363-007-106
   rel_escrow_number?: string; // Escrow Number: CA-25-26225
+  relEscrowNumber?: string;
   rel_value?: number; // Value: $588,000
+  relValue?: number;
   rel_contract_date?: string;
   rel_property_type?: string; // Property Type: Residential
+  relPropertyType?: string;
   close_of_escrow_date?: string;
+  closeOfEscrowDate?: string;
   date_proceeds_received?: string;
+  dateProceedsReceived?: string;
   day_45?: string;
+  day45?: string;
   day_180?: string;
+  day180?: string;
   proceeds?: number;
   client_vesting?: string; // Client Vesting: Ofer Butt
+  clientVesting?: string;
   type_of_exchange?: string; // Type of Exchange: Delayed
+  typeOfExchange?: string;
   contract_type?: string; // Contract Type: Residential Purchase Agreement
   expected_closing?: string; // Expected Closing: September 17, 2025
   exchange_agreement_drafted?: string; // August 29, 2025
+  exchangeAgreementDrafted?: string;
   settlement_agent?: string; // Settlement Agent: Bryan Spoltore
+  settlementAgent?: string;
   buyer_vesting?: string; // Buyer Vesting: Sanjeev Subherwal and Aarush Subherwal
   buyer_1_name?: string; // Buyer 1: Sanjeev Subherwal
+  buyer1Name?: string;
   buyer_2_name?: string; // Buyer 2: Aarush Subherwal
+  buyer2Name?: string;
   rep_1_address?: string;
   rep_1_city?: string;
   rep_1_state?: string;
   rep_1_zip?: string;
-  rep_1_sale_price?: number;
+  property_type?: string; // Main property type field
+  propertyType?: string;
+  client_signatory_title?: string; // Client Signatory Title
+  clientSignatoryTitle?: string;
+  referral_source?: string;
+  referralSource?: string;
+  referral_source_email?: string;
+  referralSourceEmail?: string;
+  internal_credit_to?: string;
+  internalCreditTo?: string;
+  assigned_to?: string;
+  assignedTo?: string;
+  rel_settlement_agent?: string;
+  relSettlementAgent?: string;
+  rep_1_settlement_agent?: string;
+  rep1SettlementAgent?: string;
   rep_1_escrow_number?: string;
+  rep1EscrowNumber?: string;
+  rep_1_seller_1_name?: string;
+  rep1Seller1Name?: string;
+  rep_1_seller_2_name?: string;
+  rep1Seller2Name?: string;
+  interest_check_sent?: boolean | string;
+  bank_referral?: boolean | string;
+  bankReferral?: boolean | string;
+  identified?: boolean | string;
+  failed_exchange?: boolean | string;
+  failedExchange?: boolean | string;
+  rep_1_sale_price?: number;
   rep_1_apn?: string;
   rep_1_close_date?: string;
   
@@ -137,6 +188,35 @@ export interface Exchange {
   urgencyLevel?: string;
   isOverdue?: boolean;
   participantCount?: number;
+  
+  // Backend structured data
+  keyDates?: {
+    day45?: string;
+    day180?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  };
+  
+  relinquishedProperty?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    propertyType?: string;
+    apn?: string;
+    escrowNumber?: string;
+    value?: number;
+    contractDate?: string;
+    contractType?: string;
+    closeDate?: string;
+    expectedClosing?: string;
+    clientVesting?: string;
+    buyerVesting?: string;
+    buyer1Name?: string;
+    buyer2Name?: string;
+    settlementAgent?: string;
+    exchangeAgreementDrafted?: string;
+  };
   
   // Timeline and status tracking
   timelineStatus?: string; // For timeline badges
@@ -203,7 +283,7 @@ export interface ExchangeExtended extends Omit<Exchange, 'exchangeNumber'> {
   exchangeValue?: number;
   relinquishedValue?: number;
   replacementValue?: number;
-  relinquishedProperty?: any; // JSONB
+  // relinquishedProperty inherited from base Exchange interface
   replacementProperties?: any; // JSONB (extended)
   complianceStatus?: 'COMPLIANT' | 'AT_RISK' | 'NON_COMPLIANT' | 'PENDING_REVIEW';
   qiCompany?: string;

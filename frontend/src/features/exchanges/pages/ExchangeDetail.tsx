@@ -35,6 +35,7 @@ import {
 import { ExchangeOverview } from '../components/ExchangeOverview';
 import { TasksList } from '../components/TasksList';
 import { DocumentsList } from '../components/DocumentsList';
+import { ExchangeTimeline } from '../components/ExchangeTimeline';
 import TaskCreateModal from '../../tasks/components/TaskCreateModal';
 
 interface TabProps {
@@ -43,119 +44,142 @@ interface TabProps {
 }
 
 const TimelineTab: React.FC<TabProps> = ({ exchange }) => {
-  const getTimelineEvents = () => {
-    const events = [];
+  // Helper function to get custom field value from PP data
+  const getCustomFieldValue = (fieldLabel: string) => {
+    // Check multiple possible locations for PP custom field data
+    const exchangeAny = exchange as any; // Type assertion for dynamic API fields
+    let customFields = null;
     
-    // Key dates
-    if (exchange.identificationDeadline) {
-      events.push({
-        date: new Date(exchange.identificationDeadline),
-        title: 'Identification Deadline',
-        type: 'deadline',
-        icon: Target,
-        color: 'text-yellow-600 bg-yellow-100'
-      });
+    if (exchangeAny.pp_custom_field_values) {
+      customFields = exchangeAny.pp_custom_field_values;
+    } else if (exchangeAny.pp_data?.custom_field_values) {
+      customFields = exchangeAny.pp_data.custom_field_values;
+    } else if (exchangeAny.ppData?.custom_field_values) {
+      customFields = exchangeAny.ppData.custom_field_values;
+    } else if (exchange.practicePartnerData?.customFields) {
+      customFields = exchange.practicePartnerData.customFields;
     }
     
-    if (exchange.exchangeDeadline) {
-      events.push({
-        date: new Date(exchange.exchangeDeadline),
-        title: 'Exchange Deadline',
-        type: 'deadline',
-        icon: Clock,
-        color: 'text-red-600 bg-red-100'
-      });
+    if (!customFields || !Array.isArray(customFields)) {
+      console.log('No custom fields found for', fieldLabel);
+      console.log('Available exchange data keys:', Object.keys(exchange));
+      return null;
     }
     
-    if (exchange.completionDeadline) {
-      events.push({
-        date: new Date(exchange.completionDeadline),
-        title: 'Expected Closing',
-        type: 'milestone',
-        icon: CheckCircle,
-        color: 'text-green-600 bg-green-100'
-      });
+    const field = customFields.find((f: any) => 
+      f.custom_field_ref?.label === fieldLabel || f.label === fieldLabel
+    );
+    
+    if (field) {
+      console.log('Found field', fieldLabel, ':', field);
+      return field?.value_date_time || field?.value_string || field?.value_number || field?.value_boolean || field?.value || null;
     }
     
-    // Sort by date
-    return events.sort((a, b) => a.date.getTime() - b.date.getTime());
+    console.log('Field not found:', fieldLabel, 'Available fields:', customFields.map((f: any) => f.custom_field_ref?.label || f.label));
+    return null;
   };
   
-  const getDaysUntil = (date: Date) => {
-    const now = new Date();
-    const diff = date.getTime() - now.getTime();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    return days;
-  };
+  // Extract timeline dates from PP custom fields or backend data
+  const exchangeAny = exchange as any;
+  const dateProceedsReceived = exchangeAny.dateProceedsReceived || getCustomFieldValue('Date Proceeds Received');
+  const closeOfEscrowDate = exchangeAny.closeOfEscrowDate || exchangeAny.relinquishedProperty?.closeDate || getCustomFieldValue('Close of Escrow Date');
+  const day45Date = exchangeAny.day45 || exchangeAny.keyDates?.day45 || getCustomFieldValue('Day 45');
+  const day180Date = exchangeAny.day180 || exchangeAny.keyDates?.day180 || getCustomFieldValue('Day 180');
+  const isIdentified = exchangeAny.identified || getCustomFieldValue('Identified?') || false;
   
-  const events = getTimelineEvents();
+  console.log('Timeline data extracted:', {
+    dateProceedsReceived,
+    closeOfEscrowDate, 
+    day45Date,
+    day180Date,
+    isIdentified
+  });
+  
+  const [propertiesIdentified, setPropertiesIdentified] = useState<boolean>(
+    exchange.metadata?.propertiesIdentified || isIdentified
+  );
+
+  const handleIdentifiedToggle = async () => {
+    try {
+      const newValue = !propertiesIdentified;
+      setPropertiesIdentified(newValue);
+      
+      // Update the exchange metadata in the backend
+      await apiService.updateExchange(exchange.id, {
+        metadata: {
+          ...exchange.metadata,
+          propertiesIdentified: newValue
+        }
+      });
+    } catch (error) {
+      console.error('Error updating properties identified status:', error);
+      setPropertiesIdentified(!propertiesIdentified); // Revert on error
+    }
+  };
   
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6">
+      {/* Enhanced Timeline Component */}
+      <ExchangeTimeline
+        startDate={exchange.startDate}
+        identificationDeadline={day45Date || exchange.identificationDeadline}
+        completionDeadline={day180Date || exchange.completionDeadline}
+        closeOfEscrowDate={closeOfEscrowDate || exchangeAny.closeOfEscrowDate}
+        dateProceedsReceived={dateProceedsReceived || exchangeAny.dateProceedsReceived}
+        status={exchange.status}
+        propertiesIdentified={propertiesIdentified}
+        showToday={true}
+      />
+      
+      {/* Properties Identification Status */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-          <Activity className="w-5 h-5 mr-2 text-blue-600" />
-          Exchange Timeline
+          <MapPin className="w-5 h-5 mr-2 text-blue-600" />
+          Properties Status
         </h3>
         
-        <div className="relative">
-          {/* Timeline line */}
-          <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-300"></div>
-          
-          {/* Timeline events */}
-          <div className="space-y-6">
-            {events.map((event, index) => {
-              const days = getDaysUntil(event.date);
-              const isPast = days < 0;
-              const isUrgent = days >= 0 && days <= 7;
-              
-              return (
-                <div key={index} className="relative flex items-start">
-                  <div className={`
-                    absolute left-4 w-8 h-8 rounded-full flex items-center justify-center
-                    ${isPast ? 'bg-gray-200' : event.color}
-                    ${isUrgent ? 'animate-pulse' : ''}
-                  `}>
-                    <event.icon className="w-4 h-4" />
-                  </div>
-                  
-                  <div className="ml-16 flex-1">
-                    <div className={`
-                      p-4 rounded-xl border-2
-                      ${isPast ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200'}
-                      ${isUrgent ? 'border-red-300 shadow-lg' : ''}
-                    `}>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h4 className={`font-semibold ${isPast ? 'text-gray-500' : 'text-gray-900'}`}>
-                            {event.title}
-                          </h4>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {event.date.toLocaleDateString('en-US', {
-                              weekday: 'long',
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
-                          </p>
-                        </div>
-                        
-                        <div className={`
-                          px-3 py-1 rounded-full text-sm font-medium
-                          ${isPast ? 'bg-gray-100 text-gray-500' : 
-                            isUrgent ? 'bg-red-100 text-red-700' : 
-                            'bg-blue-100 text-blue-700'}
-                        `}>
-                          {isPast ? 'Past' : `${days} days`}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-gray-600 mb-1">Replacement Properties</p>
+            <p className="text-lg font-medium text-gray-900">
+              {propertiesIdentified ? 'Identified' : 'Not Yet Identified'}
+            </p>
           </div>
+          
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={propertiesIdentified}
+              onChange={handleIdentifiedToggle}
+              className="sr-only"
+            />
+            <div className={`
+              w-14 h-7 rounded-full transition-colors duration-200 ease-in-out
+              ${propertiesIdentified ? 'bg-green-500' : 'bg-gray-300'}
+            `}>
+              <div className={`
+                w-6 h-6 rounded-full bg-white shadow-lg transform transition-transform duration-200 ease-in-out
+                ${propertiesIdentified ? 'translate-x-7' : 'translate-x-0.5'}
+              `} />
+            </div>
+            <span className="ml-3 text-sm font-medium text-gray-700">
+              Mark as Identified
+            </span>
+          </label>
         </div>
+        
+        {propertiesIdentified && exchange.replacementProperties && exchange.replacementProperties.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <p className="text-sm font-medium text-gray-700 mb-2">Identified Properties:</p>
+            <div className="space-y-2">
+              {exchange.replacementProperties.map((prop: any, index: number) => (
+                <div key={index} className="text-sm text-gray-600">
+                  • {prop.address} - ${prop.purchasePrice?.toLocaleString()}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Exchange Progress */}
@@ -178,24 +202,232 @@ const TimelineTab: React.FC<TabProps> = ({ exchange }) => {
               ></div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PropertiesTab: React.FC<TabProps> = ({ exchange }) => {
+  // Helper function to get custom field value from PP data
+  const getCustomFieldValue = (fieldLabel: string) => {
+    // Check multiple possible locations for PP custom field data
+    const exchangeAny = exchange as any; // Type assertion for dynamic API fields
+    let customFields = null;
+    
+    if (exchangeAny.pp_custom_field_values) {
+      customFields = exchangeAny.pp_custom_field_values;
+    } else if (exchangeAny.pp_data?.custom_field_values) {
+      customFields = exchangeAny.pp_data.custom_field_values;
+    } else if (exchangeAny.ppData?.custom_field_values) {
+      customFields = exchangeAny.ppData.custom_field_values;
+    } else if (exchange.practicePartnerData?.customFields) {
+      customFields = exchange.practicePartnerData.customFields;
+    }
+    
+    if (!customFields || !Array.isArray(customFields)) {
+      console.log('No custom fields found for', fieldLabel);
+      console.log('Available exchange data keys:', Object.keys(exchange));
+      return null;
+    }
+    
+    const field = customFields.find((f: any) => 
+      f.custom_field_ref?.label === fieldLabel || f.label === fieldLabel
+    );
+    
+    if (field) {
+      console.log('Found field', fieldLabel, ':', field);
+      return field?.value_date_time || field?.value_string || field?.value_number || field?.value_boolean || field?.value || null;
+    }
+    
+    console.log('Field not found:', fieldLabel, 'Available fields:', customFields.map((f: any) => f.custom_field_ref?.label || f.label));
+    return null;
+  };
+  
+  const isIdentified = getCustomFieldValue('Identified?') || false;
+  
+  const [propertiesIdentified, setPropertiesIdentified] = useState<boolean>(
+    exchange.metadata?.propertiesIdentified || isIdentified
+  );
+
+  const handleIdentifiedToggle = async () => {
+    try {
+      const newValue = !propertiesIdentified;
+      setPropertiesIdentified(newValue);
+      
+      // Update the exchange metadata in the backend
+      await apiService.updateExchange(exchange.id, {
+        metadata: {
+          ...exchange.metadata,
+          propertiesIdentified: newValue
+        }
+      });
+    } catch (error) {
+      console.error('Error updating properties identified status:', error);
+      setPropertiesIdentified(!propertiesIdentified); // Revert on error
+    }
+  };
+  
+  return (
+    <div className="space-y-6">
+      {/* Relinquished Property */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <Building2 className="w-5 h-5 mr-2 text-red-600" />
+          Relinquished Property
+        </h3>
+        
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-gray-600">Address</p>
+              <p className="font-medium text-gray-900">
+                {exchange.relinquishedPropertyAddress || exchange.rel_property_address || 'Not specified'}
+              </p>
+              {(exchange.rel_property_city || exchange.rel_property_state || exchange.rel_property_zip) && (
+                <p className="text-sm text-gray-600">
+                  {[exchange.rel_property_city, exchange.rel_property_state, exchange.rel_property_zip].filter(Boolean).join(', ')}
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Sale Price</p>
+              <p className="font-medium text-gray-900">
+                ${exchange.relinquishedSalePrice?.toLocaleString() || exchange.rel_value?.toLocaleString() || 'N/A'}
+              </p>
+            </div>
+          </div>
           
-          {/* Stage Progress */}
-          <div className="grid grid-cols-2 gap-4 mt-6">
-            <div className="bg-gray-50 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Documents</span>
-                <FileText className="w-4 h-4 text-gray-400" />
-              </div>
-              <p className="text-2xl font-bold text-gray-900">85%</p>
+          {exchange.rel_property_type && (
+            <div>
+              <p className="text-sm text-gray-600">Property Type</p>
+              <p className="font-medium text-gray-900">{exchange.rel_property_type}</p>
             </div>
+          )}
+          
+          {exchange.rel_apn && (
+            <div>
+              <p className="text-sm text-gray-600">APN</p>
+              <p className="font-medium text-gray-900">{exchange.rel_apn}</p>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Replacement Properties Section */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+            <MapPin className="w-5 h-5 mr-2 text-green-600" />
+            Replacement Properties
+          </h3>
+          
+          {/* Identified Toggle */}
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={propertiesIdentified}
+              onChange={handleIdentifiedToggle}
+              className="sr-only"
+            />
+            <div className={`
+              w-14 h-7 rounded-full transition-colors duration-200 ease-in-out
+              ${propertiesIdentified ? 'bg-green-500' : 'bg-gray-300'}
+            `}>
+              <div className={`
+                w-6 h-6 rounded-full bg-white shadow-lg transform transition-transform duration-200 ease-in-out
+                ${propertiesIdentified ? 'translate-x-7' : 'translate-x-0.5'}
+              `} />
+            </div>
+            <span className="ml-3 text-sm font-medium text-gray-700">
+              Properties Identified
+            </span>
+          </label>
+        </div>
+        
+        {propertiesIdentified ? (
+          <div className="space-y-3">
+            {exchange.replacementProperties && exchange.replacementProperties.length > 0 ? (
+              exchange.replacementProperties.map((prop: any, index: number) => (
+                <div key={index} className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium text-gray-900">{prop.address}</p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Purchase Price: ${prop.purchasePrice?.toLocaleString()}
+                      </p>
+                      {prop.closingDate && (
+                        <p className="text-sm text-gray-600">
+                          Closing: {new Date(prop.closingDate).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-4 bg-green-50 rounded-lg">
+                <p className="text-sm text-green-700">
+                  Properties have been identified but details are not available yet.
+                </p>
+              </div>
+            )}
             
-            <div className="bg-gray-50 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Tasks</span>
-                <CheckCircle className="w-4 h-4 text-gray-400" />
+            {/* Additional replacement property fields from PP data */}
+            {(exchange.rep_1_address || exchange.rep_1_sale_price) && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-sm font-medium text-gray-700 mb-2">Additional Properties:</p>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="font-medium text-gray-900">{exchange.rep_1_address || 'Property 1'}</p>
+                  {exchange.rep_1_sale_price && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      Sale Price: ${exchange.rep_1_sale_price.toLocaleString()}
+                    </p>
+                  )}
+                  {exchange.rep_1_close_date && (
+                    <p className="text-sm text-gray-600">
+                      Close Date: {new Date(exchange.rep_1_close_date).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
               </div>
-              <p className="text-2xl font-bold text-gray-900">67%</p>
-            </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 bg-yellow-50 rounded-lg">
+            <p className="text-sm text-yellow-700">
+              Replacement properties have not yet been identified. The deadline is approaching.
+            </p>
+          </div>
+        )}
+      </div>
+      
+      {/* Property Value Summary */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <DollarSign className="w-5 h-5 mr-2 text-blue-600" />
+          Property Value Summary
+        </h3>
+        
+        <div className="grid grid-cols-3 gap-4">
+          <div className="text-center">
+            <p className="text-sm text-gray-600">Relinquished</p>
+            <p className="text-xl font-bold text-gray-900">
+              ${exchange.relinquishedValue?.toLocaleString() || exchange.rel_value?.toLocaleString() || '0'}
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-gray-600">Replacement</p>
+            <p className="text-xl font-bold text-gray-900">
+              ${exchange.replacementValue?.toLocaleString() || '0'}
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-gray-600">Exchange Value</p>
+            <p className="text-xl font-bold text-blue-600">
+              ${exchange.exchangeValue?.toLocaleString() || exchange.exchange_value?.toLocaleString() || '0'}
+            </p>
           </div>
         </div>
       </div>
@@ -314,6 +546,261 @@ const ExchangeDetail: React.FC = () => {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   
+  // Helper function to get custom field value
+  const getCustomFieldValue = (fieldLabel: string) => {
+    if (!exchange) return null;
+    const exchangeAny = exchange as any;
+    
+    // Check direct fields first
+    const fieldMap: Record<string, string> = {
+      'Type of Exchange': 'type_of_exchange',
+      'Property Type': 'property_type',
+      'Client 1 Signatory Title': 'client_signatory_title',
+      'Bank': 'bank',
+      'Proceeds (USD)': 'proceeds',
+      'Date Proceeds Received': 'date_proceeds_received',
+      'Close of Escrow Date': 'close_of_escrow_date',
+      'Day 45': 'day_45',
+      'Day 180': 'day_180',
+      'Rel Settlement Agent': 'rel_settlement_agent',
+      'Rel Escrow Number': 'rel_escrow_number',
+      'Rep 1 Settlement Agent': 'rep_1_settlement_agent',
+      'Rep 1 Escrow Number': 'rep_1_escrow_number',
+      'Referral Source': 'referral_source',
+      'Referral Source Email': 'referral_source_email',
+      'Internal Credit To': 'internal_credit_to',
+      'Assigned To': 'assigned_to',
+      'Buyer 1 Name': 'buyer_1_name',
+      'Buyer 2 Name': 'buyer_2_name',
+      'Rep 1 Seller 1 Name': 'rep_1_seller_1_name',
+      'Rep 1 Seller 2 Name': 'rep_1_seller_2_name',
+      'Interest Check Sent': 'interest_check_sent',
+      'Bank Referral?': 'bank_referral',
+      'Identified?': 'identified',
+      'Failed Exchange?': 'failed_exchange'
+    };
+    
+    const directField = fieldMap[fieldLabel];
+    if (directField && exchangeAny[directField]) {
+      return exchangeAny[directField];
+    }
+    
+    // Check PP custom fields
+    if (exchangeAny.pp_data?.custom_field_values) {
+      const field = exchangeAny.pp_data.custom_field_values.find(
+        (f: any) => f.custom_field_ref?.label === fieldLabel
+      );
+      if (field) {
+        return field.value_string || field.value_number || field.value_date_time || 
+               field.value_boolean || field.contact_ref?.display_name;
+      }
+    }
+    
+    return null;
+  };
+  
+  // Determine exchange stage based on PP fields
+  const determineStageFromPP = () => {
+    if (!exchange) return 'pending';
+    const exchangeAny = exchange as any;
+    
+    // Check for failed exchange
+    const failedExchange = exchangeAny.failedExchange || getCustomFieldValue('Failed Exchange?');
+    if (failedExchange === 'Yes' || failedExchange === true || failedExchange === 'true') {
+      return 'CANCELLED';
+    }
+    
+    // Get key dates from backend or PP custom fields
+    const day180 = exchangeAny.day180 || exchangeAny.keyDates?.day180 || getCustomFieldValue('Day 180');
+    const day45 = exchangeAny.day45 || exchangeAny.keyDates?.day45 || getCustomFieldValue('Day 45');
+    const proceedsReceived = exchangeAny.dateProceedsReceived || getCustomFieldValue('Date Proceeds Received');
+    const closeOfEscrow = exchangeAny.closeOfEscrowDate || exchangeAny.relinquishedProperty?.closeDate || getCustomFieldValue('Close of Escrow Date');
+    const identified = exchangeAny.identified || getCustomFieldValue('Identified?');
+    const rep1Docs = exchangeAny.rep1DocsDraftedOn || getCustomFieldValue('Rep 1 Docs Drafted on');
+    const relContract = exchangeAny.relContractDate || exchangeAny.relinquishedProperty?.contractDate || getCustomFieldValue('Rel Contract Date');
+    const exchangeAgreement = exchangeAny.exchangeAgreementDrafted || exchangeAny.relinquishedProperty?.exchangeAgreementDrafted || getCustomFieldValue('Exchange Agreement Drafted');
+    
+    const now = new Date();
+    
+    // Check stages in order
+    if (day180 && new Date(day180) < now) {
+      return 'COMPLETED';
+    }
+    
+    if (rep1Docs) {
+      return 'under_contract';
+    }
+    
+    if (identified === 'Yes' || identified === true || identified === 'true') {
+      return 'property_identified';
+    }
+    
+    if (day45 && new Date(day45) < now) {
+      return 'identification_open';
+    }
+    
+    if (proceedsReceived) {
+      return 'funds_received';
+    }
+    
+    if (closeOfEscrow) {
+      return 'exchange_created';
+    }
+    
+    if (relContract) {
+      return 'started';
+    }
+    
+    return exchange?.status || 'PENDING';
+  };
+  
+  // Extract all participants with correct roles
+  const extractParticipants = () => {
+    if (!exchange) return [];
+    const participants: any[] = [];
+    const exchangeAny = exchange as any;
+    
+    // Extract client from PP data
+    const clientVesting = exchangeAny.clientVesting || exchangeAny.relinquishedProperty?.clientVesting || getCustomFieldValue('Client Vesting');
+    if (clientVesting) {
+      participants.push({
+        display_name: clientVesting,
+        role: 'Client',
+        email: exchange.client?.email,
+        signatory_title: exchangeAny.clientSignatoryTitle || getCustomFieldValue('Client 1 Signatory Title'),
+        type: 'primary'
+      });
+    } else if (exchange.client) {
+      participants.push({
+        display_name: `${exchange.client.firstName} ${exchange.client.lastName}`,
+        role: 'Client',
+        email: exchange.client.email,
+        type: 'primary'
+      });
+    }
+    
+    // Extract assigned user/coordinator - check email domain for Peak Exchange
+    const assignedTo = exchangeAny.assignedTo || getCustomFieldValue('Assigned To');
+    if (assignedTo) {
+      const email = exchangeAny.practicePartnerData?.assignedUsers?.[0]?.email_address || 
+                   exchangeAny.ppData?.assigned_to_users?.[0]?.email_address;
+      const isCoordinator = email?.includes('@peakexchange.com');
+      participants.push({
+        display_name: assignedTo,
+        role: isCoordinator ? 'Coordinator' : 'Assigned User',
+        email: email,
+        type: 'internal'
+      });
+    } else if (exchange.coordinator) {
+      // Fall back to coordinator from backend
+      const coord = exchange.coordinator as any;
+      participants.push({
+        display_name: `${coord.firstName || coord.first_name} ${coord.lastName || coord.last_name}`,
+        role: 'Coordinator',
+        email: coord.email,
+        type: 'internal'
+      });
+    }
+    
+    // Extract referral source
+    const referral = exchangeAny.referralSource || getCustomFieldValue('Referral Source');
+    if (referral) {
+      participants.push({
+        display_name: referral,
+        role: 'Referral',
+        email: exchangeAny.referralSourceEmail || getCustomFieldValue('Referral Source Email'),
+        type: 'referral'
+      });
+    }
+    
+    // Extract REL settlement agent
+    const relAgent = exchangeAny.relSettlementAgent || exchangeAny.settlementAgent || 
+                    exchangeAny.relinquishedProperty?.settlementAgent || getCustomFieldValue('Rel Settlement Agent');
+    if (relAgent) {
+      participants.push({
+        display_name: relAgent,
+        role: 'REL Escrow',
+        escrow_number: exchangeAny.relEscrowNumber || exchangeAny.relinquishedProperty?.escrowNumber || getCustomFieldValue('Rel Escrow Number'),
+        type: 'escrow'
+      });
+    }
+    
+    // Extract REP settlement agent
+    const repAgent = exchangeAny.rep1SettlementAgent || getCustomFieldValue('Rep 1 Settlement Agent');
+    if (repAgent) {
+      participants.push({
+        display_name: repAgent,
+        role: 'REP Escrow',
+        escrow_number: exchangeAny.rep1EscrowNumber || getCustomFieldValue('Rep 1 Escrow Number'),
+        type: 'escrow'
+      });
+    }
+    
+    // Extract buyers from PP data
+    const buyer1 = exchangeAny.buyer1Name || exchangeAny.relinquishedProperty?.buyer1Name || getCustomFieldValue('Buyer 1 Name');
+    const buyer2 = exchangeAny.buyer2Name || exchangeAny.relinquishedProperty?.buyer2Name || getCustomFieldValue('Buyer 2 Name');
+    
+    if (buyer1) {
+      participants.push({
+        display_name: buyer1,
+        role: 'Buyer',
+        type: 'transaction'
+      });
+    }
+    
+    if (buyer2 && buyer2 !== buyer1) {
+      participants.push({
+        display_name: buyer2,
+        role: 'Buyer',
+        type: 'transaction'
+      });
+    }
+    
+    // Extract sellers
+    const seller1 = exchangeAny.rep1Seller1Name || getCustomFieldValue('Rep 1 Seller 1 Name');
+    const seller2 = exchangeAny.rep1Seller2Name || getCustomFieldValue('Rep 1 Seller 2 Name');
+    
+    if (seller1) {
+      participants.push({
+        display_name: seller1,
+        role: 'Seller',
+        type: 'transaction'
+      });
+    }
+    
+    if (seller2 && seller2 !== seller1) {
+      participants.push({
+        display_name: seller2,
+        role: 'Seller',
+        type: 'transaction'
+      });
+    }
+    
+    // Extract bank contact
+    const bank = exchangeAny.bank || getCustomFieldValue('Bank');
+    const bankReferral = exchangeAny.bankReferral || getCustomFieldValue('Bank Referral?');
+    if (bank) {
+      participants.push({
+        display_name: bank,
+        role: 'Bank',
+        is_referral: bankReferral === 'Yes' || bankReferral === true,
+        type: 'financial'
+      });
+    }
+    
+    // Extract internal credit
+    const internalCredit = exchangeAny.internalCreditTo || getCustomFieldValue('Internal Credit To');
+    if (internalCredit) {
+      participants.push({
+        display_name: internalCredit,
+        role: 'Internal Credit',
+        type: 'internal'
+      });
+    }
+    
+    return participants;
+  };
+  
   useEffect(() => {
     if (id) {
       loadExchange();
@@ -324,7 +811,17 @@ const ExchangeDetail: React.FC = () => {
     try {
       setLoading(true);
       const data = await getExchange(id!);
-      setExchange(data);
+      if (data) {
+        console.log('🔍 Exchange Data Loaded:', data);
+        console.log('🔍 PP Matter Number:', data.ppMatterNumber);
+        console.log('🔍 Type of Exchange:', data.typeOfExchange);
+        console.log('🔍 PP Data:', (data as any).ppData);
+        console.log('🔍 Practice Partner Data:', (data as any).practicePartnerData);
+        console.log('🔍 Relinquished Property:', data.relinquishedProperty);
+        console.log('🔍 Key Dates:', data.keyDates);
+        console.log('🔍 All Exchange Keys:', Object.keys(data));
+        setExchange(data);
+      }
       
       // Load tasks for this exchange
       loadTasks();
@@ -408,6 +905,7 @@ const ExchangeDetail: React.FC = () => {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Building2 },
     { id: 'timeline', label: 'Timeline', icon: Activity },
+    { id: 'properties', label: 'Properties', icon: MapPin },
     { id: 'tasks', label: 'Tasks', icon: CheckCircle },
     { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'messages', label: 'Messages', icon: MessageSquare }
@@ -439,47 +937,74 @@ const ExchangeDetail: React.FC = () => {
                 Back to Exchanges
               </button>
               
+              {/* Display only PP Matter Number with Exchange Name */}
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2">
-                {exchange.pp_display_name || exchange.name || `Exchange #${exchange.exchangeNumber}`}
+                <span className="text-yellow-300">
+                  {exchange.ppMatterNumber || (exchange as any).practicePartnerData?.matterNumber ? `#${exchange.ppMatterNumber || (exchange as any).practicePartnerData?.matterNumber} - ` : ''}
+                  {exchange.ppDisplayName || (exchange as any).practicePartnerData?.matterName || exchange.name || `Exchange ${exchange.exchangeNumber}`}
+                </span>
               </h1>
+              {/* Remove duplicate exchange ID - keep only one */}
+              {exchange.exchangeNumber && !exchange.ppMatterNumber && !(exchange as any).practicePartnerData?.matterNumber && (
+                <p className="text-xs text-blue-200">ID: {exchange.exchangeNumber}</p>
+              )}
               
               <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-blue-100">
-                <span className="flex items-center">
-                  <Users className="w-4 h-4 mr-1" />
-                  {exchange.client?.firstName} {exchange.client?.lastName}
-                </span>
-                {exchange.type_of_exchange && (
-                  <span className="flex items-center">
+                {/* Display Exchange Type */}
+                {(exchange.typeOfExchange || getCustomFieldValue('Type of Exchange')) && (
+                  <span className="flex items-center bg-blue-800/50 px-2 py-1 rounded">
                     <Building2 className="w-4 h-4 mr-1" />
-                    {exchange.type_of_exchange}
+                    {exchange.typeOfExchange || getCustomFieldValue('Type of Exchange')} Exchange
                   </span>
                 )}
-                {exchange.bank && (
-                  <span className="flex items-center">
+                {/* Display Property Type */}
+                {(exchange.propertyType || exchange.relPropertyType || getCustomFieldValue('Property Type')) && (
+                  <span className="flex items-center bg-indigo-800/50 px-2 py-1 rounded">
+                    <MapPin className="w-4 h-4 mr-1" />
+                    {exchange.propertyType || exchange.relPropertyType || getCustomFieldValue('Property Type')}
+                  </span>
+                )}
+                {/* Display Client with Signatory Title */}
+                <span className="flex items-center bg-purple-800/50 px-2 py-1 rounded">
+                  <Users className="w-4 h-4 mr-1" />
+                  {exchange.clientVesting || exchange.relinquishedProperty?.clientVesting || (exchange.client?.firstName && `${exchange.client.firstName} ${exchange.client.lastName}`)}
+                  {(exchange.clientSignatoryTitle || getCustomFieldValue('Client 1 Signatory Title')) && 
+                    ` (${exchange.clientSignatoryTitle || getCustomFieldValue('Client 1 Signatory Title')})`}
+                </span>
+                {/* Display Bank */}
+                {(exchange.bank || getCustomFieldValue('Bank')) && (
+                  <span className="flex items-center bg-green-800/50 px-2 py-1 rounded">
                     <DollarSign className="w-4 h-4 mr-1" />
-                    {exchange.bank}
+                    {exchange.bank || getCustomFieldValue('Bank')}
                   </span>
                 )}
-                {exchange.proceeds && (
-                  <span className="flex items-center">
+                {/* Display Proceeds prominently */}
+                {(exchange.proceeds || getCustomFieldValue('Proceeds (USD)')) && (
+                  <span className="flex items-center bg-yellow-600/70 px-3 py-1 rounded font-semibold">
                     <Banknote className="w-4 h-4 mr-1" />
-                    Proceeds: ${exchange.proceeds.toLocaleString()}
+                    ${((exchange.proceeds || getCustomFieldValue('Proceeds (USD)')) || 0).toLocaleString()}
                   </span>
                 )}
               </div>
             </div>
             
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Status Badge */}
+              {/* Status Badge - Auto-determined from PP fields */}
               <div className={`
                 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-medium flex items-center gap-1 sm:gap-2 text-xs sm:text-sm
-                ${(exchange.status === 'In Progress' || exchange.status === '45D' || exchange.status === '180D') ? 'bg-green-500 text-white' :
-                  exchange.status === 'PENDING' ? 'bg-yellow-500 text-white' :
-                  exchange.status === 'COMPLETED' ? 'bg-blue-500 text-white' :
-                  'bg-gray-500 text-white'}
+                ${(() => {
+                  const stage = determineStageFromPP();
+                  if (stage === 'COMPLETED' || stage === 'Completed') return 'bg-green-500 text-white';
+                  if (stage === 'CANCELLED' || stage === 'Cancelled' || stage === 'TERMINATED') return 'bg-red-500 text-white';
+                  if (stage.includes('property_identified') || stage.includes('under_contract')) return 'bg-blue-500 text-white';
+                  if (stage.includes('funds_received') || stage.includes('identification_open')) return 'bg-indigo-500 text-white';
+                  if (stage === 'PENDING' || stage === 'pending') return 'bg-yellow-500 text-white';
+                  if (stage === '45D' || stage === '180D' || stage === 'In Progress') return 'bg-indigo-500 text-white';
+                  return 'bg-gray-500 text-white';
+                })()}
               `}>
                 <Shield className="w-4 h-4" />
-                <span>{exchange.status}</span>
+                <span>{determineStageFromPP().replace(/_/g, ' ').toUpperCase()}</span>
               </div>
               
               {/* Days remaining - now using PP dates */}
@@ -522,19 +1047,7 @@ const ExchangeDetail: React.FC = () => {
           </div>
           
           
-          {/* Progress Bar */}
-          <div className="mt-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-blue-100">Exchange Progress</span>
-              <span className="text-sm font-semibold">{exchange.progress || 0}%</span>
-            </div>
-            <div className="w-full bg-blue-800/30 rounded-full h-2">
-              <div 
-                className="bg-gradient-to-r from-green-400 to-emerald-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${exchange.progress || 0}%` }}
-              ></div>
-            </div>
-          </div>
+          {/* Removed progress bar - redundant with timeline */}
         </div>
         
         {/* Tabs */}
@@ -563,8 +1076,9 @@ const ExchangeDetail: React.FC = () => {
           
           {/* Tab Content */}
           <div className="p-3 sm:p-6">
-            {activeTab === 'overview' && <ExchangeOverview exchange={exchange as any} participants={[]} tasks={tasks} documents={[]} />}
+            {activeTab === 'overview' && <ExchangeOverview exchange={exchange as any} participants={extractParticipants()} tasks={tasks} documents={[]} />}
             {activeTab === 'timeline' && <TimelineTab exchange={exchange} />}
+            {activeTab === 'properties' && <PropertiesTab exchange={exchange} />}
             {activeTab === 'tasks' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">

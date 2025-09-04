@@ -89,6 +89,13 @@ const ParticipantAvatars: React.FC<{
       case 'client': return 'bg-green-500 text-white';
       case 'third_party': return 'bg-purple-500 text-white';
       case 'agency': return 'bg-orange-500 text-white';
+      case 'rel_escrow': return 'bg-indigo-500 text-white';
+      case 'rep_escrow': return 'bg-indigo-500 text-white';
+      case 'buyer': return 'bg-teal-500 text-white';
+      case 'seller': return 'bg-cyan-500 text-white';
+      case 'referral': return 'bg-yellow-500 text-white';
+      case 'internal_credit': return 'bg-pink-500 text-white';
+      case 'bank': return 'bg-gray-600 text-white';
       default: return 'bg-gray-500 text-white';
     }
   };
@@ -100,6 +107,13 @@ const ParticipantAvatars: React.FC<{
       case 'client': return 'Client';
       case 'third_party': return '3rd Party';
       case 'agency': return 'Agency';
+      case 'rel_escrow': return 'REL Escrow';
+      case 'rep_escrow': return 'REP Escrow';
+      case 'buyer': return 'Buyer';
+      case 'seller': return 'Seller';
+      case 'referral': return 'Referral';
+      case 'internal_credit': return 'Internal Credit';
+      case 'bank': return 'Bank';
       default: return role;
     }
   };
@@ -780,11 +794,11 @@ const LegalSettlementTab: React.FC<TabProps> = ({ exchange }) => {
           <div className="space-y-3">
             <div>
               <label className="text-sm font-medium text-gray-600">Type of Exchange</label>
-              <p className="text-gray-900">{formatValue(ex.type_of_exchange)}</p>
+              <p className="text-gray-900">{formatValue(ex.typeOfExchange || ex.type_of_exchange)}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-600">Failed Exchange?</label>
-              <p className="text-gray-900">{ex.failed_exchange ? 'Yes' : 'No'}</p>
+              <p className="text-gray-900">{(ex.failedExchange || ex.failed_exchange) ? 'Yes' : 'No'}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-600">Identified?</label>
@@ -848,7 +862,7 @@ const LegalSettlementTab: React.FC<TabProps> = ({ exchange }) => {
           <div className="space-y-3">
             <div>
               <label className="text-sm font-medium text-gray-600">Client Vesting</label>
-              <p className="text-gray-900">{formatValue(ex.client_vesting)}</p>
+              <p className="text-gray-900">{formatValue(ex.clientVesting || ex.client_vesting)}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-600">Client 1 Signatory Title</label>
@@ -1030,11 +1044,11 @@ const ContactsReferralsTab: React.FC<TabProps> = ({ exchange }) => {
             </div>
             <div>
               <label className="text-sm font-medium text-gray-600">Matter Name</label>
-              <p className="text-gray-900">{ex.matter_name || ex.pp_display_name || exchange.name || 'Not specified'}</p>
+              <p className="text-gray-900">{ex.matterName || ex.ppDisplayName || ex.pp_display_name || exchange.name || 'Not specified'}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-600">PP Matter Number</label>
-              <p className="text-gray-900 font-mono">{ex.pp_matter_number || '7981'}</p>
+              <p className="text-gray-900 font-mono">{ex.ppMatterNumber || ex.pp_matter_number || '7981'}</p>
             </div>
           </div>
           <div className="space-y-3">
@@ -1494,7 +1508,7 @@ const PeopleCard: React.FC<{ exchange: Exchange; participants: any[] }> = ({ exc
               </div>
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Matter Name</span>
-                <p>{ex.matter_name || ex.pp_display_name || exchange.name}</p>
+                <p>{ex.matterName || ex.ppDisplayName || ex.pp_display_name || exchange.name}</p>
               </div>
             </div>
             <div className="space-y-2">
@@ -1577,7 +1591,7 @@ const PeopleCard: React.FC<{ exchange: Exchange; participants: any[] }> = ({ exc
               </div>
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Client Vesting</span>
-                <p className="text-sm">{ex.client_vesting || 'Not specified'}</p>
+                <p className="text-sm">{ex.clientVesting || ex.client_vesting || 'Not specified'}</p>
               </div>
             </div>
           </div>
@@ -1600,7 +1614,7 @@ const LegalCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
     <div className="flex items-center space-x-4 text-sm">
       <span className="flex items-center">
         <Scale className="w-4 h-4 mr-1 text-indigo-500" />
-        Type: {ex.type_of_exchange || 'Not specified'}
+        Type: {ex.typeOfExchange || ex.type_of_exchange || 'Not specified'}
       </span>
       <span className="flex items-center">
         <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
@@ -1627,11 +1641,11 @@ const LegalCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
             <div className="space-y-2">
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Type of Exchange</span>
-                <p className="font-medium">{ex.type_of_exchange || 'Not specified'}</p>
+                <p className="font-medium">{ex.typeOfExchange || ex.type_of_exchange || 'Not specified'}</p>
               </div>
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Failed Exchange</span>
-                <p>{ex.failed_exchange ? 'Yes' : 'No'}</p>
+                <p>{(ex.failedExchange || ex.failed_exchange) ? 'Yes' : 'No'}</p>
               </div>
             </div>
             <div className="space-y-2">
@@ -1705,7 +1719,7 @@ const LegalCard: React.FC<{ exchange: Exchange }> = ({ exchange }) => {
             <div className="space-y-2">
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Client Vesting</span>
-                <p className="text-sm">{ex.client_vesting || 'Not specified'}</p>
+                <p className="text-sm">{ex.clientVesting || ex.client_vesting || 'Not specified'}</p>
               </div>
               <div>
                 <span className="text-xs text-gray-500 uppercase tracking-wide">Client Signatory Title</span>
@@ -1830,14 +1844,186 @@ const ExchangeDetailEnhanced: React.FC = () => {
     }
   }, [id]);
 
-  const loadParticipants = useCallback(async () => {
+  // Extract participants from PP fields
+  const extractParticipantsFromPP = (exchange: Exchange) => {
+    const ppParticipants: any[] = [];
+    const ex = exchange as any;
+    
+    // Extract Client from PP fields
+    if (ex.clientVesting || ex.client_vesting) {
+      ppParticipants.push({
+        firstName: ex.clientVesting || ex.client_vesting,
+        lastName: '',
+        role: 'client',
+        email: '',
+        title: ex.clientSignatoryTitle || ex.client_signatory_title || '',
+        fromPP: true
+      });
+    }
+    
+    // Extract REL Settlement Agent with escrow number
+    if (ex.relSettlementAgent || ex.rel_settlement_agent || ex.settlementAgent || ex.settlement_agent) {
+      ppParticipants.push({
+        firstName: ex.relSettlementAgent || ex.rel_settlement_agent || ex.settlementAgent || ex.settlement_agent,
+        lastName: `(Escrow: ${ex.relEscrowNumber || ex.rel_escrow_number || 'N/A'})`,
+        role: 'rel_escrow',
+        email: '',
+        fromPP: true
+      });
+    }
+    
+    // Extract REP Settlement Agent with escrow number
+    if (ex.rep1SettlementAgent || ex.rep_1_settlement_agent) {
+      ppParticipants.push({
+        firstName: ex.rep1SettlementAgent || ex.rep_1_settlement_agent,
+        lastName: `(Escrow: ${ex.rep1EscrowNumber || ex.rep_1_escrow_number || 'N/A'})`,
+        role: 'rep_escrow',
+        email: '',
+        fromPP: true
+      });
+    }
+    
+    // Extract Buyers
+    if (ex.buyer1Name || ex.buyer_1_name) {
+      ppParticipants.push({
+        firstName: ex.buyer1Name || ex.buyer_1_name,
+        lastName: '',
+        role: 'buyer',
+        fromPP: true
+      });
+    }
+    
+    if (ex.buyer2Name || ex.buyer_2_name) {
+      ppParticipants.push({
+        firstName: ex.buyer2Name || ex.buyer_2_name,
+        lastName: '',
+        role: 'buyer',
+        fromPP: true
+      });
+    }
+    
+    // Extract Sellers
+    if (ex.rep1Seller1Name || ex.rep_1_seller_1_name) {
+      ppParticipants.push({
+        firstName: ex.rep1Seller1Name || ex.rep_1_seller_1_name,
+        lastName: '',
+        role: 'seller',
+        fromPP: true
+      });
+    }
+    
+    if (ex.rep1Seller2Name || ex.rep_1_seller_2_name) {
+      ppParticipants.push({
+        firstName: ex.rep1Seller2Name || ex.rep_1_seller_2_name,
+        lastName: '',
+        role: 'seller',
+        fromPP: true
+      });
+    }
+    
+    // Extract Referral Source
+    if (ex.referralSource || ex.referral_source) {
+      ppParticipants.push({
+        firstName: ex.referralSource || ex.referral_source,
+        lastName: '',
+        role: 'referral',
+        email: ex.referralSourceEmail || ex.referral_source_email || '',
+        fromPP: true
+      });
+    }
+    
+    // Extract Internal Credit
+    if (ex.internalCreditTo || ex.internal_credit_to) {
+      ppParticipants.push({
+        firstName: ex.internalCreditTo || ex.internal_credit_to,
+        lastName: '',
+        role: 'internal_credit',
+        fromPP: true
+      });
+    }
+    
+    // Extract Bank
+    if (ex.bank) {
+      ppParticipants.push({
+        firstName: ex.bank,
+        lastName: '',
+        role: 'bank',
+        fromPP: true
+      });
+    }
+    
+    return ppParticipants;
+  };
+  
+  // Auto-determine stage from PP fields
+  const determineStageFromPP = (exchange: Exchange): string => {
+    const ex = exchange as any;
+    
+    // Check if exchange is completed
+    if (ex.status === 'COMPLETED' || ex.status === 'Completed') {
+      return 'COMPLETED';
+    }
+    
+    // Check if 180-day deadline has passed
+    const day180 = ex.day180 || ex.day_180;
+    if (day180) {
+      const deadline180 = new Date(day180);
+      if (new Date() > deadline180) {
+        return 'TERMINATED';
+      }
+    }
+    
+    // Check if properties have been identified
+    if (ex.identified === true || ex.identified === 'true' || ex.identified === 'Yes') {
+      // Check if we're past 45-day deadline
+      const day45 = ex.day45 || ex.day_45;
+      if (day45) {
+        const deadline45 = new Date(day45);
+        if (new Date() > deadline45) {
+          return '180D'; // In 180-day period
+        } else {
+          return '45D'; // Still in 45-day identification period
+        }
+      }
+      return '180D'; // Properties identified, assume in 180-day period
+    }
+    
+    // Check if exchange has started (proceeds received)
+    if (ex.dateProceedsReceived || ex.date_proceeds_received) {
+      return '45D'; // Started but not yet identified
+    }
+    
+    // Default to pending
+    return 'PENDING';
+  };
+  
+  const loadParticipants = useCallback(async (exchangeData?: Exchange | null) => {
     if (!id) return;
     try {
       console.log('📥 Loading participants for exchange:', id);
       const response = await apiService.get(`/exchanges/${id}/participants`);
-      const participantsList = Array.isArray(response) ? response : (response.participants || response.data || []);
-      console.log('✅ Loaded participants:', participantsList);
-      setParticipants(participantsList);
+      let participantsList = Array.isArray(response) ? response : (response.participants || response.data || []);
+      
+      // Check for coordinator by @peakexchange.com email
+      participantsList = participantsList.map((p: any) => {
+        if (p.email && p.email.includes('@peakexchange.com')) {
+          return { ...p, role: 'coordinator' };
+        }
+        return p;
+      });
+      
+      // If exchange data is provided or available in state, extract PP participants
+      const exchangeToUse = exchangeData || exchange;
+      if (exchangeToUse) {
+        const ppParticipants = extractParticipantsFromPP(exchangeToUse);
+        // Merge PP participants with API participants
+        const mergedParticipants = [...participantsList, ...ppParticipants];
+        console.log('✅ Loaded participants with PP data:', mergedParticipants);
+        setParticipants(mergedParticipants);
+      } else {
+        console.log('✅ Loaded participants:', participantsList);
+        setParticipants(participantsList);
+      }
     } catch (error) {
       console.error('Error loading participants:', error);
       setParticipants([]);
@@ -1898,7 +2084,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
           console.error('Error loading documents:', err);
           setDocuments([]);
         }),
-        loadParticipants().catch(err => {
+        loadParticipants(validatedData).catch(err => {
           console.error('Error loading participants:', err);
           setParticipants([]);
         })
@@ -1939,14 +2125,14 @@ const ExchangeDetailEnhanced: React.FC = () => {
     const handleParticipantAdded = (data: any) => {
       console.log('🔥 Participant added:', data);
       if (data.exchangeId === id) {
-        loadParticipants(); // Reload participants
+        loadParticipants(exchange || undefined); // Reload participants
       }
     };
 
     const handleParticipantRemoved = (data: any) => {
       console.log('🔥 Participant removed:', data);
       if (data.exchangeId === id) {
-        loadParticipants(); // Reload participants
+        loadParticipants(exchange || undefined); // Reload participants
       }
     };
 
@@ -2056,7 +2242,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
       if (response.success) {
         console.log(`✅ Successfully removed ${participantName} from exchange`);
         // Reload participants to update the list
-        await loadParticipants();
+        await loadParticipants(exchange || undefined);
         // Show success message
         alert(`Successfully removed ${participantName} from the exchange`);
       } else {
@@ -2152,9 +2338,9 @@ const ExchangeDetailEnhanced: React.FC = () => {
       'Basic Information': [
         { label: 'Exchange ID', value: ex.id, type: undefined },
         { label: 'Exchange Number', value: ex.exchangeNumber || ex.exchange_number, type: undefined },
-        { label: 'Name', value: ex.pp_display_name || ex.name, type: undefined },
+        { label: 'Name', value: ex.ppDisplayName || ex.pp_display_name || ex.name, type: undefined },
         { label: 'Status', value: ex.status, type: undefined },
-        { label: 'Type of Exchange', value: ex.type_of_exchange || ex.exchangeType || ex.exchange_type, type: undefined },
+        { label: 'Type of Exchange', value: ex.typeOfExchange || ex.type_of_exchange || ex.exchangeType || ex.exchange_type, type: undefined },
         { label: 'Bank', value: ex.bank, type: undefined },
         { label: 'Priority', value: ex.priority, type: undefined },
         { label: 'Active', value: ex.isActive || ex.is_active ? 'Yes' : 'No', type: undefined }
@@ -2214,7 +2400,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
       'Buyer Information': [
         { label: 'Buyer 1 Name', value: ex.buyer_1_name, type: undefined },
         { label: 'Buyer 2 Name', value: ex.buyer_2_name, type: undefined },
-        { label: 'Client Vesting', value: ex.client_vesting, type: undefined }
+        { label: 'Client Vesting', value: ex.clientVesting || ex.client_vesting, type: undefined }
       ],
       'Communication': [
         { label: 'Chat Enabled', value: ex.chatEnabled || ex.chat_enabled ? 'Yes' : 'No', type: undefined },
@@ -2294,7 +2480,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
               </button>
               
               <div className="flex items-center gap-3">
-                <StatusIndicator status={exchange.status} daysRemaining={daysUntilClosing || undefined} />
+                <StatusIndicator status={determineStageFromPP(exchange)} daysRemaining={daysUntilClosing || undefined} />
                 
                 {/* Open in New Tab Button */}
                 <button
@@ -2328,36 +2514,26 @@ const ExchangeDetailEnhanced: React.FC = () => {
               <div className="flex-1">
                 {/* Prominent Exchange Number Display */}
                 <div className="flex items-start gap-4 mb-3">
-                  <div className={`text-white px-4 py-2 rounded-lg ${
-                    ((exchange.status as string) === 'COMPLETED' || (exchange.status as string) === 'Completed') 
-                      ? 'bg-green-600' 
-                      : calculateExchangeProgress(exchange) === 100
-                      ? 'bg-red-600'
-                      : 'bg-blue-600'
-                  }`}>
-                    <span className="text-2xl font-bold">
-                      {((exchange.status as string) === 'COMPLETED' || (exchange.status as string) === 'Completed') && '✓ '}
-                      {formatExchangeNumber(exchange.exchangeNumber || exchange.id)}
-                    </span>
-                  </div>
+                  {/* Only show PP Matter Number when available */}
+                  {(exchange.ppMatterNumber || exchange.pp_matter_number) && (
+                    <div className="text-white px-4 py-2 rounded-lg bg-blue-600">
+                      <span className="text-2xl font-bold">
+                        #{exchange.ppMatterNumber || exchange.pp_matter_number}
+                      </span>
+                    </div>
+                  )}
                   <div>
-                    <h1 className="text-2xl font-bold text-gray-900">
-                      {exchange.name || getExchangeDisplayName(exchange)}
+                    <h1 className="text-3xl font-bold text-gray-900">
+                      <span className="text-yellow-500">
+                        {exchange.ppDisplayName || exchange.pp_display_name || exchange.name || getExchangeDisplayName(exchange)}
+                      </span>
                     </h1>
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      {((exchange.status as string) === 'COMPLETED' || (exchange.status as string) === 'Completed') && <span>Completed Exchange</span>}
-                      {calculateExchangeProgress(exchange) === 100 && (exchange.status as string) !== 'COMPLETED' && (exchange.status as string) !== 'Completed' && <span>Overdue Exchange</span>}
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(exchange.id);
-                          // You might want to add a toast notification here
-                        }}
-                        className="inline-flex items-center px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-                        title="Click to copy Exchange ID"
-                      >
-                        <Hash className="w-4 h-4 mr-1 text-gray-600" />
-                        <span className="font-mono">{exchange.id}</span>
-                      </button>
+                    <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                      {((exchange.status as string) === 'COMPLETED' || (exchange.status as string) === 'Completed') && <span>✓ Completed Exchange</span>}
+                      {/* Only show exchange ID if no PP Matter Number exists */}
+                      {!(exchange.ppMatterNumber || exchange.pp_matter_number) && exchange.exchangeNumber && (
+                        <span className="font-mono text-gray-400">ID: {exchange.exchangeNumber}</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2380,34 +2556,44 @@ const ExchangeDetailEnhanced: React.FC = () => {
                     <Calendar className="w-4 h-4 mr-1" />
                     {new Date(exchange.createdAt || '').toLocaleDateString()}
                   </span>
-                  <span className="flex items-center">
+                  
+                  {/* Exchange Type Badge */}
+                  {(exchange.typeOfExchange || exchange.type_of_exchange) && (
+                    <span className="flex items-center bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                      <Briefcase className="w-4 h-4 mr-1" />
+                      {exchange.typeOfExchange || exchange.type_of_exchange}
+                    </span>
+                  )}
+                  
+                  {/* Property Type Badge */}
+                  {(exchange.propertyType || exchange.property_type || exchange.relPropertyType) && (
+                    <span className="flex items-center bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
+                      <MapPin className="w-4 h-4 mr-1" />
+                      {exchange.propertyType || exchange.property_type || exchange.relPropertyType}
+                    </span>
+                  )}
+                  
+                  {/* Exchange Value - Use actual proceeds */}
+                  <span className="flex items-center bg-yellow-100 text-yellow-800 px-2 py-1 rounded font-semibold">
                     <DollarSign className="w-4 h-4 mr-1" />
-                    {exchange.exchangeValue 
-                      ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(exchange.exchangeValue)
+                    {(exchange as any).proceeds || (exchange as any).relValue || exchange.exchangeValue 
+                      ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(
+                          (exchange as any).proceeds || (exchange as any).relValue || exchange.exchangeValue
+                        )
                       : 'Value TBD'
                     }
                   </span>
-                </div>
-
-                {/* Progress indicator */}
-                <div className="mt-2">
-                  <div className="flex items-center space-x-2">
-                    <div className="flex-1 bg-gray-200 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full transition-all duration-300 ${
-                          ((exchange.status as string) === 'COMPLETED' || (exchange.status as string) === 'Completed')
-                            ? 'bg-green-600'
-                            : calculateExchangeProgress(exchange) >= 99
-                            ? 'bg-red-600'
-                            : 'bg-blue-600'
-                        }`}
-                        style={{ width: `${calculateExchangeProgress(exchange)}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-sm text-gray-600 font-medium">
-                      {calculateExchangeProgress(exchange)}%
+                  
+                  {/* Client Signatory Title */}
+                  {(exchange.clientSignatoryTitle || exchange.client_signatory_title) && (
+                    <span className="flex items-center bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                      <Users className="w-4 h-4 mr-1" />
+                      {exchange.clientVesting || exchange.client_vesting || 
+                       (exchange.client ? `${exchange.client.firstName || (exchange.client as any).first_name} ${exchange.client.lastName || (exchange.client as any).last_name}` : '')}
+                      {' - '}
+                      {exchange.clientSignatoryTitle || exchange.client_signatory_title}
                     </span>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -2423,9 +2609,12 @@ const ExchangeDetailEnhanced: React.FC = () => {
           {/* Full Timeline Display - FIRST for clear deadline visibility */}
           <div className="mb-6">
             <ExchangeTimeline
-              startDate={exchange.startDate || exchange.createdAt}
-              identificationDeadline={exchange.identificationDeadline}
-              completionDeadline={exchange.completionDeadline || exchange.exchangeDeadline}
+              startDate={(exchange as any).dateProceedsReceived || (exchange as any).date_proceeds_received || exchange.startDate || exchange.createdAt}
+              identificationDeadline={(exchange as any).day45 || (exchange as any).day_45 || exchange.identificationDeadline}
+              completionDeadline={(exchange as any).day180 || (exchange as any).day_180 || exchange.completionDeadline || exchange.exchangeDeadline}
+              closeOfEscrowDate={(exchange as any).closeOfEscrowDate || (exchange as any).close_of_escrow_date}
+              dateProceedsReceived={(exchange as any).dateProceedsReceived || (exchange as any).date_proceeds_received}
+              propertiesIdentified={(exchange as any).identified === true || (exchange as any).identified === 'true' || (exchange as any).identified === 'Yes'}
               status={exchange.status}
               compact={false}
               showToday={true}
@@ -2551,7 +2740,7 @@ const ExchangeDetailEnhanced: React.FC = () => {
           onClose={() => {
             setShowUserManagement(false);
             // Refresh participants when closing the modal
-            loadParticipants();
+            loadParticipants(exchange || undefined);
           }}
         />
       )}
